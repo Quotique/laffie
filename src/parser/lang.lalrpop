@@ -1,0 +1,91 @@
+//use std::str::FromStr;
+use parser::syntax_tree::Node;
+
+grammar;
+
+pub Statements = Vector<Statement, Semicolon>;
+
+Vector<T, Delim> : Vec<T> = {
+    <v:(<T> Delim)*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            let mut v = v;
+            v.push(e);
+            v
+        }
+    }
+}
+
+Statement: Box<Node> = {
+    Rule,
+    Predicate,
+};
+
+Tier<Op, NextTier>: Box<Node> = {
+    <l:Tier<Op, NextTier> > <o:Op> <r:NextTier> => Box::new(Node{ label: String::from(o),
+                                                                  childs: vec!(l, r)}
+                                                           ),
+    NextTier
+};
+
+Predicate = Tier<LogicOr, AndPred>;
+AndPred = Tier<LogicAnd, ElemPred>;
+
+LogicOr = { "||" };
+LogicAnd = { "&&" };
+
+ElemPred: Box<Node> = {
+    "(" <p:Predicate> ")" => p,
+    <l:Expr> <o:PredOp> <r:Expr> => Box::new(Node{ label: String::from(o),
+                                                   childs: vec!(l, r)}
+                                            ),
+};
+
+PredOp = {
+    "is",
+    "in",
+    "==",
+    "!=",
+    "<=",
+    ">=",
+    "<",
+    ">",
+};
+
+Rule: Box<Node> = {
+    <l:Predicate> <o:RuleOp> <r:Predicate> =>  Box::new(Node{ label: String::from(o),
+                                                              childs: vec!(l, r)}
+                                                       ),
+};
+
+RuleOp = {
+    "=>",
+};
+
+Expr = Tier<SumOp, Factor>;
+Factor = Tier<MulOp, Eval>;
+
+SumOp = {
+    "+",
+    "-",
+};
+
+MulOp = {
+    "*",
+    "/",
+};
+
+Eval: Box<Node> = {
+    Term => Box::new(Node{ label: String::from(<>),
+                           childs: vec!()}),
+};
+
+Term : &'input str = {
+    <s:Str> => s,
+};
+
+Str = { r"[A-Za-z0-9_.]+", };
+
+Semicolon = { ";", };
+
+Comma = { ",", };

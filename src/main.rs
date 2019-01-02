@@ -9,6 +9,7 @@ extern crate serde;
 extern crate serde_derive;
 
 mod settings;
+mod parser;
 
 use std::str::FromStr;
 

@@ -12,6 +12,7 @@ log = "0.4"
 fern = "0.5"
 chrono = "0.4"
 lalrpop-util = "0.16.1"
+regex = "1"
 
 [build-dependencies]
 lalrpop = "0.16.1"
