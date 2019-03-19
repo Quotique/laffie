@@ -76,9 +76,16 @@ MulOp = {
 };
 
 Eval: Box<Node> = {
+    "(" <Expr> ")" => <>,
     Term => Box::new(Node{ label: String::from(<>),
                            childs: vec!()}),
+    <t:Term> "(" <a:Args> ")" => Box::new(Node{ label: String::from(t),
+                                                childs: a }),
+    <o:SumOp> <e:Eval> => Box::new(Node{ label: String::from(o),
+                                         childs: vec!(e) }),
 };
+
+Args = Vector<Expr, Comma>;
 
 Term : &'input str = {
     <s:Str> => s,
