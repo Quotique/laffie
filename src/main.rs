@@ -8,14 +8,18 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
-mod settings;
 mod core;
 mod parser;
+mod settings;
 
+use std::env;
+use std::path::Path;
 use std::str::FromStr;
 
 use settings::Logger;
 use settings::Settings;
+
+use core::symbols::all_symbols;
 
 fn log_init(config: &Logger) {
     let log_level = log::LevelFilter::from_str(&config.level).unwrap_or(log::LevelFilter::Debug);
@@ -28,7 +32,8 @@ fn log_init(config: &Logger) {
                 record.level(),
                 message
             ))
-        }).level(log_level)
+        })
+        .level(log_level)
         .chain(std::io::stdout())
         .chain(fern::log_file(&config.filename).unwrap())
         .apply()
@@ -39,11 +44,21 @@ fn log_init(config: &Logger) {
 }
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+
     let settings = Settings::new();
     match settings {
         Ok(ref s) => log_init(&s.logger),
         Err(e) => println!("Config error: {:?}", e),
     }
+
+    info!(target: "log_init", "Args {:?}", args);
+
+    all_symbols().load_dir(Path::new(&args[1][..])).unwrap();
+    //{
+    //    () => info!(target: "log_init", "Success!"),
+    //    None => info!(target: "log_init", "Hui!"),
+    //}
 
     info!(target: "main", "Hello world");
 }

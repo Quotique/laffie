@@ -1,6 +1,6 @@
 {
   "logger": {
     "filename": "output.log",
-    "level": "Debug"
+    "level": "Trace"
   }
 }

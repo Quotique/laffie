@@ -17,8 +17,22 @@ Vector<T, Delim> : Vec<T> = {
 }
 
 Statement: Box<Node> = {
+    Declare,
     Rule,
     Predicate,
+};
+
+Declare: Box<Node> = {
+    "symbol" <s:Str> => Box::new(Node{ label: String::from("Declare"),
+                                       childs: vec!(Box::new(Node{ label: String::from(s),
+                                                                   childs: vec!()}
+                                                            ),
+                                                    Box::new(Node{ label: String::from("Symbol"),
+                                                                   childs: vec!()}
+                                                            ),
+                                                   )
+                                     }
+                                ),
 };
 
 Tier<Op, NextTier>: Box<Node> = {
