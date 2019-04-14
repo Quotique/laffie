@@ -33,6 +33,16 @@ Declare: Box<Node> = {
                                                    )
                                      }
                                 ),
+    "symbol" <s:SystemOp> => Box::new(Node{ label: String::from("Declare"),
+                                            childs: vec!(Box::new(Node{ label: String::from(s),
+                                                                        childs: vec!()}
+                                                                 ),
+                                                         Box::new(Node{ label: String::from("Symbol"),
+                                                                        childs: vec!()}
+                                                                 ),
+                                                        )
+                                          }
+                                     ),
 };
 
 Tier<Op, NextTier>: Box<Node> = {
@@ -105,6 +115,7 @@ Term : &'input str = {
     <s:Str> => s,
 };
 
+SystemOp = { "+", "-", "*", "/", "==",  }
 Str = { r"[A-Za-z0-9_.]+", };
 
 Semicolon = { ";", };

@@ -19,6 +19,7 @@ use std::str::FromStr;
 use settings::Logger;
 use settings::Settings;
 
+use core::rules_engine::RulesEngine;
 use core::symbols::all_symbols;
 
 fn log_init(config: &Logger) {
@@ -39,8 +40,8 @@ fn log_init(config: &Logger) {
         .apply()
         .unwrap();
 
-    info!(target: "log_init", "Log initialized with params: {:?}", config);
-    info!(target: "log_init", "Current log level: {:?}", log_level);
+    info!(target: "init", "Log initialized with params: {:?}", config);
+    info!(target: "init", "Current log level: {:?}", log_level);
 }
 
 fn main() {
@@ -52,13 +53,18 @@ fn main() {
         Err(e) => println!("Config error: {:?}", e),
     }
 
-    info!(target: "log_init", "Args {:?}", args);
+    info!(target: "init", "Args {:?}", args);
 
-    all_symbols().load_dir(Path::new(&args[1][..])).unwrap();
-    //{
-    //    () => info!(target: "log_init", "Success!"),
-    //    None => info!(target: "log_init", "Hui!"),
-    //}
+    if args.len() < 2 {
+        println!("Usage: {} <code_dir>", &args[0]);
+        return;
+    }
 
-    info!(target: "main", "Hello world");
+    let dir = Path::new(&args[1][..]);
+
+    info!(target: "init", "Reading symbols");
+    all_symbols().load_dir(&dir).unwrap();
+    let mut rules = RulesEngine::new();
+    info!(target: "init", "Reading rules");
+    rules.load_dir(&dir).unwrap();
 }

@@ -1,5 +1,7 @@
 pub mod node;
 pub mod symbols;
+pub mod rule;
+pub mod rules_engine;
 //use self::node::{Node, NodeType};
 //use std::io::{self, Write};
 
