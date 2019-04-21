@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::io::{self, Write};
+use std::mem::swap;
 
 #[derive(Clone)]
 pub enum NodeType {
@@ -46,6 +47,23 @@ impl Node {
     fn sort_childs(&mut self) {
         // TODO: effective insert
         self.childs.sort_by(|a, b| a.id.cmp(&b.id));
+    }
+
+    pub fn apply_map(&mut self, params: &ParamsMap) {
+        match self.node_type {
+            NodeType::Param => {
+                let replace = params.get(&self.id);
+                match replace {
+                    Some(r) => swap(self, &mut r.clone()),
+                    None => {}
+                }
+            }
+            _ => {
+                for i in &mut self.childs {
+                    i.apply_map(params);
+                }
+            }
+        }
     }
 
     pub fn map(&self, target: &Node) -> Option<ParamsMap> {

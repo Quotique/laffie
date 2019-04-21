@@ -8,8 +8,8 @@ use super::symbols::all_symbols;
 extern crate log;
 
 pub struct Rule {
-    pattern: Node,
-    replace: Node,
+    pub pattern: Node,
+    pub replace: Node,
 }
 
 type ParamsMap = HashMap<String, u64>;
@@ -76,5 +76,17 @@ impl Rule {
             }
         }
         Some(result)
+    }
+
+    pub fn apply(&self, arg: &Node) -> Option<Node> {
+        let params = self.pattern.map(arg);
+        match params {
+            Some(params) => {
+                let mut result = self.replace.clone();
+                result.apply_map(&params);
+                return Some(result);
+            }
+            None => return None,
+        }
     }
 }
