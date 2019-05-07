@@ -10,6 +10,7 @@ extern crate serde_derive;
 
 mod core;
 mod parser;
+mod solver;
 mod settings;
 
 use std::env;

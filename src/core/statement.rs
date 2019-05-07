@@ -1,5 +1,5 @@
-use node::Node;
+use super::node::Node;
 
 pub struct Statement {
-    root: node,
+    root: Node,
 }

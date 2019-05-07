@@ -2,6 +2,7 @@ pub mod node;
 pub mod rule;
 pub mod rules_engine;
 pub mod symbols;
+pub mod statement;
 
 use self::node::{Node, NodeType};
 use self::rule::Rule;
