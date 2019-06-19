@@ -1,0 +1,7 @@
+problem {
+
+2*x+5 == 0;
+
+target find x;
+
+};

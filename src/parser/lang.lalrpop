@@ -17,9 +17,44 @@ Vector<T, Delim> : Vec<T> = {
 }
 
 Statement: Box<Node> = {
+    Problem,
     Declare,
     Rule,
     Predicate,
+};
+
+Problem: Box<Node> = {
+    "problem" "{" <c:Conditions> "}" => Box::new(Node{ label: String::from("Problem"),
+                                                       childs: c }),
+};
+
+Conditions = Vector<Condition, Semicolon>;
+
+Condition: Box<Node> = {
+    Rule,
+    Predicate,
+    Target,
+};
+
+Target: Box<Node> = {
+    "target" <c:Str> "(" <p:Predicate> ")" => Box::new(Node{ label: String::from("Target"),
+                                                             childs: vec!(Box::new(Node{ label: String::from(c),
+                                                                                         childs: vec!()}
+                                                                                  ),
+                                                                          p
+                                                                         ),
+                                                            }
+                                                      ),
+    "target" <c:Str> <s:Str> => Box::new(Node{ label: String::from("Target"),
+                                               childs: vec!(Box::new(Node{ label: String::from(c),
+                                                                           childs: vec!()}
+                                                                    ),
+                                                            Box::new(Node{ label: String::from(s),
+                                                                           childs: vec!()}
+                                                                    ),
+                                                           )
+                                             }
+                                        ),
 };
 
 Declare: Box<Node> = {
@@ -43,6 +78,16 @@ Declare: Box<Node> = {
                                                         )
                                           }
                                      ),
+    "symbol" <s:PredOp> => Box::new(Node{ label: String::from("Declare"),
+                                          childs: vec!(Box::new(Node{ label: String::from(s),
+                                                                      childs: vec!()}
+                                                               ),
+                                                       Box::new(Node{ label: String::from("Symbol"),
+                                                                      childs: vec!()}
+                                                               ),
+                                                      )
+                                        }
+                                   ),
 };
 
 Tier<Op, NextTier>: Box<Node> = {
@@ -115,7 +160,7 @@ Term : &'input str = {
     <s:Str> => s,
 };
 
-SystemOp = { "+", "-", "*", "/", "==",  }
+SystemOp = { "+", "-", "*", "/", }
 Str = { r"[A-Za-z0-9_.]+", };
 
 Semicolon = { ";", };

@@ -10,8 +10,8 @@ extern crate serde_derive;
 
 mod core;
 mod parser;
-mod solver;
 mod settings;
+mod solver;
 
 use std::env;
 use std::path::Path;
@@ -22,6 +22,8 @@ use settings::Settings;
 
 use core::rules_engine::RulesEngine;
 use core::symbols::all_symbols;
+
+use solver::problem_storage::ProblemStorage;
 
 fn log_init(config: &Logger) {
     let log_level = log::LevelFilter::from_str(&config.level).unwrap_or(log::LevelFilter::Debug);
@@ -56,16 +58,25 @@ fn main() {
 
     info!(target: "init", "Args {:?}", args);
 
-    if args.len() < 2 {
-        println!("Usage: {} <code_dir>", &args[0]);
+    if args.len() < 3 {
+        println!("Usage: {} <code_dir> <problems_dir>", &args[0]);
         return;
     }
-
-    let dir = Path::new(&args[1][..]);
+    let code_dir = Path::new(&args[1][..]);
+    let problems_dir = Path::new(&args[2][..]);
 
     info!(target: "init", "Reading symbols");
-    all_symbols().load_dir(&dir).unwrap();
+    all_symbols().load_dir(&code_dir).unwrap();
+
     let mut rules = RulesEngine::new();
     info!(target: "init", "Reading rules");
-    rules.load_dir(&dir).unwrap();
+    rules.load_dir(&code_dir).unwrap();
+
+    let mut problems = ProblemStorage::new();
+    info!(target: "init", "Reading problems");
+    problems.load_dir(&problems_dir).unwrap();
+
+    for i in problems.problems {
+        println!("Problem {}", i);
+    }
 }
