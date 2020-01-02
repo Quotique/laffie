@@ -1,120 +1,67 @@
-use std::collections::HashMap;
-use std::fs;
-use std::io;
-use std::mem;
-use std::path::Path;
-use std::sync::{Arc, Mutex, Once, ONCE_INIT};
+use std::{fs, io, path::Path, sync::Mutex};
+
+use super::multi_map::MultiMap;
 
 use parser::lang;
 
-extern crate log;
+lazy_static! {
+    static ref ALL_SYMBOLS: Mutex<MultiMap<u64, String, Symbol>> = Mutex::new(MultiMap::new());
+    static ref LAST_ID: Mutex<u64> = Mutex::new(0);
+}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Symbol {
-    id: u64,
-    name: String,
+    pub id:   u64,
+    pub name: String,
 }
 
-struct SymbolsImpl {
-    pub symbol_by_id: HashMap<u64, Symbol>,
-    pub id_by_name: HashMap<String, u64>,
-    pub last_id: u64,
+pub fn symbol_by_id(id: u64) -> Option<Symbol> {
+    ALL_SYMBOLS.lock().expect("Unable to lock symbols").get(&id).map(|x| x.clone())
 }
 
-#[derive(Clone)]
-pub struct Symbols {
-    inner: Arc<Mutex<SymbolsImpl>>,
+pub fn symbol_by_name(name: &String) -> Option<Symbol> {
+    ALL_SYMBOLS.lock().expect("Unable to lock symbols").get_alt(name).map(|x| x.clone())
 }
 
-pub fn all_symbols() -> Symbols {
-    // Initialize it to a null value
-    static mut SINGLETON: *const Symbols = 0 as *const Symbols;
-    static ONCE: Once = ONCE_INIT;
+pub fn add_symbol(mut symbol: Symbol) {
+    if ALL_SYMBOLS.lock().expect("Unable to lock symbols").contains_key_alt(&symbol.name) {
+        trace!("Duplicate symbol: {}. Skipping", symbol.name);
+        return;
+    }
+    *LAST_ID.lock().expect("Unable to lock symbols") += 1;
+    symbol.id = *LAST_ID.lock().expect("Unable to lock symbols");
+    ALL_SYMBOLS.lock().expect("Unable to lock symbols").insert(symbol.id, symbol.name.clone(), symbol);
+}
 
-    unsafe {
-        ONCE.call_once(|| {
-            let singleton = Symbols {
-                inner: Arc::new(Mutex::new(SymbolsImpl {
-                    symbol_by_id: HashMap::new(),
-                    id_by_name: HashMap::new(),
-                    last_id: 0,
-                })),
+pub fn load_dir(dir: &Path) -> io::Result<()> {
+    if !dir.is_dir() {
+        panic!(dir.to_string_lossy().to_string().push_str("  is not directory!"));
+    }
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            load_dir(&path)?;
+        } else if path.extension().unwrap() == "sym" {
+            load_file(&path)?;
+        }
+    }
+    Ok(())
+}
+
+fn load_file(file: &Path) -> io::Result<()> {
+    info!("Processing file: {}", file.to_string_lossy());
+    let content = fs::read_to_string(file)?;
+    let states = lang::StatementsParser::new().parse(&content[..]).unwrap();
+    for s in states {
+        if s.root().data == "Declare" && s.degree() > 1 && s.last().unwrap().data == "Symbol" {
+            let mut s = Symbol {
+                id:   0,
+                name: s.first().unwrap().data.clone(),
             };
-
-            // Put it in the heap so it can outlive this call
-            SINGLETON = mem::transmute(Box::new(singleton));
-        });
-
-        // Now we give out a copy of the data that is safe to use concurrently.
-        (*SINGLETON).clone()
-    }
-}
-
-impl Symbols {
-    pub fn id_by_name(&self, name: &String) -> Option<u64> {
-        let im = self.inner.lock().unwrap();
-        let id = im.id_by_name.get(name);
-        match id {
-            Some(&x) => Some(x),
-            None => None,
+            add_symbol(s);
         }
     }
 
-    pub fn name_by_id(&self, id: u64) -> Option<String> {
-        let im = self.inner.lock().unwrap();
-        let sym = im.symbol_by_id.get(&id);
-        match sym {
-            Some(x) => Some(x.name.clone()),
-            None => None,
-        }
-    }
-
-    pub fn load_dir(&mut self, dir: &Path) -> io::Result<()> {
-        if !dir.is_dir() {
-            panic!(dir
-                .to_string_lossy()
-                .to_string()
-                .push_str("  is not directory!"));
-        }
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                self.load_dir(&path)?;
-            } else if path.extension().unwrap() == "sym" {
-                self.load_file(&path)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn load_file(&mut self, file: &Path) -> io::Result<()> {
-        info!("Processing file: {}", file.to_string_lossy());
-        let content = fs::read_to_string(file)?;
-        let states = lang::StatementsParser::new().parse(&content[..]).unwrap();
-        for s in states {
-            if s.label == "Declare" && s.childs.len() > 1 && s.childs[1].label == "Symbol" {
-                let mut s = Symbol {
-                    id: 0,
-                    name: s.childs[0].label.clone(),
-                };
-                self.add_symbol(s);
-            }
-        }
-
-        Ok(())
-    }
-
-    fn add_symbol(&mut self, mut sym: Symbol) {
-        trace!("Symbol adding: {}", sym.name);
-        let mut im = self.inner.lock().unwrap();
-        if im.id_by_name.contains_key(&sym.name) {
-            trace!("Duplicate symbol: {}. Skipping", sym.name);
-            return;
-        }
-        sym.id = im.last_id + 1;
-        im.id_by_name.insert(sym.name.clone(), sym.id);
-        im.symbol_by_id.insert(sym.id, sym);
-        im.last_id += 1;
-    }
+    Ok(())
 }

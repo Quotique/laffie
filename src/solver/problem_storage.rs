@@ -1,27 +1,34 @@
-use std::path::Path;
-use std::{fs, io};
+use std::{fs, io, path::Path};
 
 use parser::lang;
 
-use super::problem::Problem;
-//use Solution;
+use super::problem::{Problem, Solution};
+use crate::core::statement::Statement;
+// use Solution;
 
 use core::rules_engine::RulesEngine;
 
-//pub struct SolverEngine<'a> {
-//    pub problem: &'a Problem,
-//    pub solution: Vec<Statement>,
-//    pub result: Solution,
-//}
-//
-//impl<'a> SolverEngine<'a> {
-//    pub fn new(problem: &'a Problem) -> SolverEngine<'a> {
-//        SolverEngine(problem: problem, solution: vec![], result: Solution())
-//    }
-//
-//    pub fn run(rules: &RulesEngine) -> Option<Solution> {
-//    }
-//}
+pub struct SolverEngine<'a> {
+    pub problem:  &'a Problem,
+    pub solution: Vec<Statement>,
+    pub result:   Solution,
+}
+
+impl<'a> SolverEngine<'a> {
+    pub fn new(problem: &'a Problem) -> SolverEngine<'a> {
+        SolverEngine {
+            problem:  problem,
+            solution: vec![],
+            result:   Solution { targets: vec![] },
+        }
+    }
+
+    pub fn run(rules: &RulesEngine) -> Option<Solution> {
+        for (sym, rules) in &rules.rules_by_sym {
+        }
+        None
+    }
+}
 
 pub struct ProblemStorage {
     pub problems: Vec<Problem>,
@@ -29,17 +36,12 @@ pub struct ProblemStorage {
 
 impl ProblemStorage {
     pub fn new() -> ProblemStorage {
-        ProblemStorage {
-            problems: Vec::new(),
-        }
+        ProblemStorage { problems: Vec::new() }
     }
 
     pub fn load_dir(&mut self, dir: &Path) -> io::Result<()> {
         if !dir.is_dir() {
-            panic!(dir
-                .to_string_lossy()
-                .to_string()
-                .push_str(" is not directory!"));
+            panic!(dir.to_string_lossy().to_string().push_str(" is not directory!"));
         }
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
@@ -59,7 +61,7 @@ impl ProblemStorage {
         let states = lang::StatementsParser::new().parse(&content[..]).unwrap();
         let mut symbol_id: u64 = 0;
         for s in states {
-            if s.label == "Problem" {
+            if s.root().data == "Problem" {
                 match Problem::from(&s) {
                     Some(p) => self.problems.push(p),
                     None => error!("Problem not parsed"),

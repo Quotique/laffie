@@ -1,0 +1,7 @@
+binop_separator = "Back"
+max_width = 120
+merge_imports = true
+normalize_comments = true
+reorder_impl_items = true
+struct_field_align_threshold = 40
+wrap_comments = true

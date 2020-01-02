@@ -1,5 +1,6 @@
 //use std::str::FromStr;
-use parser::syntax_tree::Node;
+use std::iter::FromIterator;
+use parser::trees::linked::fully::{tr, Tree, Forest};
 
 grammar;
 
@@ -16,84 +17,42 @@ Vector<T, Delim> : Vec<T> = {
     }
 }
 
-Statement: Box<Node> = {
+Statement: Tree<String> = {
     Problem,
     Declare,
     Rule,
     Predicate,
 };
 
-Problem: Box<Node> = {
-    "problem" "{" <c:Conditions> "}" => Box::new(Node{ label: String::from("Problem"),
-                                                       childs: c }),
+Problem: Tree<String> = {
+    "problem" "{" <c:Conditions> "}" => {
+        let mut t = tr(String::from("Problem"));
+        t.append(Forest::from_iter(c.iter().map(|x| x.clone())));
+        t
+    },
 };
 
 Conditions = Vector<Condition, Semicolon>;
 
-Condition: Box<Node> = {
+Condition: Tree<String> = {
     Rule,
     Predicate,
     Target,
 };
 
-Target: Box<Node> = {
-    "target" <c:Str> "(" <p:Predicate> ")" => Box::new(Node{ label: String::from("Target"),
-                                                             childs: vec!(Box::new(Node{ label: String::from(c),
-                                                                                         childs: vec!()}
-                                                                                  ),
-                                                                          p
-                                                                         ),
-                                                            }
-                                                      ),
-    "target" <c:Str> <s:Str> => Box::new(Node{ label: String::from("Target"),
-                                               childs: vec!(Box::new(Node{ label: String::from(c),
-                                                                           childs: vec!()}
-                                                                    ),
-                                                            Box::new(Node{ label: String::from(s),
-                                                                           childs: vec!()}
-                                                                    ),
-                                                           )
-                                             }
-                                        ),
+Target: Tree<String> = {
+    "target" <c:Str> "(" <p:Predicate> ")" => tr(String::from("Target")) /tr(String::from(c))/p,
+    "target" <c:Str> <s:Str> => tr(String::from("Target")) /tr(String::from(c))/tr(String::from(s)),
 };
 
-Declare: Box<Node> = {
-    "symbol" <s:Str> => Box::new(Node{ label: String::from("Declare"),
-                                       childs: vec!(Box::new(Node{ label: String::from(s),
-                                                                   childs: vec!()}
-                                                            ),
-                                                    Box::new(Node{ label: String::from("Symbol"),
-                                                                   childs: vec!()}
-                                                            ),
-                                                   )
-                                     }
-                                ),
-    "symbol" <s:SystemOp> => Box::new(Node{ label: String::from("Declare"),
-                                            childs: vec!(Box::new(Node{ label: String::from(s),
-                                                                        childs: vec!()}
-                                                                 ),
-                                                         Box::new(Node{ label: String::from("Symbol"),
-                                                                        childs: vec!()}
-                                                                 ),
-                                                        )
-                                          }
-                                     ),
-    "symbol" <s:PredOp> => Box::new(Node{ label: String::from("Declare"),
-                                          childs: vec!(Box::new(Node{ label: String::from(s),
-                                                                      childs: vec!()}
-                                                               ),
-                                                       Box::new(Node{ label: String::from("Symbol"),
-                                                                      childs: vec!()}
-                                                               ),
-                                                      )
-                                        }
-                                   ),
+Declare: Tree<String> = {
+    "symbol" <s:Str> => tr(String::from("Declare")) /tr(String::from(s))/tr(String::from("Symbol")),
+    "symbol" <s:SystemOp> => tr(String::from("Declare")) /tr(String::from(s))/tr(String::from("Symbol")),
+    "symbol" <s:PredOp> => tr(String::from("Declare")) /tr(String::from(s))/tr(String::from("Symbol")),
 };
 
-Tier<Op, NextTier>: Box<Node> = {
-    <l:Tier<Op, NextTier> > <o:Op> <r:NextTier> => Box::new(Node{ label: String::from(o),
-                                                                  childs: vec!(l, r)}
-                                                           ),
+Tier<Op, NextTier>: Tree<String> = {
+    <l:Tier<Op, NextTier> > <o:Op> <r:NextTier> => tr(String::from(o))/l/r,
     NextTier
 };
 
@@ -103,11 +62,9 @@ AndPred = Tier<LogicAnd, ElemPred>;
 LogicOr = { "||" };
 LogicAnd = { "&&" };
 
-ElemPred: Box<Node> = {
+ElemPred: Tree<String> = {
     "(" <p:Predicate> ")" => p,
-    <l:Expr> <o:PredOp> <r:Expr> => Box::new(Node{ label: String::from(o),
-                                                   childs: vec!(l, r)}
-                                            ),
+    <l:Expr> <o:PredOp> <r:Expr> => tr(String::from(o))/l/r,
 };
 
 PredOp = {
@@ -121,10 +78,8 @@ PredOp = {
     ">",
 };
 
-Rule: Box<Node> = {
-    <l:Predicate> <o:RuleOp> <r:Predicate> =>  Box::new(Node{ label: String::from(o),
-                                                              childs: vec!(l, r)}
-                                                       ),
+Rule: Tree<String> = {
+    <l:Predicate> <o:RuleOp> <r:Predicate> => tr(String::from(o))/l/r,
 };
 
 RuleOp = {
@@ -144,14 +99,16 @@ MulOp = {
     "/",
 };
 
-Eval: Box<Node> = {
+Eval: Tree<String> = {
     "(" <Expr> ")" => <>,
-    Term => Box::new(Node{ label: String::from(<>),
-                           childs: vec!()}),
-    <t:Term> "(" <a:Args> ")" => Box::new(Node{ label: String::from(t),
-                                                childs: a }),
-    <o:SumOp> <e:Eval> => Box::new(Node{ label: String::from(o),
-                                         childs: vec!(e) }),
+    Term => tr(String::from(<>)),
+    <t:Term> "(" <a:Args> ")" => {
+        let mut t = tr(String::from(t));
+        t.append(Forest::from_iter(a.iter().map(|x| x.clone())));
+        t
+    },
+    <o:SumOp> <e:Eval> => tr(String::from(o))/e
+    ,
 };
 
 Args = Vector<Expr, Comma>;
