@@ -8,6 +8,9 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+#[macro_use]
+extern crate lazy_static;
+
 mod core;
 mod parser;
 mod settings;
@@ -21,7 +24,7 @@ use settings::Logger;
 use settings::Settings;
 
 use core::rules_engine::RulesEngine;
-use core::symbols::all_symbols;
+use core::symbols::load_dir;
 
 use solver::problem_storage::ProblemStorage;
 
@@ -66,7 +69,7 @@ fn main() {
     let problems_dir = Path::new(&args[2][..]);
 
     info!(target: "init", "Reading symbols");
-    all_symbols().load_dir(&code_dir).unwrap();
+    load_dir(&code_dir).unwrap();
 
     let mut rules = RulesEngine::new();
     info!(target: "init", "Reading rules");

@@ -117,14 +117,10 @@ impl Node {
             stdout.lock().write(ident.as_bytes())?;
             if i != self.childs.len() - 1 {
                 ident.push_str("\u{2502} ");
-                stdout
-                    .lock()
-                    .write(String::from("\u{251C}\u{2500}").as_bytes())?;
+                stdout.lock().write(String::from("\u{251C}\u{2500}").as_bytes())?;
             } else {
                 ident.push_str("  ");
-                stdout
-                    .lock()
-                    .write(String::from("\u{2514}\u{2500}").as_bytes())?;
+                stdout.lock().write(String::from("\u{2514}\u{2500}").as_bytes())?;
             }
             item.visual_ident(ident)?;
         }

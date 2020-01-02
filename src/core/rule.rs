@@ -1,35 +1,36 @@
 use std::collections::HashMap;
 
-use parser::syntax_tree::Node as ParserNode;
-
-use super::node::{Node, NodeType};
-use super::symbols::all_symbols;
-
-extern crate log;
-
-pub struct Rule {
-    pub pattern: Node,
-    pub replace: Node,
-}
+use super::{
+    tree_utils::{apply_map, params_map, NodeData, parse_node},
+    trees::{Node, Tree},
+};
 
 type ParamsMap = HashMap<String, u64>;
+type ParserTree = Tree<String>;
+type RuleTree = Tree<NodeData>;
+type RuleNode = Node<NodeData>;
+
+pub struct Rule {
+    pub pattern: RuleTree,
+    pub replace: RuleTree,
+}
 
 impl Rule {
-    pub fn new(statement: &ParserNode) -> Option<Rule> {
-        if statement.label != "=>" {
+    pub fn new(statement: &ParserTree) -> Option<Rule> {
+        if statement.root().data != "=>" {
             return None;
         }
-        if statement.childs.len() != 2 {
-            error!("Incorrect childs count: {}, should be 2!", statement.label);
+        if statement.degree() != 2 {
+            error!("Incorrect childs count: {}, should be 2!", statement.root().data);
             return None;
         }
         let mut params = HashMap::new();
         let mut params_count: u64 = 0;
-        let left = Rule::parse_node(&statement.childs[0], &mut params, &mut params_count);
+        let left = parse_node(statement.first().unwrap(), &mut params, &mut params_count);
         if left.is_none() {
             return None;
         }
-        let right = Rule::parse_node(&statement.childs[1], &mut params, &mut params_count);
+        let right = parse_node(statement.last().unwrap(), &mut params, &mut params_count);
         if right.is_none() {
             return None;
         }
@@ -39,54 +40,12 @@ impl Rule {
         })
     }
 
-    fn parse_node(
-        src_node: &ParserNode,
-        params: &mut ParamsMap,
-        last_param_id: &mut u64,
-    ) -> Option<Node> {
-        let mut result = Node::new();
-        let id = all_symbols().id_by_name(&src_node.label);
-        match id {
-            Some(i) => {
-                result.node_type = NodeType::Symbol;
-                result.id = i;
-            }
-            None => {
-                result.node_type = NodeType::Param;
-                if params.contains_key(&src_node.label) {
-                    result.id = *params.get(&src_node.label).unwrap();
-                } else {
-                    *last_param_id += 1;
-                    params.insert(src_node.label.clone(), *last_param_id);
-                    result.id = *last_param_id;
-                }
-                if !src_node.childs.is_empty() {
-                    error!(
-                        "Node type Param({}) can't contains childs!",
-                        &src_node.label
-                    );
-                    return None;
-                }
-            }
-        }
-        for child in &src_node.childs {
-            match Rule::parse_node(&child, params, last_param_id) {
-                Some(n) => result.childs.push(Box::new(n)),
-                None => error!("Child parsing error: {}", &child.label),
-            }
-        }
-        Some(result)
-    }
+    pub fn apply(&self, arg: &RuleNode) -> Result<RuleTree, String> {
+        let map = params_map(arg, &self.pattern)?;
 
-    pub fn apply(&self, arg: &Node) -> Option<Node> {
-        let params = self.pattern.map(arg);
-        match params {
-            Some(params) => {
-                let mut result = self.replace.clone();
-                result.apply_map(&params);
-                return Some(result);
-            }
-            None => return None,
-        }
+        let mut result = self.replace.clone();
+        apply_map(&mut result, &map);
+
+        Ok(result)
     }
 }
