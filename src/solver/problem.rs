@@ -1,41 +1,49 @@
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, io, path::Path};
 
-use super::trees::{Node as TreeNode, Tree};
+use core::{dir_parser::load_dir, tree_utils::NodeData};
 
-use core::{
+use super::{
     statement::{ParamsMap, Statement},
-    tree_utils::NodeData,
+    trees::{Node as TreeNode, Tree},
 };
 
-extern crate log;
+use core::rule::RulesEngine;
 
 type ParserTree = Tree<String>;
 type ParserNode = TreeNode<String>;
 type TargetTree = Tree<NodeData>;
 
 pub enum ProblemType {
-    Proof,
-    Calculate,
+    Proof(TargetTree),
+    Calculate(TargetTree),
     Transform,
 }
 
 pub struct Problem {
-    pub problem_type: ProblemType,
-    pub conditions:   Vec<Statement>,
-    pub targets:      Option<TargetTree>,
+    pub conditions: Vec<Statement>,
+    pub target:     ProblemType,
 }
 
 pub struct Solution {
     pub targets: Vec<TargetTree>,
 }
 
+pub struct ProblemStorage {
+    pub problems: Vec<Problem>,
+}
+
 impl ProblemType {
-    fn from(s: &str) -> Option<ProblemType> {
-        match s {
-            "proof" => Some(ProblemType::Proof),
-            "find" => Some(ProblemType::Calculate),
-            "transform" => Some(ProblemType::Transform),
-            _ => None,
+    fn try_from(node: &ParserNode, params: &mut ParamsMap) -> Result<Self, String> {
+        if node.degree() != 2 {
+            return Err("Wrong target tree".into());
+        }
+        let target = Statement::new(node.last().unwrap(), params)?.root;
+
+        match node.first().unwrap().data.as_ref() {
+            "proof" => Ok(ProblemType::Proof(target)),
+            "find" => Ok(ProblemType::Calculate(target)),
+            "transform" => Ok(ProblemType::Transform),
+            _ => Err(format!("Incorrect problem type: {}", node.first().unwrap().data)),
         }
     }
 }
@@ -43,63 +51,37 @@ impl ProblemType {
 impl fmt::Display for ProblemType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ProblemType::Proof => write!(f, "proof"),
-            ProblemType::Calculate => write!(f, "find"),
+            ProblemType::Proof(target) => write!(f, "proof {:?}", target),
+            ProblemType::Calculate(target) => write!(f, "find {:?}", target),
             ProblemType::Transform => write!(f, "transform"),
         }
     }
 }
 
 impl Problem {
-    fn new(problem_type: ProblemType) -> Problem {
+    fn new(target: ProblemType) -> Problem {
         Problem {
-            problem_type,
+            target,
             conditions: vec![],
-            targets: None,
         }
     }
 
-    pub fn from(node: &ParserNode) -> Option<Problem> {
+    pub fn from(node: &ParserNode) -> Result<Problem, String> {
         if node.data != "Problem" {
-            error!(target: "problem", "Bad root node: {:?}", node);
-            return None;
+            return Err(format!("Bad root node: {:?}", node));
         }
 
-        let mut result = Problem::new(ProblemType::Calculate);
+        let mut result = Problem::new(ProblemType::Transform);
         let mut params = HashMap::new();
 
         for child in node.iter() {
             if child.data == "Target" {
-                result.parse_target(child, &mut params);
+                result.target = ProblemType::try_from(child, &mut params)?;
             } else {
-                match Statement::new(child, &mut params) {
-                    Some(s) => result.conditions.push(s),
-                    None => return None,
-                }
+                result.conditions.push(Statement::new(child, &mut params)?);
             }
         }
-        Some(result)
-    }
-
-    fn parse_target(&mut self, node: &ParserNode, params: &mut ParamsMap) {
-        if node.degree() != 2 {
-            return;
-        }
-
-        match ProblemType::from(&node.first().unwrap().data) {
-            Some(t) => self.problem_type = t,
-            None => {
-                error!("Incorrect problem type: {}", node.first().unwrap().data);
-                return;
-            }
-        }
-        match Statement::new(node.last().unwrap(), params) {
-            Some(s) => self.targets = Some(s.root),
-            None => {
-                error!("Bad target body");
-                return;
-            }
-        }
+        Ok(result)
     }
 }
 
@@ -107,17 +89,30 @@ impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{{contitions: [{}], target: {} {} }}",
+            "{{contitions: [{}], target: {} }}",
             self.conditions
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>()
                 .join(";"),
-            self.problem_type,
-            match &self.targets {
-                Some(t) => format!("{:?}", &t),
-                None => String::from("None"),
-            }
+            self.target,
         )
+    }
+}
+
+impl ProblemStorage {
+    pub fn new() -> ProblemStorage {
+        ProblemStorage { problems: Vec::new() }
+    }
+
+    pub fn load_dir(&mut self, dir: &Path) -> io::Result<()> {
+        load_dir(dir, &mut |s| {
+            if s.root().data == "Problem" {
+                match Problem::from(&s) {
+                    Ok(p) => self.problems.push(p),
+                    Err(e) => error!("Problem not parsed: {}", e),
+                }
+            }
+        })
     }
 }

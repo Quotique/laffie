@@ -1,12 +1,10 @@
 use std::{collections::HashMap, fmt};
 
-use super::{
-    tree_utils::{parse_node, NodeData},
-    trees::{Node, Tree},
-};
+use super::trees::{Node, Tree};
+
+use core::tree_utils::{parse_node, NodeData};
 
 pub type ParamsMap = HashMap<String, u64>;
-type ParserTree = Tree<String>;
 type ParserNode = Node<String>;
 type StatementTree = Tree<NodeData>;
 
@@ -16,12 +14,12 @@ pub struct Statement {
 }
 
 impl Statement {
-    pub fn new(statement: &ParserNode, params: &mut ParamsMap) -> Option<Statement> {
+    pub fn new(statement: &ParserNode, params: &mut ParamsMap) -> Result<Statement, String> {
         let mut params_count: u64 = *params.values().max().unwrap_or(&0);
-        match parse_node(&statement, params, &mut params_count) {
-            Some(root) => Some(Statement { root }),
-            None => None,
-        }
+
+        Ok(Statement {
+            root: parse_node(&statement, params, &mut params_count)?,
+        })
     }
 
     // pub fn to_string(node: &Node) -> String {
