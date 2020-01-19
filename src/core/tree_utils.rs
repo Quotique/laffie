@@ -17,13 +17,16 @@ type ParserNode = Node<String>;
 
 type DataTree = Tree<NodeData>;
 
-pub fn parse_node(src_node: &ParserNode, params: &mut ParamsNameMap, last_param_id: &mut u64) -> Option<DataTree> {
+pub fn parse_node(
+    src_node: &ParserNode,
+    params: &mut ParamsNameMap,
+    last_param_id: &mut u64,
+) -> Result<DataTree, String> {
     let mut result = match super::symbols::symbol_by_name(&src_node.data) {
         Some(symbol) => tr(NodeData::Symbol(symbol.id)),
         None => {
             if !src_node.is_leaf() {
-                error!("Node type Param({}) can't contains childs!", &src_node.data);
-                return None;
+                return Err(format!("Node type Param({}) can't contains childs!", &src_node.data));
             }
             tr(NodeData::Param(if params.contains_key(&src_node.data) {
                 *params.get(&src_node.data).unwrap()
@@ -35,12 +38,9 @@ pub fn parse_node(src_node: &ParserNode, params: &mut ParamsNameMap, last_param_
         }
     };
     for child in src_node.iter() {
-        match parse_node(&child, params, last_param_id) {
-            Some(tree) => result.push_back(tree),
-            None => error!("Child parsing error: {}", &child.data),
-        }
+        result.push_back(parse_node(&child, params, last_param_id)?);
     }
-    Some(result)
+    Ok(result)
 }
 
 pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {

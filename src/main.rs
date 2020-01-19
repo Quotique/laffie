@@ -16,17 +16,13 @@ mod parser;
 mod settings;
 mod solver;
 
-use std::env;
-use std::path::Path;
-use std::str::FromStr;
+use std::{env, path::Path, str::FromStr};
 
-use settings::Logger;
-use settings::Settings;
+use settings::{Logger, Settings};
 
-use core::rules_engine::RulesEngine;
-use core::symbols::load_dir;
+use core::{rule::RulesEngine, symbols::load_symbols};
 
-use solver::problem_storage::ProblemStorage;
+use solver::problem::ProblemStorage;
 
 fn log_init(config: &Logger) {
     let log_level = log::LevelFilter::from_str(&config.level).unwrap_or(log::LevelFilter::Debug);
@@ -69,7 +65,7 @@ fn main() {
     let problems_dir = Path::new(&args[2][..]);
 
     info!(target: "init", "Reading symbols");
-    load_dir(&code_dir).unwrap();
+    load_symbols(&code_dir).unwrap();
 
     let mut rules = RulesEngine::new();
     info!(target: "init", "Reading rules");
