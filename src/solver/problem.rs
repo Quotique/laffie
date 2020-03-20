@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt, io, path::Path};
 
-use core::{dir_parser::load_dir, tree_utils::NodeData};
+use core::{dir_parser::load_dir, symbols::symbol_by_name, tree_utils::NodeData};
 
 use super::{
     statement::{ParamsMap, Statement},
@@ -13,6 +13,7 @@ type ParserTree = Tree<String>;
 type ParserNode = TreeNode<String>;
 type TargetTree = Tree<NodeData>;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProblemType {
     Proof(TargetTree),
     Calculate(TargetTree),
@@ -25,7 +26,7 @@ pub struct Problem {
 }
 
 pub struct Solution {
-    pub targets: Vec<TargetTree>,
+    pub target: ProblemType,
 }
 
 pub struct ProblemStorage {
@@ -100,6 +101,29 @@ impl fmt::Display for Problem {
     }
 }
 
+impl Solution {
+    pub fn new(problem: &Problem) -> Solution {
+        Solution {
+            target: problem.target.clone(),
+        }
+    }
+
+    fn solve(&mut self, rules_engine: &RulesEngine) {}
+
+    pub fn is_answer(&self, statement: &Statement) -> bool {
+        match &self.target {
+            ProblemType::Calculate(x) => {
+                let eq_sym = symbol_by_name(&String::from("==")).unwrap().id;
+                if statement.root.degree() != 2 || statement.root.root().data != NodeData::Symbol(eq_sym) {
+                    return false;
+                }
+                statement.root.first().unwrap() == x.root()
+            }
+            _ => false,
+        }
+    }
+}
+
 impl ProblemStorage {
     pub fn new() -> ProblemStorage {
         ProblemStorage { problems: Vec::new() }
@@ -114,5 +138,56 @@ impl ProblemStorage {
                 }
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod paroblem_tests {
+    use super::*;
+    use core::symbols::symbols_tests::setup;
+    use solver::trees::linked::fully::tr;
+
+    fn test_problem() -> Problem {
+        let test = tr(String::from("Problem")) /
+            (tr(String::from("==")) /
+                (tr(String::from("+")) /
+                    (tr(String::from("*")) / tr(String::from("2")) / tr(String::from("x"))) /
+                    tr(String::from("5"))) /
+                tr(String::from("0"))) /
+            (tr(String::from("Target")) / tr(String::from("find")) / tr(String::from("x")));
+
+        Problem::from(&test).unwrap()
+    }
+
+    #[test]
+    fn problem_parse_test() {
+        setup();
+
+        let problem = test_problem();
+        assert_eq!(problem.conditions.len(), 1);
+        assert_eq!(
+            problem.conditions[0].root,
+            tr(NodeData::Symbol(1)) /
+                (tr(NodeData::Symbol(2)) /
+                    (tr(NodeData::Symbol(7)) / tr(NodeData::Symbol(6)) / tr(NodeData::Param(1))) /
+                    tr(NodeData::Symbol(5))) /
+                tr(NodeData::Symbol(4))
+        );
+    }
+
+    #[test]
+    fn check_answer_test() {
+        setup();
+
+        let problem = test_problem();
+        let solution = Solution::new(&problem);
+        let statement_answer = Statement {
+            root: tr(NodeData::Symbol(1)) / tr(NodeData::Param(1)) / tr(NodeData::Symbol(5)),
+        };
+        let statement_not_answer = Statement {
+            root: tr(NodeData::Symbol(1)) / tr(NodeData::Param(2)) / tr(NodeData::Symbol(5)),
+        };
+        assert_eq!(solution.is_answer(&statement_answer), true);
+        assert_eq!(solution.is_answer(&statement_not_answer), false);
     }
 }

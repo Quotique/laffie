@@ -102,13 +102,9 @@ impl RulesEngine {
 }
 
 #[cfg(test)]
-mod rule_tests {
+pub mod rule_tests {
     use super::*;
-    use core::{
-        symbols::{add_symbol, Symbol},
-        tree_utils::NodeData,
-        trees::linked::fully::tr,
-    };
+    use core::{symbols::symbols_tests::setup, tree_utils::NodeData, trees::linked::fully::tr};
     use std::sync::Once;
 
     static INIT: Once = Once::new();
@@ -119,31 +115,6 @@ mod rule_tests {
                 (tr(String::from("+")) / tr(String::from("a")) / tr(String::from("x"))) /
                 tr(String::from("0"))) /
             (tr(String::from("==")) / tr(String::from("x")) / (tr(String::from("-")) / tr(String::from("a"))))
-    }
-
-    fn setup() {
-        INIT.call_once(|| {
-            add_symbol(Symbol {
-                id:   0,
-                name: "==".into(),
-            });
-            add_symbol(Symbol {
-                id:   0,
-                name: "+".into(),
-            });
-            add_symbol(Symbol {
-                id:   0,
-                name: "-".into(),
-            });
-            add_symbol(Symbol {
-                id:   0,
-                name: "0".into(),
-            });
-            add_symbol(Symbol {
-                id:   0,
-                name: "5".into(),
-            });
-        });
     }
 
     #[test]

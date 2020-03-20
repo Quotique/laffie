@@ -7,7 +7,7 @@ lazy_static! {
     static ref LAST_ID: Mutex<u64> = Mutex::new(0);
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Symbol {
     pub id:   u64,
     pub name: String,
@@ -56,4 +56,73 @@ pub fn load_symbols(dir: &Path) -> io::Result<()> {
             add_symbol(s);
         }
     })
+}
+
+#[cfg(test)]
+pub mod symbols_tests {
+    use super::*;
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    pub fn setup() {
+        INIT.call_once(|| {
+            add_symbol(Symbol {
+                id:   0,
+                name: "==".into(),
+            });
+            add_symbol(Symbol {
+                id:   0,
+                name: "+".into(),
+            });
+            add_symbol(Symbol {
+                id:   0,
+                name: "-".into(),
+            });
+            add_symbol(Symbol {
+                id:   0,
+                name: "0".into(),
+            });
+            add_symbol(Symbol {
+                id:   0,
+                name: "5".into(),
+            });
+            add_symbol(Symbol {
+                id:   0,
+                name: "2".into(),
+            });
+            add_symbol(Symbol {
+                id:   0,
+                name: "*".into(),
+            });
+        });
+    }
+
+    #[test]
+    fn by_id_test() {
+        setup();
+
+        let sym = symbol_by_id(1).unwrap();
+        assert_eq!(
+            sym,
+            Symbol {
+                id:   1,
+                name: "==".into(),
+            }
+        )
+    }
+
+    #[test]
+    fn by_name_test() {
+        setup();
+
+        let sym = symbol_by_name(&String::from("==")).unwrap();
+        assert_eq!(
+            sym,
+            Symbol {
+                id:   1,
+                name: "==".into(),
+            }
+        )
+    }
 }

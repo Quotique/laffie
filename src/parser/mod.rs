@@ -45,4 +45,24 @@ mod parser_tests {
                     (tr(String::from("==")) / tr(String::from("x")) / tr(String::from("0"))))
         );
     }
+
+    #[test]
+    fn problem_parse_test() {
+        let test = r#"problem {
+                        2*x+5 == 0;
+                        target find x;
+                    };"#;
+        let states = lang::StatementsParser::new().parse(test).unwrap();
+        assert_eq!(states.len(), 1);
+        assert_eq!(
+            states[0],
+            tr(String::from("Problem")) /
+                (tr(String::from("==")) /
+                    (tr(String::from("+")) /
+                        (tr(String::from("*")) / tr(String::from("2")) / tr(String::from("x"))) /
+                        tr(String::from("5"))) /
+                    tr(String::from("0"))) /
+                (tr(String::from("Target")) / tr(String::from("find")) / tr(String::from("x")))
+        )
+    }
 }
