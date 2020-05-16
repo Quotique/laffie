@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, io, path::Path};
+use std::{collections::HashMap, fmt, io, path::Path, sync::Arc};
 
 use core::{dir_parser::load_dir, symbols::symbol_by_name, tree_utils::NodeData};
 
@@ -7,9 +7,11 @@ use super::{
     trees::{Node as TreeNode, Tree},
 };
 
+use bigdecimal::BigDecimal;
 use core::rule::RulesEngine;
+use std::collections::HashSet;
 
-type ParserTree = Tree<String>;
+// type ParserTree = Tree<String>;
 type ParserNode = TreeNode<String>;
 type TargetTree = Tree<NodeData>;
 
@@ -26,7 +28,9 @@ pub struct Problem {
 }
 
 pub struct Solution {
-    pub target: ProblemType,
+    pub conditions: Vec<Arc<Statement>>,
+    pub target:     ProblemType,
+    pub answer:     Option<Arc<Statement>>,
 }
 
 pub struct ProblemStorage {
@@ -104,11 +108,54 @@ impl fmt::Display for Problem {
 impl Solution {
     pub fn new(problem: &Problem) -> Solution {
         Solution {
-            target: problem.target.clone(),
+            target:     problem.target.clone(),
+            conditions: problem.conditions.iter().map(|x| Arc::new(x.clone())).collect(),
+            answer:     None,
         }
     }
 
-    fn solve(&mut self, rules_engine: &RulesEngine) {}
+    pub fn solve(&mut self, rules_engine: &RulesEngine) -> Result<(), String> {
+        loop {
+            let mut new_state = None;
+            match self.conditions.iter().max_by(|x, y| x.weigth().cmp(&y.weigth())) {
+                Some(state) => {
+                    trace!("Statement: {} ({})", state, state.weigth());
+                    if !state.decrease_weigth() {
+                        return Err("No solution found".into());
+                    }
+                    if self.is_answer(&state) {
+                        self.answer = Some(state.clone());
+                        return Ok(());
+                    }
+
+                    let mut rules = rules_engine.find_rules(&state.symbols);
+                    rules.sort_by(|x, y| {
+                        x.read()
+                            .expect("Cant lock rule")
+                            .level
+                            .cmp(&y.read().expect("Cant lock rule").level)
+                    });
+
+                    for rule in rules.iter() {
+                        trace!("Rule: {:?}", rule);
+                        match Statement::apply(state.clone(), rule.clone()) {
+                            Ok(s) => {
+                                new_state = Some(s);
+                                break;
+                            }
+                            Err(e) => {
+                                trace!("Cant apply rule: {}", e);
+                            }
+                        }
+                    }
+                }
+                None => return Err("Conditions not found".into()),
+            }
+            if let Some(s) = new_state {
+                self.conditions.push(Arc::new(s));
+            }
+        }
+    }
 
     pub fn is_answer(&self, statement: &Statement) -> bool {
         match &self.target {
@@ -118,6 +165,23 @@ impl Solution {
                     return false;
                 }
                 statement.root.first().unwrap() == x.root()
+            }
+            ProblemType::Proof(x) => self.is_true(x),
+            _ => false,
+        }
+    }
+
+    fn is_true(&self, statement: &TargetTree) -> bool {
+        match statement.data {
+            NodeData::Symbol(id) => {
+                if id == symbol_by_name(&">".into()).unwrap().id {
+                    if let (NodeData::Number(d1), NodeData::Number(d2)) =
+                        (&statement.first().unwrap().data, &statement.last().unwrap().data)
+                    {
+                        return d1 > d2;
+                    }
+                }
+                false
             }
             _ => false,
         }
@@ -131,6 +195,7 @@ impl ProblemStorage {
 
     pub fn load_dir(&mut self, dir: &Path) -> io::Result<()> {
         load_dir(dir, &mut |s| {
+            trace!("New problem cb: {}", s);
             if s.root().data == "Problem" {
                 match Problem::from(&s) {
                     Ok(p) => self.problems.push(p),
@@ -138,6 +203,40 @@ impl ProblemStorage {
                 }
             }
         })
+    }
+}
+
+impl fmt::Display for Solution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(a) = self.answer.as_ref() {
+            let mut trace: Vec<Arc<Statement>> = vec![];
+
+            fn visitor(trace: &mut Vec<Arc<Statement>>, state: &Arc<Statement>) {
+                trace.push(state.clone());
+                for i in state.parents.iter() {
+                    visitor(trace, i);
+                }
+            };
+
+            visitor(&mut trace, a);
+
+            while let Some(t) = trace.pop() {
+                write!(f, "\n")?;
+                for p in t.parents.iter() {
+                    write!(f, "{},\n", p)?;
+                }
+                write!(f, "------------------------------------------------------------\n")?;
+                write!(f, "{}\n", t)?;
+            }
+            write!(f, "SOLVED!\n")?;
+        } else {
+            write!(f, "NOT SOLVED\n")?;
+        }
+
+        write!(
+            f,
+            "######################################################################\n"
+        )
     }
 }
 
@@ -181,12 +280,10 @@ mod paroblem_tests {
 
         let problem = test_problem();
         let solution = Solution::new(&problem);
-        let statement_answer = Statement {
-            root: tr(NodeData::Symbol(1)) / tr(NodeData::Param(1)) / tr(NodeData::Symbol(5)),
-        };
-        let statement_not_answer = Statement {
-            root: tr(NodeData::Symbol(1)) / tr(NodeData::Param(2)) / tr(NodeData::Symbol(5)),
-        };
+        let statement_answer =
+            Statement::from(tr(NodeData::Symbol(1)) / tr(NodeData::Param(1)) / tr(NodeData::Symbol(5)));
+        let statement_not_answer =
+            Statement::from(tr(NodeData::Symbol(1)) / tr(NodeData::Param(2)) / tr(NodeData::Symbol(5)));
         assert_eq!(solution.is_answer(&statement_answer), true);
         assert_eq!(solution.is_answer(&statement_not_answer), false);
     }

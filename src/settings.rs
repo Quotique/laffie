@@ -3,7 +3,7 @@ use config::{Config, ConfigError, File};
 #[derive(Debug, Deserialize)]
 pub struct Logger {
     pub filename: String,
-    pub level: String,
+    pub level:    String,
 }
 
 #[derive(Debug, Deserialize)]

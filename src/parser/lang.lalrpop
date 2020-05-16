@@ -1,4 +1,3 @@
-//use std::str::FromStr;
 use std::iter::FromIterator;
 use parser::trees::linked::fully::{tr, Tree, Forest};
 
@@ -80,6 +79,7 @@ PredOp = {
 
 Rule: Tree<String> = {
     <l:Predicate> <o:RuleOp> <r:Predicate> => tr(String::from(o))/l/r,
+    <l:Expr> <o:RuleOp> <r:Expr> => tr(String::from(o))/l/r,
 };
 
 RuleOp = {

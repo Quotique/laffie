@@ -1,0 +1,17 @@
+problem {
+x == 2;
+
+target proof (1 > 0);
+};
+
+problem {
+x == 2;
+
+target proof (x > 0);
+};
+
+problem {
+x == 2 + 2;
+
+target proof (x > 0);
+};

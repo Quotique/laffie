@@ -1,15 +1,15 @@
-#[macro_use]
-extern crate log;
+extern crate bigdecimal;
 extern crate chrono;
-extern crate fern;
-
 extern crate config;
+extern crate fern;
 extern crate serde;
-#[macro_use]
-extern crate serde_derive;
 
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate serde_derive;
 
 mod core;
 mod parser;
@@ -22,7 +22,7 @@ use settings::{Logger, Settings};
 
 use core::{rule::RulesEngine, symbols::load_symbols};
 
-use solver::problem::ProblemStorage;
+use solver::problem::{ProblemStorage, Solution};
 
 fn log_init(config: &Logger) {
     let log_level = log::LevelFilter::from_str(&config.level).unwrap_or(log::LevelFilter::Debug);
@@ -64,18 +64,28 @@ fn main() {
     let code_dir = Path::new(&args[1][..]);
     let problems_dir = Path::new(&args[2][..]);
 
-    info!(target: "init", "Reading symbols");
+    info!(target: "init", "Reading symbols: {:?}", code_dir);
     load_symbols(&code_dir).unwrap();
 
     let mut rules = RulesEngine::new();
-    info!(target: "init", "Reading rules");
+    info!(target: "init", "Reading rules: {:?}", code_dir);
     rules.load_dir(&code_dir).unwrap();
 
     let mut problems = ProblemStorage::new();
-    info!(target: "init", "Reading problems");
+    info!(target: "init", "Reading problems: {:?}", problems_dir);
     problems.load_dir(&problems_dir).unwrap();
 
-    for i in problems.problems {
-        println!("Problem {}", i);
+    for p in problems.problems {
+        println!("Problem {}", p);
+        let mut solution = Solution::new(&p);
+        match solution.solve(&rules) {
+            Ok(_) => {
+                println!("Solution: {}", solution);
+            }
+            Err(e) => {
+                println!("Solution: {}", solution);
+                println!("Solution  error: {}", e);
+            }
+        };
     }
 }
