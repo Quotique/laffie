@@ -1,5 +1,5 @@
 use std::iter::FromIterator;
-use parser::trees::linked::fully::{tr, Tree, Forest};
+use trees::linked::fully::{tr, Tree, Forest};
 
 grammar;
 
@@ -19,7 +19,7 @@ Vector<T, Delim> : Vec<T> = {
 Statement: Tree<String> = {
     Problem,
     Declare,
-    Rule,
+    RuleExt,
     Predicate,
 };
 
@@ -44,10 +44,15 @@ Target: Tree<String> = {
     "target" <c:Str> <s:Str> => tr(String::from("Target")) /tr(String::from(c))/tr(String::from(s)),
 };
 
+Attributes = Vector<Eval, Comma>;
+
 Declare: Tree<String> = {
-    "symbol" <s:Str> => tr(String::from("Declare")) /tr(String::from(s))/tr(String::from("Symbol")),
-    "symbol" <s:SystemOp> => tr(String::from("Declare")) /tr(String::from(s))/tr(String::from("Symbol")),
-    "symbol" <s:PredOp> => tr(String::from("Declare")) /tr(String::from(s))/tr(String::from("Symbol")),
+    "symbol" <s:ExtStr> => tr(String::from("Declare")) /(tr(String::from("Symbol"))/tr(String::from(s))),
+    "symbol" <s:ExtStr> "{" "attr" <a:Attributes> "}" => {
+        let mut t = tr(String::from("Attrs"));
+        t.append(Forest::from_iter(a.iter().map(|x| x.clone())));
+        tr(String::from("Declare")) /(tr(String::from("Symbol"))/tr(String::from(s))) /t
+    }
 };
 
 Tier<Op, NextTier>: Tree<String> = {
@@ -77,6 +82,18 @@ PredOp = {
     ">",
 };
 
+RuleExt: Tree<String> = {
+    <o:Rule> => o,
+    "rule" "{" <r:Rule> ";" <p:Predicates> "}" => {
+        let mut t = tr(String::from("Rule"));
+        t.push_back(r);
+        t.append(Forest::from_iter(p.iter().map(|x| x.clone())));
+        t
+    }
+}
+
+Predicates = Vector<Predicate, Semicolon>;
+
 Rule: Tree<String> = {
     <l:Predicate> <o:RuleOp> <r:Predicate> => tr(String::from(o))/l/r,
     <l:Expr> <o:RuleOp> <r:Expr> => tr(String::from(o))/l/r,
@@ -84,6 +101,7 @@ Rule: Tree<String> = {
 
 RuleOp = {
     "=>",
+    "<=>",
 };
 
 Expr = Tier<SumOp, Factor>;
@@ -119,6 +137,7 @@ Term : &'input str = {
 
 SystemOp = { "+", "-", "*", "/", }
 Str = { r"[A-Za-z0-9_.]+", };
+ExtStr = { r"[A-Za-z0-9_.]+", "is", "in", "==", "!=", "<=", ">=", "<", ">", "+", "-", "*", "/", };
 
 Semicolon = { ";", };
 

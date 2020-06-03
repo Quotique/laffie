@@ -3,27 +3,38 @@ use std::{
     fs, io,
     path::Path,
     sync::{Arc, RwLock},
+    convert::TryFrom,
 };
 
-use parser::lang;
+use trees::Node;
+
+use parser::{lang, Tree as ParserTree};
 
 use super::{
-    symbols::{add_symbol, symbol_by_name, Symbol},
-    tree_utils::{apply_map, params_map, parse_node, NodeData},
-    trees::{Node, Tree},
+    statement::Statement,
+    symbols::Symbol,
+    term::{parse_rule_node, StatementTree, Term},
+    tree_utils::{apply_map, params_map},
 };
 
-// type ParamsMap = HashMap<String, u64>;
-type ParserTree = Tree<String>;
-type RuleTree = Tree<NodeData>;
-type RuleNode = Node<NodeData>;
+bitflags! {
+    pub struct RuleFlags: u32 {
+        const SUBTREE_REPLACEMENT = 0b010;
+        const EQUIVALENCE         = 0b001;
+        const NONE                = 0b000;
+    }
+}
 
 #[derive(Debug)]
 pub struct Rule {
-    pub id:      usize,
-    pub level:   usize,
-    pub pattern: RuleTree,
-    pub replace: RuleTree,
+    pub id:    usize,
+    pub level: usize,
+    pub flags: RuleFlags,
+
+    pub pattern: StatementTree,
+    pub replace: StatementTree,
+
+    pub requirements: Vec<Arc<Statement>>,
 }
 
 pub struct RulesEngine {
@@ -32,10 +43,75 @@ pub struct RulesEngine {
 }
 
 impl Rule {
-    pub fn new(id: usize, statement: &ParserTree) -> Result<Rule, String> {
-        if statement.root().data != "=>" {
-            return Err(format!("Expect => in rule, found: {:?}", statement.root()));
-        }
+    pub fn new(rule_id: usize, statement: &ParserTree) -> Result<Rule, String> {
+        let result = match statement.root().data.as_str() {
+            "=>" | "<=>" => {
+                let (left, right) = Rule::parse_rule(statement)?;
+                Rule {
+                    id:           rule_id,
+                    level:        0, // TODO: level
+                    flags:        if statement.root().data == "=>" {
+                        RuleFlags::NONE
+                    } else {
+                        RuleFlags::EQUIVALENCE
+                    },
+                    pattern:      left,
+                    replace:      right,
+                    requirements: vec![],
+                }
+            }
+            "Rule" => {
+                let mut params = HashMap::new();
+                let mut params_count: u64 = 0;
+
+                let mut left = None;
+                let mut right = None;
+                let mut rule_flags = None;
+                let mut reqs = vec![];
+
+                for i in statement.iter() {
+                    match i.data.as_str() {
+                        "=>" | "<=>" => {
+                            left = Some(parse_rule_node(i.first().unwrap(), &mut params, &mut params_count)?);
+                            right = Some(parse_rule_node(i.last().unwrap(), &mut params, &mut params_count)?);
+
+                            rule_flags = Some(if i.data.as_str() == "<=>" {
+                                RuleFlags::EQUIVALENCE
+                            } else {
+                                RuleFlags::NONE
+                            });
+                        }
+                        _ => reqs.push(Arc::new(Statement::new(i, &mut params)?)),
+                    }
+                }
+
+                Rule {
+                    id:           rule_id,
+                    level:        0, // TODO: level
+                    flags:        rule_flags.unwrap(),
+                    pattern:      left.unwrap(),
+                    replace:      right.unwrap(),
+                    requirements: reqs,
+                }
+            }
+            _ => {
+                return Err(format!("Expect => in rule, found: {:?}", statement.root()));
+            }
+        };
+
+        Ok(result)
+    }
+
+    pub fn apply(&self, arg: &Node<Term>) -> Result<StatementTree, String> {
+        let map = params_map(arg, &self.pattern)?;
+
+        let mut result = self.replace.clone();
+        apply_map(&mut result, &map);
+
+        Ok(result)
+    }
+
+    fn parse_rule(statement: &ParserTree) -> Result<(StatementTree, StatementTree), String> {
         if statement.degree() != 2 {
             return Err(format!(
                 "Incorrect childs count: {}, should be 2!",
@@ -44,23 +120,10 @@ impl Rule {
         }
         let mut params = HashMap::new();
         let mut params_count: u64 = 0;
-        let left = parse_node(statement.first().unwrap(), &mut params, &mut params_count)?;
-        let right = parse_node(statement.last().unwrap(), &mut params, &mut params_count)?;
-        Ok(Rule {
-            id:      id,
-            level:   0, // TODO: level impl
-            pattern: left,
-            replace: right,
-        })
-    }
-
-    pub fn apply(&self, arg: &RuleNode) -> Result<RuleTree, String> {
-        let map = params_map(arg, &self.pattern)?;
-
-        let mut result = self.replace.clone();
-        apply_map(&mut result, &map);
-
-        Ok(result)
+        Ok((
+            parse_rule_node(statement.first().unwrap(), &mut params, &mut params_count)?,
+            parse_rule_node(statement.last().unwrap(), &mut params, &mut params_count)?,
+        ))
     }
 }
 
@@ -106,20 +169,22 @@ impl RulesEngine {
         let mut symbol_id: u64 = 0;
         for state in states {
             let s = state.root();
-            if s.data == "Declare" && s.degree() == 2 && s.last().unwrap().data == "Symbol" {
-                symbol_id = symbol_by_name(&s.first().unwrap().data).map(|s| s.id).unwrap_or(0);
-                if !self.rules_by_sym.contains_key(&symbol_id) {
-                    self.rules_by_sym.insert(symbol_id, Vec::new());
+            if let Ok(sym) = Symbol::try_from(&state) {
+                symbol_id = sym.id;
+                if !self.rules_by_sym.contains_key(&sym.id) {
+                    self.rules_by_sym.insert(sym.id, Vec::new());
                 }
             } else {
                 trace!("Processing: {:?} ({})", s, symbol_id);
                 self.last_rule_id += 1;
                 match Rule::new(self.last_rule_id, &state) {
-                    Ok(r) => self
-                        .rules_by_sym
-                        .get_mut(&symbol_id)
-                        .unwrap()
-                        .push(Arc::new(RwLock::new(r))),
+                    Ok(r) => {
+                        trace!("New rule: {:?}", r);
+                        self.rules_by_sym
+                            .get_mut(&symbol_id)
+                            .unwrap()
+                            .push(Arc::new(RwLock::new(r)))
+                    }
                     Err(e) => trace!("Not rule!: {}", e),
                 }
             }
@@ -132,10 +197,11 @@ impl RulesEngine {
 #[cfg(test)]
 pub mod rule_tests {
     use super::*;
-    use core::{symbols::symbols_tests::setup, tree_utils::NodeData, trees::linked::fully::tr};
-    use std::sync::Once;
+    use bigdecimal::BigDecimal as Decimal;
+    use std::str::FromStr;
+    use trees::Tree;
 
-    static INIT: Once = Once::new();
+    use core::{symbols::symbols_tests::setup, term::Term, trees::linked::fully::tr};
 
     fn test_rule_tree() -> Tree<String> {
         tr(String::from("=>")) /
@@ -145,15 +211,33 @@ pub mod rule_tests {
             (tr(String::from("==")) / tr(String::from("x")) / (tr(String::from("-")) / tr(String::from("a"))))
     }
 
+    fn test_extended_tree() -> Tree<String> {
+        tr(String::from("Rule")) /
+            (tr(String::from("=>")) /
+                (tr(String::from("==")) /
+                    (tr(String::from("+")) / tr(String::from("a")) / tr(String::from("x"))) /
+                    tr(String::from("0"))) /
+                (tr(String::from("==")) / tr(String::from("x")) / (tr(String::from("-")) / tr(String::from("a"))))) /
+            (tr(String::from("!=")) / tr(String::from("a")) / tr(String::from("0")))
+    }
+
     #[test]
     fn pattern_test() {
         setup();
         let rule = Rule::new(1, &test_rule_tree()).expect("Unable to parse rule");
         assert_eq!(
             rule.pattern,
-            tr(NodeData::Symbol(1)) /
-                (tr(NodeData::Symbol(2)) / tr(NodeData::Param(1)) / tr(NodeData::Param(2))) /
-                tr(NodeData::Symbol(4))
+            tr(Term::Symbol(1)) /
+                (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Param(2))) /
+                tr(Term::Number(Decimal::from_str("0").unwrap()))
+        );
+
+        let rule_ext = Rule::new(1, &test_extended_tree()).expect("Unable to parse rule");
+        assert_eq!(
+            rule_ext.pattern,
+            tr(Term::Symbol(1)) /
+                (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Param(2))) /
+                tr(Term::Number(Decimal::from_str("0").unwrap()))
         );
     }
 
@@ -163,7 +247,13 @@ pub mod rule_tests {
         let rule = Rule::new(1, &test_rule_tree()).expect("Unable to parse rule");
         assert_eq!(
             rule.replace,
-            tr(NodeData::Symbol(1)) / tr(NodeData::Param(2)) / (tr(NodeData::Symbol(3)) / tr(NodeData::Param(1)))
+            tr(Term::Symbol(1)) / tr(Term::Param(2)) / (tr(Term::Symbol(3)) / tr(Term::Param(1)))
+        );
+
+        let rule_ext = Rule::new(1, &test_extended_tree()).expect("Unable to parse rule");
+        assert_eq!(
+            rule_ext.replace,
+            tr(Term::Symbol(1)) / tr(Term::Param(2)) / (tr(Term::Symbol(3)) / tr(Term::Param(1)))
         );
     }
 
@@ -171,17 +261,16 @@ pub mod rule_tests {
     fn apply_test() {
         setup();
         let rule = Rule::new(1, &test_rule_tree()).expect("Unable to parse rule");
-        let state = tr(NodeData::Symbol(1)) /
-            (tr(NodeData::Symbol(2)) / tr(NodeData::Symbol(5)) / tr(NodeData::Varible(1))) /
-            tr(NodeData::Symbol(4));
+        println!("{:?}", rule);
+        let state = tr(Term::Symbol(1)) /
+            (tr(Term::Symbol(2)) / tr(Term::Symbol(5)) / tr(Term::Variable(1))) /
+            tr(Term::Number(Decimal::from_str("0").unwrap()));
         match rule.apply(state.root()) {
             Ok(result) => assert_eq!(
                 result,
-                tr(NodeData::Symbol(1)) /
-                    tr(NodeData::Varible(1)) /
-                    (tr(NodeData::Symbol(3)) / tr(NodeData::Symbol(5)))
+                tr(Term::Symbol(1)) / tr(Term::Variable(1)) / (tr(Term::Symbol(3)) / tr(Term::Symbol(5)))
             ),
-            Err(e) => assert!(false, ""),
+            Err(e) => assert!(false, "Rule must be applied. Error: {}", e),
         }
     }
 }

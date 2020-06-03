@@ -1,1 +1,7 @@
 symbol *;
+
+rule {
+    a*x + b == 0 => x == - b/a;
+
+    a != 0
+}

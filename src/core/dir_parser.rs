@@ -1,8 +1,9 @@
 use std::{fs, io, path::Path};
 
+use trees::Tree;
+
 use parser::lang;
 
-use super::trees::Tree;
 
 pub fn load_dir<F: FnMut(&Tree<String>)>(dir: &Path, cb: &mut F) -> io::Result<()> {
     trace!("Processing dir: {}", dir.to_string_lossy());

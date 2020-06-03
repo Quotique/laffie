@@ -1,9 +1,14 @@
 extern crate bigdecimal;
 extern crate chrono;
+extern crate colored;
 extern crate config;
 extern crate fern;
+extern crate multi_map;
 extern crate serde;
+extern crate trees;
 
+#[macro_use]
+extern crate bitflags;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -16,13 +21,13 @@ mod parser;
 mod settings;
 mod solver;
 
-use std::{env, path::Path, str::FromStr};
+use std::{env, path::Path, str::FromStr, sync::Arc};
 
-use settings::{Logger, Settings};
+use colored::*;
 
 use core::{rule::RulesEngine, symbols::load_symbols};
-
-use solver::problem::{ProblemStorage, Solution};
+use settings::{Logger, Settings};
+use solver::{problem::ProblemStorage, solution::Solution};
 
 fn log_init(config: &Logger) {
     let log_level = log::LevelFilter::from_str(&config.level).unwrap_or(log::LevelFilter::Debug);
@@ -37,7 +42,7 @@ fn log_init(config: &Logger) {
             ))
         })
         .level(log_level)
-        .chain(std::io::stdout())
+        // .chain(std::io::stdout())
         .chain(fern::log_file(&config.filename).unwrap())
         .apply()
         .unwrap();
@@ -70,21 +75,21 @@ fn main() {
     let mut rules = RulesEngine::new();
     info!(target: "init", "Reading rules: {:?}", code_dir);
     rules.load_dir(&code_dir).unwrap();
+    let rules = Arc::new(rules);
 
     let mut problems = ProblemStorage::new();
     info!(target: "init", "Reading problems: {:?}", problems_dir);
     problems.load_dir(&problems_dir).unwrap();
 
     for p in problems.problems {
-        println!("Problem {}", p);
-        let mut solution = Solution::new(&p);
-        match solution.solve(&rules) {
+        println!("{} {}", "Problem".bold().green(), p);
+        let mut solution = Solution::new(&p, rules.clone());
+        match solution.solve() {
             Ok(_) => {
-                println!("Solution: {}", solution);
+                println!("{} {}", "Solution:".italic().blue(), solution);
             }
             Err(e) => {
-                println!("Solution: {}", solution);
-                println!("Solution  error: {}", e);
+                println!("{} {} {}", "Solution:".italic().blue(), e.red(), solution);
             }
         };
     }

@@ -2,4 +2,4 @@ extern crate log;
 extern crate trees;
 
 pub mod problem;
-pub mod statement;
+pub mod solution;

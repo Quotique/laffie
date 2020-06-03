@@ -6,24 +6,20 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use super::trees::{Node, Tree};
+use trees::Node;
 
-use core::{
-    rule::Rule,
-    tree_utils::{parse_node, NodeData, swap_node},
+use super::{
+    rule::{Rule, RuleFlags},
+    term::{parse_statement_node, StatementTree, Term},
+    tree_utils::swap_node,
 };
-// use std::borrow::BorrowMut;
 
 pub type ParamsMap = HashMap<String, u64>;
-type ParserNode = Node<String>;
-type StatementTree = Tree<NodeData>;
-
-pub const DEFAULT_WEIGHT: usize = 10;
 
 #[derive(Clone, Debug)]
 pub struct Statement {
-    weight:        RefCell<usize>,
     applied_rules: RefCell<HashSet<usize>>,
+    as_rule:       RefCell<bool>,
 
     pub parents: Vec<Arc<Statement>>,
     pub rule:    Option<Arc<RwLock<Rule>>>,
@@ -33,13 +29,13 @@ pub struct Statement {
 }
 
 impl Statement {
-    pub fn new(statement: &ParserNode, params: &mut ParamsMap) -> Result<Statement, String> {
+    pub fn new(statement: &Node<String>, params: &mut ParamsMap) -> Result<Statement, String> {
         let mut params_count: u64 = *params.values().max().unwrap_or(&0);
 
-        let root = parse_node(&statement, params, &mut params_count)?;
+        let root = parse_statement_node(&statement, params, &mut params_count)?;
         Ok(Statement {
-            weight:        RefCell::new(DEFAULT_WEIGHT),
             applied_rules: RefCell::new(HashSet::new()),
+            as_rule:       RefCell::new(true),
             parents:       vec![],
             rule:          None,
             symbols:       Self::symbols(&root),
@@ -48,21 +44,24 @@ impl Statement {
     }
 
     pub fn apply(statement: Arc<Self>, rule: Arc<RwLock<Rule>>) -> Result<Statement, String> {
-        if statement
+        if !statement
             .applied_rules
             .borrow_mut()
             .insert(rule.read().expect("Cant lock rule").id)
         {
-            let new_tree = rule.read().expect("Cant lock rule").apply(&statement.root)?;
+            return Err("Already applied".into());
+        }
+        if let Ok(new_tree) = rule.read().expect("Cant lock rule").apply(&statement.root) {
             Ok(Statement {
-                weight:        RefCell::new(DEFAULT_WEIGHT),
                 applied_rules: RefCell::new(HashSet::new()),
+                as_rule:       RefCell::new(true),
                 parents:       vec![statement.clone()],
                 rule:          Some(rule.clone()),
                 symbols:       Self::symbols(&new_tree),
                 root:          new_tree,
             })
         } else {
+            // if subtree replacement
             let mut applied = false;
             let mut new_tree = statement.root.clone();
             for i in new_tree.iter_mut() {
@@ -73,8 +72,8 @@ impl Statement {
             }
             if applied {
                 Ok(Statement {
-                    weight:        RefCell::new(DEFAULT_WEIGHT),
                     applied_rules: RefCell::new(HashSet::new()),
+                    as_rule:       RefCell::new(true),
                     parents:       vec![statement.clone()],
                     rule:          Some(rule.clone()),
                     symbols:       Self::symbols(&new_tree),
@@ -86,26 +85,48 @@ impl Statement {
         }
     }
 
-    pub fn weigth(&self) -> usize {
-        *self.weight.borrow()
+    pub fn rule(&self) -> Option<Rule> {
+        if *self.as_rule.borrow() {
+            *self.as_rule.borrow_mut() = false;
+
+            if self.root.data.is_symbol_name(&"==".into()) {
+                if self.root.first().unwrap().data.is_variable() {
+                    return Some(Rule {
+                        id:           0,
+                        level:        0,
+                        flags:        RuleFlags::SUBTREE_REPLACEMENT,
+                        pattern:      self.root.first().unwrap().to_owned(),
+                        replace:      self.root.last().unwrap().to_owned(),
+                        requirements: vec![],
+                    });
+                }
+            } else if self.root.data.is_symbol_name(&"=>".into()) {
+                return Some(Rule {
+                    id:           0,
+                    level:        0,
+                    flags:        RuleFlags::NONE,
+                    pattern:      self.root.first().unwrap().to_owned(),
+                    replace:      self.root.last().unwrap().to_owned(),
+                    requirements: vec![],
+                });
+            }
+
+            return None;
+        }
+        None
     }
 
-    pub fn decrease_weigth(&self) -> bool {
-        if *self.weight.borrow() == 0 {
-            return false;
-        }
-
-        *self.weight.borrow_mut() -= 1;
-        true
+    pub fn block_rule(&self, id: usize) {
+        self.applied_rules.borrow_mut().insert(id);
     }
 
     fn symbols(root: &StatementTree) -> HashSet<u64> {
         let mut symbols = HashSet::new();
-        root.iter().for_each(|x| {
-            if let NodeData::Symbol(s) = x.data {
-                symbols.insert(s);
+        for i in root.root().bfs().iter {
+            if let Term::Symbol(s) = i.data {
+                symbols.insert(*s);
             }
-        });
+        }
         symbols
     }
 
@@ -139,8 +160,8 @@ impl Statement {
 impl From<StatementTree> for Statement {
     fn from(root: StatementTree) -> Self {
         Statement {
-            weight: RefCell::new(DEFAULT_WEIGHT),
             applied_rules: RefCell::new(HashSet::new()),
+            as_rule: RefCell::new(true),
             parents: vec![],
             rule: None,
             symbols: Self::symbols(&root),
@@ -152,5 +173,32 @@ impl From<StatementTree> for Statement {
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", &self.root)
+    }
+}
+
+#[cfg(test)]
+mod statement_test {
+    use super::*;
+    use core::symbols::{symbol_by_name, symbols_tests::setup};
+    use trees::tr;
+
+    #[test]
+    fn symbols_test() {
+        setup();
+        let test = tr(String::from("==")) /
+            (tr(String::from("+")) /
+                (tr(String::from("*")) / tr(String::from("2")) / tr(String::from("x"))) /
+                tr(String::from("5"))) /
+            tr(String::from("0"));
+        let mut t1 = HashMap::new();
+        let mut t2: u64 = 0;
+        let state = parse_statement_node(&test, &mut t1, &mut t2).unwrap();
+        let expect_syms = vec![String::from("=="), String::from("*"), String::from("+")];
+        let syms = Statement::symbols(&state);
+        assert_eq!(syms.len(), expect_syms.len());
+        for s in expect_syms {
+            let id = symbol_by_name(&s).unwrap().id;
+            assert!(syms.contains(&id));
+        }
     }
 }

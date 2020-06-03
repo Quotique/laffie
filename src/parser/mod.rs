@@ -1,11 +1,11 @@
-extern crate trees;
-
 pub mod lang;
+
+pub type Tree = trees::Tree<String>;
 
 #[cfg(test)]
 mod parser_tests {
     use super::*;
-    use parser::trees::linked::fully::tr;
+    use trees::linked::fully::tr;
 
     #[test]
     fn predicate_parse_test() {
@@ -43,6 +43,32 @@ mod parser_tests {
                         (tr(String::from("+")) / tr(String::from("y")) / tr(String::from("z"))) /
                         tr(String::from("0"))) /
                     (tr(String::from("==")) / tr(String::from("x")) / tr(String::from("0"))))
+        );
+    }
+
+    #[test]
+    fn extended_rule_parse_test() {
+        let test = r#"rule {
+                a*x+b==0 => x==b/a;
+                a!=0;
+            }"#;
+        let states = lang::StatementsParser::new().parse(test).unwrap();
+        assert_eq!(states.len(), 1);
+        assert_eq!(
+            states[0],
+            tr(String::from("Rule")) /
+                (tr(String::from("=>")) /
+                    (tr(String::from("==")) /
+                        (tr(String::from("+")) /
+                            (tr(String::from("*")) / tr(String::from("a")) / tr(String::from("x"))) /
+                            tr(String::from("b"))) /
+                        tr(String::from("0"))) /
+                    (tr(String::from("==")) /
+                        tr(String::from("x")) /
+                        (tr(String::from("/")) /
+                            tr(String::from("b")) /
+                            tr(String::from("a"))))) /
+                (tr(String::from("!=")) / tr(String::from("a")) / tr(String::from("0")))
         );
     }
 
