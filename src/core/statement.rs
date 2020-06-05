@@ -10,7 +10,7 @@ use trees::Node;
 
 use super::{
     rule::{Rule, RuleFlags},
-    term::{parse_statement_node, StatementTree, Term},
+    term::{display_string, parse_statement_node, StatementTree, Term},
     tree_utils::swap_node,
 };
 
@@ -172,7 +172,7 @@ impl From<StatementTree> for Statement {
 
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", &self.root)
+        write!(f, "{}", display_string(&self.root))
     }
 }
 

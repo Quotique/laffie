@@ -1,4 +1,6 @@
-symbol -;
+symbol - {
+    attr infix(300)
+};
 
 --a => a;
 

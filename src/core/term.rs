@@ -2,10 +2,10 @@ use bigdecimal::BigDecimal as Decimal;
 use std::{collections::HashMap, fmt, str::FromStr};
 use trees::{tr, Node, Tree};
 
-use super::symbols::{symbol_by_id, symbol_by_name};
+use super::symbols::{symbol_by_id, symbol_by_name, Symbol, SymbolAttr};
 
 pub type StatementTree = Tree<Term>;
-//type ParamsMap = HashMap<u64, StatementTree>;
+// type ParamsMap = HashMap<u64, StatementTree>;
 type ParamsNameMap = HashMap<String, u64>;
 type ParserNode = Node<String>;
 
@@ -45,10 +45,20 @@ fn parse_node(
     last_param_id: &mut u64,
     node_type: NodeType,
 ) -> Result<StatementTree, String> {
-    let mut result = tr(Term::parse(src_node.data.clone(), params, last_param_id, &node_type));
+    let mut result = tr(Term::parse(
+        src_node.data.clone(),
+        params,
+        last_param_id,
+        &node_type,
+    ));
     if result.root().data.is_symbol() {
         for child in src_node.iter() {
-            result.push_back(parse_node(&child, params, last_param_id, node_type.clone())?);
+            result.push_back(parse_node(
+                &child,
+                params,
+                last_param_id,
+                node_type.clone(),
+            )?);
         }
     } else {
         if !src_node.is_leaf() {
@@ -59,7 +69,12 @@ fn parse_node(
 }
 
 impl Term {
-    fn parse(data: String, params: &mut ParamsNameMap, last_param_id: &mut u64, node_type: &NodeType) -> Self {
+    fn parse(
+        data: String,
+        params: &mut ParamsNameMap,
+        last_param_id: &mut u64,
+        node_type: &NodeType,
+    ) -> Self {
         if let Ok(value) = Decimal::from_str(&data) {
             Term::Number(value)
         } else if let Some(symbol) = symbol_by_name(&data) {
@@ -139,6 +154,57 @@ impl Term {
             return self.is_symbol_id(s.id);
         }
         false
+    }
+}
+
+pub fn display_string(node: &Node<Term>) -> String {
+    match node.data {
+        Term::Symbol(id) => {
+            let symbol = symbol_by_id(id).unwrap();
+            match symbol.display_weight() {
+                Some(weight) => {
+                    if node.degree() < 2 {
+                        return format!(
+                            "{}{}",
+                            symbol,
+                            node.iter()
+                                .map(|x| display_string(x))
+                                .collect::<Vec::<String>>()
+                                .join(", ")
+                        );
+                    }
+                    format!(
+                        "{}",
+                        node.iter()
+                            .map(|x| {
+                                if let Term::Symbol(id) = x.data {
+                                    let symbol = symbol_by_id(id).unwrap();
+                                    if let Some(other_weight) = symbol.display_weight() {
+                                        if weight <= other_weight {
+                                            return format!("({})", display_string(x));
+                                        }
+                                    }
+                                }
+                                display_string(x)
+                            })
+                            .collect::<Vec::<String>>()
+                            .join(symbol.to_string().as_str())
+                    )
+                }
+                None => {
+                    // Prefix notation is default
+                    format!(
+                        "{}({})",
+                        symbol,
+                        node.iter()
+                            .map(|x| display_string(x))
+                            .collect::<Vec::<String>>()
+                            .join(", ")
+                    )
+                }
+            }
+        }
+        _ => node.data.to_string(),
     }
 }
 

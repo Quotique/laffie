@@ -1,4 +1,6 @@
-symbol *;
+symbol * {
+    attr infix(200),display("")
+};
 
 rule {
     a*x + b == 0 => x == - b/a;
