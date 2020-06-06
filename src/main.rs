@@ -4,6 +4,8 @@ extern crate colored;
 extern crate config;
 extern crate fern;
 extern crate multi_map;
+extern crate num;
+extern crate num_bigint;
 extern crate serde;
 extern crate trees;
 

@@ -56,7 +56,11 @@ pub fn params_map(target: &TreeNode, pattern: &TreeNode) -> Result<ParamsMap, St
     params_map_impl(target, pattern, ParamsMap::new())
 }
 
-fn params_map_impl(target: &TreeNode, pattern: &TreeNode, mut params: ParamsMap) -> Result<ParamsMap, String> {
+fn params_map_impl(
+    target: &TreeNode,
+    pattern: &TreeNode,
+    mut params: ParamsMap,
+) -> Result<ParamsMap, String> {
     trace!("Pattern: {}, traget: {}", pattern, target);
     match &pattern.data {
         Term::Symbol(id) => match &target.data {
@@ -77,13 +81,15 @@ fn params_map_impl(target: &TreeNode, pattern: &TreeNode, mut params: ParamsMap)
                 }
             }
             _ => {
-                return Err(format!("Expect symbol id: {}, found target: {:?}", id, &target.data));
+                return Err(format!(
+                    "Expect symbol id: {}, found target: {:?}",
+                    id, &target.data
+                ));
             }
         },
         Term::Param(id) => {
             if params.contains_key(id) {
                 let node = params.get(id).unwrap();
-                println!("Node: {:?}", node);
                 let _ = params_map(node, target)?;
             } else {
                 params.insert(*id, target.to_owned()); // subtree_clone(target));
@@ -133,8 +139,9 @@ mod tree_utils_tests {
         let tree = tr(Term::Symbol(1)) /
             (tr(Term::Symbol(2)) / tr(Term::Symbol(3)) / tr(Term::Symbol(4))) /
             tr(Term::Variable(5));
-        let pattern =
-            tr(Term::Symbol(1)) / (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) / tr(Term::Param(2));
+        let pattern = tr(Term::Symbol(1)) /
+            (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) /
+            tr(Term::Param(2));
         match params_map(&tree, &pattern) {
             Ok(map) => {
                 assert_eq!(*map.get(&1).unwrap(), (tr(Term::Symbol(3))));
@@ -152,8 +159,9 @@ mod tree_utils_tests {
         let tree = tr(Term::Symbol(1)) /
             (tr(Term::Symbol(2)) / tr(Term::Symbol(3)) / tr(Term::Symbol(4))) /
             tr(Term::Symbol(3));
-        let pattern =
-            tr(Term::Symbol(1)) / (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) / tr(Term::Param(2));
+        let pattern = tr(Term::Symbol(1)) /
+            (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) /
+            tr(Term::Param(2));
         match params_map(&tree, &pattern) {
             Ok(map) => {
                 assert_eq!(*map.get(&1).unwrap(), (tr(Term::Symbol(3))));
@@ -172,8 +180,9 @@ mod tree_utils_tests {
                 (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2))) /
                 tr(Term::Symbol(4))) /
             (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2)));
-        let pattern =
-            tr(Term::Symbol(1)) / (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) / tr(Term::Param(2));
+        let pattern = tr(Term::Symbol(1)) /
+            (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) /
+            tr(Term::Param(2));
         match params_map(&tree, &pattern) {
             Ok(map) => {
                 assert_eq!(
@@ -195,8 +204,9 @@ mod tree_utils_tests {
                 (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2))) /
                 tr(Term::Symbol(4))) /
             (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2)));
-        let pattern =
-            tr(Term::Symbol(1)) / (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) / tr(Term::Param(2));
+        let pattern = tr(Term::Symbol(1)) /
+            (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) /
+            tr(Term::Param(2));
         match params_map(&tree, &pattern) {
             Ok(map) => {
                 let mut test = tr(Term::Symbol(1)) / tr(Term::Param(1));
@@ -204,7 +214,8 @@ mod tree_utils_tests {
 
                 assert_eq!(
                     test,
-                    tr(Term::Symbol(1)) / (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2)))
+                    tr(Term::Symbol(1)) /
+                        (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2)))
                 );
             }
             Err(e) => {

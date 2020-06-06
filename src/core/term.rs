@@ -1,8 +1,8 @@
-use bigdecimal::BigDecimal as Decimal;
+use bigdecimal::{BigDecimal as Decimal, Signed};
 use std::{collections::HashMap, fmt, str::FromStr};
 use trees::{tr, Node, Tree};
 
-use super::symbols::{symbol_by_id, symbol_by_name, Symbol, SymbolAttr};
+use super::symbols::{symbol_by_id, symbol_by_name, Symbol};
 
 pub type StatementTree = Tree<Term>;
 // type ParamsMap = HashMap<u64, StatementTree>;
@@ -90,6 +90,13 @@ impl Term {
                 NodeType::Statement => Term::Variable(id),
             }
         }
+    }
+
+    pub fn symbol(&self) -> Option<Symbol> {
+        if let Term::Symbol(id) = self {
+            return symbol_by_id(*id);
+        }
+        None
     }
 
     #[allow(dead_code)]
@@ -216,7 +223,13 @@ impl fmt::Display for Term {
                 write!(f, "{}", s.name)
             }
             Term::Param(id) => write!(f, "p{}", id),
-            Term::Number(value) => write!(f, "{}", value),
+            Term::Number(value) => {
+                if value.is_negative() {
+                    write!(f, "({})", value)
+                } else {
+                    write!(f, "{}", value)
+                }
+            }
             Term::Variable(id) => write!(f, "x{}", id),
         }
     }

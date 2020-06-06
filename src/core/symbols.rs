@@ -15,10 +15,13 @@ lazy_static! {
 pub enum SymbolAttr {
     Infix,
     Display,
+    Associative,
+    Commutative,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SymbolAttrValue {
+    None,
     UInt(u64),
     UStr(String),
 }
@@ -100,6 +103,8 @@ impl Symbol {
                     .clone();
                 Ok((SymbolAttr::Display, SymbolAttrValue::UStr(s)))
             }
+            "associative" => Ok((SymbolAttr::Associative, SymbolAttrValue::None)),
+            "commutative" => Ok((SymbolAttr::Commutative, SymbolAttrValue::None)),
             _ => Err(format!("Unknown symbol attribute: {}", data.data)),
         }
     }
@@ -166,13 +171,24 @@ pub mod symbols_tests {
 
     pub fn setup() {
         INIT.call_once(|| {
-            Symbol::add_with_name("==");
-            Symbol::add_with_name("+");
-            Symbol::add_with_name("-");
-            Symbol::add_with_name("!=");
-            Symbol::add_with_name(">");
-            Symbol::add_with_name("<");
-            Symbol::add_with_name("*");
+            Symbol::add_with_name("=="); // 1
+
+            let mut attr = HashMap::new();
+            attr.insert(SymbolAttr::Infix, SymbolAttrValue::UInt(10));
+            attr.insert(SymbolAttr::Associative, SymbolAttrValue::None);
+            attr.insert(SymbolAttr::Commutative, SymbolAttrValue::None);
+
+            add_symbol(Symbol {
+                id:    0,
+                name:  "+".into(), // 2
+                attrs: attr,
+            });
+            Symbol::add_with_name("-"); // 3
+            Symbol::add_with_name("!="); // 4
+            Symbol::add_with_name(">"); // 5
+            Symbol::add_with_name("<"); // 6
+            Symbol::add_with_name("*"); // 7
+            Symbol::add_with_name("/"); // 8
         });
     }
 

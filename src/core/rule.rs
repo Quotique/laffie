@@ -1,9 +1,9 @@
 use std::{
     collections::{HashMap, HashSet},
+    convert::TryFrom,
     fs, io,
     path::Path,
     sync::{Arc, RwLock},
-    convert::TryFrom,
 };
 
 use trees::Node;
@@ -72,8 +72,16 @@ impl Rule {
                 for i in statement.iter() {
                     match i.data.as_str() {
                         "=>" | "<=>" => {
-                            left = Some(parse_rule_node(i.first().unwrap(), &mut params, &mut params_count)?);
-                            right = Some(parse_rule_node(i.last().unwrap(), &mut params, &mut params_count)?);
+                            left = Some(parse_rule_node(
+                                i.first().unwrap(),
+                                &mut params,
+                                &mut params_count,
+                            )?);
+                            right = Some(parse_rule_node(
+                                i.last().unwrap(),
+                                &mut params,
+                                &mut params_count,
+                            )?);
 
                             rule_flags = Some(if i.data.as_str() == "<=>" {
                                 RuleFlags::EQUIVALENCE
@@ -148,7 +156,10 @@ impl RulesEngine {
 
     pub fn load_dir(&mut self, dir: &Path) -> io::Result<()> {
         if !dir.is_dir() {
-            panic!(dir.to_string_lossy().to_string().push_str(" is not directory!"));
+            panic!(dir
+                .to_string_lossy()
+                .to_string()
+                .push_str(" is not directory!"));
         }
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
@@ -208,7 +219,9 @@ pub mod rule_tests {
             (tr(String::from("==")) /
                 (tr(String::from("+")) / tr(String::from("a")) / tr(String::from("x"))) /
                 tr(String::from("0"))) /
-            (tr(String::from("==")) / tr(String::from("x")) / (tr(String::from("-")) / tr(String::from("a"))))
+            (tr(String::from("==")) /
+                tr(String::from("x")) /
+                (tr(String::from("-")) / tr(String::from("a"))))
     }
 
     fn test_extended_tree() -> Tree<String> {
@@ -217,7 +230,9 @@ pub mod rule_tests {
                 (tr(String::from("==")) /
                     (tr(String::from("+")) / tr(String::from("a")) / tr(String::from("x"))) /
                     tr(String::from("0"))) /
-                (tr(String::from("==")) / tr(String::from("x")) / (tr(String::from("-")) / tr(String::from("a"))))) /
+                (tr(String::from("==")) /
+                    tr(String::from("x")) /
+                    (tr(String::from("-")) / tr(String::from("a"))))) /
             (tr(String::from("!=")) / tr(String::from("a")) / tr(String::from("0")))
     }
 
@@ -261,14 +276,15 @@ pub mod rule_tests {
     fn apply_test() {
         setup();
         let rule = Rule::new(1, &test_rule_tree()).expect("Unable to parse rule");
-        println!("{:?}", rule);
         let state = tr(Term::Symbol(1)) /
             (tr(Term::Symbol(2)) / tr(Term::Symbol(5)) / tr(Term::Variable(1))) /
             tr(Term::Number(Decimal::from_str("0").unwrap()));
         match rule.apply(state.root()) {
             Ok(result) => assert_eq!(
                 result,
-                tr(Term::Symbol(1)) / tr(Term::Variable(1)) / (tr(Term::Symbol(3)) / tr(Term::Symbol(5)))
+                tr(Term::Symbol(1)) /
+                    tr(Term::Variable(1)) /
+                    (tr(Term::Symbol(3)) / tr(Term::Symbol(5)))
             ),
             Err(e) => assert!(false, "Rule must be applied. Error: {}", e),
         }

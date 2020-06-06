@@ -13,52 +13,12 @@ use core::{
     term::{StatementTree, Term},
 };
 
-use super::problem::{Problem, ProblemType};
+use super::{
+    operations::{is_true, normalize},
+    problem::{Problem, ProblemType},
+};
 
 pub const DEFAULT_WEIGHT: usize = 10;
-
-fn is_true(statement: &StatementTree) -> bool {
-    if let Term::Symbol(id) = &statement.data {
-        if *id == symbol_by_name(&"==".into()).unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) =
-                (&statement.first().unwrap().data, &statement.last().unwrap().data)
-            {
-                return d1 == d2;
-            }
-        } else if *id == symbol_by_name(&"!=".into()).unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) =
-                (&statement.first().unwrap().data, &statement.last().unwrap().data)
-            {
-                return d1 != d2;
-            }
-        } else if *id == symbol_by_name(&"<".into()).unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) =
-                (&statement.first().unwrap().data, &statement.last().unwrap().data)
-            {
-                return d1 < d2;
-            }
-        } else if *id == symbol_by_name(&"<=".into()).unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) =
-                (&statement.first().unwrap().data, &statement.last().unwrap().data)
-            {
-                return d1 <= d2;
-            }
-        } else if *id == symbol_by_name(&">".into()).unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) =
-                (&statement.first().unwrap().data, &statement.last().unwrap().data)
-            {
-                return d1 > d2;
-            }
-        } else if *id == symbol_by_name(&">=".into()).unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) =
-                (&statement.first().unwrap().data, &statement.last().unwrap().data)
-            {
-                return d1 >= d2;
-            }
-        }
-    }
-    false
-}
 
 pub struct Solution {
     pub conditions: Vec<(Arc<Statement>, RefCell<usize>)>,
@@ -77,7 +37,12 @@ impl Solution {
             conditions: problem
                 .conditions
                 .iter()
-                .map(|x| (x.clone(), RefCell::new(DEFAULT_WEIGHT)))
+                .map(|x| {
+                    let mut s = (**x).clone();
+                    normalize(s.root.root_mut());
+
+                    (Arc::new(s), RefCell::new(DEFAULT_WEIGHT))
+                })
                 .collect(),
             answer:     None,
 
@@ -97,7 +62,7 @@ impl Solution {
                         return Err("No solution found".into());
                     }
                     *weight.borrow_mut() -= 1;
-                    if self.is_answer(&state) {
+                    if self.is_answer(&state, &*weight.borrow()) {
                         self.answer = Some(state.clone());
                         return Ok(());
                     }
@@ -109,7 +74,8 @@ impl Solution {
                     }
 
                     if let Some(s) = self.next_statement(state.clone(), |_| true) {
-                        self.conditions.push((Arc::new(s), RefCell::new(DEFAULT_WEIGHT)));
+                        self.conditions
+                            .push((Arc::new(s), RefCell::new(DEFAULT_WEIGHT)));
                     }
                     self.prepare_target();
                 }
@@ -118,11 +84,13 @@ impl Solution {
         }
     }
 
-    pub fn is_answer(&self, statement: &Statement) -> bool {
+    pub fn is_answer(&self, statement: &Statement, weight: &usize) -> bool {
         match &self.target {
             ProblemType::Calculate(x) => {
                 let eq_sym = symbol_by_name(&String::from("==")).unwrap().id;
-                if statement.root.degree() != 2 || statement.root.root().data != Term::Symbol(eq_sym) {
+                if statement.root.degree() != 2 ||
+                    statement.root.root().data != Term::Symbol(eq_sym)
+                {
                     return false;
                 }
                 statement.root.first().unwrap() == x.root()
@@ -145,7 +113,9 @@ impl Solution {
                 }
                 false
             }
-            _ => false,
+            ProblemType::Transform => {
+                return weight == &1;
+            }
         }
     }
 
@@ -162,7 +132,8 @@ impl Solution {
             ProblemType::Proof(x) => {
                 for i in std::iter::once(x).chain(self.equivalent_targets.iter()) {
                     while let Some(x) = self.next_statement(i.clone(), |r| {
-                        r.flags.contains(RuleFlags::EQUIVALENCE) | r.flags.contains(RuleFlags::SUBTREE_REPLACEMENT)
+                        r.flags.contains(RuleFlags::EQUIVALENCE) |
+                            r.flags.contains(RuleFlags::SUBTREE_REPLACEMENT)
                     }) {
                         alt_targets.push(Arc::new(x));
                     }
@@ -173,7 +144,11 @@ impl Solution {
         self.equivalent_targets.append(&mut alt_targets);
     }
 
-    fn next_statement<F: Fn(&Rule) -> bool>(&self, statement: Arc<Statement>, rule_filter: F) -> Option<Statement> {
+    fn next_statement<F: Fn(&Rule) -> bool>(
+        &self,
+        statement: Arc<Statement>,
+        rule_filter: F,
+    ) -> Option<Statement> {
         let mut rules = self.rules_engine.find_rules(&statement.symbols);
         rules.append(&mut self.local_rules.clone());
         rules.sort_by(|x, y| {
@@ -183,11 +158,19 @@ impl Solution {
                 .cmp(&y.read().expect("Cant lock rule").level)
         });
 
-        for rule in rules.iter().filter(|x| rule_filter(&x.read().expect("Cant lock rule"))) {
+        for rule in rules
+            .iter()
+            .filter(|x| rule_filter(&x.read().expect("Cant lock rule")))
+        {
             trace!("Rule: {:?}", rule);
             match Statement::apply(statement.clone(), rule.clone()) {
-                Ok(s) => {
-                    for r in rule.read().expect("Unable to lock rule").requirements.iter() {
+                Ok(mut s) => {
+                    for r in rule
+                        .read()
+                        .expect("Unable to lock rule")
+                        .requirements
+                        .iter()
+                    {
                         let sub_p = self.subproblem(ProblemType::Proof(r.clone()));
                         let mut sol = Solution::new(&sub_p, self.rules_engine.clone());
                         if sol.solve().is_err() {
@@ -196,6 +179,7 @@ impl Solution {
                         }
                     }
 
+                    normalize(s.root.root_mut());
                     return Some(s);
                 }
                 Err(e) => {
@@ -264,12 +248,16 @@ mod solution_tests {
         let problem = test_problem();
         let solution = Solution::new(&problem, rules);
         let statement_answer = Statement::from(
-            tr(Term::Symbol(1)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from_str("2").unwrap())),
+            tr(Term::Symbol(1)) /
+                tr(Term::Variable(1)) /
+                tr(Term::Number(Decimal::from_str("2").unwrap())),
         );
         let statement_not_answer = Statement::from(
-            tr(Term::Symbol(1)) / tr(Term::Variable(2)) / tr(Term::Number(Decimal::from_str("2").unwrap())),
+            tr(Term::Symbol(1)) /
+                tr(Term::Variable(2)) /
+                tr(Term::Number(Decimal::from_str("2").unwrap())),
         );
-        assert_eq!(solution.is_answer(&statement_answer), true);
-        assert_eq!(solution.is_answer(&statement_not_answer), false);
+        assert_eq!(solution.is_answer(&statement_answer, &10), true);
+        assert_eq!(solution.is_answer(&statement_not_answer, &10), false);
     }
 }

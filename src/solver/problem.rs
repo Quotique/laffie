@@ -37,7 +37,10 @@ impl ProblemType {
             "proof" => Ok(ProblemType::Proof(Arc::new(target))),
             "find" => Ok(ProblemType::Calculate(target.root)),
             "transform" => Ok(ProblemType::Transform),
-            _ => Err(format!("Incorrect problem type: {}", node.first().unwrap().data)),
+            _ => Err(format!(
+                "Incorrect problem type: {}",
+                node.first().unwrap().data
+            )),
         }
     }
 }
@@ -72,7 +75,9 @@ impl Problem {
             if child.data == "Target" {
                 result.target = ProblemType::try_from(child, &mut params)?;
             } else {
-                result.conditions.push(Arc::new(Statement::new(child, &mut params)?));
+                result
+                    .conditions
+                    .push(Arc::new(Statement::new(child, &mut params)?));
             }
         }
         Ok(result)
@@ -96,7 +101,9 @@ impl fmt::Display for Problem {
 
 impl ProblemStorage {
     pub fn new() -> ProblemStorage {
-        ProblemStorage { problems: Vec::new() }
+        ProblemStorage {
+            problems: Vec::new(),
+        }
     }
 
     pub fn load_dir(&mut self, dir: &Path) -> io::Result<()> {
