@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    fs, io,
+    fmt, fs, io,
     path::Path,
     sync::{Arc, RwLock},
 };
@@ -13,7 +13,7 @@ use parser::{lang, Tree as ParserTree};
 use super::{
     statement::Statement,
     symbols::Symbol,
-    term::{parse_rule_node, StatementTree, Term},
+    term::{display_string, parse_rule_node, StatementTree, Term},
     tree_utils::{apply_map, params_map},
 };
 
@@ -35,6 +35,20 @@ pub struct Rule {
     pub replace: StatementTree,
 
     pub requirements: Vec<Arc<Statement>>,
+}
+
+impl fmt::Display for Rule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{} => {} id: {}, level: {}, reqs: {:?}",
+            display_string(self.pattern.root()),
+            display_string(self.replace.root()),
+            self.id,
+            self.level,
+            self.requirements
+        )
+    }
 }
 
 pub struct RulesEngine {

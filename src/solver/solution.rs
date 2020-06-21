@@ -162,7 +162,7 @@ impl Solution {
             .iter()
             .filter(|x| rule_filter(&x.read().expect("Cant lock rule")))
         {
-            trace!("Rule: {:?}", rule);
+            trace!("Rule: {}", rule.read().unwrap());
             match Statement::apply(statement.clone(), rule.clone()) {
                 Ok(mut s) => {
                     for r in rule

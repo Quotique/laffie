@@ -44,7 +44,7 @@ fn log_init(config: &Logger) {
             ))
         })
         .level(log_level)
-        // .chain(std::io::stdout())
+        //.chain(std::io::stdout())
         .chain(fern::log_file(&config.filename).unwrap())
         .apply()
         .unwrap();

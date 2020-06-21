@@ -123,12 +123,6 @@ fn params_map_impl(
     Ok(params)
 }
 
-// fn subtree_clone(src: &TreeNode) -> Tree<Term> {
-//    let mut result = tr(src.data.clone());
-//    result.append(src.forest().clone());
-//    result
-//}
-
 #[cfg(test)]
 mod tree_utils_tests {
     use super::*;

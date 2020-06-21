@@ -1,0 +1,5 @@
+problem {
+1 > 0 && x == 1;
+
+target transform 0;
+};

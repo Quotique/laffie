@@ -1,9 +1,9 @@
 symbol * {
-    attr infix(200),display("")
+    attr infix(200),display(""),associative,commutative
 };
 
 rule {
-    a*x + b == 0 => x == - b/a;
+    x*a + b == 0 => x == - b/a;
 
     a != 0
 }
