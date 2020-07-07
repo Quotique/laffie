@@ -11,15 +11,14 @@ use trees::Node;
 use super::{
     rule::{Rule, RuleFlags},
     term::{display_string, parse_statement_node, StatementTree, Term},
-    tree_utils::swap_node,
 };
 
 pub type ParamsMap = HashMap<String, u64>;
 
 #[derive(Clone, Debug)]
 pub struct Statement {
-    applied_rules: RefCell<HashSet<usize>>,
-    as_rule:       RefCell<bool>,
+    pub applied_rules: RefCell<HashSet<usize>>,
+    as_rule:           RefCell<bool>,
 
     pub parents: Vec<Arc<Statement>>,
     pub rule:    Option<Arc<RwLock<Rule>>>,
@@ -43,46 +42,9 @@ impl Statement {
         })
     }
 
-    pub fn apply(statement: Arc<Self>, rule: Arc<RwLock<Rule>>) -> Result<Statement, String> {
-        if !statement
-            .applied_rules
-            .borrow_mut()
-            .insert(rule.read().expect("Cant lock rule").id)
-        {
-            return Err("Already applied".into());
-        }
-        if let Ok(new_tree) = rule.read().expect("Cant lock rule").apply(&statement.root) {
-            Ok(Statement {
-                applied_rules: RefCell::new(HashSet::new()),
-                as_rule:       RefCell::new(true),
-                parents:       vec![statement.clone()],
-                rule:          Some(rule.clone()),
-                symbols:       Self::symbols(&new_tree),
-                root:          new_tree,
-            })
-        } else {
-            // if subtree replacement
-            let mut applied = false;
-            let mut new_tree = statement.root.clone();
-            for i in new_tree.iter_mut() {
-                if let Ok(mut new_sub) = rule.read().expect("Cant lock rule").apply(&i) {
-                    applied = true;
-                    swap_node(i, &mut new_sub);
-                }
-            }
-            if applied {
-                Ok(Statement {
-                    applied_rules: RefCell::new(HashSet::new()),
-                    as_rule:       RefCell::new(true),
-                    parents:       vec![statement.clone()],
-                    rule:          Some(rule.clone()),
-                    symbols:       Self::symbols(&new_tree),
-                    root:          new_tree,
-                })
-            } else {
-                Err("Rule applied".into())
-            }
-        }
+    pub fn with_rule(mut self, rule: Arc<RwLock<Rule>>) -> Self {
+        self.rule = Some(rule);
+        self
     }
 
     pub fn rule(&self) -> Option<Rule> {

@@ -404,6 +404,8 @@ mod operations_tests {
 
     #[test]
     fn commutative_reorder_test() {
+        setup();
+
         // 1+2+5+(2*x)+x+(2+3) -> (2+3)+(2*x)+x+1+2+5
         let mut test_tree = tr(Term::Symbol(2)) /
             tr(Term::Number(Decimal::from(1))) /

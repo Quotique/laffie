@@ -11,6 +11,7 @@ use core::{
     statement::Statement,
     symbols::symbol_by_name,
     term::{StatementTree, Term},
+    tree_utils::swap_node,
 };
 
 use super::{
@@ -73,7 +74,7 @@ impl Solution {
                         self.local_rules.push(Arc::new(RwLock::new(r)));
                     }
 
-                    if let Some(s) = self.next_statement(state.clone(), |_| true) {
+                    for s in self.next_statement(state.clone(), |_| true).into_iter() {
                         self.conditions
                             .push((Arc::new(s), RefCell::new(DEFAULT_WEIGHT)));
                     }
@@ -119,6 +120,57 @@ impl Solution {
         }
     }
 
+    pub fn apply(
+        &self,
+        statement: Arc<Statement>,
+        rule: Arc<RwLock<Rule>>,
+    ) -> Result<Vec<Statement>, String> {
+        if !statement
+            .applied_rules
+            .borrow_mut()
+            .insert(rule.read().expect("Cant lock rule").id)
+        {
+            return Err("Already applied".into());
+        }
+        if let Ok(new_trees) = rule.read().expect("Cant lock rule").apply(&statement.root) {
+            Ok(new_trees
+                .into_iter()
+                .filter_map(|(x, reqs)| {
+                    for r in reqs {
+                        if !self.proof(Arc::new(r)) {
+                            return None;
+                        }
+                    }
+                    Some(Statement::from(x).with_rule(rule.clone()))
+                })
+                .collect())
+        } else {
+            // if subtree replacement
+            let mut applied = false;
+            let mut new_tree = statement.root.clone();
+            for i in new_tree.iter_mut() {
+                if let Ok(new_sub) = rule.read().expect("Cant lock rule").apply(&i) {
+                    for (mut variant, reqs) in new_sub {
+                        for r in reqs {
+                            if !self.proof(Arc::new(r)) {
+                                continue;
+                            }
+                        }
+                        applied = true;
+                        // TODO: is multiple replace possible?
+                        swap_node(i, &mut variant);
+                        break;
+                    }
+                }
+            }
+            if applied {
+                Ok(vec![Statement::from(new_tree).with_rule(rule.clone())])
+            } else {
+                Err("Rule applied".into())
+            }
+        }
+    }
+
     fn subproblem(&self, target: ProblemType) -> Problem {
         Problem {
             conditions: self.conditions.iter().map(|(x, _)| x.clone()).collect(),
@@ -126,15 +178,28 @@ impl Solution {
         }
     }
 
+    fn proof(&self, statement: Arc<Statement>) -> bool {
+        let sub_p = self.subproblem(ProblemType::Proof(statement.clone()));
+        let mut sol = Solution::new(&sub_p, self.rules_engine.clone());
+        if sol.solve().is_err() {
+            trace!("Can't proof: {}", statement);
+            return false;
+        }
+        return true;
+    }
+
     fn prepare_target(&mut self) {
         let mut alt_targets = vec![];
         match &self.target {
             ProblemType::Proof(x) => {
                 for i in std::iter::once(x).chain(self.equivalent_targets.iter()) {
-                    while let Some(x) = self.next_statement(i.clone(), |r| {
-                        r.flags.contains(RuleFlags::EQUIVALENCE) |
-                            r.flags.contains(RuleFlags::SUBTREE_REPLACEMENT)
-                    }) {
+                    for x in self
+                        .next_statement(i.clone(), |r| {
+                            r.flags.contains(RuleFlags::EQUIVALENCE) |
+                                r.flags.contains(RuleFlags::SUBTREE_REPLACEMENT)
+                        })
+                        .into_iter()
+                    {
                         alt_targets.push(Arc::new(x));
                     }
                 }
@@ -148,7 +213,7 @@ impl Solution {
         &self,
         statement: Arc<Statement>,
         rule_filter: F,
-    ) -> Option<Statement> {
+    ) -> Vec<Statement> {
         let mut rules = self.rules_engine.find_rules(&statement.symbols);
         rules.append(&mut self.local_rules.clone());
         rules.sort_by(|x, y| {
@@ -163,31 +228,22 @@ impl Solution {
             .filter(|x| rule_filter(&x.read().expect("Cant lock rule")))
         {
             trace!("Rule: {}", rule.read().unwrap());
-            match Statement::apply(statement.clone(), rule.clone()) {
-                Ok(mut s) => {
-                    for r in rule
-                        .read()
-                        .expect("Unable to lock rule")
-                        .requirements
-                        .iter()
-                    {
-                        let sub_p = self.subproblem(ProblemType::Proof(r.clone()));
-                        let mut sol = Solution::new(&sub_p, self.rules_engine.clone());
-                        if sol.solve().is_err() {
-                            trace!("Can't proof: {}", r);
-                            continue;
-                        }
-                    }
-
-                    normalize(s.root.root_mut());
-                    return Some(s);
+            match self.apply(statement.clone(), rule.clone()) {
+                Ok(results) => {
+                    return results
+                        .into_iter()
+                        .map(|mut s| {
+                            normalize(s.root.root_mut());
+                            s
+                        })
+                        .collect()
                 }
                 Err(e) => {
                     trace!("Cant apply rule: {}", e);
                 }
             }
         }
-        None
+        vec![]
     }
 
     fn is_true(&self, statement: &StatementTree) -> bool {

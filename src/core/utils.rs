@@ -13,6 +13,7 @@ impl Subsets {
 
 #[derive(Debug)]
 pub struct SubsetIterator {
+    first:            bool,
     subset_count:     usize,
     positions:        Rc<Vec<usize>>,
     element_counters: Vec<usize>,
@@ -23,7 +24,8 @@ impl Iterator for SubsetIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let mut shift = true;
+            let mut shift = !self.first;
+            self.first = false;
 
             for i in Rc::get_mut(&mut self.positions)
                 .expect("Subset must be destroyed before new iteration")
@@ -41,7 +43,7 @@ impl Iterator for SubsetIterator {
                     shift = false;
                     old + 1
                 };
-                assert!(old != new);
+                assert!(old != new || self.subset_count == 1);
                 *i = new;
                 self.element_counters[old] = self.element_counters[old] - 1;
                 self.element_counters[new] = self.element_counters[new] + 1;
@@ -66,6 +68,7 @@ impl SubsetIterator {
         element_counters[0] = container_len;
 
         Self {
+            first: true,
             subset_count,
             positions: Rc::new(vec![0; container_len]),
             element_counters,
@@ -88,5 +91,12 @@ mod subsets_test {
         assert!(res.contains(&vec![1, 0, 1]));
         assert!(res.contains(&vec![1, 1, 0]));
         assert_eq!(res.len(), 6);
+    }
+
+    #[test]
+    fn iterator_single_test() {
+        let ss = SubsetIterator::new(3, 1);
+        let res: Vec<Vec<usize>> = ss.map(|x| x.as_vec().clone()).collect();
+        assert_eq!(res, vec![vec![0, 0, 0]]);
     }
 }

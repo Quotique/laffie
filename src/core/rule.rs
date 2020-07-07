@@ -34,7 +34,7 @@ pub struct Rule {
     pub pattern: StatementTree,
     pub replace: StatementTree,
 
-    pub requirements: Vec<Arc<Statement>>,
+    pub requirements: Vec<StatementTree>,
 }
 
 impl fmt::Display for Rule {
@@ -103,7 +103,7 @@ impl Rule {
                                 RuleFlags::NONE
                             });
                         }
-                        _ => reqs.push(Arc::new(Statement::new(i, &mut params)?)),
+                        _ => reqs.push(parse_rule_node(i, &mut params, &mut params_count)?),
                     }
                 }
 
@@ -124,13 +124,27 @@ impl Rule {
         Ok(result)
     }
 
-    pub fn apply(&self, arg: &Node<Term>) -> Result<StatementTree, String> {
-        let map = params_map(arg, &self.pattern)?;
+    pub fn apply(&self, arg: &Node<Term>) -> Result<Vec<(StatementTree, Vec<Statement>)>, String> {
+        let maps = params_map(arg, &self.pattern)?;
 
-        let mut result = self.replace.clone();
-        apply_map(&mut result, &map);
-
-        Ok(result)
+        Ok(maps
+            .iter()
+            .map(|x| {
+                let mut result = self.replace.clone();
+                apply_map(&mut result, &x);
+                (
+                    result,
+                    self.requirements
+                        .iter()
+                        .map(|r| {
+                            let mut r = r.clone();
+                            apply_map(&mut r, &x);
+                            Statement::from(r)
+                        })
+                        .collect(),
+                )
+            })
+            .collect())
     }
 
     fn parse_rule(statement: &ParserTree) -> Result<(StatementTree, StatementTree), String> {
@@ -227,6 +241,7 @@ pub mod rule_tests {
     use trees::Tree;
 
     use core::{symbols::symbols_tests::setup, term::Term, trees::linked::fully::tr};
+    use logger::{log_init, Config as LogConfig};
 
     fn test_rule_tree() -> Tree<String> {
         tr(String::from("=>")) /
@@ -289,17 +304,29 @@ pub mod rule_tests {
     #[test]
     fn apply_test() {
         setup();
+        log_init(&LogConfig {
+            filename: String::from("test.log"),
+            level:    String::from("Trace"),
+        });
         let rule = Rule::new(1, &test_rule_tree()).expect("Unable to parse rule");
         let state = tr(Term::Symbol(1)) /
             (tr(Term::Symbol(2)) / tr(Term::Symbol(5)) / tr(Term::Variable(1))) /
             tr(Term::Number(Decimal::from_str("0").unwrap()));
         match rule.apply(state.root()) {
-            Ok(result) => assert_eq!(
-                result,
-                tr(Term::Symbol(1)) /
-                    tr(Term::Variable(1)) /
-                    (tr(Term::Symbol(3)) / tr(Term::Symbol(5)))
-            ),
+            Ok(result) => {
+                let result = result.into_iter().map(|x| x.0).collect::<Vec<Tree<Term>>>();
+                assert_eq!(result.len(), 2);
+                assert!(result.contains(
+                    &(tr(Term::Symbol(1)) /
+                        tr(Term::Variable(1)) /
+                        (tr(Term::Symbol(3)) / tr(Term::Symbol(5))))
+                ));
+                assert!(result.contains(
+                    &(tr(Term::Symbol(1)) /
+                        tr(Term::Symbol(5)) /
+                        (tr(Term::Symbol(3)) / tr(Term::Variable(1))))
+                ));
+            }
             Err(e) => assert!(false, "Rule must be applied. Error: {}", e),
         }
     }

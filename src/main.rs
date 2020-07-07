@@ -19,39 +19,19 @@ extern crate log;
 extern crate serde_derive;
 
 mod core;
+mod logger;
 mod parser;
 mod settings;
 mod solver;
 
-use std::{env, path::Path, str::FromStr, sync::Arc};
+use std::{env, path::Path, sync::Arc};
 
 use colored::*;
 
 use core::{rule::RulesEngine, symbols::load_symbols};
-use settings::{Logger, Settings};
+use logger::log_init;
+use settings::Settings;
 use solver::{problem::ProblemStorage, solution::Solution};
-
-fn log_init(config: &Logger) {
-    let log_level = log::LevelFilter::from_str(&config.level).unwrap_or(log::LevelFilter::Debug);
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Utc::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ))
-        })
-        .level(log_level)
-        //.chain(std::io::stdout())
-        .chain(fern::log_file(&config.filename).unwrap())
-        .apply()
-        .unwrap();
-
-    info!(target: "init", "Log initialized with params: {:?}", config);
-    info!(target: "init", "Current log level: {:?}", log_level);
-}
 
 fn main() {
     let args: Vec<String> = env::args().collect();

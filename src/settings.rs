@@ -1,14 +1,9 @@
 use config::{Config, ConfigError, File};
-
-#[derive(Debug, Deserialize)]
-pub struct Logger {
-    pub filename: String,
-    pub level:    String,
-}
+use logger::Config as LogConfig;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub logger: Logger,
+    pub logger: LogConfig,
 }
 
 impl Settings {
