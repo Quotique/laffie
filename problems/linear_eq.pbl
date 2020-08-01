@@ -21,3 +21,17 @@ problem {
 
 target find x;
 };
+
+problem {
+2*x-5+t == 0;
+t is known;
+
+target find x;
+};
+
+problem {
+2*x-t == 0;
+t is known;
+
+target find x;
+};

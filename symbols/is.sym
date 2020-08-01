@@ -1,1 +1,7 @@
-symbol is;
+symbol is {
+    attr infix(100),display(" is ")
+};
+
+a is true <=> [a];
+
+a is false <=> !([a]);

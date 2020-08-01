@@ -1,5 +1,6 @@
 extern crate bigdecimal;
 extern crate chrono;
+extern crate clap;
 extern crate colored;
 extern crate config;
 extern crate fern;
@@ -24,32 +25,83 @@ mod parser;
 mod settings;
 mod solver;
 
-use std::{env, path::Path, sync::Arc};
-
+use clap::{App, Arg};
 use colored::*;
-
 use core::{rule::RulesEngine, symbols::load_symbols};
 use logger::log_init;
 use settings::Settings;
 use solver::{problem::ProblemStorage, solution::Solution};
+use std::{path::Path, sync::Arc};
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let matches = App::new("Minerva")
+        .version("1.0")
+        .author("Quotique <just.std@gmail.com>")
+        .about("Does awesome things")
+        .arg(
+            Arg::with_name("config")
+                .short('c')
+                .long("config")
+                .value_name("FILE")
+                .about("Sets a custom config file")
+                .default_value("./config/local.json")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("only")
+                .short('o')
+                .long("only")
+                .value_name("ID")
+                .about("Runs onsly spcified problem")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("symbols")
+                .short('s')
+                .long("symbols")
+                .value_name("DIR")
+                .about("Specify symbols path")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("problems")
+                .short('p')
+                .long("problems")
+                .value_name("DIR")
+                .about("Specify problems path")
+                .takes_value(true),
+        )
+        .get_matches();
 
-    let settings = Settings::new();
-    match settings {
-        Ok(ref s) => log_init(&s.logger),
-        Err(e) => println!("Config error: {:?}", e),
-    }
+    let settings = Settings::new(&matches.value_of("config").unwrap())
+        .map_err(|e| {
+            println!("Config error: {:?}", e);
+            e
+        })
+        .unwrap_or_else(|_| {
+            std::process::exit(-1);
+        });
+    log_init(&settings.logger);
 
-    info!(target: "init", "Args {:?}", args);
+    let code_dir = matches
+        .value_of("symbols")
+        .map(|x| x.to_owned())
+        .or(settings.symbols_dir)
+        .unwrap_or_else(|| {
+            println!("Symbols dir is not specified");
+            std::process::exit(-1);
+        });
+    let code_dir = Path::new(code_dir.as_str());
 
-    if args.len() < 3 {
-        println!("Usage: {} <code_dir> <problems_dir>", &args[0]);
-        return;
-    }
-    let code_dir = Path::new(&args[1][..]);
-    let problems_dir = Path::new(&args[2][..]);
+    let problems_dir = matches
+        .value_of("problems")
+        .map(|x| x.to_owned())
+        .or(settings.problems_dir)
+        .unwrap_or_else(|| {
+            println!("Problems dir is not specified");
+            std::process::exit(-1);
+        });
+    let problems_dir = Path::new(problems_dir.as_str());
 
     info!(target: "init", "Reading symbols: {:?}", code_dir);
     load_symbols(&code_dir).unwrap();
@@ -64,6 +116,12 @@ fn main() {
     problems.load_dir(&problems_dir).unwrap();
 
     for p in problems.problems {
+        if let Some(only) = matches.value_of("only") {
+            let id = format!("{:x}", p.id);
+            if !id.starts_with(only) && !id.ends_with(only) {
+                continue;
+            }
+        }
         println!("{} {}", "Problem".bold().green(), p);
         let mut solution = Solution::new(&p, rules.clone());
         match solution.solve() {

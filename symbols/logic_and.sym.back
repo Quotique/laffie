@@ -1,9 +1,0 @@
-symbol && {
-    attr infix(500),associative,commutative
-};
-
-rule {
-    a && b => a;
-
-    a is true
-}

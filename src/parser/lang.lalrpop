@@ -60,6 +60,27 @@ Tier<Op, NextTier>: Tree<String> = {
     NextTier
 };
 
+RuleExt: Tree<String> = {
+    <o:Rule> => o,
+    "rule" "{" <r:Rule> ";" <p:Predicates> "}" => {
+        let mut t = tr(String::from("Rule"));
+        t.push_back(r);
+        t.append(Forest::from_iter(p.iter().map(|x| x.clone())));
+        t
+    }
+}
+
+Rule: Tree<String> = {
+    <l:Predicate> <o:RuleOp> <r:Predicate> => tr(String::from(o))/l/r,
+};
+
+RuleOp = {
+    "=>",
+    "<=>",
+};
+
+Predicates = Vector<Predicate, Semicolon>;
+
 Predicate = Tier<LogicOr, AndPred>;
 AndPred = Tier<LogicAnd, ElemPred>;
 
@@ -67,8 +88,10 @@ LogicOr = { "||" };
 LogicAnd = { "&&" };
 
 ElemPred: Tree<String> = {
+    "!" "(" <p:Predicate> ")" => tr(String::from("!"))/p,
     "(" <p:Predicate> ")" => p,
     <l:Expr> <o:PredOp> <r:Expr> => tr(String::from(o))/l/r,
+    "[" <e:Expr> "]" => e,
 };
 
 PredOp = {
@@ -82,30 +105,14 @@ PredOp = {
     ">",
 };
 
-RuleExt: Tree<String> = {
-    <o:Rule> => o,
-    "rule" "{" <r:Rule> ";" <p:Predicates> "}" => {
-        let mut t = tr(String::from("Rule"));
-        t.push_back(r);
-        t.append(Forest::from_iter(p.iter().map(|x| x.clone())));
-        t
-    }
-}
-
-Predicates = Vector<Predicate, Semicolon>;
-
-Rule: Tree<String> = {
-    <l:Predicate> <o:RuleOp> <r:Predicate> => tr(String::from(o))/l/r,
-    <l:Expr> <o:RuleOp> <r:Expr> => tr(String::from(o))/l/r,
-};
-
-RuleOp = {
-    "=>",
-    "<=>",
-};
 
 Expr = Tier<SumOp, Factor>;
-Factor = Tier<MulOp, Eval>;
+Factor = Tier<MulOp, Power>;
+Power = Tier<PowOp, Eval>;
+
+PowOp = {
+    "^"
+}
 
 SumOp = {
     "+",
@@ -143,7 +150,8 @@ Str = {
 
 ExtStr = { 
     r"[A-Za-z0-9_.]+",
-    "is", "in", "==", "!=",
+    "is", "in",
+    "==", "!=", "^",
     "<=", ">=", "<", ">",
     "+", "-", "*", "/",
     "&&", "||"

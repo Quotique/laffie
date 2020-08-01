@@ -2,5 +2,7 @@
   "logger": {
     "filename": "output.log",
     "level": "Trace"
-  }
+  },
+  "symbols_dir": "symbols",
+  "problems_dir": "problems"
 }

@@ -1,7 +1,7 @@
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use num::integer::gcd;
 use num_bigint::{BigInt, ToBigInt};
-use std::cmp::max;
+use std::{cmp::max, rc::Rc};
 use trees::{tr, Node};
 
 use core::{
@@ -50,7 +50,10 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                     root.data = Term::Number(mul);
                 } else if (root.degree() == 1) & mul.is_one() {
                     let mut last = root.onto_iter().next().unwrap().depart();
-                    root.append(last.abandon());
+                    while let Some(x) = last.pop_front() {
+                        root.push_back(x);
+                    }
+                    // root.append(last.abandon());
                     root.data = last.data.clone();
                 } else if !mul.is_one() {
                     root.push_back(tr(Term::Number(mul)));
@@ -129,18 +132,43 @@ fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
     let mut result = false;
     if let Some(symbol) = &root.data.symbol() {
         if symbol.attrs.contains_key(&SymbolAttr::Associative) {
-            for mut child in root.forest_mut().onto_iter() {
+            let root_degree = root.degree();
+            for _ in 0..root_degree {
+                let mut child = root.pop_front().unwrap();
                 if let Some(child_symbol) = &child.data.symbol() {
                     if child_symbol.id == symbol.id {
                         while let Some(node) = child.pop_front() {
-                            child.insert_before(node);
+                            root.push_back(node);
                         }
-                        child.depart();
                         result = true;
                         continue;
                     }
                 }
+                root.push_back(child);
             }
+            // for mut child in root.forest_mut().onto_iter() {
+            //     if let Some(child_symbol) = &child.data.symbol() {
+            //         if child_symbol.id == symbol.id {
+            //             println!("Hui22 {} {} {}", root, root.degree(),
+            // root.node_count());             println!("Hui221 {}
+            // {} {}", child_symbol, child.degree(), child.node_count());
+            //             while let Some(node) = child.pop_front() {
+            //                 println!("Hui23 {} {} {}", root, root.degree(),
+            // root.node_count());                 println!("Hui231
+            // {} {} {}", child_symbol, child.degree(), child.node_count());
+            //                 child.insert_before(node);
+            //                 println!("Hui232 {} {} {}", root, root.degree(),
+            // root.node_count());             }
+            //             println!("Hui24 {} {} {}", root, root.degree(),
+            // root.node_count());             println!("Hui241 {}
+            // {} {}", child_symbol, child.degree(), child.node_count());
+            //             child.depart();
+            //             println!("Hui25 {} {} {}", root, root.degree(),
+            // root.node_count());             result = true;
+            //             continue;
+            //         }
+            //     }
+            // }
         }
     }
     result
@@ -154,7 +182,7 @@ fn commutative_reorder(root: &mut Node<Term>) -> bool {
             let mut to_sort = vec![];
 
             while let Some(t) = root.pop_front() {
-                to_sort.push(t);
+                to_sort.push(Rc::new(t));
             }
             // Symbol < Param < Varible < Number
             to_sort.sort_by(|x, y| match &x.data {
@@ -178,7 +206,7 @@ fn commutative_reorder(root: &mut Node<Term>) -> bool {
                 },
             });
             while let Some(t) = to_sort.pop() {
-                root.push_front(t);
+                root.push_front(Rc::try_unwrap(t).unwrap());
             }
         }
     }
@@ -242,6 +270,15 @@ pub fn is_true(statement: &StatementTree) -> bool {
             ) {
                 return d1 >= d2;
             }
+        } else if *id == symbol_by_name(&"is".into()).unwrap().id {
+            if let (Term::Number(_), Term::Symbol(known_id)) = (
+                &statement.first().unwrap().data,
+                &statement.last().unwrap().data,
+            ) {
+                return known_id == &symbol_by_name(&"known".into()).unwrap().id;
+            }
+        } else if *id == symbol_by_name(&"true".into()).unwrap().id {
+            return true;
         }
     }
     false

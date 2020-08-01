@@ -8,6 +8,7 @@ build = "build.rs"
 bigdecimal = "0.1"
 bitflags = "1.2"
 chrono = "0.4"
+clap = "3.0.0-beta.1"
 colored = "1.9"
 config = "0.9"
 fern = "0.5"
@@ -20,7 +21,7 @@ num-bigint = "0.2"
 regex = "1"
 serde_derive = "1.0"
 serde = "1.0"
-trees = "0.2.1"
+trees = "0.2"
 
 [build-dependencies]
 lalrpop =  { version = "0.18", features = ["lexer"] }

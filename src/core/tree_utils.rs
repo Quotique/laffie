@@ -41,7 +41,10 @@ pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
                     let mut replace = r.clone();
                     target.data = r.root().data.clone();
                     while let Some(_) = target.pop_back() {}
-                    target.append(replace.abandon());
+                    while let Some(x) = replace.pop_front() {
+                        target.push_back(x);
+                    }
+                    //target.append(replace.abandon());
                 }
                 None => {}
             }

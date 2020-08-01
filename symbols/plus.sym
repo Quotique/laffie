@@ -1,3 +1,10 @@
 symbol + {
     attr infix(300),associative,commutative
 };
+
+rule {
+    a+b is known <=> [true];
+
+    a is known;
+    b is known
+};

@@ -1,4 +1,11 @@
-use std::{collections::HashMap, fmt, io, path::Path, sync::Arc};
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    fmt,
+    hash::{Hash, Hasher},
+    io,
+    path::Path,
+    sync::Arc,
+};
 
 use core::{
     dir_parser::load_dir,
@@ -18,6 +25,7 @@ pub enum ProblemType {
 }
 
 pub struct Problem {
+    pub id:         u64,
     pub conditions: Vec<Arc<Statement>>,
     pub target:     ProblemType,
 }
@@ -58,6 +66,7 @@ impl fmt::Display for ProblemType {
 impl Problem {
     fn new(target: ProblemType) -> Problem {
         Problem {
+            id: 1,
             target,
             conditions: vec![],
         }
@@ -69,6 +78,9 @@ impl Problem {
         }
 
         let mut result = Problem::new(ProblemType::Transform);
+        let mut s = DefaultHasher::new();
+        node.hash(&mut s);
+        result.id = s.finish();
         let mut params = HashMap::new();
 
         for child in node.iter() {
@@ -88,7 +100,8 @@ impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{{contitions: [{}], target: {} }}",
+            "{{id: {:x}, contitions: [{}], target: {} }}",
+            self.id,
             self.conditions
                 .iter()
                 .map(|x| x.to_string())

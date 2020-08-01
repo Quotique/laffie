@@ -1,0 +1,15 @@
+symbol && {
+    attr infix(500),display("&"),associative,commutative
+};
+
+rule {
+    [a] && [b] => [b];
+
+    a is true
+};
+
+rule {
+    [a] && [b] => [a];
+
+    a is false
+};

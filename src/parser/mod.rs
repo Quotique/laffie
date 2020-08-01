@@ -26,10 +26,11 @@ mod parser_tests {
     #[test]
     fn rule_parse_test() {
         let test = r#"x*(y+z) == 0 => y+z == 0 || x == 0;
-                      -sin(x) == 0 => x == Pi*n && n in Z;"#;
+                      -sin(x) == 0 => x == Pi*n && n in Z;
+                      a is true <=> [a]"#;
 
         let states = lang::StatementsParser::new().parse(test).unwrap();
-        assert_eq!(states.len(), 2);
+        assert_eq!(states.len(), 3);
         assert_eq!(
             states[0],
             tr(String::from("=>")) /

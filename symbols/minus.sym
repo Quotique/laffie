@@ -2,6 +2,12 @@ symbol - {
     attr infix(300)
 };
 
---a => a;
+[--a] <=> [a];
 
-a-b => a+(-b);
+[a-b] => [a+(-b)];
+
+rule {
+    -a is known <=> [true];
+
+    a is known
+};

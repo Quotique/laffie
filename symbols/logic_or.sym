@@ -1,0 +1,15 @@
+symbol || {
+    attr infix(600),display("|"),associative,commutative
+};
+
+rule {
+    [a] || [b] <=> [a];
+
+    a is true
+};
+
+rule {
+    [a] || [b] <=> [b];
+
+    a is false
+}

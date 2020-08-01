@@ -1,3 +1,10 @@
 symbol / {
-    attr infix(200),display("")
+    attr infix(200),display("/")
+};
+
+rule {
+    a/b is known <=> [true];
+
+    a is known;
+    b is known
 };

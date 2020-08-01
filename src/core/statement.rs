@@ -53,14 +53,17 @@ impl Statement {
 
             if self.root.data.is_symbol_name(&"==".into()) {
                 if self.root.first().unwrap().data.is_variable() {
-                    return Some(Rule {
-                        id:           0,
-                        level:        0,
-                        flags:        RuleFlags::SUBTREE_REPLACEMENT,
-                        pattern:      self.root.first().unwrap().to_owned(),
-                        replace:      self.root.last().unwrap().to_owned(),
-                        requirements: vec![],
-                    });
+                    if !Self::contains(&self.root.first().unwrap().data, &self.root.last().unwrap())
+                    {
+                        return Some(Rule {
+                            id:           0,
+                            level:        0,
+                            flags:        RuleFlags::SUBTREE_REPLACEMENT,
+                            pattern:      self.root.first().unwrap().to_owned(),
+                            replace:      self.root.last().unwrap().to_owned(),
+                            requirements: vec![],
+                        });
+                    }
                 }
             } else if self.root.data.is_symbol_name(&"=>".into()) {
                 return Some(Rule {
@@ -90,6 +93,19 @@ impl Statement {
             }
         }
         symbols
+    }
+
+    fn contains(term: &Term, tree: &Node<Term>) -> bool {
+        if &tree.data == term {
+            return true;
+        }
+
+        for i in tree.iter() {
+            if Self::contains(term, i) {
+                return true;
+            }
+        }
+        false
     }
 
     // pub fn to_string(node: &Node) -> String {

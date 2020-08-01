@@ -1,5 +1,5 @@
 symbol * {
-    attr infix(200),display(""),associative,commutative
+    attr infix(200),display("·"),associative,commutative
 };
 
 rule {

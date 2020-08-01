@@ -2,7 +2,9 @@ use std::{
     cell::RefCell,
     fmt,
     sync::{Arc, RwLock},
+    time::Instant,
 };
+use trees::linked::fully::tr;
 
 use colored::*;
 
@@ -21,14 +23,34 @@ use super::{
 
 pub const DEFAULT_WEIGHT: usize = 10;
 
+pub struct PerfStats {
+    problem_hash:   u64,
+    cycles_count:   usize,
+    solution_depth: usize,
+    absolute_time:  f64,
+}
+
 pub struct Solution {
     pub conditions: Vec<(Arc<Statement>, RefCell<usize>)>,
     pub target:     ProblemType,
     pub answer:     Option<Arc<Statement>>,
 
+    pub perf_stats: PerfStats,
+
     rules_engine:       Arc<RulesEngine>,
     local_rules:        Vec<Arc<RwLock<Rule>>>,
     equivalent_targets: Vec<Arc<Statement>>,
+}
+
+impl PerfStats {
+    pub fn new(problem: &Problem) -> PerfStats {
+        PerfStats {
+            problem_hash:   problem.id,
+            cycles_count:   0,
+            solution_depth: 0,
+            absolute_time:  0.,
+        }
+    }
 }
 
 impl Solution {
@@ -47,6 +69,8 @@ impl Solution {
                 .collect(),
             answer:     None,
 
+            perf_stats: PerfStats::new(&problem),
+
             rules_engine:       rules,
             local_rules:        vec![],
             equivalent_targets: vec![],
@@ -54,17 +78,23 @@ impl Solution {
     }
 
     pub fn solve(&mut self) -> Result<(), String> {
+        let start = Instant::now();
         loop {
+            self.perf_stats.cycles_count += 1;
             match self.conditions.iter().max_by(|x, y| x.1.cmp(&y.1)) {
                 Some((state, weight)) => {
                     trace!("Statement: {} ({})", state, weight.borrow());
                     trace!("Local rules: {:?}", self.local_rules);
                     if *weight.borrow() == 0 {
+                        self.perf_stats.absolute_time =
+                            (start.elapsed().as_nanos() as f64) / 1000000.;
                         return Err("No solution found".into());
                     }
                     *weight.borrow_mut() -= 1;
                     if self.is_answer(&state, &*weight.borrow()) {
                         self.answer = Some(state.clone());
+                        self.perf_stats.absolute_time =
+                            (start.elapsed().as_nanos() as f64) / 1000000.;
                         return Ok(());
                     }
 
@@ -78,9 +108,17 @@ impl Solution {
                         self.conditions
                             .push((Arc::new(s), RefCell::new(DEFAULT_WEIGHT)));
                     }
+                    if self.conditions.len() > 20 {
+                        self.perf_stats.absolute_time =
+                            (start.elapsed().as_nanos() as f64) / 1000000.;
+                        return Err("Stack overflow".into());
+                    }
                     self.prepare_target();
                 }
-                None => return Err("Conditions not found".into()),
+                None => {
+                    self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
+                    return Err("Conditions not found".into());
+                }
             }
         }
     }
@@ -94,7 +132,24 @@ impl Solution {
                 {
                     return false;
                 }
-                statement.root.first().unwrap() == x.root()
+                if statement.root.first().unwrap() == x.root() {
+                    let is_id = symbol_by_name(&"is".into()).unwrap().id;
+                    let known_id = symbol_by_name(&"known".into()).unwrap().id;
+
+                    let is_known = tr(Term::Symbol(is_id)) /
+                        statement.root.last().unwrap().to_owned() /
+                        tr(Term::Symbol(known_id));
+
+                    debug!("Attempt to proof: {}", is_known);
+                    if self.proof(Arc::new(Statement::from(is_known))) {
+                        debug!("Prooved!");
+                        return true;
+                    } else {
+                        debug!("Can't proof!");
+                        return false;
+                    }
+                }
+                false
             }
             ProblemType::Proof(x) => {
                 if statement.root == x.root {
@@ -146,24 +201,9 @@ impl Solution {
                 .collect())
         } else {
             // if subtree replacement
-            let mut applied = false;
             let mut new_tree = statement.root.clone();
-            for i in new_tree.iter_mut() {
-                if let Ok(new_sub) = rule.read().expect("Cant lock rule").apply(&i) {
-                    for (mut variant, reqs) in new_sub {
-                        for r in reqs {
-                            if !self.proof(Arc::new(r)) {
-                                continue;
-                            }
-                        }
-                        applied = true;
-                        // TODO: is multiple replace possible?
-                        swap_node(i, &mut variant);
-                        break;
-                    }
-                }
-            }
-            if applied {
+
+            if self.subtree_apply(new_tree.root_mut(), rule.clone()) {
                 Ok(vec![Statement::from(new_tree).with_rule(rule.clone())])
             } else {
                 Err("Rule applied".into())
@@ -171,8 +211,34 @@ impl Solution {
         }
     }
 
+    fn subtree_apply(
+        &self,
+        node: &mut trees::linked::fully::Node<Term>,
+        rule: Arc<RwLock<Rule>>,
+    ) -> bool {
+        let mut applied = false;
+        for i in node.iter_mut() {
+            applied = applied || self.subtree_apply(i, rule.clone());
+            if let Ok(new_sub) = rule.read().expect("Cant lock rule").apply(&i) {
+                for (mut variant, reqs) in new_sub {
+                    for r in reqs {
+                        if !self.proof(Arc::new(r)) {
+                            continue;
+                        }
+                    }
+                    applied = true;
+                    // TODO: is multiple replace possible?
+                    swap_node(i, &mut variant);
+                    break;
+                }
+            }
+        }
+        applied
+    }
+
     fn subproblem(&self, target: ProblemType) -> Problem {
         Problem {
+            id: 0,
             conditions: self.conditions.iter().map(|(x, _)| x.clone()).collect(),
             target,
         }
@@ -278,7 +344,16 @@ impl fmt::Display for Solution {
                 }
                 write!(f, "{}\n", t.to_string().bold().yellow())?;
             }
-            write!(f, "{}\n", "SOLVED!".green())
+            write!(
+                f,
+                "{} {}\n",
+                "SOLVED!".green(),
+                format!(
+                    "[{} cycles, {}ms]",
+                    self.perf_stats.cycles_count, self.perf_stats.absolute_time
+                )
+                .yellow()
+            )
         } else {
             write!(f, "\n")?;
             write!(f, "{}\n", "NOT SOLVED!".bold().blink().red())
