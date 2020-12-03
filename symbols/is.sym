@@ -2,6 +2,14 @@ symbol is {
     attr infix(100),display(" is ")
 };
 
-a is true <=> [a];
+rule {
+    attr replace;
 
-a is false <=> !([a]);
+    a is true <=> [a];
+};
+
+rule {
+    attr replace;
+
+    a is false <=> !([a]);
+};

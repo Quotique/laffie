@@ -189,6 +189,12 @@ pub mod symbols_tests {
             Symbol::add_with_name("<"); // 6
             Symbol::add_with_name("*"); // 7
             Symbol::add_with_name("/"); // 8
+            Symbol::add_with_name("<="); // 9
+            Symbol::add_with_name(">="); // 10
+            Symbol::add_with_name("^"); // 11
+            Symbol::add_with_name("is"); // 12
+            Symbol::add_with_name("known"); // 13
+            Symbol::add_with_name("in"); // 14
         });
     }
 

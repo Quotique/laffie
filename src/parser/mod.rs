@@ -37,11 +37,15 @@ mod parser_tests {
                 (tr(String::from("==")) /
                     (tr(String::from("*")) /
                         tr(String::from("x")) /
-                        (tr(String::from("+")) / tr(String::from("y")) / tr(String::from("z")))) /
+                        (tr(String::from("+")) /
+                            tr(String::from("y")) /
+                            tr(String::from("z")))) /
                     tr(String::from("0"))) /
                 (tr(String::from("||")) /
                     (tr(String::from("==")) /
-                        (tr(String::from("+")) / tr(String::from("y")) / tr(String::from("z"))) /
+                        (tr(String::from("+")) /
+                            tr(String::from("y")) /
+                            tr(String::from("z"))) /
                         tr(String::from("0"))) /
                     (tr(String::from("==")) / tr(String::from("x")) / tr(String::from("0"))))
         );
@@ -61,7 +65,9 @@ mod parser_tests {
                 (tr(String::from("=>")) /
                     (tr(String::from("==")) /
                         (tr(String::from("+")) /
-                            (tr(String::from("*")) / tr(String::from("a")) / tr(String::from("x"))) /
+                            (tr(String::from("*")) /
+                                tr(String::from("a")) /
+                                tr(String::from("x"))) /
                             tr(String::from("b"))) /
                         tr(String::from("0"))) /
                     (tr(String::from("==")) /
@@ -69,7 +75,8 @@ mod parser_tests {
                         (tr(String::from("/")) /
                             tr(String::from("b")) /
                             tr(String::from("a"))))) /
-                (tr(String::from("!=")) / tr(String::from("a")) / tr(String::from("0")))
+                (tr(String::from("Predicates")) /
+                    (tr(String::from("!=")) / tr(String::from("a")) / tr(String::from("0"))))
         );
     }
 
@@ -86,10 +93,12 @@ mod parser_tests {
             tr(String::from("Problem")) /
                 (tr(String::from("==")) /
                     (tr(String::from("+")) /
-                        (tr(String::from("*")) / tr(String::from("2")) / tr(String::from("x"))) /
+                        (tr(String::from("*")) /
+                            tr(String::from("2")) /
+                            tr(String::from("x"))) /
                         tr(String::from("5"))) /
                     tr(String::from("0"))) /
-                (tr(String::from("Target")) / tr(String::from("find")) / tr(String::from("x")))
+                (tr(String::from("Target")) / (tr(String::from("find")) / tr(String::from("x"))))
         )
     }
 }

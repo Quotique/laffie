@@ -1,5 +1,5 @@
-use bigdecimal::{BigDecimal as Decimal, One, Zero};
-use num::integer::gcd;
+use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive, Zero};
+use num::{integer::gcd, traits::Pow};
 use num_bigint::{BigInt, ToBigInt};
 use std::{cmp::max, rc::Rc};
 use trees::{tr, Node};
@@ -119,6 +119,26 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                     } else {
                         root.push_back(tr(Term::Number(Decimal::from(num_m))));
                         root.push_back(tr(Term::Number(Decimal::from(den_m))));
+                    }
+                }
+            }
+            "^" => {
+                if let (Term::Number(d1), Term::Number(d2)) =
+                    (&root.first().unwrap().data, &root.last().unwrap().data)
+                {
+                    if let Some(e) = d2.to_i8() {
+                        result = true;
+                        let (m, exp) = d1.as_bigint_and_exponent();
+                        let result = Decimal::new(m.pow(e.abs() as u32), exp * (e.abs() as i64));
+                        while let Some(_) = root.pop_front() {}
+                        if e >= 0 {
+                            root.data = Term::Number(result);
+                        } else {
+                            root.data = Term::Symbol(symbol_by_name(&"/".into()).unwrap().id);
+                            root.push_back(tr(Term::Number(Decimal::one())));
+                            root.push_back(tr(Term::Number(result)));
+                            evaluate(root);
+                        }
                     }
                 }
             }
@@ -288,7 +308,7 @@ pub fn is_true(statement: &StatementTree) -> bool {
 mod operations_tests {
     use super::*;
     use bigdecimal::{BigDecimal as Decimal, Num};
-    use core::symbols::symbols_tests::setup;
+    use core::symbols::{symbol_by_name, symbols_tests::setup};
     use trees::tr;
 
     #[test]
@@ -436,6 +456,47 @@ mod operations_tests {
             tr(Term::Symbol(8)) /
                 tr(Term::Number(Decimal::from(20))) /
                 tr(Term::Number(Decimal::from(3)))
+        );
+    }
+
+    #[test]
+    fn evaluate_power_test() {
+        setup();
+
+        let power_sym = symbol_by_name(&"^".into()).unwrap();
+        let div_sym = symbol_by_name(&"/".into()).unwrap();
+
+        // 2 ^ 2 -> 4
+        let mut test_tree = tr(Term::Symbol(power_sym.id)) /
+            tr(Term::Number(Decimal::from(2))) /
+            tr(Term::Number(Decimal::from(2)));
+        assert!(evaluate(&mut test_tree.root_mut()));
+        assert_eq!(test_tree, tr(Term::Number(Decimal::from(4))));
+
+        // 2 ^ (-2) -> 0.25
+        let mut test_tree = tr(Term::Symbol(power_sym.id)) /
+            tr(Term::Number(Decimal::from(2))) /
+            tr(Term::Number(Decimal::from(-2)));
+        assert!(evaluate(&mut test_tree.root_mut()));
+        assert_eq!(test_tree, tr(Term::Number(Decimal::from(0.25))));
+
+        // 0.5 ^ (-2) -> 4
+        let mut test_tree = tr(Term::Symbol(power_sym.id)) /
+            tr(Term::Number(Decimal::from(0.5))) /
+            tr(Term::Number(Decimal::from(-2)));
+        assert!(evaluate(&mut test_tree.root_mut()));
+        assert_eq!(test_tree, tr(Term::Number(Decimal::from(4))));
+
+        // 3 ^ (-2) -> 1/9
+        let mut test_tree = tr(Term::Symbol(power_sym.id)) /
+            tr(Term::Number(Decimal::from(3))) /
+            tr(Term::Number(Decimal::from(-2)));
+        assert!(evaluate(&mut test_tree.root_mut()));
+        assert_eq!(
+            test_tree,
+            tr(Term::Symbol(div_sym.id)) /
+                tr(Term::Number(Decimal::from(1))) /
+                tr(Term::Number(Decimal::from(9)))
         );
     }
 

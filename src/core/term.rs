@@ -1,15 +1,16 @@
 use bigdecimal::{BigDecimal as Decimal, Signed};
 use std::{collections::HashMap, fmt, str::FromStr};
+use std::hash::Hash;
 use trees::{tr, Node, Tree};
 
 use super::symbols::{symbol_by_id, symbol_by_name, Symbol};
 
 pub type StatementTree = Tree<Term>;
 // type ParamsMap = HashMap<u64, StatementTree>;
-type ParamsNameMap = HashMap<String, u64>;
+pub type ParamsNameMap = HashMap<String, u64>;
 type ParserNode = Node<String>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
     Symbol(u64),
     Param(u64),

@@ -3,13 +3,17 @@ symbol && {
 };
 
 rule {
-    [a] && [b] => [b];
+    attr subtree,replace;
+    
+    [a] && [b] <=> [b];
 
     a is true
 };
 
 rule {
-    [a] && [b] => [a];
+    attr subtree,replace;
+
+    [a] && [b] <=> [a];
 
     a is false
 };

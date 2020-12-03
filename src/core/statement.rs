@@ -3,22 +3,23 @@ use std::{
     collections::{HashMap, HashSet},
     convert::From,
     fmt,
+    hash::{Hash, Hasher},
     sync::{Arc, RwLock},
 };
 
 use trees::Node;
 
 use super::{
-    rule::{Rule, RuleFlags},
+    rule::{Rule, RuleAttr, RuleAttrValue},
     term::{display_string, parse_statement_node, StatementTree, Term},
+    tree_utils::symbols,
 };
 
 pub type ParamsMap = HashMap<String, u64>;
 
 #[derive(Clone, Debug)]
 pub struct Statement {
-    pub applied_rules: RefCell<HashSet<usize>>,
-    as_rule:           RefCell<bool>,
+    as_rule: RefCell<bool>,
 
     pub parents: Vec<Arc<Statement>>,
     pub rule:    Option<Arc<RwLock<Rule>>>,
@@ -33,12 +34,11 @@ impl Statement {
 
         let root = parse_statement_node(&statement, params, &mut params_count)?;
         Ok(Statement {
-            applied_rules: RefCell::new(HashSet::new()),
-            as_rule:       RefCell::new(true),
-            parents:       vec![],
-            rule:          None,
-            symbols:       Self::symbols(&root),
-            root:          root,
+            as_rule: RefCell::new(true),
+            parents: vec![],
+            rule:    None,
+            symbols: symbols(&root),
+            root:    root,
         })
     }
 
@@ -55,44 +55,39 @@ impl Statement {
                 if self.root.first().unwrap().data.is_variable() {
                     if !Self::contains(&self.root.first().unwrap().data, &self.root.last().unwrap())
                     {
+                        let pattern = self.root.first().unwrap().to_owned();
+                        let pattern_symbols = symbols(&pattern);
                         return Some(Rule {
-                            id:           0,
-                            level:        0,
-                            flags:        RuleFlags::SUBTREE_REPLACEMENT,
-                            pattern:      self.root.first().unwrap().to_owned(),
-                            replace:      self.root.last().unwrap().to_owned(),
-                            requirements: vec![],
+                            id:              0,
+                            level:           0,
+                            attrs:           [(RuleAttr::Subtree, RuleAttrValue::None)]
+                                .iter()
+                                .cloned()
+                                .collect(),
+                            pattern:         pattern,
+                            replace:         self.root.last().unwrap().to_owned(),
+                            requirements:    vec![],
+                            pattern_symbols: pattern_symbols,
                         });
                     }
                 }
             } else if self.root.data.is_symbol_name(&"=>".into()) {
+                let pattern = self.root.first().unwrap().to_owned();
+                let pattern_symbols = symbols(&pattern);
                 return Some(Rule {
-                    id:           0,
-                    level:        0,
-                    flags:        RuleFlags::NONE,
-                    pattern:      self.root.first().unwrap().to_owned(),
-                    replace:      self.root.last().unwrap().to_owned(),
-                    requirements: vec![],
+                    id:              0,
+                    level:           0,
+                    attrs:           HashMap::new(),
+                    pattern:         pattern,
+                    replace:         self.root.last().unwrap().to_owned(),
+                    requirements:    vec![],
+                    pattern_symbols: pattern_symbols,
                 });
             }
 
             return None;
         }
         None
-    }
-
-    pub fn block_rule(&self, id: usize) {
-        self.applied_rules.borrow_mut().insert(id);
-    }
-
-    fn symbols(root: &StatementTree) -> HashSet<u64> {
-        let mut symbols = HashSet::new();
-        for i in root.root().bfs().iter {
-            if let Term::Symbol(s) = i.data {
-                symbols.insert(*s);
-            }
-        }
-        symbols
     }
 
     fn contains(term: &Term, tree: &Node<Term>) -> bool {
@@ -107,42 +102,21 @@ impl Statement {
         }
         false
     }
+}
 
-    // pub fn to_string(node: &Node) -> String {
-    //    let mut result: String;
-    //    match &node.node_type {
-    //        NodeType::Symbol => {
-    //            result = all_symbols()
-    //                .name_by_id(node.id)
-    //                .unwrap_or(String::from("unknown"))
-    //                .clone()
-    //        }
-    //        NodeType::Param => result = format!("p{}", node.id),
-    //        NodeType::Varible => result = format!("v{}", node.id),
-    //    }
-    //    if node.childs.len() > 0 {
-    //        result = format!(
-    //            "{}({})",
-    //            result,
-    //            node.childs
-    //                .iter()
-    //                .map(|x| Statement::to_string(x))
-    //                .collect::<Vec<String>>()
-    //                .join(", ")
-    //        );
-    //    }
-    //    result
-    //}
+impl Hash for Statement {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.root.hash(state);
+    }
 }
 
 impl From<StatementTree> for Statement {
     fn from(root: StatementTree) -> Self {
         Statement {
-            applied_rules: RefCell::new(HashSet::new()),
             as_rule: RefCell::new(true),
             parents: vec![],
             rule: None,
-            symbols: Self::symbols(&root),
+            symbols: symbols(&root),
             root,
         }
     }
@@ -172,7 +146,7 @@ mod statement_test {
         let mut t2: u64 = 0;
         let state = parse_statement_node(&test, &mut t1, &mut t2).unwrap();
         let expect_syms = vec![String::from("=="), String::from("*"), String::from("+")];
-        let syms = Statement::symbols(&state);
+        let syms = symbols(&state);
         assert_eq!(syms.len(), expect_syms.len());
         for s in expect_syms {
             let id = symbol_by_name(&s).unwrap().id;

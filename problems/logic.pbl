@@ -3,3 +3,9 @@ problem {
 
 target transform 0;
 };
+
+problem {
+(1 > 0 && x == 1) || (1 < 0 && x == 2);
+
+target find x;
+};

@@ -1,0 +1,40 @@
+symbol ! {
+    attr display("!")
+};
+
+
+rule {
+    attr subtree,replace;
+    
+    !(a == b) <=> a != b;
+};
+
+rule {
+    attr subtree,replace;
+
+    !(a != b) <=> a == b;
+};
+
+rule {
+    attr subtree,replace;
+
+    !(a < b) <=> a >= b;
+};
+
+rule {
+    attr subtree,replace;
+    
+    !(a <= b) <=> a > b;
+};
+
+rule {
+    attr subtree,replace;
+
+    !(a >= b) <=> a < b;
+};
+
+rule {
+    attr subtree,replace;
+
+    !(a > b) <=> a <= b;
+};

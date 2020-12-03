@@ -1,37 +1,49 @@
 problem {
-x == 1;
+    x == 1;
 
-target find x;
+    target find x;
 };
 
 problem {
---x == 1;
+    x in set(1);
 
-target find x;
+    target find x;
 };
 
 problem {
-2*x+5 == 0;
+    x in set(1, (sqrt(2) + 5)/2 );
 
-target find x;
+    target find x;
 };
 
 problem {
-2*x-5 == 0;
+    --x == 1;
 
-target find x;
+    target find x;
 };
 
 problem {
-2*x-5+t == 0;
-t is known;
+    2*x+5 == 0;
 
-target find x;
+    target find x;
 };
 
 problem {
-2*x-t == 0;
-t is known;
+    2*x-5 == 0;
 
-target find x;
+    target find x;
+};
+
+problem {
+    2*x-5+t == 0;
+    t is known;
+
+    target find x;
+};
+
+problem {
+    2*x-t == 0;
+    t is known;
+
+    target find x;
 };

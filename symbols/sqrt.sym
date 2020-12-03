@@ -1,0 +1,9 @@
+symbol sqrt {
+    attr display("√")
+};
+
+rule {
+    sqrt(a) is known <=> [true];
+
+    a is known
+};

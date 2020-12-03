@@ -1,6 +1,8 @@
 use std::{
     cell::RefCell,
+    collections::{hash_map::DefaultHasher, HashMap},
     fmt,
+    hash::{Hash, Hasher},
     sync::{Arc, RwLock},
     time::Instant,
 };
@@ -9,7 +11,7 @@ use trees::linked::fully::tr;
 use colored::*;
 
 use core::{
-    rule::{Rule, RuleFlags, RulesEngine},
+    rule::{Rule, RuleAttr, RulesEngine},
     statement::Statement,
     symbols::symbol_by_name,
     term::{StatementTree, Term},
@@ -18,10 +20,11 @@ use core::{
 
 use super::{
     operations::{is_true, normalize},
-    problem::{Problem, ProblemType},
+    problem::{MarkedStatement, Problem, ProblemType, DEFAULT_WEIGHT},
 };
 
-pub const DEFAULT_WEIGHT: usize = 10;
+pub const MAX_SUBPROBLEM_LEVEL: usize = 10;
+pub const STACK_SIZE: usize = 20;
 
 pub struct PerfStats {
     problem_hash:   u64,
@@ -31,15 +34,38 @@ pub struct PerfStats {
 }
 
 pub struct Solution {
-    pub conditions: Vec<(Arc<Statement>, RefCell<usize>)>,
-    pub target:     ProblemType,
-    pub answer:     Option<Arc<Statement>>,
+    pub conditions:   Vec<MarkedStatement>,
+    condition_hashes: HashMap<u64, Vec<usize>>,
+
+    pub target: ProblemType,
+    pub answer: Option<Arc<Statement>>,
 
     pub perf_stats: PerfStats,
 
     rules_engine:       Arc<RulesEngine>,
     local_rules:        Vec<Arc<RwLock<Rule>>>,
-    equivalent_targets: Vec<Arc<Statement>>,
+    equivalent_targets: Vec<MarkedStatement>,
+
+    subproblem_level: usize,
+}
+
+#[derive(Debug)]
+pub enum SolutionError {
+    StackOverflow,
+    MaxSubproblemLevelExceed,
+    NoConditions,
+    NoSolutionsFound,
+}
+
+impl fmt::Display for SolutionError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SolutionError::StackOverflow => write!(f, "StackOverflow"),
+            SolutionError::MaxSubproblemLevelExceed => write!(f, "Max subproblem level exceed"),
+            SolutionError::NoConditions => write!(f, "No conditions"),
+            SolutionError::NoSolutionsFound => write!(f, "No solutions found"),
+        }
+    }
 }
 
 impl PerfStats {
@@ -55,80 +81,121 @@ impl PerfStats {
 
 impl Solution {
     pub fn new(problem: &Problem, rules: Arc<RulesEngine>) -> Solution {
-        Solution {
-            target:     problem.target.clone(),
-            conditions: problem
-                .conditions
-                .iter()
-                .map(|x| {
-                    let mut s = (**x).clone();
-                    normalize(s.root.root_mut());
-
-                    (Arc::new(s), RefCell::new(DEFAULT_WEIGHT))
-                })
-                .collect(),
-            answer:     None,
+        let mut result = Solution {
+            target:           problem.target.clone(),
+            condition_hashes: HashMap::new(),
+            conditions:       vec![],
+            answer:           None,
 
             perf_stats: PerfStats::new(&problem),
 
             rules_engine:       rules,
             local_rules:        vec![],
             equivalent_targets: vec![],
+
+            subproblem_level: problem.subproblem_level,
+        };
+        for i in problem.conditions.iter() {
+            let _ = result.add_condition(i.clone().normalize());
+        }
+        result
+    }
+
+    fn add_condition(&mut self, statement: MarkedStatement) -> Result<(), SolutionError> {
+        let mut s = DefaultHasher::new();
+        statement.statement.hash(&mut s);
+        let hash = s.finish();
+        trace!("Hashes: {:?}, new: {}", self.condition_hashes, hash);
+        for i in self.condition_hashes.entry(hash).or_insert(vec![]) {
+            trace!(
+                "Compare: {}, {}",
+                statement.statement.root,
+                self.conditions[*i].statement.root
+            );
+            if statement.statement.root == self.conditions[*i].statement.root {
+                trace!("Same!");
+                return Ok(());
+            }
+        }
+        trace!("New condition: {}", statement.statement);
+        self.condition_hashes
+            .get_mut(&hash)
+            .unwrap()
+            .push(self.conditions.len());
+        self.conditions.push(statement);
+        if self.conditions.len() > STACK_SIZE {
+            return Err(SolutionError::StackOverflow);
+        }
+
+        Ok(())
+    }
+
+    fn pick_condition(&self) -> Result<usize, SolutionError> {
+        let element = self
+            .conditions
+            .iter()
+            .enumerate()
+            .max_by(|(_, x), (_, y)| x.weight.cmp(&y.weight))
+            .ok_or(SolutionError::NoConditions)?;
+        if *element.1.weight.borrow() == 0 {
+            trace!("State: {:?} no solution!", element);
+            return Err(SolutionError::NoSolutionsFound);
+        }
+        *element.1.weight.borrow_mut() -= 1;
+        Ok(element.0)
+    }
+
+    fn solution_loop(&mut self) -> Result<(), SolutionError> {
+        self.prepare_target();
+        loop {
+            self.perf_stats.cycles_count += 1;
+            let index = self.pick_condition()?;
+            let state = self.conditions.get(index).unwrap();
+            trace!(
+                "Statement: {} ({:?}) ({})",
+                state.statement,
+                state.applied_rules.borrow(),
+                state.weight.borrow()
+            );
+            trace!("Local rules: {:?}", self.local_rules);
+            if self.is_answer(&state.statement, &*state.weight.borrow()) {
+                trace!("Solved. Answer: {}", state.statement);
+                self.answer = Some(state.statement.clone());
+                return Ok(());
+            }
+
+            if let Some(mut r) = state.statement.rule() {
+                r.id = (self.local_rules.len() + 1) | 0x80_00_00_00_00_00_00_00;
+                state.applied_rules.borrow_mut().insert(r.id);
+                self.local_rules.push(Arc::new(RwLock::new(r)));
+            }
+
+            for s in self.next_statement(&state, |_| true).into_iter() {
+                self.add_condition(MarkedStatement::from(Arc::new(s)))?;
+            }
+            self.prepare_target();
         }
     }
 
-    pub fn solve(&mut self) -> Result<(), String> {
-        let start = Instant::now();
-        loop {
-            self.perf_stats.cycles_count += 1;
-            match self.conditions.iter().max_by(|x, y| x.1.cmp(&y.1)) {
-                Some((state, weight)) => {
-                    trace!("Statement: {} ({})", state, weight.borrow());
-                    trace!("Local rules: {:?}", self.local_rules);
-                    if *weight.borrow() == 0 {
-                        self.perf_stats.absolute_time =
-                            (start.elapsed().as_nanos() as f64) / 1000000.;
-                        return Err("No solution found".into());
-                    }
-                    *weight.borrow_mut() -= 1;
-                    if self.is_answer(&state, &*weight.borrow()) {
-                        self.answer = Some(state.clone());
-                        self.perf_stats.absolute_time =
-                            (start.elapsed().as_nanos() as f64) / 1000000.;
-                        return Ok(());
-                    }
-
-                    if let Some(mut r) = state.rule() {
-                        r.id = (self.local_rules.len() + 1) | 0x80_00_00_00_00_00_00_00;
-                        state.block_rule(r.id); // disable self-apply
-                        self.local_rules.push(Arc::new(RwLock::new(r)));
-                    }
-
-                    for s in self.next_statement(state.clone(), |_| true).into_iter() {
-                        self.conditions
-                            .push((Arc::new(s), RefCell::new(DEFAULT_WEIGHT)));
-                    }
-                    if self.conditions.len() > 20 {
-                        self.perf_stats.absolute_time =
-                            (start.elapsed().as_nanos() as f64) / 1000000.;
-                        return Err("Stack overflow".into());
-                    }
-                    self.prepare_target();
-                }
-                None => {
-                    self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
-                    return Err("Conditions not found".into());
-                }
-            }
+    pub fn solve(&mut self) -> Result<(), SolutionError> {
+        trace!("Subproblem: {}, {:?}", self.target, self.conditions);
+        if self.subproblem_level > MAX_SUBPROBLEM_LEVEL {
+            return Err(SolutionError::MaxSubproblemLevelExceed);
         }
+        let start = Instant::now();
+        let result = self.solution_loop();
+        self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
+        result
     }
 
     pub fn is_answer(&self, statement: &Statement, weight: &usize) -> bool {
         match &self.target {
             ProblemType::Calculate(x) => {
                 let eq_sym = symbol_by_name(&String::from("==")).unwrap().id;
+                let in_sym = symbol_by_name(&String::from("in")).unwrap().id;
                 if statement.root.degree() != 2 ||
-                    statement.root.root().data != Term::Symbol(eq_sym)
+                    (statement.root.root().data != Term::Symbol(eq_sym) &&
+                        statement.root.root().data != Term::Symbol(in_sym))
                 {
                     return false;
                 }
@@ -152,18 +219,18 @@ impl Solution {
                 false
             }
             ProblemType::Proof(x) => {
-                if statement.root == x.root {
+                if statement.root == x.statement.root {
                     return true;
                 }
-                if self.is_true(&x.root) {
+                if self.is_true(&x.statement.root) {
                     return true;
                 }
 
                 for i in self.equivalent_targets.iter() {
-                    if statement.root == i.root {
+                    if statement.root == i.statement.root {
                         return true;
                     }
-                    if self.is_true(&i.root) {
+                    if self.is_true(&i.statement.root) {
                         return true;
                     }
                 }
@@ -177,9 +244,20 @@ impl Solution {
 
     pub fn apply(
         &self,
-        statement: Arc<Statement>,
+        statement: &MarkedStatement,
         rule: Arc<RwLock<Rule>>,
     ) -> Result<Vec<Statement>, String> {
+        trace!(
+            "State: {} {:?} {}",
+            statement.statement,
+            statement.applied_rules,
+            statement.weight.borrow()
+        );
+        trace!(
+            "App rule: {}, {:?}",
+            rule.read().unwrap().id,
+            statement.applied_rules.borrow()
+        );
         if !statement
             .applied_rules
             .borrow_mut()
@@ -187,7 +265,11 @@ impl Solution {
         {
             return Err("Already applied".into());
         }
-        if let Ok(new_trees) = rule.read().expect("Cant lock rule").apply(&statement.root) {
+        if let Ok(new_trees) = rule
+            .read()
+            .expect("Cant lock rule")
+            .apply(&statement.statement.root)
+        {
             Ok(new_trees
                 .into_iter()
                 .filter_map(|(x, reqs)| {
@@ -201,7 +283,7 @@ impl Solution {
                 .collect())
         } else {
             // if subtree replacement
-            let mut new_tree = statement.root.clone();
+            let mut new_tree = statement.statement.root.clone();
 
             if self.subtree_apply(new_tree.root_mut(), rule.clone()) {
                 Ok(vec![Statement::from(new_tree).with_rule(rule.clone())])
@@ -237,15 +319,34 @@ impl Solution {
     }
 
     fn subproblem(&self, target: ProblemType) -> Problem {
-        Problem {
+        let problem = Problem {
             id: 0,
-            conditions: self.conditions.iter().map(|(x, _)| x.clone()).collect(),
+            conditions: self
+                .conditions
+                .iter()
+                .map(|x| {
+                    let replaced = *x.replaced.borrow();
+                    let weight = if replaced { 0 } else { DEFAULT_WEIGHT };
+                    MarkedStatement {
+                        statement:     x.statement.clone(),
+                        applied_rules: x.applied_rules.clone(),
+                        weight:        RefCell::new(weight),
+                        replaced:      RefCell::new(replaced),
+                    }
+                })
+                .collect(),
             target,
-        }
+            subproblem_level: self.subproblem_level + 1,
+        };
+        trace!("New subproblem: {} {}", problem, self.subproblem_level);
+        problem
     }
 
     fn proof(&self, statement: Arc<Statement>) -> bool {
-        let sub_p = self.subproblem(ProblemType::Proof(statement.clone()));
+        if is_true(&statement.root) {
+            return true;
+        }
+        let sub_p = self.subproblem(ProblemType::Proof(MarkedStatement::from(statement.clone())));
         let mut sol = Solution::new(&sub_p, self.rules_engine.clone());
         if sol.solve().is_err() {
             trace!("Can't proof: {}", statement);
@@ -255,18 +356,20 @@ impl Solution {
     }
 
     fn prepare_target(&mut self) {
+        trace!("Target update");
         let mut alt_targets = vec![];
         match &self.target {
             ProblemType::Proof(x) => {
                 for i in std::iter::once(x).chain(self.equivalent_targets.iter()) {
                     for x in self
-                        .next_statement(i.clone(), |r| {
-                            r.flags.contains(RuleFlags::EQUIVALENCE) |
-                                r.flags.contains(RuleFlags::SUBTREE_REPLACEMENT)
+                        .next_statement(i, |r| {
+                            r.attribute(&RuleAttr::Equivalence).is_some() ||
+                                r.attribute(&RuleAttr::Subtree).is_some()
                         })
                         .into_iter()
                     {
-                        alt_targets.push(Arc::new(x));
+                        trace!("New alt target: {}", x);
+                        alt_targets.push(MarkedStatement::from(Arc::new(x)));
                     }
                 }
             }
@@ -277,10 +380,19 @@ impl Solution {
 
     fn next_statement<F: Fn(&Rule) -> bool>(
         &self,
-        statement: Arc<Statement>,
+        statement: &MarkedStatement,
         rule_filter: F,
     ) -> Vec<Statement> {
-        let mut rules = self.rules_engine.find_rules(&statement.symbols);
+        trace!(
+            "State: {} {:?} {}",
+            statement.statement,
+            statement.applied_rules,
+            statement.weight.borrow()
+        );
+        let mut rules = self.rules_engine.find_rules(
+            &statement.statement.symbols,
+            &statement.applied_rules.borrow(),
+        );
         rules.append(&mut self.local_rules.clone());
         rules.sort_by(|x, y| {
             x.read()
@@ -293,16 +405,31 @@ impl Solution {
             .iter()
             .filter(|x| rule_filter(&x.read().expect("Cant lock rule")))
         {
-            trace!("Rule: {}", rule.read().unwrap());
-            match self.apply(statement.clone(), rule.clone()) {
+            trace!("Rule: ({}) {}", rule.read().unwrap().id, rule.read().unwrap());
+            trace!(
+                "State: {} {:?} {}",
+                statement.statement,
+                statement.applied_rules,
+                statement.weight.borrow()
+            );
+            match self.apply(&statement, rule.clone()) {
                 Ok(results) => {
+                    if rule
+                        .read()
+                        .expect("Cant lock rule")
+                        .attribute(&RuleAttr::Replace)
+                        .is_some()
+                    {
+                        *statement.replaced.borrow_mut() = true;
+                        *statement.weight.borrow_mut() = 0;
+                    }
                     return results
                         .into_iter()
                         .map(|mut s| {
                             normalize(s.root.root_mut());
                             s
                         })
-                        .collect()
+                        .collect();
                 }
                 Err(e) => {
                     trace!("Cant apply rule: {}", e);

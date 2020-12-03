@@ -2,9 +2,17 @@ symbol - {
     attr infix(300)
 };
 
-[--a] <=> [a];
+rule {
+    attr subtree,replace;
 
-[a-b] => [a+(-b)];
+    [--a] <=> [a];
+};
+
+rule {
+    attr subtree,replace;
+
+    [a-b] => [a+(-b)];
+};
 
 rule {
     -a is known <=> [true];

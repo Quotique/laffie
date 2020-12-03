@@ -52,7 +52,7 @@ fn main() {
                 .short('o')
                 .long("only")
                 .value_name("ID")
-                .about("Runs onsly spcified problem")
+                .about("Runs only spcified problem")
                 .takes_value(true),
         )
         .arg(
@@ -129,7 +129,12 @@ fn main() {
                 println!("{} {}", "Solution:".italic().blue(), solution);
             }
             Err(e) => {
-                println!("{} {} {}", "Solution:".italic().blue(), e.red(), solution);
+                println!(
+                    "{} {} {}",
+                    "Solution:".italic().blue(),
+                    e.to_string().red(),
+                    solution
+                );
             }
         };
     }

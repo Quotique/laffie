@@ -3,12 +3,16 @@ symbol || {
 };
 
 rule {
+    attr subtree,replace;
+
     [a] || [b] <=> [a];
 
     a is true
 };
 
 rule {
+    attr subtree,replace;
+
     [a] || [b] <=> [b];
 
     a is false

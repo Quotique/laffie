@@ -3,7 +3,7 @@ use super::{
     term::{StatementTree, Term},
     utils::SubsetIterator,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use trees::{tr, Node, Tree};
 
 type ParamsMap = HashMap<u64, StatementTree>;
@@ -32,6 +32,16 @@ pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
     }
 }
 
+pub fn symbols(root: &StatementTree) -> HashSet<u64> {
+    let mut symbols = HashSet::new();
+    for i in root.root().bfs().iter {
+        if let Term::Symbol(s) = i.data {
+            symbols.insert(*s);
+        }
+    }
+    symbols
+}
+
 pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
     match target.data {
         Term::Param(id) => {
@@ -44,7 +54,7 @@ pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
                     while let Some(x) = replace.pop_front() {
                         target.push_back(x);
                     }
-                    //target.append(replace.abandon());
+                    // target.append(replace.abandon());
                 }
                 None => {}
             }
@@ -66,12 +76,12 @@ fn params_map_impl(
     pattern: &TreeNode,
     mut params: ParamsMap,
 ) -> Result<Vec<ParamsMap>, String> {
-    trace!(
-        "Pattern: {}, traget: {}, mapping: {:?}",
-        pattern,
-        target,
-        params
-    );
+    // trace!(
+    //     "Pattern: {}, traget: {}, mapping: {:?}",
+    //     pattern,
+    //     target,
+    //     params
+    // );
     let mut result = vec![];
 
     match (&pattern.data, &target.data) {
@@ -103,7 +113,21 @@ fn params_map_impl(
                         for r in loc_result.into_iter() {
                             match params_map_impl(y, x, r) {
                                 Ok(mut p) => {
-                                    trace!("New mapping: {:?}", p);
+                                    trace!(
+                                        "New mapping: [{}]",
+                                        p.iter()
+                                            .map(|m| {
+                                                format!(
+                                                    "{{ {} }}",
+                                                    m.iter()
+                                                        .map(|(x, y)| format!("{}: {}", x, y))
+                                                        .collect::<Vec<String>>()
+                                                        .join(",")
+                                                )
+                                            })
+                                            .collect::<Vec<String>>()
+                                            .join(",")
+                                    );
                                     new_result.append(&mut p)
                                 }
                                 Err(e) => trace!("Bad mapping: {}", e),

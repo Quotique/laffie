@@ -1,0 +1,22 @@
+symbol set {
+    attr commutative
+};
+
+rule {
+    set(a) is known <=> [true];
+
+    a is known
+};
+
+rule {
+    set(a, b) is known <=> [true];
+
+    a is known;
+    b is known
+};
+
+symbol empty_set;
+
+rule {
+    empty_set is known <=> [true];
+};

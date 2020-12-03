@@ -40,8 +40,8 @@ Condition: Tree<String> = {
 };
 
 Target: Tree<String> = {
-    "target" <c:Str> "(" <p:Predicate> ")" => tr(String::from("Target")) /tr(String::from(c))/p,
-    "target" <c:Str> <s:Str> => tr(String::from("Target")) /tr(String::from(c))/tr(String::from(s)),
+    "target" <c:Str> "(" <p:Predicate> ")" => tr(String::from("Target")) /(tr(String::from(c))/p),
+    "target" <c:Str> <s:Str> => tr(String::from("Target")) /(tr(String::from(c))/tr(String::from(s))),
 };
 
 Attributes = Vector<Eval, Comma>;
@@ -65,7 +65,20 @@ RuleExt: Tree<String> = {
     "rule" "{" <r:Rule> ";" <p:Predicates> "}" => {
         let mut t = tr(String::from("Rule"));
         t.push_back(r);
-        t.append(Forest::from_iter(p.iter().map(|x| x.clone())));
+        let mut pred = tr(String::from("Predicates"));
+        pred.append(Forest::from_iter(p.iter().map(|x| x.clone())));
+        t.push_back(pred);
+        t
+    },
+    "rule" "{" "attr" <a:Attributes> ";" <r:Rule> ";" <p:Predicates> "}" => {
+        let mut t = tr(String::from("Rule"));
+        t.push_back(r);
+        let mut pred = tr(String::from("Predicates"));
+        pred.append(Forest::from_iter(p.iter().map(|x| x.clone())));
+        let mut attr = tr(String::from("Attributes"));
+        attr.append(Forest::from_iter(a.iter().map(|x| x.clone())));
+        t.push_back(pred);
+        t.push_back(attr);
         t
     }
 }
@@ -90,6 +103,8 @@ LogicAnd = { "&&" };
 ElemPred: Tree<String> = {
     "!" "(" <p:Predicate> ")" => tr(String::from("!"))/p,
     "(" <p:Predicate> ")" => p,
+    "(" <l:Predicate> ")" <o:PredOp> "(" <r:Predicate> ")" => tr(String::from(o))/l/r,
+    "(" <l:Predicate> ")" <o:PredOp> <r:Expr> => tr(String::from(o))/l/r,
     <l:Expr> <o:PredOp> <r:Expr> => tr(String::from(o))/l/r,
     "[" <e:Expr> "]" => e,
 };
@@ -154,7 +169,7 @@ ExtStr = {
     "==", "!=", "^",
     "<=", ">=", "<", ">",
     "+", "-", "*", "/",
-    "&&", "||"
+    "&&", "||", "!"
 };
 
 Semicolon = { ";", };
