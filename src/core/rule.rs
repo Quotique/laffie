@@ -17,7 +17,7 @@ use super::{
     tree_utils::{apply_map, params_map, symbols},
 };
 
-use crate::solver::problem::ProblemType;
+use crate::solver::problem::{ProblemType, ProblemTypeBuilder};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RuleAttr {
@@ -54,6 +54,11 @@ pub struct Rule {
     pub pattern_symbols: HashSet<u64>,
 }
 
+pub struct RulesEngine {
+    pub rules_by_sym: HashMap<u64, Vec<Arc<RwLock<Rule>>>>,
+    last_rule_id:     usize,
+}
+
 impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -66,11 +71,6 @@ impl fmt::Display for Rule {
             self.requirements
         )
     }
-}
-
-pub struct RulesEngine {
-    pub rules_by_sym: HashMap<u64, Vec<Arc<RwLock<Rule>>>>,
-    last_rule_id:     usize,
 }
 
 impl RuleBuilder {
@@ -140,11 +140,11 @@ impl RuleBuilder {
             "subtree" => Ok((RuleAttr::Subtree, RuleAttrValue::None)),
             "equivalence" => Ok((RuleAttr::Equivalence, RuleAttrValue::None)),
             "replace" => Ok((RuleAttr::Replace, RuleAttrValue::None)),
-            "target" => {
+            "problem_target" => {
                 if attr.degree() != 1 {
                     return Err("Bad target tree".into());
                 }
-                let problem = ProblemType::try_from(attr.first().unwrap(), params)?;
+                let problem = ProblemTypeBuilder::new(attr).with_params(params).rule()?;
                 Ok((RuleAttr::Target, RuleAttrValue::Target(problem)))
             }
             _ => Err(format!("Incorrect attribute: {}", attr.data.as_str())),
@@ -241,6 +241,7 @@ impl RulesEngine {
         &self,
         symbols: &HashSet<u64>,
         applied_rules: &HashSet<usize>,
+        target: &ProblemType,
     ) -> Vec<Arc<RwLock<Rule>>> {
         trace!(
             "Symbols: {} applied: {:?}",
@@ -264,14 +265,12 @@ impl RulesEngine {
                 rules.extend(
                     x.iter()
                         .filter(|r| {
-                            let rule = r.read().expect("Cant lock rule");
-                            for s in rule.pattern_symbols.iter() {
-                                if !symbols.contains(s) {
-                                    trace!("symbol: {} not in list: {:?} reject", s, symbols);
-                                    return false;
-                                }
-                            }
-                            !applied_rules.contains(&rule.id)
+                            Self::filter_rule(
+                                &r.read().expect("Cant lock rule"),
+                                symbols,
+                                applied_rules,
+                                target,
+                            )
                         })
                         .map(|r| r.clone()),
                 )
@@ -286,6 +285,34 @@ impl RulesEngine {
                 .join(",")
         );
         rules
+    }
+
+    fn filter_rule(
+        rule: &Rule,
+        symbols: &HashSet<u64>,
+        applied_rules: &HashSet<usize>,
+        target: &ProblemType,
+    ) -> bool {
+        if applied_rules.contains(&rule.id) {
+            return false;
+        }
+        for s in rule.pattern_symbols.iter() {
+            if !symbols.contains(s) {
+                trace!("symbol: {} not in list: {:?} reject", s, symbols);
+                return false;
+            }
+        }
+        match rule.attribute(&RuleAttr::Target) {
+            Some(RuleAttrValue::Target(x)) => {
+                trace!("targets {} {}", x, target);
+                if target.map(x).is_err() {
+                    trace!("no match");
+                    return false;
+                }
+            }
+            _ => {}
+        }
+        true
     }
 
     pub fn load_dir(&mut self, dir: &Path) -> io::Result<()> {

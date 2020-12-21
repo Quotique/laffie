@@ -140,6 +140,7 @@ MulOp = {
 };
 
 Eval: Tree<String> = {
+    "[" <Predicate> "]" => <>,
     "(" <Expr> ")" => <>,
     Term => tr(String::from(<>)),
     <t:Term> "(" <a:Args> ")" => {

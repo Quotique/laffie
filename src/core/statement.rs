@@ -11,7 +11,7 @@ use trees::Node;
 
 use super::{
     rule::{Rule, RuleAttr, RuleAttrValue},
-    term::{display_string, parse_statement_node, StatementTree, Term},
+    term::{display_string, parse_rule_node, parse_statement_node, StatementTree, Term},
     tree_utils::symbols,
 };
 
@@ -33,6 +33,22 @@ impl Statement {
         let mut params_count: u64 = *params.values().max().unwrap_or(&0);
 
         let root = parse_statement_node(&statement, params, &mut params_count)?;
+        Ok(Statement {
+            as_rule: RefCell::new(true),
+            parents: vec![],
+            rule:    None,
+            symbols: symbols(&root),
+            root:    root,
+        })
+    }
+
+    pub fn new_with_params(
+        statement: &Node<String>,
+        params: &mut ParamsMap,
+    ) -> Result<Statement, String> {
+        let mut params_count: u64 = *params.values().max().unwrap_or(&0);
+
+        let root = parse_rule_node(&statement, params, &mut params_count)?;
         Ok(Statement {
             as_rule: RefCell::new(true),
             parents: vec![],

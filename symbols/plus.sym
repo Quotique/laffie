@@ -3,6 +3,8 @@ symbol + {
 };
 
 rule {
+    attr problem_target(proof([a+b is known]));
+
     a+b is known <=> [true];
 
     a is known;

@@ -392,6 +392,7 @@ impl Solution {
         let mut rules = self.rules_engine.find_rules(
             &statement.statement.symbols,
             &statement.applied_rules.borrow(),
+            &self.target,
         );
         rules.append(&mut self.local_rules.clone());
         rules.sort_by(|x, y| {
@@ -405,7 +406,11 @@ impl Solution {
             .iter()
             .filter(|x| rule_filter(&x.read().expect("Cant lock rule")))
         {
-            trace!("Rule: ({}) {}", rule.read().unwrap().id, rule.read().unwrap());
+            trace!(
+                "Rule: ({}) {}",
+                rule.read().unwrap().id,
+                rule.read().unwrap()
+            );
             trace!(
                 "State: {} {:?} {}",
                 statement.statement,

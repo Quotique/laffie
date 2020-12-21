@@ -3,12 +3,16 @@ symbol set {
 };
 
 rule {
+    attr problem_target(proof([set(a) is known]));
+
     set(a) is known <=> [true];
 
     a is known
 };
 
 rule {
+    attr problem_target(proof([set(a, b) is known]));
+    
     set(a, b) is known <=> [true];
 
     a is known;
@@ -18,5 +22,7 @@ rule {
 symbol empty_set;
 
 rule {
+    attr problem_target(proof([empty_set is known]));
+
     empty_set is known <=> [true];
 };

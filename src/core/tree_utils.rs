@@ -6,7 +6,7 @@ use super::{
 use std::collections::{HashMap, HashSet};
 use trees::{tr, Node, Tree};
 
-type ParamsMap = HashMap<u64, StatementTree>;
+pub type ParamsMap = HashMap<u64, StatementTree>;
 type TreeNode = Node<Term>;
 
 pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
