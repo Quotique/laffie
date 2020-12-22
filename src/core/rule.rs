@@ -241,6 +241,7 @@ impl RulesEngine {
         &self,
         symbols: &HashSet<u64>,
         applied_rules: &HashSet<usize>,
+        blocked_rules: &HashSet<usize>,
         target: &ProblemType,
     ) -> Vec<Arc<RwLock<Rule>>> {
         trace!(
@@ -269,6 +270,7 @@ impl RulesEngine {
                                 &r.read().expect("Cant lock rule"),
                                 symbols,
                                 applied_rules,
+                                blocked_rules,
                                 target,
                             )
                         })
@@ -291,9 +293,13 @@ impl RulesEngine {
         rule: &Rule,
         symbols: &HashSet<u64>,
         applied_rules: &HashSet<usize>,
+        blocked_rules: &HashSet<usize>,
         target: &ProblemType,
     ) -> bool {
         if applied_rules.contains(&rule.id) {
+            return false;
+        }
+        if blocked_rules.contains(&rule.id) {
             return false;
         }
         for s in rule.pattern_symbols.iter() {
@@ -310,7 +316,13 @@ impl RulesEngine {
                     return false;
                 }
             }
-            _ => {}
+            _ => match target {
+                ProblemType::Transform => {
+					// Only transform rules for transform
+                    return false;
+                }
+                _ => {}
+            },
         }
         true
     }

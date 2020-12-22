@@ -26,8 +26,10 @@ pub const DEFAULT_WEIGHT: usize = 10;
 pub struct MarkedStatement {
     pub statement:     Arc<Statement>,
     pub applied_rules: RefCell<HashSet<usize>>,
+    pub blocked_rules: RefCell<HashSet<usize>>,
     pub weight:        RefCell<usize>,
     pub replaced:      RefCell<bool>,
+    pub simplified:    RefCell<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -58,8 +60,10 @@ impl From<Arc<Statement>> for MarkedStatement {
         Self {
             statement:     statement,
             applied_rules: RefCell::new(HashSet::new()),
+            blocked_rules: RefCell::new(HashSet::new()),
             weight:        RefCell::new(DEFAULT_WEIGHT),
             replaced:      RefCell::new(false),
+            simplified:    RefCell::new(false),
         }
     }
 }
@@ -71,8 +75,10 @@ impl MarkedStatement {
         MarkedStatement {
             statement:     Arc::new(new_statement),
             applied_rules: self.applied_rules,
+            blocked_rules: self.blocked_rules,
             weight:        self.weight,
             replaced:      self.replaced,
+            simplified:    self.simplified,
         }
     }
 }
@@ -84,14 +90,23 @@ impl ProblemType {
         }
         let label = node.first().unwrap();
 
-        if label.degree() != 1 {
-            return Err(format!("Wrong target tree {:?}", label));
-        }
-        let target = Statement::new(label.first().unwrap(), params)?;
-
         match label.data.as_ref() {
-            "proof" => Ok(ProblemType::Proof(MarkedStatement::from(Arc::new(target)))),
-            "find" => Ok(ProblemType::Calculate(target.root)),
+            "proof" => {
+                if label.degree() != 1 {
+                    return Err(format!("Wrong target tree {:?}", label));
+                }
+                let target = Statement::new(label.first().unwrap(), params)?;
+
+                Ok(ProblemType::Proof(MarkedStatement::from(Arc::new(target))))
+            }
+            "find" => {
+                if label.degree() != 1 {
+                    return Err(format!("Wrong target tree {:?}", label));
+                }
+                let target = Statement::new(label.first().unwrap(), params)?;
+
+                Ok(ProblemType::Calculate(target.root))
+            }
             "transform" => Ok(ProblemType::Transform),
             _ => Err(format!("Incorrect problem type: {}", label.data)),
         }
@@ -137,6 +152,10 @@ impl<'a> ProblemTypeBuilder<'a> {
             return Err("Wrong target tree".into());
         }
         let label = self.node.first().unwrap();
+
+        if label.data == "transform" {
+            return Ok(ProblemType::Transform);
+        }
 
         if label.degree() != 1 {
             return Err(format!("Wrong target tree {:?}", label));

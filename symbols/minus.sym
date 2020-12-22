@@ -3,13 +3,13 @@ symbol - {
 };
 
 rule {
-    attr subtree,replace;
+    attr problem_target(transform),subtree,replace;
 
     [--a] <=> [a];
 };
 
 rule {
-    attr subtree,replace;
+    attr problem_target(transform),subtree,replace;
 
     [a-b] => [a+(-b)];
 };

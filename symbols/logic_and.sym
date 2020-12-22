@@ -3,7 +3,7 @@ symbol && {
 };
 
 rule {
-    attr subtree,replace;
+    attr problem_target(transform),subtree,replace;
     
     [a] && [b] <=> [b];
 
@@ -11,7 +11,7 @@ rule {
 };
 
 rule {
-    attr subtree,replace;
+    attr problem_target(transform),subtree,replace;
 
     [a] && [b] <=> [a];
 

@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
     fmt,
     hash::{Hash, Hasher},
     sync::{Arc, RwLock},
@@ -101,82 +101,6 @@ impl Solution {
         result
     }
 
-    fn add_condition(&mut self, statement: MarkedStatement) -> Result<(), SolutionError> {
-        let mut s = DefaultHasher::new();
-        statement.statement.hash(&mut s);
-        let hash = s.finish();
-        trace!("Hashes: {:?}, new: {}", self.condition_hashes, hash);
-        for i in self.condition_hashes.entry(hash).or_insert(vec![]) {
-            trace!(
-                "Compare: {}, {}",
-                statement.statement.root,
-                self.conditions[*i].statement.root
-            );
-            if statement.statement.root == self.conditions[*i].statement.root {
-                trace!("Same!");
-                return Ok(());
-            }
-        }
-        trace!("New condition: {}", statement.statement);
-        self.condition_hashes
-            .get_mut(&hash)
-            .unwrap()
-            .push(self.conditions.len());
-        self.conditions.push(statement);
-        if self.conditions.len() > STACK_SIZE {
-            return Err(SolutionError::StackOverflow);
-        }
-
-        Ok(())
-    }
-
-    fn pick_condition(&self) -> Result<usize, SolutionError> {
-        let element = self
-            .conditions
-            .iter()
-            .enumerate()
-            .max_by(|(_, x), (_, y)| x.weight.cmp(&y.weight))
-            .ok_or(SolutionError::NoConditions)?;
-        if *element.1.weight.borrow() == 0 {
-            trace!("State: {:?} no solution!", element);
-            return Err(SolutionError::NoSolutionsFound);
-        }
-        *element.1.weight.borrow_mut() -= 1;
-        Ok(element.0)
-    }
-
-    fn solution_loop(&mut self) -> Result<(), SolutionError> {
-        self.prepare_target();
-        loop {
-            self.perf_stats.cycles_count += 1;
-            let index = self.pick_condition()?;
-            let state = self.conditions.get(index).unwrap();
-            trace!(
-                "Statement: {} ({:?}) ({})",
-                state.statement,
-                state.applied_rules.borrow(),
-                state.weight.borrow()
-            );
-            trace!("Local rules: {:?}", self.local_rules);
-            if self.is_answer(&state.statement, &*state.weight.borrow()) {
-                trace!("Solved. Answer: {}", state.statement);
-                self.answer = Some(state.statement.clone());
-                return Ok(());
-            }
-
-            if let Some(mut r) = state.statement.rule() {
-                r.id = (self.local_rules.len() + 1) | 0x80_00_00_00_00_00_00_00;
-                state.applied_rules.borrow_mut().insert(r.id);
-                self.local_rules.push(Arc::new(RwLock::new(r)));
-            }
-
-            for s in self.next_statement(&state, |_| true).into_iter() {
-                self.add_condition(MarkedStatement::from(Arc::new(s)))?;
-            }
-            self.prepare_target();
-        }
-    }
-
     pub fn solve(&mut self) -> Result<(), SolutionError> {
         trace!("Subproblem: {}, {:?}", self.target, self.conditions);
         if self.subproblem_level > MAX_SUBPROBLEM_LEVEL {
@@ -237,6 +161,7 @@ impl Solution {
                 false
             }
             ProblemType::Transform => {
+                trace!("weight: {}", weight);
                 return weight == &1;
             }
         }
@@ -293,6 +218,103 @@ impl Solution {
         }
     }
 
+    fn add_condition(&mut self, statement: MarkedStatement) -> Result<usize, SolutionError> {
+        let mut s = DefaultHasher::new();
+        statement.statement.hash(&mut s);
+        let hash = s.finish();
+        trace!("Hashes: {:?}, new: {}", self.condition_hashes, hash);
+        for i in self.condition_hashes.entry(hash).or_insert(vec![]) {
+            trace!(
+                "Compare: {}, {}",
+                statement.statement.root,
+                self.conditions[*i].statement.root
+            );
+            if statement.statement.root == self.conditions[*i].statement.root {
+                trace!("Same!");
+                return Ok(*i);
+            }
+        }
+        trace!("New condition: {}", statement.statement);
+        self.condition_hashes
+            .get_mut(&hash)
+            .unwrap()
+            .push(self.conditions.len());
+        self.conditions.push(statement);
+        if self.conditions.len() > STACK_SIZE {
+            return Err(SolutionError::StackOverflow);
+        }
+
+        Ok(self.conditions.len() - 1)
+    }
+
+    fn pick_condition(&self) -> Result<usize, SolutionError> {
+        trace!("Solution: {:?}", self.conditions);
+        let element = self
+            .conditions
+            .iter()
+            .enumerate()
+            .max_by(|(_, x), (_, y)| x.weight.cmp(&y.weight))
+            .ok_or(SolutionError::NoConditions)?;
+        if *element.1.weight.borrow() == 0 {
+            trace!("State: {:?} no solution!", element);
+            return Err(SolutionError::NoSolutionsFound);
+        }
+        *element.1.weight.borrow_mut() -= 1;
+        Ok(element.0)
+    }
+
+    fn solution_loop(&mut self) -> Result<(), SolutionError> {
+        self.prepare_target();
+        loop {
+            self.perf_stats.cycles_count += 1;
+            let index = self.pick_condition()?;
+            let state = self.conditions.get(index).unwrap();
+
+            trace!("Local rules: {:?}", self.local_rules);
+            trace!(
+                "Statement: {} ({:?}) ({})",
+                state.statement,
+                state.applied_rules.borrow(),
+                state.weight.borrow()
+            );
+
+            if let Some(s) = self.transform(&self.conditions.get(index).unwrap()) {
+                self.add_condition(s)?;
+                continue;
+            }
+
+            if self.is_answer(&state.statement, &*state.weight.borrow()) {
+                trace!("Solved. Answer: {}", state.statement);
+                self.answer = Some(state.statement.clone());
+                return Ok(());
+            }
+
+            if let Some(mut r) = state.statement.rule() {
+                r.id = (self.local_rules.len() + 1) | 0x80_00_00_00_00_00_00_00;
+                state.blocked_rules.borrow_mut().insert(r.id);
+                self.local_rules.push(Arc::new(RwLock::new(r)));
+            }
+
+            for s in self
+                .next_statement(&state, |x| !state.blocked_rules.borrow().contains(&x.id))
+                .into_iter()
+            {
+                unsafe {
+                    let sp: *mut Self = self;
+                    let state = (*sp).conditions.get(index).unwrap();
+                    (*sp).add_condition({
+                        let s = MarkedStatement::from(Arc::new(s));
+                        s.blocked_rules
+                            .borrow_mut()
+                            .extend(state.blocked_rules.borrow().iter());
+                        s
+                    })?;
+                }
+            }
+            self.prepare_target();
+        }
+    }
+
     fn subtree_apply(
         &self,
         node: &mut trees::linked::fully::Node<Term>,
@@ -303,15 +325,19 @@ impl Solution {
             applied = applied || self.subtree_apply(i, rule.clone());
             if let Ok(new_sub) = rule.read().expect("Cant lock rule").apply(&i) {
                 for (mut variant, reqs) in new_sub {
+                    let mut all_prooved = true;
                     for r in reqs {
                         if !self.proof(Arc::new(r)) {
-                            continue;
+                            all_prooved = false;
+                            break;
                         }
                     }
-                    applied = true;
-                    // TODO: is multiple replace possible?
-                    swap_node(i, &mut variant);
-                    break;
+                    if all_prooved {
+                        applied = true;
+                        // TODO: is multiple replace possible?
+                        swap_node(i, &mut variant);
+                        break;
+                    }
                 }
             }
         }
@@ -319,9 +345,9 @@ impl Solution {
     }
 
     fn subproblem(&self, target: ProblemType) -> Problem {
-        let problem = Problem {
-            id: 0,
-            conditions: self
+        let conditions = match target {
+            ProblemType::Transform => vec![],
+            _ => self
                 .conditions
                 .iter()
                 .map(|x| {
@@ -330,11 +356,17 @@ impl Solution {
                     MarkedStatement {
                         statement:     x.statement.clone(),
                         applied_rules: x.applied_rules.clone(),
+                        blocked_rules: x.blocked_rules.clone(),
                         weight:        RefCell::new(weight),
                         replaced:      RefCell::new(replaced),
+                        simplified:    x.simplified.clone(),
                     }
                 })
                 .collect(),
+        };
+        let problem = Problem {
+            id: 0,
+            conditions,
             target,
             subproblem_level: self.subproblem_level + 1,
         };
@@ -346,13 +378,54 @@ impl Solution {
         if is_true(&statement.root) {
             return true;
         }
-        let sub_p = self.subproblem(ProblemType::Proof(MarkedStatement::from(statement.clone())));
-        let mut sol = Solution::new(&sub_p, self.rules_engine.clone());
-        if sol.solve().is_err() {
+        let subproblem =
+            self.subproblem(ProblemType::Proof(MarkedStatement::from(statement.clone())));
+        let mut solution = Solution::new(&subproblem, self.rules_engine.clone());
+        if solution.solve().is_err() {
             trace!("Can't proof: {}", statement);
             return false;
         }
         return true;
+    }
+
+    fn transform(&self, statement: &MarkedStatement) -> Option<MarkedStatement> {
+        match self.target {
+            ProblemType::Transform => {
+                return None;
+            }
+            _ => {}
+        }
+        if *statement.simplified.borrow() {
+            return None;
+        }
+        *statement.simplified.borrow_mut() = true;
+
+        let mut subproblem = self.subproblem(ProblemType::Transform);
+        subproblem.conditions.push(MarkedStatement {
+            statement:     statement.statement.clone(),
+            applied_rules: RefCell::new(HashSet::new()),
+            blocked_rules: RefCell::new(HashSet::new()),
+            weight:        RefCell::new(DEFAULT_WEIGHT),
+            replaced:      RefCell::new(false),
+            simplified:    RefCell::new(true),
+        });
+        let mut solution = Solution::new(&subproblem, self.rules_engine.clone());
+        let result = solution.solve();
+        if result.is_err() {
+            trace!("NOT Simplified {:?}", result);
+            return None;
+        }
+        let result = MarkedStatement::from(solution.answer.expect("No answer statement"));
+        *result.simplified.borrow_mut() = true;
+        if result.statement.root == statement.statement.root {
+            return None;
+        }
+
+        *statement.replaced.borrow_mut() = true;
+        *statement.weight.borrow_mut() = 0;
+        trace!("Simplified: {}", result.statement);
+
+        return Some(result);
     }
 
     fn prepare_target(&mut self) {
@@ -392,6 +465,7 @@ impl Solution {
         let mut rules = self.rules_engine.find_rules(
             &statement.statement.symbols,
             &statement.applied_rules.borrow(),
+            &statement.blocked_rules.borrow(),
             &self.target,
         );
         rules.append(&mut self.local_rules.clone());
@@ -419,11 +493,11 @@ impl Solution {
             );
             match self.apply(&statement, rule.clone()) {
                 Ok(results) => {
-                    if rule
-                        .read()
-                        .expect("Cant lock rule")
-                        .attribute(&RuleAttr::Replace)
-                        .is_some()
+                    if results.len() > 0 &&
+                        rule.read()
+                            .expect("Cant lock rule")
+                            .attribute(&RuleAttr::Replace)
+                            .is_some()
                     {
                         *statement.replaced.borrow_mut() = true;
                         *statement.weight.borrow_mut() = 0;
