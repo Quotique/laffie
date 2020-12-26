@@ -3,6 +3,7 @@ use std::{
     collections::{hash_map::DefaultHasher, HashMap, HashSet},
     fmt,
     hash::{Hash, Hasher},
+    rc::Rc,
     sync::{Arc, RwLock},
     time::Instant,
 };
@@ -10,6 +11,10 @@ use trees::linked::fully::tr;
 
 use colored::*;
 
+use super::{
+    operations::{is_true, normalize},
+    problem::{MarkedStatement, Problem, ProblemType, DEFAULT_WEIGHT},
+};
 use core::{
     rule::{Rule, RuleAttr, RulesEngine},
     statement::Statement,
@@ -17,11 +22,7 @@ use core::{
     term::{StatementTree, Term},
     tree_utils::swap_node,
 };
-
-use super::{
-    operations::{is_true, normalize},
-    problem::{MarkedStatement, Problem, ProblemType, DEFAULT_WEIGHT},
-};
+use dump::Dumper;
 
 pub const MAX_SUBPROBLEM_LEVEL: usize = 10;
 pub const STACK_SIZE: usize = 20;
@@ -47,6 +48,8 @@ pub struct Solution {
     equivalent_targets: Vec<MarkedStatement>,
 
     subproblem_level: usize,
+
+    dumper: Option<Rc<RefCell<Box<dyn Dumper + 'static>>>>,
 }
 
 #[derive(Debug)]
@@ -94,6 +97,8 @@ impl Solution {
             equivalent_targets: vec![],
 
             subproblem_level: problem.subproblem_level,
+
+            dumper: None,
         };
         for i in problem.conditions.iter() {
             let _ = result.add_condition(i.clone().normalize());
@@ -101,7 +106,14 @@ impl Solution {
         result
     }
 
+    pub fn add_dumper(&mut self, dumper: Rc<RefCell<Box<dyn Dumper>>>) {
+        self.dumper = Some(dumper);
+    }
+
     pub fn solve(&mut self) -> Result<(), SolutionError> {
+        if let Some(x) = self.dumper.as_ref() {
+            x.borrow_mut().subproblem_start(&self)
+        }
         trace!("Subproblem: {}, {:?}", self.target, self.conditions);
         if self.subproblem_level > MAX_SUBPROBLEM_LEVEL {
             return Err(SolutionError::MaxSubproblemLevelExceed);
@@ -109,6 +121,9 @@ impl Solution {
         let start = Instant::now();
         let result = self.solution_loop();
         self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
+        if let Some(x) = self.dumper.as_ref() {
+            x.borrow_mut().subproblem_end()
+        }
         result
     }
 
@@ -219,6 +234,10 @@ impl Solution {
     }
 
     fn add_condition(&mut self, statement: MarkedStatement) -> Result<usize, SolutionError> {
+        if let Some(x) = self.dumper.as_ref() {
+            x.borrow_mut().add_statement(&statement);
+        }
+
         let mut s = DefaultHasher::new();
         statement.statement.hash(&mut s);
         let hash = s.finish();
@@ -381,6 +400,10 @@ impl Solution {
         let subproblem =
             self.subproblem(ProblemType::Proof(MarkedStatement::from(statement.clone())));
         let mut solution = Solution::new(&subproblem, self.rules_engine.clone());
+        if let Some(x) = self.dumper.as_ref() {
+            solution.add_dumper(x.clone());
+        }
+
         if solution.solve().is_err() {
             trace!("Can't proof: {}", statement);
             return false;
@@ -410,6 +433,10 @@ impl Solution {
             simplified:    RefCell::new(true),
         });
         let mut solution = Solution::new(&subproblem, self.rules_engine.clone());
+        if let Some(x) = self.dumper.as_ref() {
+            solution.add_dumper(x.clone());
+        }
+
         let result = solution.solve();
         if result.is_err() {
             trace!("NOT Simplified {:?}", result);

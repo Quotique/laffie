@@ -2,7 +2,7 @@ use std::{fs::File, io::prelude::*};
 
 use crate::solver::{problem::MarkedStatement, solution::Solution};
 
-trait Dumper {
+pub trait Dumper {
     fn subproblem_start(&mut self, solution: &Solution);
 
     fn subproblem_end(&mut self);
@@ -16,7 +16,7 @@ pub struct FileDumper {
 }
 
 impl FileDumper {
-    pub fn new(file_name: &String) -> FileDumper {
+    pub fn new(file_name: &str) -> FileDumper {
         FileDumper {
             subproblem_level: 0,
             file:             File::create(file_name).expect("Unable to create dump file"),
@@ -24,14 +24,27 @@ impl FileDumper {
     }
 
     fn prefix(&self) -> String {
-        String::from(" ").repeat(self.subproblem_level)
+        String::from(" ").repeat(self.subproblem_level * 2)
     }
 }
 
 impl Dumper for FileDumper {
     fn subproblem_start(&mut self, solution: &Solution) {
         self.file
-            .write_all(format!("").as_bytes())
+            .write_all(
+                format!(
+                    "{} {} [{}]\n",
+                    self.prefix(),
+                    solution.target,
+                    solution
+                        .conditions
+                        .iter()
+                        .map(|x| x.statement.to_string())
+                        .collect::<Vec<String>>()
+                        .join(";"),
+                )
+                .as_bytes(),
+            )
             .expect("Unable write into dump file");
         self.subproblem_level += 1;
     }
@@ -40,5 +53,9 @@ impl Dumper for FileDumper {
         self.subproblem_level -= 1;
     }
 
-    fn add_statement(&mut self, statement: &MarkedStatement) {}
+    fn add_statement(&mut self, statement: &MarkedStatement) {
+        self.file
+            .write_all(format!("{} {}\n", self.prefix(), statement.statement).as_bytes())
+            .expect("Unable write into dump file");
+    }
 }

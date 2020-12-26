@@ -20,19 +20,20 @@ extern crate log;
 extern crate serde_derive;
 
 mod core;
+mod dump;
 mod logger;
 mod parser;
 mod settings;
 mod solver;
-mod dump;
 
 use clap::{App, Arg};
 use colored::*;
 use core::{rule::RulesEngine, symbols::load_symbols};
+use dump::{Dumper, FileDumper};
 use logger::log_init;
 use settings::Settings;
 use solver::{problem::ProblemStorage, solution::Solution};
-use std::{path::Path, sync::Arc};
+use std::{cell::RefCell, path::Path, rc::Rc, sync::Arc};
 
 fn main() {
     let matches = App::new("Minerva")
@@ -132,6 +133,12 @@ fn main() {
         }
         println!("{} {}", "Problem".bold().green(), p);
         let mut solution = Solution::new(&p, rules.clone());
+        if matches.is_present("dump") {
+            let dumper = Rc::new(RefCell::new(Box::new(FileDumper::new(
+                format!("dumps/{:x}.dump", p.id).as_str(),
+            )) as Box<dyn Dumper>));
+            solution.add_dumper(dumper);
+        }
         match solution.solve() {
             Ok(_) => {
                 println!("{} {}", "Solution:".italic().blue(), solution);
