@@ -24,6 +24,7 @@ mod logger;
 mod parser;
 mod settings;
 mod solver;
+mod dump;
 
 use clap::{App, Arg};
 use colored::*;
@@ -37,9 +38,9 @@ fn main() {
     let matches = App::new("Minerva")
         .version("1.0")
         .author("Quotique <just.std@gmail.com>")
-        .about("Does awesome things")
+        .about("Minerva core develop/debug enviroment")
         .arg(
-            Arg::with_name("config")
+            Arg::new("config")
                 .short('c')
                 .long("config")
                 .value_name("FILE")
@@ -48,7 +49,7 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("only")
+            Arg::new("only")
                 .short('o')
                 .long("only")
                 .value_name("ID")
@@ -56,7 +57,7 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("symbols")
+            Arg::new("symbols")
                 .short('s')
                 .long("symbols")
                 .value_name("DIR")
@@ -64,12 +65,19 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("problems")
+            Arg::new("problems")
                 .short('p')
                 .long("problems")
                 .value_name("DIR")
                 .about("Specify problems path")
                 .takes_value(true),
+        )
+        .arg(
+            Arg::new("dump")
+                .short('d')
+                .long("dump")
+                .about("Dump solution trace into a file")
+                .takes_value(false),
         )
         .get_matches();
 
