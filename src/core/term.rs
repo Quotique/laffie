@@ -1,6 +1,5 @@
-use bigdecimal::{BigDecimal as Decimal, Signed};
-use std::{collections::HashMap, fmt, str::FromStr};
-use std::hash::Hash;
+pub use bigdecimal::{BigDecimal as Decimal, Signed};
+use std::{collections::HashMap, fmt, hash::Hash, str::FromStr};
 use trees::{tr, Node, Tree};
 
 use super::symbols::{symbol_by_id, symbol_by_name, Symbol};
@@ -93,9 +92,20 @@ impl Term {
         }
     }
 
+    pub fn with_symbol_name(name: &str) -> Option<Self> {
+        symbol_by_name(&name.into()).map(|s| Self::Symbol(s.id))
+    }
+
     pub fn symbol(&self) -> Option<Symbol> {
         if let Term::Symbol(id) = self {
             return symbol_by_id(*id);
+        }
+        None
+    }
+
+    pub fn symbol_id(&self) -> Option<u64> {
+        if let Term::Symbol(id) = self {
+            return Some(*id);
         }
         None
     }

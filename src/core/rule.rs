@@ -318,7 +318,7 @@ impl RulesEngine {
             }
             _ => match target {
                 ProblemType::Transform => {
-					// Only transform rules for transform
+                    // Only transform rules for transform
                     return false;
                 }
                 _ => {}

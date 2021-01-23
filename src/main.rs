@@ -19,12 +19,18 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
+mod statement;
+
 mod core;
 mod dump;
 mod logger;
 mod parser;
+mod predefine;
+mod problem;
+mod rule;
 mod settings;
 mod solver;
+mod utils;
 
 use clap::{App, Arg};
 use colored::*;

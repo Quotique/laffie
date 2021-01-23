@@ -1,6 +1,32 @@
+use std::fmt;
+
 pub mod lang;
+mod problem;
+mod rule;
+mod statement;
 
 pub type Tree = trees::Tree<String>;
+pub type Node = trees::Node<String>;
+
+pub use self::{lang::StatementsParser as LangParser, problem::ProblemParser};
+
+#[derive(Clone, Debug)]
+pub enum SemanticError {
+    UnexpectedWord(String),
+    WorngArgCount(String),
+
+    Other(String),
+}
+
+impl fmt::Display for SemanticError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::UnexpectedWord(w) => write!(f, "Unexpected word {}", w),
+            Self::WorngArgCount(e) => write!(f, "Arg count missmath: {}", e),
+            Self::Other(e) => write!(f, "Semantic error: {}", e),
+        }
+    }
+}
 
 #[cfg(test)]
 mod parser_tests {

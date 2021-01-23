@@ -4,11 +4,13 @@ use trees::Tree;
 
 use parser::lang;
 
-
 pub fn load_dir<F: FnMut(&Tree<String>)>(dir: &Path, cb: &mut F) -> io::Result<()> {
     trace!("Processing dir: {}", dir.to_string_lossy());
     if !dir.is_dir() {
-        panic!(dir.to_string_lossy().to_string().push_str("  is not directory!"));
+        panic!(dir
+            .to_string_lossy()
+            .to_string()
+            .push_str("  is not directory!"));
     }
     for entry in fs::read_dir(dir)? {
         let entry = entry?;

@@ -110,7 +110,7 @@ impl Symbol {
     }
 
     #[allow(dead_code)]
-    fn add_with_name(name: &str) {
+    pub fn add_with_name(name: &str) {
         add_symbol(Symbol {
             id:    0,
             name:  String::from(name),
