@@ -1,10 +1,14 @@
 use super::rule::{Rule, RuleAttr, RuleAttrValue};
-use crate::{core::symbols::symbol_by_name, statement::Statement};
-use std::{collections::HashMap, convert::From};
+use crate::{
+    core::{symbols::symbol_by_name, term::Term},
+    statement::Statement,
+};
+use std::{collections::HashMap, convert::From, fmt};
 
 #[derive(Clone, Debug)]
 pub enum RuleBuilderError {
     BadStatementRoot,
+    WrongArgsCount,
     OnlyOneStatementIsAllowed,
     MissingLevelAttribute,
 }
@@ -19,6 +23,17 @@ pub struct RuleBuilder {
 impl From<Statement> for RuleBuilder {
     fn from(source: Statement) -> Self {
         Self::new().with_statement(source).unwrap()
+    }
+}
+
+impl fmt::Display for RuleBuilderError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::BadStatementRoot => write!(f, "Bad statement root"),
+            Self::WrongArgsCount => write!(f, "Wrong args count"),
+            Self::OnlyOneStatementIsAllowed => write!(f, "Only one statementis allowed"),
+            Self::MissingLevelAttribute => write!(f, "Missing level attribute"),
+        }
     }
 }
 
@@ -94,43 +109,41 @@ impl RuleBuilder {
     }
 
     fn split_statement(&mut self) -> Result<(Statement, Statement), RuleBuilderError> {
-        Err(RuleBuilderError::BadStatementRoot)
-        // TODO: parse statement with params match
+        let (root, mut childs) = self
+            .statement
+            .take()
+            .ok_or(RuleBuilderError::BadStatementRoot)?
+            .destruct();
 
-        // if self.statement.root.data.is_symbol_name(&"==".into()) {
-        //     if self.root.first().unwrap().data.is_variable() {
-        //         if !Self::contains(&self.root.first().unwrap().data,
-        // &self.root.last().unwrap())         {
-        //             let pattern = self.root.first().unwrap().to_owned();
-        //             let pattern_symbols = symbols(&pattern);
-        //             return Some(Rule {
-        //                 id:              0,
-        //                 level:           0,
-        //                 attrs:           [(RuleAttr::Subtree,
-        // RuleAttrValue::None)]                     .iter()
-        //                     .cloned()
-        //                     .collect(),
-        //                 pattern:         pattern,
-        //                 replace:
-        // self.root.last().unwrap().to_owned(),
-        // requirements:    vec![],                 pattern_symbols:
-        // pattern_symbols,             });
-        //         }
-        //     }
-        // } else if self.root.data.is_symbol_name(&"=>".into()) {
-        //     let pattern = self.root.first().unwrap().to_owned();
-        //     let pattern_symbols = symbols(&pattern);
-        //     return Some(Rule {
-        //         id:              0,
-        //         level:           0,
-        //         attrs:           HashMap::new(),
-        //         pattern:         pattern,
-        //         replace:         self.root.last().unwrap().to_owned(),
-        //         requirements:    vec![],
-        //         pattern_symbols: pattern_symbols,
-        //     });
-        // }
-        //
-        // return None;
+        if childs.degree() != 2 {
+            return Err(RuleBuilderError::WrongArgsCount);
+        }
+
+        if root.data == Term::with_symbol_name("=>").unwrap() {
+            return Ok((
+                Statement::from(childs.pop_front().unwrap()),
+                Statement::from(childs.pop_back().unwrap()),
+            ));
+        } else if root.data == Term::with_symbol_name("<=>").unwrap() {
+            self.attributes
+                .push((RuleAttr::Equivalence, RuleAttrValue::None));
+
+            return Ok((
+                Statement::from(childs.pop_front().unwrap()),
+                Statement::from(childs.pop_back().unwrap()),
+            ));
+        } else if root.data == Term::with_symbol_name("==").unwrap() {
+            self.attributes
+                .push((RuleAttr::Equivalence, RuleAttrValue::None));
+            self.attributes
+                .push((RuleAttr::Subtree, RuleAttrValue::None));
+
+            return Ok((
+                Statement::from(childs.pop_front().unwrap()),
+                Statement::from(childs.pop_back().unwrap()),
+            ));
+        }
+
+        Err(RuleBuilderError::BadStatementRoot)
     }
 }

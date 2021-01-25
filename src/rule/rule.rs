@@ -17,12 +17,12 @@ pub enum RuleAttr {
     Level,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuleAttrValue {
     None,
     UInt(u64),
     Str(String),
-    Target(ProblemType),
+    Target(Statement),
 }
 
 #[derive(Clone, Debug)]
@@ -86,22 +86,22 @@ impl Rule {
         true
     }
 
-    pub fn is_target_suitable(&self, target: &ProblemType) -> bool {
-        match self.attribute(&RuleAttr::Target) {
-            Some(RuleAttrValue::Target(x)) => {
-                if target.map(x).is_err() {
-                    trace!("no match");
-                    return false;
-                }
-            }
-            _ => match target {
-                ProblemType::Transform => {
-                    // Only transform rules for transform
-                    return false;
-                }
-                _ => {}
-            },
-        }
+    pub fn is_target_suitable(&self, target: &MarkedStatement) -> bool {
+        // match self.attribute(&RuleAttr::Target) {
+        //     Some(RuleAttrValue::Target(x)) => {
+        //         if target.map(x.statement).is_err() {
+        //             trace!("no match");
+        //             return false;
+        //         }
+        //     }
+        //     _ => match target {
+        //         ProblemType::Transform => {
+        //             // Only transform rules for transform
+        //             return false;
+        //         }
+        //         _ => {}
+        //     },
+        // }
         true
     }
 

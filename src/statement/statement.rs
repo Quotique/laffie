@@ -1,4 +1,7 @@
-use crate::core::term::{display_string, StatementTree, Term};
+use crate::core::{
+    term::{display_string, StatementTree, Term},
+    tree_utils::params_map,
+};
 use std::{
     collections::{HashMap, HashSet},
     convert::From,
@@ -8,6 +11,7 @@ use std::{
 use trees::Node;
 
 pub type ParamsMap = HashMap<String, u64>;
+pub type ReverseParamsMap = HashMap<u64, StatementTree>;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Statement {
@@ -32,6 +36,15 @@ impl Statement {
             .iter
             .filter_map(|x| x.data.symbol_id())
             .collect::<HashSet<u64>>()
+    }
+
+    pub fn destruct(mut self) -> (StatementTree, trees::Forest<Term>) {
+	let childs = self.tree.abandon();
+	(self.tree, childs)
+    }
+
+    pub fn map(&self, target: &Self) -> Result<Vec<ReverseParamsMap>, String> {
+	params_map(target.tree.root(), self.tree.root())
     }
 
     fn contains(term: &Term, tree: &Node<Term>) -> bool {

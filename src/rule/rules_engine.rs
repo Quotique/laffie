@@ -44,7 +44,7 @@ impl RulesEngine {
     pub fn suggest_rules(
         &self,
         statement: &MarkedStatement,
-        target: &ProblemType,
+        target: &MarkedStatement,
     ) -> Vec<SharedRule> {
         let empty_level = LevelRules::new();
         let level = self

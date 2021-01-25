@@ -8,7 +8,9 @@ mod statement;
 pub type Tree = trees::Tree<String>;
 pub type Node = trees::Node<String>;
 
-pub use self::{lang::StatementsParser as LangParser, problem::ProblemParser};
+pub use self::{
+    lang::StatementsParser as LangParser, problem::ProblemParser, statement::StatementParser,
+};
 
 #[derive(Clone, Debug)]
 pub enum SemanticError {

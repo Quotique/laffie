@@ -30,5 +30,10 @@ pub fn setup() {
         Symbol::add_with_name("is"); // 12
         Symbol::add_with_name("known"); // 13
         Symbol::add_with_name("in"); // 14
+        Symbol::add_with_name("find");
+        Symbol::add_with_name("AnySymbol");
+        Symbol::add_with_name("==");
+        Symbol::add_with_name("=>");
+        Symbol::add_with_name("<=>");
     });
 }
