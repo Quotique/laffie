@@ -56,7 +56,7 @@ impl RulesEngine {
             .flat_map(|symbol_id| level.get(symbol_id).clone().into_iter())
             .filter(|rule| {
                 let rule = rule.read().expect("Can't lock rule");
-                rule.is_statement_suitable(&statement) && rule.is_target_suitable(&target)
+                rule.is_statement_suitable(&statement).is_ok() && rule.is_target_suitable(&target).is_ok()
             })
             .cloned()
             .collect()

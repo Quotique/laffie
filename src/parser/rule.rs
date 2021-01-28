@@ -125,7 +125,7 @@ mod tests {
         assert_eq!(states.len(), 1);
 
         let result = RuleParser::with(&states[0]).parse();
-        // assert!(result.is_ok());
+        assert!(result.is_ok());
 
         let rule = result.unwrap();
         assert_eq!(

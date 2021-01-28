@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::statement::Statement;
+
 pub mod lang;
 mod problem;
 mod rule;
@@ -9,7 +11,8 @@ pub type Tree = trees::Tree<String>;
 pub type Node = trees::Node<String>;
 
 pub use self::{
-    lang::StatementsParser as LangParser, problem::ProblemParser, statement::StatementParser,
+    lang::StatementsParser as LangParser, problem::ProblemParser, rule::RuleParser,
+    statement::StatementParser,
 };
 
 #[derive(Clone, Debug)]
@@ -18,6 +21,23 @@ pub enum SemanticError {
     WorngArgCount(String),
 
     Other(String),
+}
+
+#[allow(dead_code)]
+#[cfg(test)]
+pub fn statement_with_params(text: &str) -> Statement {
+    let states = LangParser::new().parse(text).unwrap();
+    StatementParser::new(&states[0]).parse().unwrap()
+}
+
+#[allow(dead_code)]
+#[cfg(test)]
+pub fn statement_with_vars(text: &str) -> Statement {
+    let states = LangParser::new().parse(text).unwrap();
+    StatementParser::new(&states[0])
+        .with_variables()
+        .parse()
+        .unwrap()
 }
 
 impl fmt::Display for SemanticError {

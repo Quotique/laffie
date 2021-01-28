@@ -1,14 +1,15 @@
 use crate::core::{
     term::{display_string, StatementTree, Term},
-    tree_utils::params_map,
+    tree_utils::{apply_map, params_map, swap_node},
 };
 use std::{
-    collections::{HashMap, HashSet},
+    borrow::Borrow,
+    collections::{HashMap, HashSet, VecDeque},
     convert::From,
     fmt,
     hash::{Hash, Hasher},
 };
-use trees::Node;
+use trees::{linked::fully::iter::IterMut as TreeIterMut, Node};
 
 pub type ParamsMap = HashMap<String, u64>;
 pub type ReverseParamsMap = HashMap<u64, StatementTree>;
@@ -38,13 +39,46 @@ impl Statement {
             .collect::<HashSet<u64>>()
     }
 
+    pub fn root(&self) -> &trees::Node<Term> {
+        self.tree.root()
+    }
+
     pub fn destruct(mut self) -> (StatementTree, trees::Forest<Term>) {
-	let childs = self.tree.abandon();
-	(self.tree, childs)
+        let childs = self.tree.abandon();
+        (self.tree, childs)
     }
 
     pub fn map(&self, target: &Self) -> Result<Vec<ReverseParamsMap>, String> {
-	params_map(target.tree.root(), self.tree.root())
+        params_map(target.tree.root(), self.tree.root())
+    }
+
+    pub fn apply_map(&self, params: &ReverseParamsMap) -> Self {
+        let mut result = self.clone();
+        apply_map(result.tree.root_mut(), params);
+        result
+    }
+
+    pub fn find_subtree_map_mut<'a>(
+        &self,
+        target: &'a mut Self,
+    ) -> Option<(Vec<ReverseParamsMap>, &'a mut Node<Term>)> {
+        let mut queue = VecDeque::new();
+        queue.push_back(target.tree.root_mut());
+
+        while let Some(node) = queue.pop_front() {
+            if let Ok(mapping) = params_map(node, self.tree.root()) {
+                return Some((mapping, node));
+            }
+
+            for i in node.iter_mut() {
+                queue.push_back(i);
+            }
+        }
+        None
+    }
+
+    pub fn swap_node(&mut self, node: &mut Node<Term>) {
+        swap_node(self.tree.root_mut(), node)
     }
 
     fn contains(term: &Term, tree: &Node<Term>) -> bool {
