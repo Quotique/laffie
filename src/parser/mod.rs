@@ -51,7 +51,7 @@ impl fmt::Display for SemanticError {
 }
 
 #[cfg(test)]
-mod parser_tests {
+mod tests {
     use super::*;
     use trees::linked::fully::tr;
 

@@ -127,7 +127,7 @@ impl fmt::Display for Problem {
 }
 
 #[cfg(test)]
-pub mod problem_tests {
+pub mod tests {
     use super::*;
     use bigdecimal::BigDecimal as Decimal;
     use core::{symbols::symbols_tests::setup, term::Term};

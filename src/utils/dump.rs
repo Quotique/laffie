@@ -1,6 +1,6 @@
 use std::{fs::File, io::prelude::*};
 
-use crate::solver::{problem::MarkedStatement, solution::Solution};
+use crate::{problem::Solution, statement::MarkedStatement};
 
 pub trait Dumper {
     fn subproblem_start(&mut self, solution: &Solution);
@@ -35,8 +35,9 @@ impl Dumper for FileDumper {
                 format!(
                     "{} {} [{}]\n",
                     self.prefix(),
-                    solution.target,
+                    solution.problem.target,
                     solution
+                        .problem
                         .conditions
                         .iter()
                         .map(|x| x.statement.to_string())

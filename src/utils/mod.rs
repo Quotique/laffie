@@ -1,4 +1,6 @@
-pub mod dir_loader;
-pub mod dump;
-pub mod logger;
-pub mod settings;
+mod dir_loader;
+mod dump;
+mod logger;
+mod settings;
+
+pub use self::dump::{Dumper, FileDumper};

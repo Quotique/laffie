@@ -4,6 +4,7 @@ use std::{
     collections::HashSet,
     convert::From,
     fmt,
+    hash::{Hash, Hasher},
     sync::{Arc, RwLock},
 };
 
@@ -49,6 +50,20 @@ impl fmt::Display for MarkedStatement {
         write!(f, "{}", self.statement)
     }
 }
+
+impl Hash for MarkedStatement {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.statement.hash(state);
+    }
+}
+
+impl PartialEq for MarkedStatement {
+    fn eq(&self, other: &Self) -> bool {
+        *self.statement == *self.statement
+    }
+}
+
+impl Eq for MarkedStatement {}
 
 impl MarkedStatement {
     pub fn normalize(self) -> Self {

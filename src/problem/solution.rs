@@ -7,8 +7,9 @@ use crate::{
     rule::{Rule, RuleAttr, RulesEngine, SharedRule},
     solver::operations::{is_true, normalize},
     statement::{MarkedStatement, Statement},
-    utils::dump::Dumper,
+    utils::Dumper,
 };
+use indexmap::IndexSet;
 use std::{
     cell::RefCell,
     collections::{hash_map::DefaultHasher, HashMap},
@@ -21,7 +22,6 @@ use std::{
 use colored::*;
 
 pub const MAX_SUBPROBLEM_LEVEL: usize = 10;
-pub const STACK_SIZE: usize = 20;
 
 pub struct PerfStats {
     problem_hash:   u64,
@@ -31,10 +31,9 @@ pub struct PerfStats {
 }
 
 pub struct Solution {
-    problem: Problem,
+    pub problem: Problem,
 
-    stack:        Vec<MarkedStatement>,
-    stack_hashes: HashMap<u64, Vec<usize>>,
+    stack: IndexSet<MarkedStatement>,
 
     rules_engine:       Arc<RulesEngine>,
     local_rules:        Vec<SharedRule>,
@@ -79,8 +78,7 @@ impl PerfStats {
 impl Solution {
     pub fn new(problem: Problem, rules: Arc<RulesEngine>) -> Solution {
         let mut result = Solution {
-            stack:        vec![],
-            stack_hashes: HashMap::new(),
+            stack: IndexSet::new(),
 
             rules_engine:       rules,
             local_rules:        vec![],
@@ -105,23 +103,79 @@ impl Solution {
     }
 
     pub fn solve(&mut self) -> Result<(), SolutionError> {
-        Ok(())
-        // if let Some(x) = self.dumper.as_ref() {
-        //     x.borrow_mut().subproblem_start(&self)
-        // }
-        //
+        if let Some(x) = self.dumper.as_ref() {
+            x.borrow_mut().subproblem_start(&self);
+        }
         // trace!("Subproblem: {}, {:?}", self.target, self.conditions);
-        // if self.subproblem_level > MAX_SUBPROBLEM_LEVEL {
-        //     return Err(SolutionError::MaxSubproblemLevelExceed);
-        // }
+        if self.problem.subproblem_level > MAX_SUBPROBLEM_LEVEL {
+            return Err(SolutionError::MaxSubproblemLevelExceed);
+        }
+
+        let start = Instant::now();
+        let result = self.solution_loop();
+
+        self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
+        if let Some(x) = self.dumper.as_ref() {
+            x.borrow_mut().subproblem_end()
+        }
+        result
+    }
+
+    fn solution_loop(&mut self) -> Result<(), SolutionError> {
+        loop {
+            self.perf_stats.cycles_count += 1;
+        }
+        Ok(())
+        // self.prepare_target();
+        // loop {
+        //     let index = self.pick_condition()?;
+        //     let state = self.conditions.get(index).unwrap();
         //
-        // let start = Instant::now();
-        // let result = self.solution_loop();
-        // self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) /
-        // 1000000.; if let Some(x) = self.dumper.as_ref() {
-        //     x.borrow_mut().subproblem_end()
+        //     trace!("Local rules: {:?}", self.local_rules);
+        //     trace!(
+        //         "Statement: {} ({:?}) ({})",
+        //         state.statement,
+        //         state.applied_rules.borrow(),
+        //         state.weight.borrow()
+        //     );
+        //
+        //     if let Some(s) =
+        // self.transform(&self.conditions.get(index).unwrap()) {
+        //         self.add_condition(s)?;
+        //         continue;
+        //     }
+        //
+        //     if self.is_answer(&state.statement, &*state.weight.borrow()) {
+        //         trace!("Solved. Answer: {}", state.statement);
+        //         self.answer = Some(state.statement.clone());
+        //         return Ok(());
+        //     }
+        //
+        //     if let Some(mut r) = state.statement.rule() {
+        //         r.id = (self.local_rules.len() + 1) |
+        // 0x80_00_00_00_00_00_00_00;         state.blocked_rules.
+        // borrow_mut().insert(r.id);         self.local_rules.push(Arc:
+        // :new(RwLock::new(r)));     }
+        //
+        //     for s in self
+        //         .next_statement(&state, |x|
+        // !state.blocked_rules.borrow().contains(&x.id))
+        //         .into_iter()
+        //     {
+        //         unsafe {
+        //             let sp: *mut Self = self;
+        //             let state = (*sp).conditions.get(index).unwrap();
+        //             (*sp).add_condition({
+        //                 let s = MarkedStatement::from(Arc::new(s));
+        //                 s.blocked_rules
+        //                     .borrow_mut()
+        //                     .extend(state.blocked_rules.borrow().iter());
+        //                 s
+        //             })?;
+        //         }
+        //     }
+        //     self.prepare_target();
         // }
-        // result
     }
 
     fn is_answer(&self, statement: &Statement, weight: &usize) -> bool {
@@ -230,112 +284,6 @@ impl Solution {
         //     } else {
         //         Err("Rule applied".into())
         //     }
-        // }
-    }
-
-    fn add_condition(&mut self, statement: MarkedStatement) -> Result<usize, SolutionError> {
-        Ok(0)
-        // if let Some(x) = self.dumper.as_ref() {
-        //     x.borrow_mut().add_statement(&statement);
-        // }
-        //
-        // let mut s = DefaultHasher::new();
-        // statement.statement.hash(&mut s);
-        // let hash = s.finish();
-        // trace!("Hashes: {:?}, new: {}", self.condition_hashes, hash);
-        // for i in self.condition_hashes.entry(hash).or_insert(vec![]) {
-        //     trace!(
-        //         "Compare: {}, {}",
-        //         statement.statement.root,
-        //         self.conditions[*i].statement.root
-        //     );
-        //     if statement.statement.root == self.conditions[*i].statement.root
-        // {         trace!("Same!");
-        //         return Ok(*i);
-        //     }
-        // }
-        // trace!("New condition: {}", statement.statement);
-        // self.condition_hashes
-        //     .get_mut(&hash)
-        //     .unwrap()
-        //     .push(self.conditions.len());
-        // self.conditions.push(statement);
-        // if self.conditions.len() > STACK_SIZE {
-        //     return Err(SolutionError::StackOverflow);
-        // }
-        //
-        // Ok(self.conditions.len() - 1)
-    }
-
-    fn pick_condition(&self) -> Result<usize, SolutionError> {
-        Ok(4)
-        // trace!("Solution: {:?}", self.conditions);
-        // let element = self
-        //     .conditions
-        //     .iter()
-        //     .enumerate()
-        //     .max_by(|(_, x), (_, y)| x.weight.cmp(&y.weight))
-        //     .ok_or(SolutionError::NoConditions)?;
-        // if *element.1.weight.borrow() == 0 {
-        //     trace!("State: {:?} no solution!", element);
-        //     return Err(SolutionError::NoSolutionsFound);
-        // }
-        // *element.1.weight.borrow_mut() -= 1;
-        // Ok(element.0)
-    }
-
-    fn solution_loop(&mut self) -> Result<(), SolutionError> {
-        Ok(())
-        // self.prepare_target();
-        // loop {
-        //     self.perf_stats.cycles_count += 1;
-        //     let index = self.pick_condition()?;
-        //     let state = self.conditions.get(index).unwrap();
-        //
-        //     trace!("Local rules: {:?}", self.local_rules);
-        //     trace!(
-        //         "Statement: {} ({:?}) ({})",
-        //         state.statement,
-        //         state.applied_rules.borrow(),
-        //         state.weight.borrow()
-        //     );
-        //
-        //     if let Some(s) =
-        // self.transform(&self.conditions.get(index).unwrap()) {
-        //         self.add_condition(s)?;
-        //         continue;
-        //     }
-        //
-        //     if self.is_answer(&state.statement, &*state.weight.borrow()) {
-        //         trace!("Solved. Answer: {}", state.statement);
-        //         self.answer = Some(state.statement.clone());
-        //         return Ok(());
-        //     }
-        //
-        //     if let Some(mut r) = state.statement.rule() {
-        //         r.id = (self.local_rules.len() + 1) |
-        // 0x80_00_00_00_00_00_00_00;         state.blocked_rules.
-        // borrow_mut().insert(r.id);         self.local_rules.push(Arc:
-        // :new(RwLock::new(r)));     }
-        //
-        //     for s in self
-        //         .next_statement(&state, |x|
-        // !state.blocked_rules.borrow().contains(&x.id))
-        //         .into_iter()
-        //     {
-        //         unsafe {
-        //             let sp: *mut Self = self;
-        //             let state = (*sp).conditions.get(index).unwrap();
-        //             (*sp).add_condition({
-        //                 let s = MarkedStatement::from(Arc::new(s));
-        //                 s.blocked_rules
-        //                     .borrow_mut()
-        //                     .extend(state.blocked_rules.borrow().iter());
-        //                 s
-        //             })?;
-        //         }
-        //     }
-        //     self.prepare_target();
         // }
     }
 
