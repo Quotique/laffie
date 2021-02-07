@@ -246,7 +246,7 @@ pub fn normalize(root: &mut Node<Term>) -> bool {
     result
 }
 
-pub fn is_true(statement: &StatementTree) -> bool {
+pub fn is_true(statement: &Node<Term>) -> bool {
     if let Term::Symbol(id) = &statement.data {
         if *id == symbol_by_name(&"==".into()).unwrap().id {
             if let (Term::Number(d1), Term::Number(d2)) = (

@@ -1,5 +1,5 @@
 use crate::statement::MarkedStatement;
-use std::fmt;
+use std::{fmt, iter::Iterator};
 
 #[derive(Clone)]
 pub struct Problem {
@@ -42,10 +42,7 @@ impl ProblemBuilder {
         self
     }
 
-    pub fn with_conditions<I>(mut self, reqs: I) -> Self
-    where
-        I: std::iter::Iterator<Item = MarkedStatement> + IntoIterator<Item = MarkedStatement>,
-    {
+    pub fn with_conditions(mut self, reqs: impl Iterator<Item = MarkedStatement>) -> Self {
         self.conditions.extend(reqs.map(|mut x| {
             x.weight = 0;
             x

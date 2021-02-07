@@ -1,3 +1,4 @@
+mod frame;
 mod problem;
 mod solution;
 mod target;

@@ -14,6 +14,7 @@ pub enum RuleBuilderError {
 }
 
 pub struct RuleBuilder {
+    rule_id:      usize,
     statement:    Option<Statement>,
     requirements: Vec<Statement>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
@@ -40,6 +41,7 @@ impl fmt::Display for RuleBuilderError {
 impl RuleBuilder {
     pub fn new() -> Self {
         RuleBuilder {
+            rule_id:      0,
             statement:    None,
             requirements: vec![],
             attributes:   vec![],
@@ -47,6 +49,11 @@ impl RuleBuilder {
                 .expect("System symbol AnySymbol is not found")
                 .id,
         }
+    }
+
+    pub fn with_id(mut self, id: usize) -> Self {
+        self.rule_id = id;
+        self
     }
 
     pub fn with_symbol_id(mut self, symbol_id: u64) -> Self {
@@ -93,8 +100,9 @@ impl RuleBuilder {
         } else {
             return Err(RuleBuilderError::MissingLevelAttribute);
         };
+
         Ok(Rule {
-            id:        0,
+            id:        self.rule_id,
             level:     *level as usize,
             symbol_id: self.symbol_id,
 

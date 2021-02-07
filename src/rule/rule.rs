@@ -36,7 +36,7 @@ pub enum RuleDeclineReason {
 
 #[derive(Debug)]
 pub struct Suppose {
-    pub requirements: Vec<Statement>,
+    pub requirements: Vec<Arc<Statement>>,
     pub resolution:   MarkedStatement,
 }
 
@@ -144,8 +144,14 @@ impl Rule {
         Ok(maps
             .iter()
             .map(|x| Suppose {
-                requirements: self.requirements.iter().map(|r| r.apply_map(&x)).collect(),
-                resolution:   MarkedStatement::from(Arc::new(self.replace.apply_map(&x))),
+                requirements: self
+                    .requirements
+                    .iter()
+                    .map(|r| Arc::new(r.apply_map(&x)))
+                    .collect(),
+                resolution:   MarkedStatement::from(Arc::new(
+                    self.replace.apply_map(&x).normalize(),
+                )),
             })
             .collect())
     }
@@ -163,9 +169,13 @@ impl Rule {
             .map(|x| {
                 let mut replace = self.replace.apply_map(&x);
                 replace.swap_node(node);
-                let clone = unsafe { (*state).clone() };
+                let clone = unsafe { (*state).normalize() };
                 Suppose {
-                    requirements: self.requirements.iter().map(|r| r.apply_map(&x)).collect(),
+                    requirements: self
+                        .requirements
+                        .iter()
+                        .map(|r| Arc::new(r.apply_map(&x)))
+                        .collect(),
                     resolution:   MarkedStatement::from(Arc::new(clone)),
                 }
             })
@@ -269,16 +279,16 @@ pub mod tests {
         let suppose = suppose.unwrap();
         assert_eq!(suppose.len(), 2);
         assert_eq!(suppose[0].requirements.len(), 1);
-        assert_eq!(suppose[0].requirements[0], statement_with_vars("x != 0"));
+        assert_eq!(*suppose[0].requirements[0], statement_with_vars("x != 0"));
         assert_eq!(
             *suppose[0].resolution.statement,
             statement_with_vars("2 == -x")
         );
         assert_eq!(suppose[1].requirements.len(), 1);
-        assert_eq!(suppose[1].requirements[0], statement_with_vars("2 != 0"));
+        assert_eq!(*suppose[1].requirements[0], statement_with_vars("2 != 0"));
         assert_eq!(
             *suppose[1].resolution.statement,
-            statement_with_vars("x == -2")
+            statement_with_vars("x == -2").normalize()
         );
     }
 

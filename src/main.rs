@@ -4,7 +4,6 @@ extern crate clap;
 extern crate colored;
 extern crate config;
 extern crate fern;
-extern crate indexmap;
 extern crate multi_map;
 extern crate num;
 extern crate num_bigint;
@@ -44,7 +43,7 @@ use std::{cell::RefCell, path::Path, rc::Rc, sync::Arc};
 
 fn main() {
     let matches = App::new("Minerva")
-        .version("1.0")
+        .version("0.2.0-pre-alpha")
         .author("Quotique <just.std@gmail.com>")
         .about("Minerva core develop/debug enviroment")
         .arg(

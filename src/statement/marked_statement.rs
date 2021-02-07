@@ -1,5 +1,5 @@
 use super::statement::Statement;
-use crate::core::rule::Rule;
+use crate::rule::{Rule, RuleBuilder};
 use std::{
     collections::HashSet,
     convert::From,
@@ -72,7 +72,29 @@ impl MarkedStatement {
         copy
     }
 
-    pub fn rule(&mut self) -> Option<Arc<RwLock<Rule>>> {
+    pub fn rule(&mut self, id: usize) -> Option<Arc<RwLock<Rule>>> {
+        if self.not_rule {
+            return None;
+        }
+
+        if let Some(rule) = &self.as_rule {
+            return Some(rule.clone());
+        }
+
+        if let Ok(builder) = RuleBuilder::new()
+            .with_id(id)
+            .with_statement((*self.statement).clone())
+        {
+            if let Ok(rule) = builder.build() {
+                if rule.pattern.root().data.is_variable() {
+                    let rule = Arc::new(RwLock::new(rule));
+                    self.as_rule = Some(rule.clone());
+                    self.blocked_rules.insert(id);
+                    return Some(rule);
+                }
+            }
+        }
+        self.not_rule = true;
         None
     }
 }
