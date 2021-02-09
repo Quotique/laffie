@@ -24,7 +24,7 @@ impl Frame {
         self.index.contains_key(statement)
     }
 
-    pub fn add_condition(&mut self, statement: MarkedStatement) -> Result<(), SolutionError> {
+    pub fn add_condition(&mut self, mut statement: MarkedStatement) -> Result<(), SolutionError> {
         if self.contains(&statement.statement) {
             return Ok(());
         }
@@ -32,6 +32,7 @@ impl Frame {
         // if let Some(x) = self.dumper.as_ref() {
         // 	   x.borrow_mut().add_statement(&statement);
         // }
+        statement.id = self.stack.len();
         self.index
             .insert(statement.statement.clone(), self.stack.len());
         self.stack.push(statement);

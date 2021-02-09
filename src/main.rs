@@ -34,12 +34,12 @@ mod utils;
 
 use clap::{App, Arg};
 use colored::*;
-use core::{rule::RulesEngine, symbols::load_symbols};
-use dump::{Dumper, FileDumper};
-use logger::log_init;
-use settings::Settings;
-use solver::{problem::ProblemStorage, solution::Solution};
 use std::{cell::RefCell, path::Path, rc::Rc, sync::Arc};
+
+use problem::Solution;
+use rule::RulesEngine;
+use utils::{log_init, Settings};
+use utils::{DirectoryParser, Dumper, FileDumper};
 
 fn main() {
     let matches = App::new("Minerva")
@@ -98,39 +98,29 @@ fn main() {
         });
     log_init(&settings.logger);
 
-    let code_dir = matches
-        .value_of("symbols")
-        .map(|x| x.to_owned())
-        .or(settings.symbols_dir)
-        .unwrap_or_else(|| {
-            println!("Symbols dir is not specified");
-            std::process::exit(-1);
-        });
-    let code_dir = Path::new(code_dir.as_str());
+    let parser = DirectoryParser::new(
+        matches
+            .value_of("symbols")
+            .map(|x| x.to_owned())
+            .or(settings.symbols_dir)
+            .unwrap_or_else(|| {
+                println!("Symbols dir is not specified");
+                std::process::exit(-1);
+            }),
+        matches
+            .value_of("problems")
+            .map(|x| x.to_owned())
+            .or(settings.problems_dir)
+            .unwrap_or_else(|| {
+                println!("Problems dir is not specified");
+                std::process::exit(-1);
+            }),
+    );
 
-    let problems_dir = matches
-        .value_of("problems")
-        .map(|x| x.to_owned())
-        .or(settings.problems_dir)
-        .unwrap_or_else(|| {
-            println!("Problems dir is not specified");
-            std::process::exit(-1);
-        });
-    let problems_dir = Path::new(problems_dir.as_str());
+    let rules_engine = Arc::new(parser.load_rules().unwrap());
+    let problems = parser.load_problems().unwrap();
 
-    info!(target: "init", "Reading symbols: {:?}", code_dir);
-    load_symbols(&code_dir).unwrap();
-
-    let mut rules = RulesEngine::new();
-    info!(target: "init", "Reading rules: {:?}", code_dir);
-    rules.load_dir(&code_dir).unwrap();
-    let rules = Arc::new(rules);
-
-    let mut problems = ProblemStorage::new();
-    info!(target: "init", "Reading problems: {:?}", problems_dir);
-    problems.load_dir(&problems_dir).unwrap();
-
-    for p in problems.problems {
+    for p in problems {
         if let Some(only) = matches.value_of("only") {
             let id = format!("{:x}", p.id);
             if !id.starts_with(only) && !id.ends_with(only) {
@@ -138,12 +128,14 @@ fn main() {
             }
         }
         println!("{} {}", "Problem".bold().green(), p);
-        let mut solution = Solution::new(&p, rules.clone());
+        let p_id = p.id;
+        let mut solution = Solution::new(p, rules_engine.clone());
+		
         if matches.is_present("dump") {
             let dumper = Rc::new(RefCell::new(Box::new(FileDumper::new(
-                format!("dumps/{:x}.dump", p.id).as_str(),
+                format!("dumps/{:x}.dump", p_id).as_str(),
             )) as Box<dyn Dumper>));
-            solution.add_dumper(dumper);
+            solution.set_dumper(dumper);
         }
         match solution.solve() {
             Ok(_) => {

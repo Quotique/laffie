@@ -6,11 +6,20 @@ use crate::{
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
+    symbol_id:   u64,
 }
 
 impl<'a> RuleParser<'a> {
     pub fn with(syntax_tree: &'a Tree) -> Self {
-        Self { syntax_tree }
+        Self {
+            syntax_tree,
+            symbol_id: 0,
+        }
+    }
+
+    pub fn with_symbol_id(mut self, symbol_id: u64) -> Self {
+        self.symbol_id = symbol_id;
+        self
     }
 
     pub fn parse(self) -> Result<Rule, SemanticError> {

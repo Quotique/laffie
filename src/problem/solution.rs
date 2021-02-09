@@ -44,7 +44,7 @@ pub struct Solution {
     rules_engine:       Arc<RulesEngine>,
     local_rules:        Vec<SharedRule>,
     equivalent_targets: Frame,
-    pub answer:         Option<MarkedStatement>,
+    pub answer:         Option<usize>,
 
     pub perf_stats: PerfStats,
 
@@ -102,6 +102,10 @@ impl Solution {
         }
     }
 
+    pub fn answer(&self) -> Option<Arc<Statement>> {
+        self.answer.map(|i| self.stack[i].statement.clone())
+    }
+
     pub fn set_dumper(&mut self, dumper: Rc<RefCell<Box<dyn Dumper>>>) {
         self.dumper = Some(dumper);
     }
@@ -140,18 +144,21 @@ impl Solution {
 
             let index = self.stack.pick_condition()?;
             let level = self.stack[index].weight;
+            trace!("Level: {}", level);
             if level > MAX_LEVEL {
                 return Err(SolutionError::NoSolutionsFound);
             }
+            self.prepare_target(level);
 
             if self.is_answer(&self.stack[index]) {
                 trace!("Solved. Answer: {}", self.stack[index].statement);
-                self.answer = Some(self.stack[index].clone());
+                self.answer = Some(index);
                 return Ok(());
             }
-            if let Some(r) =
-                self.stack[index].rule((self.local_rules.len() + 1) | 0x80_00_00_00_00_00_00_00)
-            {
+            if let Some(r) = self.stack[index].rule(
+                (self.local_rules.len() + 1) | 0x80_00_00_00_00_00_00_00,
+                (level + 1) as u64,
+            ) {
                 self.local_rules.push(r);
             }
 
@@ -179,6 +186,7 @@ impl Solution {
                         .rules_engine
                         .suggest_rules(&self.equivalent_targets[index], &self.problem.target);
                     rules.append(&mut self.local_rules.clone());
+                    let mut applied = false;
                     for rule in rules.iter().filter(|r| {
                         r.read()
                             .expect("Can't read rule")
@@ -204,10 +212,15 @@ impl Solution {
                                 }
 
                                 if proofed {
+                                    applied = true;
+                                    trace!("New alternative target: {}", sup.resolution);
                                     self.equivalent_targets.add_condition(sup.resolution);
                                 }
                             }
                         }
+                    }
+                    if !applied {
+                        self.equivalent_targets[index].weight += 1;
                     }
                 }
             }
@@ -243,25 +256,18 @@ impl Solution {
             }
             false
         } else if target_root.data.is_symbol_name(&"proof".into()) {
-            if statement_root == target_root.first().unwrap() {
-                return true;
-            }
-            if self.is_true(statement_root) {
-                return true;
-            }
-
             for i in self.equivalent_targets.iter() {
-                if statement_root == i.statement.root() {
+                if statement_root == i.statement.root().first().unwrap() {
                     return true;
                 }
-                if self.is_true(&i.statement.root()) {
+                if self.is_true(&i.statement.root().first().unwrap()) {
                     return true;
                 }
             }
             false
         } else if target_root.data.is_symbol_name(&"transform".into()) {
-            //         trace!("weight: {}", weight);
-            //         return weight == &1;
+            // 		   trace!("weight: {}", weight);
+            // 		   return weight == &1;
             false
         } else {
             false
@@ -341,116 +347,119 @@ impl Solution {
 
     fn transform(&self, statement: &MarkedStatement) -> Option<MarkedStatement> {
         None
-        //    match self.target {
-        //        ProblemType::Transform => {
-        //            return None;
-        //        }
-        //        _ => {}
-        //    }
-        //    if *statement.simplified.borrow() {
-        //        return None;
-        //    }
-        //    *statement.simplified.borrow_mut() = true;
+        // 	  match self.target {
+        // 		  ProblemType::Transform => {
+        // 			  return None;
+        // 		  }
+        // 		  _ => {}
+        // 	  }
+        // 	  if *statement.simplified.borrow() {
+        // 		  return None;
+        // 	  }
+        // 	  *statement.simplified.borrow_mut() = true;
         //
-        //    let mut subproblem = self.subproblem(ProblemType::Transform);
-        //    subproblem.conditions.push(MarkedStatement {
-        //        statement:     statement.statement.clone(),
-        //        applied_rules: RefCell::new(HashSet::new()),
-        //        blocked_rules: RefCell::new(HashSet::new()),
-        //        weight:        RefCell::new(DEFAULT_WEIGHT),
-        //        replaced:      RefCell::new(false),
-        //        simplified:    RefCell::new(true),
-        //    });
-        //    let mut solution = Solution::new(&subproblem,
-        // self.rules_engine.clone());    if let Some(x) =
-        // self.dumper.as_ref() {        solution.add_dumper(x.clone());
-        //    }
+        // 	  let mut subproblem = self.subproblem(ProblemType::Transform);
+        // 	  subproblem.conditions.push(MarkedStatement {
+        // 		  statement:	 statement.statement.clone(),
+        // 		  applied_rules: RefCell::new(HashSet::new()),
+        // 		  blocked_rules: RefCell::new(HashSet::new()),
+        // 		  weight:		 RefCell::new(DEFAULT_WEIGHT),
+        // 		  replaced:		 RefCell::new(false),
+        // 		  simplified:	 RefCell::new(true),
+        // 	  });
+        // 	  let mut solution = Solution::new(&subproblem,
+        // self.rules_engine.clone());	  if let Some(x) =
+        // self.dumper.as_ref() {		 solution.add_dumper(x.clone());
+        // 	  }
         //
-        //    let result = solution.solve();
-        //    if result.is_err() {
-        //        trace!("NOT Simplified {:?}", result);
-        //        return None;
-        //    }
-        //    let result = MarkedStatement::from(solution.answer.expect("No
+        // 	  let result = solution.solve();
+        // 	  if result.is_err() {
+        // 		  trace!("NOT Simplified {:?}", result);
+        // 		  return None;
+        // 	  }
+        // 	  let result = MarkedStatement::from(solution.answer.expect("No
         // answer statement"));    *result.simplified.borrow_mut() =
-        // true;    if result.statement.root == statement.statement.root
-        // {        return None;
-        //    }
+        // true;	if result.statement.root == statement.statement.root
+        // {		return None;
+        // 	  }
         //
-        //    *statement.replaced.borrow_mut() = true;
-        //    *statement.weight.borrow_mut() = 0;
-        //    trace!("Simplified: {}", result.statement);
+        // 	  *statement.replaced.borrow_mut() = true;
+        // 	  *statement.weight.borrow_mut() = 0;
+        // 	  trace!("Simplified: {}", result.statement);
         //
-        //    return Some(result);
+        // 	  return Some(result);
     }
 }
 
-// impl fmt::Display for Solution {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         if let Some(a) = self.answer.as_ref() {
-//             let mut trace: Vec<Arc<MarkedStatement>> = vec![];
-//
-//             fn visitor(trace: &mut Vec<Arc<MarkedStatement>>, state:
-// &Arc<MarkedStatement>) {                 trace.push(state.clone());
-//                 for i in state.parents.iter() {
-//                     visitor(trace, i);
-//                 }
-//             };
-//
-//             visitor(&mut trace, a);
-//
-//             while let Some(t) = trace.pop() {
-//                 write!(f, "\n")?;
-//                 for p in t.parents.iter() {
-//                     write!(f, "{},\n", p.to_string().underline())?;
-//                 }
-//                 write!(f, "{}\n", t.to_string().bold().yellow())?;
-//             }
-//             write!(
-//                 f,
-//                 "{} {}\n",
-//                 "SOLVED!".green(),
-//                 format!(
-//                     "[{} cycles, {}ms]",
-//                     self.perf_stats.cycles_count,
-// self.perf_stats.absolute_time                 )
-//                 .yellow()
-//             )
-//         } else {
-//             write!(f, "\n")?;
-//             write!(f, "{}\n", "NOT SOLVED!".bold().blink().red())
-//         }
-//     }
-// }
+impl fmt::Display for Solution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(a) = self.answer.as_ref() {
+            let mut trace: Vec<(usize, Vec<usize>)> = vec![];
+
+            fn visitor(stack: &Frame, id: usize, trace: &mut Vec<(usize, Vec<usize>)>) {
+                trace.push((id, stack[id].parents.clone()));
+                for i in stack[id].parents.iter() {
+                    visitor(stack, *i, trace);
+                }
+            };
+
+            visitor(&self.stack, *a, &mut trace);
+
+            while let Some(t) = trace.pop() {
+                write!(f, "\n")?;
+                for p in t.1.iter() {
+                    write!(f, "{},\n", self.stack[*p].statement.to_string().underline())?;
+                }
+                write!(
+                    f,
+                    "{}\n",
+                    self.stack[t.0].statement.to_string().bold().yellow()
+                )?;
+            }
+            write!(
+                f,
+                "{} {}\n",
+                "SOLVED!".green(),
+                format!(
+                    "[{} cycles, {}ms]",
+                    self.perf_stats.cycles_count, self.perf_stats.absolute_time
+                )
+                .yellow()
+            )
+        } else {
+            write!(f, "\n")?;
+            write!(f, "{}\n", "NOT SOLVED!".bold().blink().red())
+        }
+    }
+}
 
 #[cfg(test)]
 mod solution_tests {
     use super::*;
-    use bigdecimal::BigDecimal as Decimal;
-    use core::symbols::symbols_tests::setup;
-    use std::str::FromStr;
-    use trees::linked::fully::tr;
-
-    use solver::problem::problem_tests::test_problem;
+    use crate::{
+        parser::{parse_problem, statement_with_vars},
+        predefine::setup,
+    };
 
     #[test]
-    fn check_answer_test() {
-        // setup();
-        //
-        // let rules = Arc::new(RulesEngine::new());
-        // let problem = test_problem();
-        // let solution = Solution::new(&problem, rules);
-        // let statement_answer = Statement::from(
-        //     tr(Term::Symbol(1)) /
-        //         tr(Term::Variable(1)) /
-        //         tr(Term::Number(Decimal::from_str("2").unwrap())),
-        // );
-        // let statement_not_answer = Statement::from(
-        //     tr(Term::Symbol(1)) /
-        //         tr(Term::Variable(2)) /
-        //         tr(Term::Number(Decimal::from_str("2").unwrap())),
-        // );
-        // assert_eq!(solution.is_answer(&statement_answer, &10), true);
-        // assert_eq!(solution.is_answer(&statement_not_answer, &10), false);
+    fn check_answer_find_test() {
+        setup();
+
+        let problem = parse_problem("problem {x == 1; target find x;};");
+        let rules = Arc::new(RulesEngine::new());
+        let mut solution = Solution::new(problem, rules);
+        assert!(solution.solve().is_ok());
+        assert_eq!(*solution.answer().unwrap(), statement_with_vars("x == 1"));
+    }
+
+    #[test]
+    fn check_answer_proof_test() {
+        setup();
+
+        let problem = parse_problem("problem { x == 2; target proof (x > 0); }; ");
+        let rules = Arc::new(RulesEngine::new());
+        let mut solution = Solution::new(problem, rules);
+        assert!(solution.solve().is_ok());
+        assert_eq!(*solution.answer().unwrap(), statement_with_vars("x == 2"));
     }
 }

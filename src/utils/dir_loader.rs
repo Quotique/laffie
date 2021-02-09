@@ -1,7 +1,8 @@
 use crate::{
     core::symbols::{add_symbol, Symbol},
-    parser::{lang, ProblemParser},
+    parser::{lang, ProblemParser, RuleParser},
     problem::{Problem, ProblemBuilder},
+    rule::RulesEngine,
 };
 use std::{convert::TryFrom, fs, io, path::Path};
 use trees::Tree;
@@ -19,17 +20,29 @@ impl DirectoryParser {
         }
     }
 
-    pub fn load_symbols(&self) -> io::Result<()> {
+    pub fn load_rules(&self) -> io::Result<RulesEngine> {
+        info!(target: "init", "Reading rules: {:?}", self.symbols_path);
+
+        let mut result = RulesEngine::new();
+        let mut last_sym: Option<Symbol> = None;
+
         Self::load_dir(
             Path::new(self.symbols_path.as_str()),
             &vec!["sym"],
             &mut |s: &Tree<String>| {
                 if let Ok(sym) = Symbol::try_from(s) {
-                    add_symbol(sym);
+                    let sym = add_symbol(sym);
+                    last_sym.replace(sym);
+                } else if let Ok(rule) = RuleParser::with(&s)
+                    .with_symbol_id(last_sym.as_ref().unwrap().id)
+                    .parse()
+                    .map_err(|e| error!("Rule not parsed: {}", e))
+                {
+                    result.register_raw_rule(rule);
                 }
             },
-        );
-        Ok(())
+        )?;
+        Ok(result)
     }
 
     pub fn load_problems(&self) -> io::Result<Vec<Problem>> {

@@ -1,5 +1,5 @@
 use super::statement::Statement;
-use crate::rule::{Rule, RuleBuilder};
+use crate::rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder};
 use std::{
     collections::HashSet,
     convert::From,
@@ -10,7 +10,8 @@ use std::{
 
 #[derive(Debug, Clone)]
 pub struct MarkedStatement {
-    pub parents: Vec<Arc<MarkedStatement>>,
+    pub id:      usize,
+    pub parents: Vec<usize>,
     pub rule:    Option<Arc<RwLock<Rule>>>,
 
     pub statement: Arc<Statement>,
@@ -28,6 +29,7 @@ pub struct MarkedStatement {
 impl From<Arc<Statement>> for MarkedStatement {
     fn from(statement: Arc<Statement>) -> Self {
         Self {
+            id:      0,
             parents: vec![],
             rule:    None,
 
@@ -66,13 +68,18 @@ impl PartialEq for MarkedStatement {
 impl Eq for MarkedStatement {}
 
 impl MarkedStatement {
+    pub fn with_parent(mut self, id: usize) -> Self {
+        self.parents.push(id);
+        self
+    }
+
     pub fn normalize(self) -> Self {
         let mut copy = self.clone();
         copy.statement = Arc::new(self.statement.normalize());
         copy
     }
 
-    pub fn rule(&mut self, id: usize) -> Option<Arc<RwLock<Rule>>> {
+    pub fn rule(&mut self, id: usize, level: u64) -> Option<Arc<RwLock<Rule>>> {
         if self.not_rule {
             return None;
         }
@@ -83,10 +90,15 @@ impl MarkedStatement {
 
         if let Ok(builder) = RuleBuilder::new()
             .with_id(id)
+            .with_attribute(RuleAttr::Level, RuleAttrValue::UInt(level))
             .with_statement((*self.statement).clone())
         {
-            if let Ok(rule) = builder.build() {
+            if let Ok(rule) = builder
+                .build()
+                .map_err(|e| trace!("Error rule build: {}", e))
+            {
                 if rule.pattern.root().data.is_variable() {
+                    trace!("New rule: {}", rule);
                     let rule = Arc::new(RwLock::new(rule));
                     self.as_rule = Some(rule.clone());
                     self.blocked_rules.insert(id);

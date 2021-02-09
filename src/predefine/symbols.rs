@@ -36,6 +36,9 @@ pub fn setup() {
         Symbol::add_with_name("=>");
         Symbol::add_with_name("<=>");
 
+        Symbol::add_with_name("true");
+        Symbol::add_with_name("false");
+
         Symbol::add_with_name("find");
         Symbol::add_with_name("proof");
         Symbol::add_with_name("transform");

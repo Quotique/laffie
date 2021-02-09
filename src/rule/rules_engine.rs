@@ -29,6 +29,10 @@ impl RulesEngine {
         }
     }
 
+    pub fn register_raw_rule(&mut self, rule: Rule) {
+        self.register_rule(Arc::new(RwLock::new(rule)))
+    }
+
     pub fn register_rule(&mut self, rule: SharedRule) {
         self.last_id += 1;
         let (level, symbol_id) = {

@@ -151,7 +151,8 @@ impl Rule {
                     .collect(),
                 resolution:   MarkedStatement::from(Arc::new(
                     self.replace.apply_map(&x).normalize(),
-                )),
+                ))
+                .with_parent(arg.id),
             })
             .collect())
     }
@@ -176,7 +177,7 @@ impl Rule {
                         .iter()
                         .map(|r| Arc::new(r.apply_map(&x)))
                         .collect(),
-                    resolution:   MarkedStatement::from(Arc::new(clone)),
+                    resolution:   MarkedStatement::from(Arc::new(clone)).with_parent(arg.id),
                 }
             })
             .collect())

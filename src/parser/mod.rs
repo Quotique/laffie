@@ -40,6 +40,13 @@ pub fn statement_with_vars(text: &str) -> Statement {
         .unwrap()
 }
 
+#[allow(dead_code)]
+#[cfg(test)]
+pub fn parse_problem(text: &str) -> crate::problem::Problem {
+    let states = LangParser::new().parse(text).unwrap();
+    ProblemParser::with(&states[0]).parse().unwrap()
+}
+
 impl fmt::Display for SemanticError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

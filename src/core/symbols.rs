@@ -49,22 +49,23 @@ pub fn symbol_by_name(name: &String) -> Option<Symbol> {
         .map(|x| x.clone())
 }
 
-pub fn add_symbol(mut symbol: Symbol) {
-    if ALL_SYMBOLS
+pub fn add_symbol(mut symbol: Symbol) -> Symbol {
+    if let Some(s) = ALL_SYMBOLS
         .lock()
         .expect("Unable to lock symbols")
-        .contains_key_alt(&symbol.name)
+        .get_mut_alt(&symbol.name)
     {
-        trace!("Duplicate symbol: {}. Skipping", symbol.name);
-        return;
+        s.attrs.extend(symbol.attrs.into_iter());
+        return s.clone();
     }
     *LAST_ID.lock().expect("Unable to lock symbols") += 1;
     symbol.id = *LAST_ID.lock().expect("Unable to lock symbols");
     ALL_SYMBOLS.lock().expect("Unable to lock symbols").insert(
         symbol.id,
         symbol.name.clone(),
-        symbol,
+        symbol.clone(),
     );
+    symbol
 }
 
 pub fn load_symbols(dir: &Path) -> io::Result<()> {
