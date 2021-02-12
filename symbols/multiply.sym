@@ -3,6 +3,8 @@ symbol * {
 };
 
 rule {
+    attr level(1),problem_target(find(x));
+
     x*a + b == 0 => x == - b/a;
 
     a != 0

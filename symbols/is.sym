@@ -3,13 +3,13 @@ symbol is {
 };
 
 rule {
-    attr replace;
+    attr replace,level(0),problem_target(proof([a is true]));
 
     a is true <=> [a];
 };
 
 rule {
-    attr replace;
+    attr replace,level(0);
 
     a is false <=> !([a]);
 };

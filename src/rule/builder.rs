@@ -93,7 +93,8 @@ impl RuleBuilder {
 
     pub fn build(mut self) -> Result<Rule, RuleBuilderError> {
         let (pattern, replace) = self.split_statement()?;
-        let attrs: HashMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
+        let mut attrs: HashMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
+        attrs.insert(RuleAttr::Subtree, RuleAttrValue::None);
 
         let level = if let Some(RuleAttrValue::UInt(level)) = attrs.get(&RuleAttr::Level) {
             level

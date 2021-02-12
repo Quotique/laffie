@@ -24,12 +24,12 @@ impl<'a> ProblemParser<'a> {
                 self.syntax_tree.root().data.clone(),
             ));
         }
-        let mut builder = ProblemBuilder::new();
-
         let mut hasher = DefaultHasher::new();
         self.syntax_tree.root().hash(&mut hasher);
         let hash = hasher.finish();
         let mut params = ParamsMap::new();
+
+        let mut builder = ProblemBuilder::new().with_id(hash);
 
         for child in self.syntax_tree.iter() {
             if child.data == "Target" {

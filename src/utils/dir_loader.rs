@@ -1,6 +1,7 @@
 use crate::{
     core::symbols::{add_symbol, Symbol},
     parser::{lang, ProblemParser, RuleParser},
+    predefine::setup,
     problem::{Problem, ProblemBuilder},
     rule::RulesEngine,
 };
@@ -22,6 +23,10 @@ impl DirectoryParser {
 
     pub fn load_rules(&self) -> io::Result<RulesEngine> {
         info!(target: "init", "Reading rules: {:?}", self.symbols_path);
+
+        setup();
+
+        self.load_symbols()?;
 
         let mut result = RulesEngine::new();
         let mut last_sym: Option<Symbol> = None;
@@ -61,6 +66,19 @@ impl DirectoryParser {
             },
         )?;
         Ok(result)
+    }
+
+    fn load_symbols(&self) -> io::Result<()> {
+        Self::load_dir(
+            Path::new(self.symbols_path.as_str()),
+            &vec!["sym"],
+            &mut |s: &Tree<String>| {
+                if let Ok(sym) = Symbol::try_from(s) {
+                    add_symbol(sym);
+                }
+            },
+        );
+        Ok(())
     }
 
     fn load_dir<F: FnMut(&Tree<String>)>(

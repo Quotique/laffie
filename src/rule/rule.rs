@@ -1,4 +1,5 @@
 use crate::{
+    core::symbols::symbol_by_id,
     solver::problem::ProblemType,
     statement::{MarkedStatement, Statement},
 };
@@ -87,7 +88,7 @@ impl Rule {
             if !statement.symbols.contains(s) {
                 return Err(RuleDeclineReason::ParamsMappingErr(format!(
                     "symbol: {} not found",
-                    s
+                    symbol_by_id(*s).unwrap().name
                 )));
             }
         }

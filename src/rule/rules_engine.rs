@@ -13,7 +13,7 @@ type SymbolId = u64;
 type Level = usize;
 
 pub type SharedRule = Arc<RwLock<Rule>>;
-type LevelRules = HashMap<SymbolId, SharedRule>;
+type LevelRules = HashMap<SymbolId, Vec<SharedRule>>;
 type RuleId = u64;
 
 pub struct RulesEngine {
@@ -39,10 +39,13 @@ impl RulesEngine {
             let rule = rule.read().expect("Can't lock rule");
             (rule.level.clone(), rule.symbol_id.clone())
         };
+        rule.write().expect("Can't lock rule").id = self.last_id as usize;
         self.all_rules
             .entry(level)
             .or_insert(LevelRules::new())
-            .insert(symbol_id, rule);
+            .entry(symbol_id)
+            .or_insert(vec![])
+            .push(rule);
     }
 
     pub fn suggest_rules(
@@ -58,10 +61,15 @@ impl RulesEngine {
         once(&symbol_by_name(&"AnySymbol".into()).unwrap().id)
             .chain(statement.symbols.iter())
             .flat_map(|symbol_id| level.get(symbol_id).clone().into_iter())
+            .flat_map(|i| i.iter())
             .filter(|rule| {
                 let rule = rule.read().expect("Can't lock rule");
-                rule.is_statement_suitable(&statement).is_ok() &&
-                    rule.is_target_suitable(&target).is_ok()
+                rule.is_statement_suitable(&statement)
+                    .map_err(|e| trace!("Statement not suitable({:?}): {} {}", e, statement, rule))
+                    .is_ok() &&
+                    rule.is_target_suitable(&target)
+                        .map_err(|e| trace!("Target not suitable({:?}): {} {}", e, target, rule))
+                        .is_ok()
             })
             .cloned()
             .collect()

@@ -3,19 +3,19 @@ symbol - {
 };
 
 rule {
-    attr problem_target(transform),subtree,replace;
+    attr level(0),problem_target(transform),subtree,replace;
 
     [--a] <=> [a];
 };
 
 rule {
-    attr problem_target(transform),subtree,replace;
+    attr level(0),problem_target(transform),subtree,replace;
 
     [a-b] => [a+(-b)];
 };
 
 rule {
-    attr problem_target(proof([-a is known]));
+    attr level(0),problem_target(proof([-a is known]));
 
     -a is known <=> [true];
 

@@ -4,37 +4,37 @@ symbol ! {
 
 
 rule {
-    attr subtree,replace;
+    attr level(0),subtree,replace;
     
     !(a == b) <=> a != b;
 };
 
 rule {
-    attr subtree,replace;
+    attr level(0),subtree,replace;
 
     !(a != b) <=> a == b;
 };
 
 rule {
-    attr subtree,replace;
+    attr level(0),subtree,replace;
 
     !(a < b) <=> a >= b;
 };
 
 rule {
-    attr subtree,replace;
+    attr level(0),subtree,replace;
     
     !(a <= b) <=> a > b;
 };
 
 rule {
-    attr subtree,replace;
+    attr level(0),subtree,replace;
 
     !(a >= b) <=> a < b;
 };
 
 rule {
-    attr subtree,replace;
+    attr level(0),subtree,replace;
 
     !(a > b) <=> a <= b;
 };

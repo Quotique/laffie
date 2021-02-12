@@ -16,6 +16,7 @@ pub enum ProblemBuilderError {
 }
 
 pub struct ProblemBuilder {
+    id:         u64,
     conditions: Vec<MarkedStatement>,
     target:     Option<MarkedStatement>,
 }
@@ -23,9 +24,15 @@ pub struct ProblemBuilder {
 impl ProblemBuilder {
     pub fn new() -> Self {
         Self {
+            id:         0,
             conditions: vec![],
             target:     None,
         }
+    }
+
+    pub fn with_id(mut self, id: u64) -> Self {
+        self.id = id;
+        self
     }
 
     pub fn with_target(mut self, mut target: MarkedStatement) -> Result<Self, ProblemBuilderError> {
@@ -52,7 +59,7 @@ impl ProblemBuilder {
 
     pub fn build(self) -> Result<Problem, ProblemBuilderError> {
         Ok(Problem {
-            id:               0,
+            id:               self.id,
             conditions:       self.conditions,
             target:           self.target.ok_or(ProblemBuilderError::NoTargetFound)?,
             subproblem_level: 0,
@@ -117,7 +124,7 @@ impl fmt::Display for Problem {
                 .map(|x| x.statement.to_string())
                 .collect::<Vec<String>>()
                 .join(";"),
-            0, // self.target,
+            self.target,
             self.subproblem_level,
         )
     }

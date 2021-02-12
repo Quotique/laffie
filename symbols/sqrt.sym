@@ -3,7 +3,7 @@ symbol sqrt {
 };
 
 rule {
-    attr problem_target(proof([sqrt(a) is known]));
+    attr level(0),problem_target(proof([sqrt(a) is known]));
 
     sqrt(a) is known <=> [true];
 
