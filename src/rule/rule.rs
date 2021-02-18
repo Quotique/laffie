@@ -102,6 +102,7 @@ impl Rule {
                 trace!("no match");
                 return Err(RuleDeclineReason::TargetMissmatch);
             }
+            return Ok(());
         }
         if (*target.statement)
             .root()

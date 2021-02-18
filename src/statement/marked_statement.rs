@@ -61,7 +61,7 @@ impl Hash for MarkedStatement {
 
 impl PartialEq for MarkedStatement {
     fn eq(&self, other: &Self) -> bool {
-        *self.statement == *self.statement
+        self.statement.as_ref() == other.statement.as_ref()
     }
 }
 

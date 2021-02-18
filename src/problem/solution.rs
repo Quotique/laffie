@@ -1,6 +1,7 @@
 use super::{
     frame::Frame,
     problem::{Problem, ProblemBuilder},
+    target::Target,
 };
 use crate::{
     core::{
@@ -41,10 +42,10 @@ pub struct Solution {
 
     stack: Frame,
 
-    rules_engine:       Arc<RulesEngine>,
-    local_rules:        Vec<SharedRule>,
-    equivalent_targets: Frame,
-    pub answer:         Option<usize>,
+    rules_engine: Arc<RulesEngine>,
+    local_rules:  Vec<SharedRule>,
+    target:       Target,
+    pub answer:   Option<usize>,
 
     pub perf_stats: PerfStats,
 
@@ -83,14 +84,13 @@ impl PerfStats {
 
 impl Solution {
     pub fn new(problem: Problem, rules: Arc<RulesEngine>) -> Solution {
-        let mut targets = Frame::default();
-        targets.add_condition(problem.target.clone());
+        let target = Target::try_from((*problem.target.statement).clone(), rules.clone()).unwrap();
         Solution {
-            stack: Frame::from_iter(problem.conditions.iter().cloned()),
+            stack: Frame::with_statements(rules.clone(), problem.conditions.iter().cloned()),
 
-            rules_engine:       rules,
-            local_rules:        vec![],
-            equivalent_targets: targets,
+            rules_engine: rules,
+            local_rules:  vec![],
+            target:       target,
 
             answer: None,
 
@@ -133,6 +133,7 @@ impl Solution {
         self.stack
             .iter()
             .enumerate()
+            .filter(|(_, x)| !x.replaced)
             .min_by_key(|(_, x)| x.weight)
             .map(|(num, _)| num)
             .ok_or(SolutionError::NoConditions)
@@ -148,12 +149,37 @@ impl Solution {
             if level > MAX_LEVEL {
                 return Err(SolutionError::NoSolutionsFound);
             }
-            self.prepare_target(level);
+            self.target.prepare_target(
+                level,
+                self.local_rules.clone(),
+                &self.stack,
+                &self.problem.target,
+            );
 
-            if self.is_answer(&self.stack[index]) {
-                trace!("Solved. Answer: {}", self.stack[index].statement);
-                self.answer = Some(index);
-                return Ok(());
+            if !self.target.is_transform() {
+                if let Some(simplified) = self.stack.transform(&self.stack[index]) {
+                    self.stack[index].replaced = true;
+                    // let _ =
+                    self.stack.add_condition(simplified).unwrap();
+                    continue;
+                } else {
+                    self.stack[index].simplified = true;
+                }
+            }
+
+            if let Some(suppose) = self.target.is_answer(&self.stack[index]) {
+                if self.stack.suppose_proof(&suppose) {
+                    trace!("Resolution: {}", suppose.resolution);
+                    if self.stack[index] == suppose.resolution {
+                        trace!("Equivalence");
+                        self.answer = Some(index);
+                    } else {
+                        let _ = self.stack.add_condition(suppose.resolution.clone());
+                        self.answer = Some(self.stack.find(&suppose.resolution.statement).unwrap());
+                    }
+                    trace!("Solved. Answer: {}", self.answer().unwrap());
+                    return Ok(());
+                }
             }
             if let Some(r) = self.stack[index].rule(
                 (self.local_rules.len() + 1) | 0x80_00_00_00_00_00_00_00,
@@ -162,141 +188,149 @@ impl Solution {
                 self.local_rules.push(r);
             }
 
-            let statements = self.next_statement(index);
-            if statements.is_empty() {
+            if !self.target.is_transform() {
+                let statements = self.stack.next_statement(
+                    self.local_rules.clone(),
+                    index,
+                    &self.problem.target,
+                );
+                if statements.is_empty() {
+                    self.stack[index].weight += 1;
+                }
+                for s in statements {
+                    self.stack.add_condition(s)?;
+                }
+            } else {
                 self.stack[index].weight += 1;
             }
-            for s in statements {
-                self.stack.add_condition(s)?;
-            }
         }
     }
 
-    fn prepare_target(&mut self, level: usize) {
-        let target_root = self.problem.target.statement.root();
+    // fn prepare_target(&mut self, level: usize) {
+    //     let target_root = self.problem.target.statement.root();
 
-        if target_root.data.is_symbol_name(&"find".into()) {
-        } else if target_root.data.is_symbol_name(&"proof".into()) {
-            loop {
-                if let Ok(index) = self.equivalent_targets.pick_condition() {
-                    if self.equivalent_targets[index].weight > level {
-                        return;
-                    }
-                    let mut rules = self
-                        .rules_engine
-                        .suggest_rules(&self.equivalent_targets[index], &self.problem.target);
-                    rules.append(&mut self.local_rules.clone());
-                    let mut applied = false;
-                    for rule in rules.iter().filter(|r| {
-                        r.read()
-                            .expect("Can't read rule")
-                            .attribute(&RuleAttr::Equivalence)
-                            .is_some()
-                    }) {
-                        if let Ok(result) = rule
-                            .read()
-                            .expect("Can't read rule")
-                            .apply(&mut self.equivalent_targets[index], &self.problem.target)
-                        {
-                            for sup in result {
-                                let mut proofed = true;
-                                if self.equivalent_targets.contains(&sup.resolution.statement) {
-                                    continue;
-                                }
+    //     if target_root.data.is_symbol_name(&"find".into()) {
+    //     } else if target_root.data.is_symbol_name(&"proof".into()) {
+    //         loop {
+    //             if let Ok(index) = self.equivalent_targets.pick_condition() {
+    //                 if self.equivalent_targets[index].weight > level {
+    //                     return;
+    //                 }
+    //                 let mut rules = self
+    //                     .rules_engine
+    //                     .suggest_rules(&self.equivalent_targets[index],
+    // &self.problem.target);                 rules.append(&mut
+    // self.local_rules.clone());                 let mut applied = false;
+    //                 for rule in rules.iter().filter(|r| {
+    //                     r.read()
+    //                         .expect("Can't read rule")
+    //                         .attribute(&RuleAttr::Equivalence)
+    //                         .is_some()
+    //                 }) {
+    //                     if let Ok(result) = rule
+    //                         .read()
+    //                         .expect("Can't read rule")
+    //                         .apply(&mut self.equivalent_targets[index],
+    // &self.problem.target)                     {
+    //                         for sup in result {
+    //                             let mut proofed = true;
+    //                             if
+    // self.equivalent_targets.contains(&sup.resolution.statement) {
+    // continue;                             }
 
-                                for req in sup.requirements {
-                                    if !self.proof(req) {
-                                        proofed = false;
-                                        break;
-                                    }
-                                }
+    //                             for req in sup.requirements {
+    //                                 if !self.proof(req) {
+    //                                     proofed = false;
+    //                                     break;
+    //                                 }
+    //                             }
 
-                                if proofed {
-                                    applied = true;
-                                    trace!("New alternative target: {}", sup.resolution);
-                                    self.equivalent_targets.add_condition(sup.resolution);
-                                }
-                            }
-                        }
-                    }
-                    if !applied {
-                        self.equivalent_targets[index].weight += 1;
-                    }
-                }
-            }
-        } else if target_root.data.is_symbol_name(&"transform".into()) {
-        }
-    }
+    //                             if proofed {
+    //                                 applied = true;
+    //                                 trace!("New alternative target: {}",
+    // sup.resolution);
+    // self.equivalent_targets.add_condition(sup.resolution);
+    // }                         }
+    //                     }
+    //                 }
+    //                 if !applied {
+    //                     self.equivalent_targets[index].weight += 1;
+    //                 }
+    //             }
+    //         }
+    //     } else if target_root.data.is_symbol_name(&"transform".into()) {
+    //     }
+    // }
 
-    fn is_answer(&self, statement: &MarkedStatement) -> bool {
-        let target_root = self.problem.target.statement.root();
-        let statement_root = statement.statement.root();
+    // fn is_answer(&self, statement: &MarkedStatement) -> bool {
+    //     let target_root = self.problem.target.statement.root();
+    //     let statement_root = statement.statement.root();
 
-        if target_root.data.is_symbol_name(&"find".into()) {
-            if statement_root.degree() != 2 ||
-                (!statement_root.data.is_symbol_name(&"==".into()) &&
-                    !statement_root.data.is_symbol_name(&"in".into()))
-            {
-                return false;
-            }
+    //     if target_root.data.is_symbol_name(&"find".into()) {
+    //         if statement_root.degree() != 2 ||
+    //             (!statement_root.data.is_symbol_name(&"==".into()) &&
+    //                 !statement_root.data.is_symbol_name(&"in".into()))
+    //         {
+    //             return false;
+    //         }
 
-            if statement_root.first().unwrap() == target_root.first().unwrap() {
-                let is_known = tr(Term::with_symbol_name("is").unwrap()) /
-                    statement_root.last().unwrap().to_owned() /
-                    tr(Term::with_symbol_name("known").unwrap());
+    //         if statement_root.first().unwrap() == target_root.first().unwrap() {
+    //             let is_known = tr(Term::with_symbol_name("is").unwrap()) /
+    //                 statement_root.last().unwrap().to_owned() /
+    //                 tr(Term::with_symbol_name("known").unwrap());
 
-                debug!("Attempt to proof: {}", is_known);
-                if self.proof(Arc::new(Statement::from(is_known))) {
-                    debug!("Prooved!");
-                    return true;
-                } else {
-                    debug!("Can't proof!");
-                    return false;
-                }
-            }
-            false
-        } else if target_root.data.is_symbol_name(&"proof".into()) {
-            for i in self.equivalent_targets.iter() {
-                if statement_root == i.statement.root().first().unwrap() {
-                    return true;
-                }
-                if self.is_true(&i.statement.root().first().unwrap()) {
-                    return true;
-                }
-            }
-            false
-        } else if target_root.data.is_symbol_name(&"transform".into()) {
-            // 		   trace!("weight: {}", weight);
-            // 		   return weight == &1;
-            false
-        } else {
-            false
-        }
-    }
+    //             debug!("Attempt to proof: {}", is_known);
+    //             if self.proof(Arc::new(Statement::from(is_known))) {
+    //                 debug!("Prooved!");
+    //                 return true;
+    //             } else {
+    //                 debug!("Can't proof!");
+    //                 return false;
+    //             }
+    //         }
+    //         false
+    //     } else if target_root.data.is_symbol_name(&"proof".into()) {
+    //         for i in self.equivalent_targets.iter() {
+    //             if statement_root == i.statement.root().first().unwrap() {
+    //                 return true;
+    //             }
+    //             if self.is_true(&i.statement.root().first().unwrap()) {
+    //                 return true;
+    //             }
+    //         }
+    //         false
+    //     } else if target_root.data.is_symbol_name(&"transform".into()) {
+    //         // 		   trace!("weight: {}", weight);
+    //         // 		   return weight == &1;
+    //         false
+    //     } else {
+    //         false
+    //     }
+    // }
 
-    fn proof(&self, statement: Arc<Statement>) -> bool {
-        if is_true(statement.root()) {
-            return true;
-        }
-        let subproblem = ProblemBuilder::new()
-            .with_target(MarkedStatement::from(Arc::new(Statement::from(
-                tr(Term::with_symbol_name("proof").unwrap()) / statement.root().to_owned(),
-            ))))
-            .expect("Can't build subproblem")
-            .with_conditions(self.stack.iter().cloned())
-            .build()
-            .expect("Can't build subproblem");
-        let mut solution = Solution::new(subproblem, self.rules_engine.clone());
-        if let Some(x) = self.dumper.as_ref() {
-            solution.set_dumper(x.clone());
-        }
+    // fn proof(&self, statement: Arc<Statement>) -> bool {
+    //     if is_true(statement.root()) {
+    //         return true;
+    //     }
+    //     let subproblem = ProblemBuilder::new()
+    //         .with_target(MarkedStatement::from(Arc::new(Statement::from(
+    //             tr(Term::with_symbol_name("proof").unwrap()) /
+    // statement.root().to_owned(),         ))))
+    //         .expect("Can't build subproblem")
+    //         .with_conditions(self.stack.iter().cloned())
+    //         .build()
+    //         .expect("Can't build subproblem");
+    //     let mut solution = Solution::new(subproblem, self.rules_engine.clone());
+    //     if let Some(x) = self.dumper.as_ref() {
+    //         solution.set_dumper(x.clone());
+    //     }
 
-        if solution.solve().is_err() {
-            trace!("Can't proof: {}", statement);
-            return false;
-        }
-        return true;
-    }
+    //     if solution.solve().is_err() {
+    //         trace!("Can't proof: {}", statement);
+    //         return false;
+    //     }
+    //     return true;
+    // }
 
     fn is_true(&self, statement: &Node<Term>) -> bool {
         if is_true(statement) {
@@ -308,42 +342,42 @@ impl Solution {
         }
     }
 
-    fn next_statement(&mut self, index: usize) -> Vec<MarkedStatement> {
-        let mut rules = self
-            .rules_engine
-            .suggest_rules(&self.stack[index], &self.problem.target);
-        rules.append(&mut self.local_rules.clone());
-        for rule in rules {
-            if let Ok(result) = rule
-                .read()
-                .expect("Can't read rule")
-                .apply(&mut self.stack[index], &self.problem.target)
-            {
-                let mut res = vec![];
-                for sup in result {
-                    let mut proofed = true;
-                    if self.stack.contains(&sup.resolution.statement) {
-                        continue;
-                    }
+    // pub fn next_statement(&mut self, index: usize) -> Vec<MarkedStatement> {
+    //     let mut rules = self
+    //         .rules_engine
+    //         .suggest_rules(&self.stack[index], &self.problem.target);
+    //     rules.append(&mut self.local_rules.clone());
+    //     for rule in rules {
+    //         if let Ok(result) = rule
+    //             .read()
+    //             .expect("Can't read rule")
+    //             .apply(&mut self.stack[index], &self.problem.target)
+    //         {
+    //             let mut res = vec![];
+    //             for sup in result {
+    //                 let mut proofed = true;
+    //                 if self.stack.contains(&sup.resolution.statement) {
+    //                     continue;
+    //                 }
 
-                    for req in sup.requirements {
-                        if !self.proof(req) {
-                            proofed = false;
-                            break;
-                        }
-                    }
+    //                 for req in sup.requirements {
+    //                     if !self.proof(req) {
+    //                         proofed = false;
+    //                         break;
+    //                     }
+    //                 }
 
-                    if proofed {
-                        res.push(sup.resolution);
-                    }
-                }
-                if res.len() > 0 {
-                    return res;
-                }
-            }
-        }
-        vec![]
-    }
+    //                 if proofed {
+    //                     res.push(sup.resolution);
+    //                 }
+    //             }
+    //             if res.len() > 0 {
+    //                 return res;
+    //             }
+    //         }
+    //     }
+    //     vec![]
+    // }
 
     fn transform(&self, statement: &MarkedStatement) -> Option<MarkedStatement> {
         None
@@ -401,7 +435,7 @@ impl fmt::Display for Solution {
                 for i in stack[id].parents.iter() {
                     visitor(stack, *i, trace);
                 }
-            };
+            }
 
             visitor(&self.stack, *a, &mut trace);
 

@@ -1,5 +1,5 @@
-use config::{Config, ConfigError, File};
 use super::logger::Config as LogConfig;
+use config::{Config, ConfigError, File};
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {

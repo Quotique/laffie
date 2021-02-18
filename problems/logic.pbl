@@ -1,11 +1,11 @@
 problem {
-1 > 0 && x == 1;
+    [0];
 
-target transform 0;
+    target transform (1 > 0 && x == 1);
 };
 
 problem {
-(1 > 0 && x == 1) || (1 < 0 && x == 2);
+    (1 > 0 && x == 1) || (1 < 0 && x == 2);
 
-target find x;
+    target find x;
 };
