@@ -3,7 +3,7 @@ use super::{
     term::{StatementTree, Term},
     utils::SubsetIterator,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use trees::{tr, Node, Tree};
 
 pub type ParamsMap = HashMap<u64, StatementTree>;
@@ -32,31 +32,28 @@ pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
     }
 }
 
-pub fn symbols(root: &StatementTree) -> HashSet<u64> {
-    let mut symbols = HashSet::new();
-    for i in root.root().bfs().iter {
-        if let Term::Symbol(s) = i.data {
-            symbols.insert(*s);
-        }
-    }
-    symbols
-}
+// pub fn symbols(root: &StatementTree) -> HashSet<u64> {
+//     let mut symbols = HashSet::new();
+//     for i in root.root().bfs().iter {
+//         if let Term::Symbol(s) = i.data {
+//             symbols.insert(*s);
+//         }
+//     }
+//     symbols
+// }
 
 pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
     match target.data {
         Term::Param(id) => {
             let replace = params.get(&id);
-            match replace {
-                Some(r) => {
+            if let Some(r) = replace {
                     let mut replace = r.clone();
                     target.data = r.root().data.clone();
-                    while let Some(_) = target.pop_back() {}
+                    while target.pop_back().is_some() {}
                     while let Some(x) = replace.pop_front() {
                         target.push_back(x);
                     }
                     // target.append(replace.abandon());
-                }
-                None => {}
             }
         }
         _ => {
@@ -130,7 +127,7 @@ fn params_map_impl(
                                     // );
                                     new_result.append(&mut p)
                                 }
-                                Err(e) => {} // trace!("Bad mapping: {}", e),
+                                Err(_e) => {} // trace!("Bad mapping: {}", e),
                             }
                         }
                         loc_result = new_result;
@@ -138,7 +135,7 @@ fn params_map_impl(
                     result.append(&mut loc_result);
                 }
 
-                if result.len() > 0 {
+                if !result.is_empty() {
                     return Ok(result);
                 } else {
                     return Err("No mapping found".into());
@@ -161,13 +158,13 @@ fn params_map_impl(
                                 // trace!("New mapping: {:?}", p);
                                 new_result.append(&mut p)
                             }
-                            Err(e) => {} // trace!("Bad mapping: {}", e),
+                            Err(_e) => {} // trace!("Bad mapping: {}", e),
                         }
                     }
                     result = new_result;
                 }
 
-                if result.len() > 0 {
+                if !result.is_empty() {
                     return Ok(result);
                 } else {
                     return Err("No mapping found".into());
@@ -241,7 +238,7 @@ mod tree_utils_tests {
             }
             Err(e) => {
                 println!("Error: {}", e);
-                assert!(false);
+                unreachable!();
             }
         }
     }
@@ -262,7 +259,7 @@ mod tree_utils_tests {
             }
             Err(e) => {
                 println!("Error: {}", e);
-                assert!(false);
+                unreachable!();
             }
         }
     }
@@ -288,7 +285,7 @@ mod tree_utils_tests {
             }
             Err(e) => {
                 println!("Error: {}", e);
-                assert!(false);
+                unreachable!();
             }
         }
     }
@@ -318,7 +315,7 @@ mod tree_utils_tests {
             }
             Err(e) => {
                 println!("Error: {}", e);
-                assert!(false);
+                unreachable!();
             }
         }
     }

@@ -45,7 +45,7 @@ impl RuleBuilder {
             statement:    None,
             requirements: vec![],
             attributes:   vec![],
-            symbol_id:    symbol_by_name(&"AnySymbol".into())
+            symbol_id:    symbol_by_name("AnySymbol")
                 .expect("System symbol AnySymbol is not found")
                 .id,
         }
@@ -62,7 +62,7 @@ impl RuleBuilder {
     }
 
     pub fn with_statement(mut self, statement: Statement) -> Result<Self, RuleBuilderError> {
-        if let Some(_) = self.statement.replace(statement) {
+        if self.statement.replace(statement).is_some() {
             return Err(RuleBuilderError::OnlyOneStatementIsAllowed);
         }
         Ok(self)
@@ -75,19 +75,6 @@ impl RuleBuilder {
 
     pub fn with_attribute(mut self, attr: RuleAttr, value: RuleAttrValue) -> Self {
         self.attributes.push((attr, value));
-        self
-    }
-
-    pub fn with_requires<I: IntoIterator<Item = Statement>>(mut self, reqs: I) -> Self {
-        self.requirements.extend(reqs);
-        self
-    }
-
-    pub fn with_attributes<I>(mut self, attrs: I) -> Self
-    where
-        I: IntoIterator<Item = (RuleAttr, RuleAttrValue)>,
-    {
-        self.attributes.extend(attrs);
         self
     }
 

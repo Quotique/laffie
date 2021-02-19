@@ -1,12 +1,11 @@
 use crate::{
     core::symbols::symbol_by_id,
-    solver::problem::ProblemType,
     statement::{MarkedStatement, Statement},
 };
 use std::{
     collections::{HashMap, HashSet},
     fmt,
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -22,7 +21,6 @@ pub enum RuleAttr {
 pub enum RuleAttrValue {
     None,
     UInt(u64),
-    Str(String),
     Target(Statement),
 }
 
@@ -107,7 +105,7 @@ impl Rule {
         if (*target.statement)
             .root()
             .data
-            .is_symbol_name(&"transform".into())
+            .is_symbol_name("transform")
         {
             // Only transform rules for transform
             return Err(RuleDeclineReason::TargetMissmatch);
@@ -141,7 +139,7 @@ impl Rule {
         let maps = self
             .pattern
             .map(&arg.statement)
-            .map_err(|e| RuleDeclineReason::ParamsMappingErr(e))?;
+            .map_err(RuleDeclineReason::ParamsMappingErr)?;
 
         Ok(maps
             .iter()
@@ -165,7 +163,7 @@ impl Rule {
         let (maps, node) = self
             .pattern
             .find_subtree_map_mut(&mut statement)
-            .ok_or(RuleDeclineReason::ParamsMappingErr("no match".into()))?;
+            .ok_or_else(|| RuleDeclineReason::ParamsMappingErr("no match".into()))?;
 
         Ok(maps
             .iter()
@@ -191,14 +189,11 @@ pub mod tests {
     use super::*;
 
     use crate::{
-        parser::{
-            statement_with_params, statement_with_vars, LangParser, RuleParser, StatementParser,
-        },
+        parser::{statement_with_vars, LangParser, RuleParser, StatementParser},
         predefine::setup,
         statement::MarkedStatement,
     };
     use std::sync::Arc;
-    use trees::tr;
 
     fn base_rule() -> Rule {
         setup();

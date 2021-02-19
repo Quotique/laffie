@@ -3,13 +3,12 @@ use crate::core::{
     tree_utils::{apply_map, params_map, swap_node},
 };
 use std::{
-    borrow::Borrow,
     collections::{HashMap, HashSet, VecDeque},
     convert::From,
     fmt,
     hash::{Hash, Hasher},
 };
-use trees::{linked::fully::iter::IterMut as TreeIterMut, Node};
+use trees::Node;
 
 pub type ParamsMap = HashMap<String, u64>;
 pub type ReverseParamsMap = HashMap<u64, StatementTree>;
@@ -81,18 +80,18 @@ impl Statement {
         swap_node(self.tree.root_mut(), node)
     }
 
-    fn contains(term: &Term, tree: &Node<Term>) -> bool {
-        if &tree.data == term {
-            return true;
-        }
+    // fn contains(term: &Term, tree: &Node<Term>) -> bool {
+    //     if &tree.data == term {
+    //         return true;
+    //     }
 
-        for i in tree.iter() {
-            if Self::contains(term, i) {
-                return true;
-            }
-        }
-        false
-    }
+    //     for i in tree.iter() {
+    //         if Self::contains(term, i) {
+    //             return true;
+    //         }
+    //     }
+    //     false
+    // }
 }
 
 impl From<StatementTree> for Statement {

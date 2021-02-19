@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 use std::iter::FromIterator;
 use trees::linked::fully::{tr, Tree, Forest};
 

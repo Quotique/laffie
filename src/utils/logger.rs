@@ -28,6 +28,7 @@ pub fn log_init(config: &Config) {
     info!(target: "init", "Current log level: {:?}", log_level);
 }
 
+#[allow(dead_code)]
 pub fn stdout_log_init(level: &str) {
     let log_level = log::LevelFilter::from_str(&level).unwrap_or(log::LevelFilter::Debug);
     fern::Dispatch::new()

@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[cfg(test)]
 use crate::statement::Statement;
 
 pub mod lang;

@@ -12,9 +12,9 @@ pub struct StatementParser<'a> {
 }
 
 impl<'a> StatementParser<'a> {
-    pub fn new(ast: &'a Node) -> Self {
+    pub fn new(syntax_tree: &'a Node) -> Self {
         Self {
-            ast:      ast,
+            ast:      syntax_tree,
             params:   None,
             with_var: false,
         }

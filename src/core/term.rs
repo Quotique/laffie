@@ -60,11 +60,10 @@ fn parse_node(
                 node_type.clone(),
             )?);
         }
-    } else {
-        if !src_node.is_leaf() {
-            return Err(format!("Node {} can't contains childs!", &src_node.data));
-        }
+    } else if !src_node.is_leaf() {
+        return Err(format!("Node {} can't contains childs!", &src_node.data));
     }
+
     Ok(result)
 }
 
@@ -93,7 +92,7 @@ impl Term {
     }
 
     pub fn with_symbol_name(name: &str) -> Option<Self> {
-        symbol_by_name(&name.into()).map(|s| Self::Symbol(s.id))
+        symbol_by_name(name).map(|s| Self::Symbol(s.id))
     }
 
     pub fn symbol(&self) -> Option<Symbol> {
@@ -167,7 +166,7 @@ impl Term {
     }
 
     #[allow(dead_code)]
-    pub fn is_symbol_name(&self, name: &String) -> bool {
+    pub fn is_symbol_name(&self, name: &str) -> bool {
         if let Some(s) = symbol_by_name(name) {
             return self.is_symbol_id(s.id);
         }
@@ -191,9 +190,7 @@ pub fn display_string(node: &Node<Term>) -> String {
                                 .join(", ")
                         );
                     }
-                    format!(
-                        "{}",
-                        node.iter()
+                    node.iter()
                             .map(|x| {
                                 if let Term::Symbol(id) = x.data {
                                     let symbol = symbol_by_id(id).unwrap();
@@ -207,7 +204,6 @@ pub fn display_string(node: &Node<Term>) -> String {
                             })
                             .collect::<Vec::<String>>()
                             .join(symbol.to_string().as_str())
-                    )
                 }
                 None => {
                     // Prefix notation is default

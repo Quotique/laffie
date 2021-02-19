@@ -2,7 +2,7 @@ use crate::{
     core::symbols::{add_symbol, Symbol},
     parser::{lang, ProblemParser, RuleParser},
     predefine::setup,
-    problem::{Problem, ProblemBuilder},
+    problem::Problem,
     rule::RulesEngine,
 };
 use std::{convert::TryFrom, fs, io, path::Path};
@@ -33,7 +33,7 @@ impl DirectoryParser {
 
         Self::load_dir(
             Path::new(self.symbols_path.as_str()),
-            &vec!["sym"],
+            &["sym"],
             &mut |s: &Tree<String>| {
                 if let Ok(sym) = Symbol::try_from(s) {
                     let sym = add_symbol(sym);
@@ -54,7 +54,7 @@ impl DirectoryParser {
         let mut result = vec![];
         Self::load_dir(
             Path::new(self.problems_path.as_str()),
-            &vec!["pbl"],
+            &["pbl"],
             &mut |s| {
                 trace!("New problem cb: {}", s);
                 if s.root().data == "Problem" {
@@ -71,19 +71,18 @@ impl DirectoryParser {
     fn load_symbols(&self) -> io::Result<()> {
         Self::load_dir(
             Path::new(self.symbols_path.as_str()),
-            &vec!["sym"],
+            &["sym"],
             &mut |s: &Tree<String>| {
                 if let Ok(sym) = Symbol::try_from(s) {
                     add_symbol(sym);
                 }
             },
-        );
-        Ok(())
+        )
     }
 
     fn load_dir<F: FnMut(&Tree<String>)>(
         dir: &Path,
-        extensions: &Vec<&str>,
+        extensions: &[&str],
         cb: &mut F,
     ) -> io::Result<()> {
         trace!("Processing dir: {}", dir.to_string_lossy());

@@ -27,14 +27,14 @@ pub struct MarkedStatement {
 }
 
 impl From<Arc<Statement>> for MarkedStatement {
-    fn from(statement: Arc<Statement>) -> Self {
+    fn from(value: Arc<Statement>) -> Self {
         Self {
             id:      0,
             parents: vec![],
             rule:    None,
 
-            symbols:   statement.symbols(),
-            statement: statement,
+            symbols:   value.symbols(),
+            statement: value,
             as_rule:   None,
 
             applied_rules: HashSet::new(),
@@ -73,11 +73,11 @@ impl MarkedStatement {
         self
     }
 
-    pub fn normalize(self) -> Self {
-        let mut copy = self.clone();
-        copy.statement = Arc::new(self.statement.normalize());
-        copy
-    }
+    // pub fn normalize(self) -> Self {
+    //     let mut copy = self.clone();
+    //     copy.statement = Arc::new(self.statement.normalize());
+    //     copy
+    // }
 
     pub fn rule(&mut self, id: usize, level: u64) -> Option<Arc<RwLock<Rule>>> {
         if self.not_rule {

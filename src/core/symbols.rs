@@ -1,9 +1,8 @@
-use std::{collections::HashMap, convert::TryFrom, fmt, io, path::Path, str::FromStr, sync::Mutex};
+use std::{collections::HashMap, convert::TryFrom, fmt, str::FromStr, sync::Mutex};
 
 use multi_map::MultiMap;
-use trees::{Node, Tree};
+use trees::Node;
 
-use super::dir_parser::load_dir;
 use crate::parser::Tree as ParserTree;
 
 lazy_static! {
@@ -38,15 +37,15 @@ pub fn symbol_by_id(id: u64) -> Option<Symbol> {
         .lock()
         .expect("Unable to lock symbols")
         .get(&id)
-        .map(|x| x.clone())
+        .cloned()
 }
 
-pub fn symbol_by_name(name: &String) -> Option<Symbol> {
+pub fn symbol_by_name(name: &str) -> Option<Symbol> {
     ALL_SYMBOLS
         .lock()
         .expect("Unable to lock symbols")
-        .get_alt(name)
-        .map(|x| x.clone())
+        .get_alt(&name.to_owned())
+        .cloned()
 }
 
 pub fn add_symbol(mut symbol: Symbol) -> Symbol {
@@ -68,20 +67,10 @@ pub fn add_symbol(mut symbol: Symbol) -> Symbol {
     symbol
 }
 
-pub fn load_symbols(dir: &Path) -> io::Result<()> {
-    load_dir(dir, &mut |s: &Tree<String>| {
-        if let Ok(sym) = Symbol::try_from(s) {
-            add_symbol(sym);
-        }
-    })
-}
-
 impl Symbol {
     pub fn display_weight(&self) -> Option<u64> {
-        if let Some(attr) = self.attrs.get(&SymbolAttr::Infix) {
-            if let SymbolAttrValue::UInt(v) = attr {
-                return Some(*v);
-            }
+        if let Some(SymbolAttrValue::UInt(v)) = self.attrs.get(&SymbolAttr::Infix) {
+            return Some(*v);
         }
         None
     }
@@ -91,7 +80,7 @@ impl Symbol {
             "infix" => {
                 let c = data
                     .first()
-                    .ok_or(String::from("infix(w) argument is required!"))?;
+                    .ok_or_else(|| String::from("infix(w) argument is required!"))?;
                 let w = u64::from_str(&c.data)
                     .map_err(|_| String::from("Infix argument must be u64"))?;
                 Ok((SymbolAttr::Infix, SymbolAttrValue::UInt(w)))
@@ -99,7 +88,7 @@ impl Symbol {
             "display" => {
                 let s = data
                     .first()
-                    .ok_or(String::from("display(s) argument is required!"))?
+                    .ok_or_else(|| String::from("display(s) argument is required!"))?
                     .data
                     .clone();
                 Ok((SymbolAttr::Display, SymbolAttrValue::UStr(s)))
@@ -137,7 +126,7 @@ impl TryFrom<&ParserTree> for Symbol {
                 } else if sym_child.data == "Attrs" {
                     for attr in sym_child.iter() {
                         let a = Symbol::parse_attr(attr)
-                            .expect(&format!("Bad symbol attribute: {:?}", attr));
+                            .unwrap_or_else(|_| panic!("Bad symbol attribute: {:?}", attr));
                         symbol.attrs.insert(a.0, a.1);
                     }
                 }
@@ -153,10 +142,8 @@ impl TryFrom<&ParserTree> for Symbol {
 
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(attr) = self.attrs.get(&SymbolAttr::Display) {
-            if let SymbolAttrValue::UStr(s) = attr {
-                return write!(f, "{}", s);
-            }
+        if let Some(SymbolAttrValue::UStr(s)) = self.attrs.get(&SymbolAttr::Display) {
+            return write!(f, "{}", s);
         }
         write!(f, "{}", self.name)
     }

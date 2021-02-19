@@ -39,7 +39,7 @@ impl<'a> RuleParser<'a> {
                             StatementParser::new(child)
                                 .with_params(&mut params)
                                 .parse()
-                                .map_err(|e| SemanticError::Other(e))?,
+                                .map_err(SemanticError::Other)?,
                         )
                         .map_err(|e| SemanticError::Other(e.to_string()))?;
                 }
@@ -49,7 +49,7 @@ impl<'a> RuleParser<'a> {
                             StatementParser::new(req)
                                 .with_params(&mut params)
                                 .parse()
-                                .map_err(|e| SemanticError::Other(e))?,
+                                .map_err(SemanticError::Other)?,
                         )
                     }
                 }
@@ -64,6 +64,7 @@ impl<'a> RuleParser<'a> {
         }
 
         builder
+            .with_symbol_id(self.symbol_id)
             .build()
             .map_err(|e| SemanticError::Other(e.to_string()))
     }
@@ -101,7 +102,7 @@ impl<'a> RuleParser<'a> {
                 let target = StatementParser::new(attr.first().unwrap())
                     .with_params(params)
                     .parse()
-                    .map_err(|e| SemanticError::Other(e))?;
+                    .map_err(SemanticError::Other)?;
                 Ok((RuleAttr::Target, RuleAttrValue::Target(target)))
             }
             _ => Err(SemanticError::UnexpectedWord(attr.data.clone())),

@@ -45,8 +45,8 @@ impl Iterator for SubsetIterator {
                 };
                 assert!(old != new || self.subset_count == 1);
                 *i = new;
-                self.element_counters[old] = self.element_counters[old] - 1;
-                self.element_counters[new] = self.element_counters[new] + 1;
+                self.element_counters[old] -= 1;
+                self.element_counters[new] += 1;
             }
             if shift {
                 return None;

@@ -1,7 +1,5 @@
-use super::rule::{Rule, RuleAttr, RuleAttrValue};
-use crate::{
-    core::symbols::symbol_by_name, solver::problem::ProblemType, statement::MarkedStatement,
-};
+use super::rule::Rule;
+use crate::{core::symbols::symbol_by_name, statement::MarkedStatement};
 use std::{
     collections::HashMap,
     iter::once,
@@ -37,14 +35,14 @@ impl RulesEngine {
         self.last_id += 1;
         let (level, symbol_id) = {
             let rule = rule.read().expect("Can't lock rule");
-            (rule.level.clone(), rule.symbol_id.clone())
+            (rule.level, rule.symbol_id)
         };
         rule.write().expect("Can't lock rule").id = self.last_id as usize;
         self.all_rules
             .entry(level)
-            .or_insert(LevelRules::new())
+            .or_insert_with(LevelRules::new)
             .entry(symbol_id)
-            .or_insert(vec![])
+            .or_insert_with(Vec::new)
             .push(rule);
     }
 
@@ -58,7 +56,7 @@ impl RulesEngine {
             .all_rules
             .get(&statement.weight)
             .unwrap_or(&empty_level);
-        once(&symbol_by_name(&"AnySymbol".into()).unwrap().id)
+        once(&symbol_by_name("AnySymbol").unwrap().id)
             .chain(statement.symbols.iter())
             .flat_map(|symbol_id| level.get(symbol_id).clone().into_iter())
             .flat_map(|i| i.iter())

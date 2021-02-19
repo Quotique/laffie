@@ -1,7 +1,6 @@
 use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
-    hash::{Hash, Hasher},
-    iter::{FromIterator, Iterator},
+    collections::HashMap,
+    iter::Iterator,
     ops::{Index, IndexMut},
     sync::Arc,
 };
@@ -32,12 +31,12 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new(rules: Arc<RulesEngine>, dumper: Dumper) -> Self {
+    pub fn new(rules: Arc<RulesEngine>, dump: Dumper) -> Self {
         Frame {
             stack:        Vec::new(),
             index:        HashMap::new(),
             rules_engine: rules,
-            dumper:       dumper,
+            dumper:       dump,
         }
     }
 
@@ -48,7 +47,8 @@ impl Frame {
     ) -> Self {
         let mut result = Self::new(rules, dumper);
         for i in statements {
-            result.add_condition(i);
+            // TODO: error processing
+            let _ = result.add_condition(i);
         }
         result
     }
@@ -110,7 +110,7 @@ impl Frame {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     pub fn proof(&self, statement: &Statement) -> bool {
@@ -133,7 +133,7 @@ impl Frame {
             trace!("Can't proof: {}", statement);
             return false;
         }
-        return true;
+        true
     }
 
     pub fn transform(&mut self, index: usize) -> Option<MarkedStatement> {
@@ -157,7 +157,7 @@ impl Frame {
         if solution.solve().is_err() || self[index].statement == solution.answer().unwrap() {
             return None;
         }
-        let mut result = MarkedStatement::from(solution.answer().unwrap().clone());
+        let mut result = MarkedStatement::from(solution.answer().unwrap());
         result.blocked_rules = self[index].blocked_rules.clone();
         result.simplified = true;
         result.parents.push(self[index].id);
@@ -208,7 +208,7 @@ impl Frame {
                         res.push(sup.resolution);
                     }
                 }
-                if res.len() > 0 {
+                if !res.is_empty() {
                     return res;
                 }
             }
@@ -250,7 +250,7 @@ impl Frame {
                         res.push(sup.resolution);
                     }
                 }
-                if res.len() > 0 {
+                if !res.is_empty() {
                     return res;
                 }
             }
@@ -277,7 +277,11 @@ impl IndexMut<usize> for Frame {
 pub mod tests {
     use super::*;
     use crate::core::term::Term;
-    use std::sync::Arc;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+        sync::Arc,
+    };
     use trees::tr;
 
     #[test]

@@ -1,3 +1,6 @@
+#![allow(clippy::redundant_field_names)]
+#![allow(clippy::module_inception)]
+
 extern crate bigdecimal;
 extern crate chrono;
 extern crate clap;
@@ -11,8 +14,6 @@ extern crate serde;
 extern crate trees;
 
 #[macro_use]
-extern crate bitflags;
-#[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
@@ -22,23 +23,22 @@ extern crate serde_derive;
 mod statement;
 
 mod core;
-mod dump;
-mod logger;
+// mod dump;
+// mod logger;
 mod parser;
 mod predefine;
 mod problem;
 mod rule;
-mod settings;
+// mod settings;
 mod solver;
 mod utils;
 
 use clap::{App, Arg};
 use colored::*;
-use std::{cell::RefCell, path::Path, rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use problem::Solution;
-use rule::RulesEngine;
-use utils::{log_init, DirectoryParser, Dumper, DumperConfig, FileDumper, Settings};
+use utils::{log_init, DirectoryParser, Dumper, DumperConfig, Settings};
 
 fn main() {
     let matches = App::new("Minerva")

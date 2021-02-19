@@ -67,11 +67,11 @@ impl DumperSink for Dumper {
 }
 
 impl DumperSink for NoneDumper {
-    fn subproblem_start(&mut self, problem: &Problem) {}
+    fn subproblem_start(&mut self, _: &Problem) {}
 
     fn subproblem_end(&mut self) {}
 
-    fn add_statement(&mut self, statement: &MarkedStatement) {}
+    fn add_statement(&mut self, _: &MarkedStatement) {}
 }
 
 impl FileDumper {

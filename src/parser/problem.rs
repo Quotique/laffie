@@ -46,7 +46,7 @@ impl<'a> ProblemParser<'a> {
                             .with_params(&mut params)
                             .with_variables()
                             .parse()
-                            .map_err(|e| SemanticError::Other(e))?,
+                            .map_err(SemanticError::Other)?,
                     )))
                     .map_err(|e| SemanticError::Other(e.to_string()))?;
             } else {
@@ -55,13 +55,13 @@ impl<'a> ProblemParser<'a> {
                         .with_params(&mut params)
                         .with_variables()
                         .parse()
-                        .map_err(|e| SemanticError::Other(e))?,
+                        .map_err(SemanticError::Other)?,
                 )));
             }
         }
-        Ok(builder
+        builder
             .build()
-            .map_err(|e| SemanticError::Other(e.to_string()))?)
+            .map_err(|e| SemanticError::Other(e.to_string()))
     }
 }
 

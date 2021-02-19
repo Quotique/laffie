@@ -7,7 +7,7 @@ use crate::{
     statement::{MarkedStatement, Statement},
     utils::Dumper,
 };
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 use trees::tr;
 
 pub enum Target {
@@ -17,36 +17,38 @@ pub enum Target {
 }
 
 impl Target {
-    pub fn try_from(mut value: Statement, rules: Arc<RulesEngine>) -> Result<Self, SemanticError> {
+    pub fn try_from(value: Statement, rules: Arc<RulesEngine>) -> Result<Self, SemanticError> {
         let (root, mut childs) = value.destruct();
 
-        if root.data.is_symbol_name(&"find".into()) {
+        if root.data.is_symbol_name("find") {
             if childs.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(format!("")));
             }
-            return Ok(Self::Find(MarkedStatement::from(Arc::new(
+            Ok(Self::Find(MarkedStatement::from(Arc::new(
                 Statement::from(childs.pop_front().unwrap()),
-            ))));
-        } else if root.data.is_symbol_name(&"proof".into()) {
+            ))))
+        } else if root.data.is_symbol_name("proof") {
             if childs.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(format!("")));
             }
 
             let mut frame = Frame::new(rules, Dumper::default());
-            frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
+            // TODO: error Processing
+            let _ = frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
                 childs.pop_front().unwrap(),
             ))));
-            return Ok(Self::Proof(frame));
-        } else if root.data.is_symbol_name(&"transform".into()) {
+            Ok(Self::Proof(frame))
+        } else if root.data.is_symbol_name("transform") {
             if childs.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(format!("")));
             }
 
             let mut frame = Frame::new(rules, Dumper::default());
-            frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
+            // TODO: error Processing
+            let _ = frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
                 childs.pop_front().unwrap(),
             ))));
-            return Ok(Self::Transform(frame));
+            Ok(Self::Transform(frame))
         } else {
             Err(SemanticError::UnexpectedWord(root.to_string()))
         }
@@ -58,8 +60,8 @@ impl Target {
         match self {
             Self::Find(x) => {
                 if statement_root.degree() != 2 ||
-                    (!statement_root.data.is_symbol_name(&"==".into()) &&
-                        !statement_root.data.is_symbol_name(&"in".into()))
+                    (!statement_root.data.is_symbol_name("==") &&
+                        !statement_root.data.is_symbol_name("in"))
                 {
                     return None;
                 }
@@ -127,7 +129,7 @@ impl Target {
                         target,
                         |rule| rule.attribute(&RuleAttr::Equivalence).is_some(),
                     );
-                    if new_states.len() == 0 {
+                    if new_states.is_empty() {
                         x[index].weight += 1;
                     }
                     for s in new_states {
@@ -146,7 +148,7 @@ impl Target {
                         target,
                         |_| true,
                     );
-                    if new_states.len() == 0 {
+                    if new_states.is_empty() {
                         x[index].weight += 1;
                     } else {
                         for s in new_states {
@@ -165,6 +167,6 @@ impl Target {
         if let Target::Transform(_) = self {
             return true;
         }
-        return false;
+        false
     }
 }
