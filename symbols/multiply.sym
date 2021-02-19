@@ -7,5 +7,6 @@ rule {
 
     x*a + b == 0 => x == - b/a;
 
-    a != 0
+    a != 0;
+    b is known
 }

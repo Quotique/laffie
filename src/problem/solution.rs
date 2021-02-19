@@ -11,7 +11,7 @@ use crate::{
     rule::{Rule, RuleAttr, RulesEngine, SharedRule},
     solver::operations::{is_true, normalize},
     statement::{MarkedStatement, Statement},
-    utils::Dumper,
+    utils::{Dumper, DumperSink},
 };
 use std::{
     cell::RefCell,
@@ -48,8 +48,6 @@ pub struct Solution {
     pub answer:   Option<usize>,
 
     pub perf_stats: PerfStats,
-
-    dumper: Option<Rc<RefCell<Box<dyn Dumper + 'static>>>>,
 }
 
 #[derive(Debug)]
@@ -83,10 +81,14 @@ impl PerfStats {
 }
 
 impl Solution {
-    pub fn new(problem: Problem, rules: Arc<RulesEngine>) -> Solution {
+    pub fn new(problem: Problem, rules: Arc<RulesEngine>, mut dumper: Dumper) -> Solution {
         let target = Target::try_from((*problem.target.statement).clone(), rules.clone()).unwrap();
         Solution {
-            stack: Frame::with_statements(rules.clone(), problem.conditions.iter().cloned()),
+            stack: Frame::with_statements(
+                rules.clone(),
+                dumper,
+                problem.conditions.iter().cloned(),
+            ),
 
             rules_engine: rules,
             local_rules:  vec![],
@@ -96,8 +98,6 @@ impl Solution {
 
             perf_stats: PerfStats::new(&problem),
 
-            dumper: None,
-
             problem: problem,
         }
     }
@@ -106,14 +106,8 @@ impl Solution {
         self.answer.map(|i| self.stack[i].statement.clone())
     }
 
-    pub fn set_dumper(&mut self, dumper: Rc<RefCell<Box<dyn Dumper>>>) {
-        self.dumper = Some(dumper);
-    }
-
     pub fn solve(&mut self) -> Result<(), SolutionError> {
-        if let Some(x) = self.dumper.as_ref() {
-            x.borrow_mut().subproblem_start(&self);
-        }
+        self.stack.dumper().subproblem_start(&self.problem);
         // trace!("Subproblem: {}, {:?}", self.target, self.conditions);
         if self.problem.subproblem_level > MAX_SUBPROBLEM_LEVEL {
             return Err(SolutionError::MaxSubproblemLevelExceed);
@@ -123,9 +117,7 @@ impl Solution {
         let result = self.solution_loop();
 
         self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
-        if let Some(x) = self.dumper.as_ref() {
-            x.borrow_mut().subproblem_end()
-        }
+        self.stack.dumper().subproblem_end();
         result
     }
 
@@ -145,7 +137,6 @@ impl Solution {
 
             let index = self.stack.pick_condition()?;
             let level = self.stack[index].weight;
-            trace!("Level: {}", level);
             if level > MAX_LEVEL {
                 return Err(SolutionError::NoSolutionsFound);
             }
@@ -157,7 +148,7 @@ impl Solution {
             );
 
             if !self.target.is_transform() {
-                if let Some(simplified) = self.stack.transform(&self.stack[index]) {
+                if let Some(simplified) = self.stack.transform(index) {
                     self.stack[index].replaced = true;
                     // let _ =
                     self.stack.add_condition(simplified).unwrap();
@@ -198,6 +189,7 @@ impl Solution {
                     self.stack[index].weight += 1;
                 }
                 for s in statements {
+                    trace!("{} => {}", self.stack[index], s);
                     self.stack.add_condition(s)?;
                 }
             } else {
@@ -481,7 +473,7 @@ mod solution_tests {
 
         let problem = parse_problem("problem {x == 1; target find x;};");
         let rules = Arc::new(RulesEngine::new());
-        let mut solution = Solution::new(problem, rules);
+        let mut solution = Solution::new(problem, rules, Dumper::default());
         assert!(solution.solve().is_ok());
         assert_eq!(*solution.answer().unwrap(), statement_with_vars("x == 1"));
     }
@@ -492,7 +484,7 @@ mod solution_tests {
 
         let problem = parse_problem("problem { x == 2; target proof (x > 0); }; ");
         let rules = Arc::new(RulesEngine::new());
-        let mut solution = Solution::new(problem, rules);
+        let mut solution = Solution::new(problem, rules, Dumper::default());
         assert!(solution.solve().is_ok());
         assert_eq!(*solution.answer().unwrap(), statement_with_vars("x == 2"));
     }

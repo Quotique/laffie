@@ -163,7 +163,7 @@ mod tests {
             .into()
         );
 
-        assert_eq!(rule.attrs.len(), 2);
+        assert_eq!(rule.attrs.len(), 3);
 
         assert!(rule.attribute(&RuleAttr::Replace).is_some());
         assert_eq!(

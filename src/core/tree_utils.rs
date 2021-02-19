@@ -113,24 +113,24 @@ fn params_map_impl(
                         for r in loc_result.into_iter() {
                             match params_map_impl(y, x, r) {
                                 Ok(mut p) => {
-                                    trace!(
-                                        "New mapping: [{}]",
-                                        p.iter()
-                                            .map(|m| {
-                                                format!(
-                                                    "{{ {} }}",
-                                                    m.iter()
-                                                        .map(|(x, y)| format!("{}: {}", x, y))
-                                                        .collect::<Vec<String>>()
-                                                        .join(",")
-                                                )
-                                            })
-                                            .collect::<Vec<String>>()
-                                            .join(",")
-                                    );
+                                    // trace!(
+                                    //     "New mapping: [{}]",
+                                    //     p.iter()
+                                    //         .map(|m| {
+                                    //             format!(
+                                    //                 "{{ {} }}",
+                                    //                 m.iter()
+                                    //                     .map(|(x, y)| format!("{}: {}", x, y))
+                                    //                     .collect::<Vec<String>>()
+                                    //                     .join(",")
+                                    //             )
+                                    //         })
+                                    //         .collect::<Vec<String>>()
+                                    //         .join(",")
+                                    // );
                                     new_result.append(&mut p)
                                 }
-                                Err(e) => trace!("Bad mapping: {}", e),
+                                Err(e) => {} // trace!("Bad mapping: {}", e),
                             }
                         }
                         loc_result = new_result;
@@ -158,10 +158,10 @@ fn params_map_impl(
                     for r in result.into_iter() {
                         match params_map_impl(y, x, r) {
                             Ok(mut p) => {
-                                trace!("New mapping: {:?}", p);
+                                // trace!("New mapping: {:?}", p);
                                 new_result.append(&mut p)
                             }
-                            Err(e) => trace!("Bad mapping: {}", e),
+                            Err(e) => {} // trace!("Bad mapping: {}", e),
                         }
                     }
                     result = new_result;

@@ -13,6 +13,7 @@ use crate::{
     rule::{Rule, RulesEngine, SharedRule, Suppose},
     solver::operations::is_true,
     statement::{MarkedStatement, Statement},
+    utils::{Dumper, DumperSink},
 };
 
 use super::{
@@ -27,22 +28,25 @@ pub struct Frame {
     index: HashMap<Arc<Statement>, usize>,
 
     rules_engine: Arc<RulesEngine>,
+    dumper:       Dumper,
 }
 
 impl Frame {
-    pub fn new(rules: Arc<RulesEngine>) -> Self {
+    pub fn new(rules: Arc<RulesEngine>, dumper: Dumper) -> Self {
         Frame {
             stack:        Vec::new(),
             index:        HashMap::new(),
             rules_engine: rules,
+            dumper:       dumper,
         }
     }
 
     pub fn with_statements(
         rules: Arc<RulesEngine>,
+        dumper: Dumper,
         statements: impl IntoIterator<Item = MarkedStatement>,
     ) -> Self {
-        let mut result = Self::new(rules);
+        let mut result = Self::new(rules, dumper);
         for i in statements {
             result.add_condition(i);
         }
@@ -59,14 +63,17 @@ impl Frame {
         self.index.get(statement).copied()
     }
 
+    #[inline]
+    pub fn dumper(&mut self) -> &mut Dumper {
+        &mut self.dumper
+    }
+
     pub fn add_condition(&mut self, mut statement: MarkedStatement) -> Result<(), SolutionError> {
         if self.contains(&statement.statement) {
             return Ok(());
         }
+        self.dumper.add_statement(&statement);
 
-        // if let Some(x) = self.dumper.as_ref() {
-        // 	   x.borrow_mut().add_statement(&statement);
-        // }
         statement.id = self.stack.len();
         self.index
             .insert(statement.statement.clone(), self.stack.len());
@@ -88,7 +95,6 @@ impl Frame {
     }
 
     pub fn pick_condition(&self) -> Result<usize, SolutionError> {
-        trace!("{:?}", self.stack);
         self.stack
             .iter()
             .enumerate()
@@ -120,10 +126,8 @@ impl Frame {
             .with_conditions(self.stack.iter().cloned())
             .build()
             .expect("Can't build subproblem");
-        let mut solution = Solution::new(subproblem, self.rules_engine.clone());
-        // if let Some(x) = self.dumper.as_ref() {
-        //     solution.set_dumper(x.clone());
-        // }
+        let mut solution =
+            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
 
         if solution.solve().is_err() {
             trace!("Can't proof: {}", statement);
@@ -132,28 +136,31 @@ impl Frame {
         return true;
     }
 
-    pub fn transform(&self, statement: &MarkedStatement) -> Option<MarkedStatement> {
-        if statement.simplified {
+    pub fn transform(&mut self, index: usize) -> Option<MarkedStatement> {
+        if self[index].simplified {
             return None;
         }
+        self[index].simplified = true;
 
         let subproblem = ProblemBuilder::new()
             .with_target(MarkedStatement::from(Arc::new(Statement::from(
                 tr(Term::with_symbol_name("transform").unwrap()) /
-                    statement.statement.root().to_owned(),
+                    self[index].statement.root().to_owned(),
             ))))
             .expect("Can't build subproblem")
             .with_conditions(self.stack.iter().cloned())
             .build()
             .expect("Can't build subproblem");
-        let mut solution = Solution::new(subproblem, self.rules_engine.clone());
+        let mut solution =
+            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
 
-        if solution.solve().is_err() || statement.statement == solution.answer().unwrap() {
+        if solution.solve().is_err() || self[index].statement == solution.answer().unwrap() {
             return None;
         }
         let mut result = MarkedStatement::from(solution.answer().unwrap().clone());
+        result.blocked_rules = self[index].blocked_rules.clone();
         result.simplified = true;
-        result.parents.push(statement.id);
+        result.parents.push(self[index].id);
 
         Some(result)
     }

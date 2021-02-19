@@ -5,6 +5,7 @@ use crate::{
     rule::{RuleAttr, RulesEngine, SharedRule, Suppose},
     solver::operations::is_true,
     statement::{MarkedStatement, Statement},
+    utils::Dumper,
 };
 use std::{convert::TryFrom, sync::Arc};
 use trees::tr;
@@ -31,7 +32,7 @@ impl Target {
                 return Err(SemanticError::WorngArgCount(format!("")));
             }
 
-            let mut frame = Frame::new(rules);
+            let mut frame = Frame::new(rules, Dumper::default());
             frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
                 childs.pop_front().unwrap(),
             ))));
@@ -41,8 +42,7 @@ impl Target {
                 return Err(SemanticError::WorngArgCount(format!("")));
             }
 
-            trace!("Childs: {:?}", childs);
-            let mut frame = Frame::new(rules);
+            let mut frame = Frame::new(rules, Dumper::default());
             frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
                 childs.pop_front().unwrap(),
             ))));

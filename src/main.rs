@@ -38,7 +38,7 @@ use std::{cell::RefCell, path::Path, rc::Rc, sync::Arc};
 
 use problem::Solution;
 use rule::RulesEngine;
-use utils::{log_init, DirectoryParser, Dumper, FileDumper, Settings};
+use utils::{log_init, DirectoryParser, Dumper, DumperConfig, FileDumper, Settings};
 
 fn main() {
     let matches = App::new("Minerva")
@@ -128,14 +128,19 @@ fn main() {
         }
         println!("{} {}", "Problem".bold().green(), p);
         let p_id = p.id;
-        let mut solution = Solution::new(p, rules_engine.clone());
+        let mut solution = Solution::new(
+            p,
+            rules_engine.clone(),
+            Dumper::new(DumperConfig {
+                sink:     if matches.is_present("dump") {
+                    "file".into()
+                } else {
+                    "none".into()
+                },
+                filename: format!("dumps/{:x}.dump", p_id),
+            }),
+        );
 
-        if matches.is_present("dump") {
-            let dumper = Rc::new(RefCell::new(Box::new(FileDumper::new(
-                format!("dumps/{:x}.dump", p_id).as_str(),
-            )) as Box<dyn Dumper>));
-            solution.set_dumper(dumper);
-        }
         match solution.solve() {
             Ok(_) => {
                 println!("{} {}", "Solution:".italic().blue(), solution);

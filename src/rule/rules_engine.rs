@@ -64,12 +64,8 @@ impl RulesEngine {
             .flat_map(|i| i.iter())
             .filter(|rule| {
                 let rule = rule.read().expect("Can't lock rule");
-                rule.is_statement_suitable(&statement)
-                    .map_err(|e| trace!("Statement not suitable({:?}): {} {}", e, statement, rule))
-                    .is_ok() &&
-                    rule.is_target_suitable(&target)
-                        .map_err(|e| trace!("Target not suitable({:?}): {} {}", e, target, rule))
-                        .is_ok()
+                rule.is_statement_suitable(&statement).is_ok() &&
+                    rule.is_target_suitable(&target).is_ok()
             })
             .cloned()
             .collect()
