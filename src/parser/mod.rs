@@ -7,19 +7,21 @@ pub mod lang;
 mod problem;
 mod rule;
 mod statement;
+mod symbol;
 
 pub type Tree = trees::Tree<String>;
 pub type Node = trees::Node<String>;
 
 pub use self::{
     lang::StatementsParser as LangParser, problem::ProblemParser, rule::RuleParser,
-    statement::StatementParser,
+    statement::StatementParser, symbol::SymbolParser,
 };
 
 #[derive(Clone, Debug)]
 pub enum SemanticError {
     UnexpectedWord(String),
     WorngArgCount(String),
+    MissingWord(String),
 
     Other(String),
 }
@@ -53,6 +55,7 @@ impl fmt::Display for SemanticError {
         match self {
             Self::UnexpectedWord(w) => write!(f, "Unexpected word {}", w),
             Self::WorngArgCount(e) => write!(f, "Arg count missmath: {}", e),
+            Self::MissingWord(w) => write!(f, "Missing word {}", w),
             Self::Other(e) => write!(f, "Semantic error: {}", e),
         }
     }

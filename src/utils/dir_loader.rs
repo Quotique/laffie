@@ -1,11 +1,11 @@
 use crate::{
-    core::symbols::{add_symbol, Symbol},
-    parser::{lang, ProblemParser, RuleParser},
+    parser::{lang, ProblemParser, RuleParser, SymbolParser},
     predefine::setup,
     problem::Problem,
     rule::RulesEngine,
+    statement::symbols::{add_symbol, Symbol},
 };
-use std::{convert::TryFrom, fs, io, path::Path};
+use std::{fs, io, path::Path};
 use trees::Tree;
 
 pub struct DirectoryParser {
@@ -35,7 +35,7 @@ impl DirectoryParser {
             Path::new(self.symbols_path.as_str()),
             &["sym"],
             &mut |s: &Tree<String>| {
-                if let Ok(sym) = Symbol::try_from(s) {
+                if let Ok(sym) = SymbolParser::new(s).parse() {
                     let sym = add_symbol(sym);
                     last_sym.replace(sym);
                 } else if let Ok(rule) = RuleParser::with(&s)
@@ -52,19 +52,15 @@ impl DirectoryParser {
 
     pub fn load_problems(&self) -> io::Result<Vec<Problem>> {
         let mut result = vec![];
-        Self::load_dir(
-            Path::new(self.problems_path.as_str()),
-            &["pbl"],
-            &mut |s| {
-                trace!("New problem cb: {}", s);
-                if s.root().data == "Problem" {
-                    match ProblemParser::with(&s).parse() {
-                        Ok(p) => result.push(p),
-                        Err(e) => error!("Problem not parsed: {}", e),
-                    }
+        Self::load_dir(Path::new(self.problems_path.as_str()), &["pbl"], &mut |s| {
+            trace!("New problem cb: {}", s);
+            if s.root().data == "Problem" {
+                match ProblemParser::with(&s).parse() {
+                    Ok(p) => result.push(p),
+                    Err(e) => error!("Problem not parsed: {}", e),
                 }
-            },
-        )?;
+            }
+        })?;
         Ok(result)
     }
 
@@ -73,7 +69,7 @@ impl DirectoryParser {
             Path::new(self.symbols_path.as_str()),
             &["sym"],
             &mut |s: &Tree<String>| {
-                if let Ok(sym) = Symbol::try_from(s) {
+                if let Ok(sym) = SymbolParser::new(s).parse() {
                     add_symbol(sym);
                 }
             },

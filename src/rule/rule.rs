@@ -1,7 +1,4 @@
-use crate::{
-    core::symbols::symbol_by_id,
-    statement::{MarkedStatement, Statement},
-};
+use crate::statement::{symbols::symbol_by_id, MarkedStatement, Statement};
 use std::{
     collections::{HashMap, HashSet},
     fmt,
@@ -102,11 +99,7 @@ impl Rule {
             }
             return Ok(());
         }
-        if (*target.statement)
-            .root()
-            .data
-            .is_symbol_name("transform")
-        {
+        if (*target.statement).root().data.is_symbol_name("transform") {
             // Only transform rules for transform
             return Err(RuleDeclineReason::TargetMissmatch);
         }

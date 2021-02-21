@@ -4,7 +4,7 @@ use num_bigint::{BigInt, ToBigInt};
 use std::{cmp::max, rc::Rc};
 use trees::{tr, Node};
 
-use core::{
+use statement::{
     symbols::{symbol_by_name, SymbolAttr},
     term::Term,
 };
@@ -308,7 +308,8 @@ pub fn is_true(statement: &Node<Term>) -> bool {
 mod operations_tests {
     use super::*;
     use bigdecimal::{BigDecimal as Decimal, Num};
-    use core::symbols::{symbol_by_name, symbols_tests::setup};
+    use predefine::setup;
+    use statement::symbols::symbol_by_name;
     use trees::tr;
 
     #[test]

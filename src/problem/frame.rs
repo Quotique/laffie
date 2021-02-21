@@ -8,10 +8,9 @@ use std::{
 use trees::tr;
 
 use crate::{
-    core::term::Term,
+    predefine::operations::is_true,
     rule::{Rule, RulesEngine, SharedRule, Suppose},
-    solver::operations::is_true,
-    statement::{MarkedStatement, Statement},
+    statement::{term::Term, MarkedStatement, Statement},
     utils::{Dumper, DumperSink},
 };
 
@@ -184,7 +183,7 @@ impl Frame {
         let mut rules = self.rules_engine.suggest_rules(statement, target);
         rules.append(&mut local_rules);
         for rule in rules {
-            let rule = rule.read().expect("Can't read rule");
+            let rule = rule.read();
             if !filter(&rule) {
                 continue;
             }
@@ -226,7 +225,7 @@ impl Frame {
         let mut rules = self.rules_engine.suggest_rules(&self.stack[index], target);
         rules.append(&mut local_rules);
         for rule in rules {
-            let rule = rule.read().expect("Can't read rule");
+            let rule = rule.read();
             if !filter(&rule) {
                 continue;
             }
@@ -276,7 +275,7 @@ impl IndexMut<usize> for Frame {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::core::term::Term;
+    use crate::statement::term::Term;
     use std::{
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},

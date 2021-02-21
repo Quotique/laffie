@@ -1,6 +1,6 @@
-use crate::{
-    core::term::{parse_rule_node, parse_statement_node},
-    statement::{ParamsMap, Statement},
+use crate::statement::{
+    term::{parse_rule_node, parse_statement_node},
+    ParamsMap, Statement,
 };
 
 use super::Node;
@@ -48,7 +48,8 @@ impl<'a> StatementParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{core::term::Term, parser::LangParser, predefine::setup};
+    use crate::{parser::LangParser, predefine::setup, statement::term::Term};
+
     use trees::tr;
 
     #[test]

@@ -1,4 +1,4 @@
-use crate::core::{
+use super::{
     term::{display_string, StatementTree, Term},
     tree_utils::{apply_map, params_map, swap_node},
 };
@@ -26,7 +26,7 @@ impl Statement {
     }
 
     pub fn inpl_normalize(&mut self) {
-        crate::solver::operations::normalize(self.tree.root_mut());
+        crate::predefine::operations::normalize(self.tree.root_mut());
     }
 
     pub fn symbols(&self) -> HashSet<u64> {

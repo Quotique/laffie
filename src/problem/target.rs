@@ -1,10 +1,9 @@
 use super::{frame::Frame, solution::MAX_LEVEL};
 use crate::{
-    core::term::Term,
     parser::SemanticError,
+    predefine::operations::is_true,
     rule::{RuleAttr, RulesEngine, SharedRule, Suppose},
-    solver::operations::is_true,
-    statement::{MarkedStatement, Statement},
+    statement::{term::Term, MarkedStatement, Statement},
     utils::Dumper,
 };
 use std::sync::Arc;

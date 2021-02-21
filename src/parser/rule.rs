@@ -114,10 +114,10 @@ impl<'a> RuleParser<'a> {
 mod tests {
     use super::*;
     use crate::{
-        core::term::Term,
         parser::LangParser,
         predefine::setup,
         rule::{RuleAttr, RuleAttrValue},
+        statement::term::Term,
     };
 
     use trees::tr;

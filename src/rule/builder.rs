@@ -1,8 +1,5 @@
 use super::rule::{Rule, RuleAttr, RuleAttrValue};
-use crate::{
-    core::{symbols::symbol_by_name, term::Term},
-    statement::Statement,
-};
+use crate::statement::{symbols::symbol_by_name, term::Term, Statement};
 use std::{collections::HashMap, convert::From, fmt};
 
 #[derive(Clone, Debug)]

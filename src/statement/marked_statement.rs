@@ -5,8 +5,10 @@ use std::{
     convert::From,
     fmt,
     hash::{Hash, Hasher},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
+
+use parking_lot::RwLock;
 
 #[derive(Debug, Clone)]
 pub struct MarkedStatement {

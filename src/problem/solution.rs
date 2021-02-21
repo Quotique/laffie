@@ -70,8 +70,7 @@ impl Solution {
             ),
 
             local_rules: vec![],
-            target:      Target::try_from((*problem.target.statement).clone(), rules)
-                .unwrap(),
+            target:      Target::try_from((*problem.target.statement).clone(), rules).unwrap(),
 
             answer: None,
 

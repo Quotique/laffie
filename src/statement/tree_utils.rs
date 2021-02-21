@@ -1,8 +1,9 @@
 use super::{
     symbols::{symbol_by_id, SymbolAttr},
     term::{StatementTree, Term},
-    utils::SubsetIterator,
 };
+use utils::SubsetIterator;
+
 use std::collections::HashMap;
 use trees::{tr, Node, Tree};
 
@@ -33,13 +34,13 @@ pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
 }
 
 // pub fn symbols(root: &StatementTree) -> HashSet<u64> {
-//     let mut symbols = HashSet::new();
-//     for i in root.root().bfs().iter {
-//         if let Term::Symbol(s) = i.data {
-//             symbols.insert(*s);
-//         }
-//     }
-//     symbols
+// 	   let mut symbols = HashSet::new();
+// 	   for i in root.root().bfs().iter {
+// 		   if let Term::Symbol(s) = i.data {
+// 			   symbols.insert(*s);
+// 		   }
+// 	   }
+// 	   symbols
 // }
 
 pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
@@ -47,13 +48,13 @@ pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
         Term::Param(id) => {
             let replace = params.get(&id);
             if let Some(r) = replace {
-                    let mut replace = r.clone();
-                    target.data = r.root().data.clone();
-                    while target.pop_back().is_some() {}
-                    while let Some(x) = replace.pop_front() {
-                        target.push_back(x);
-                    }
-                    // target.append(replace.abandon());
+                let mut replace = r.clone();
+                target.data = r.root().data.clone();
+                while target.pop_back().is_some() {}
+                while let Some(x) = replace.pop_front() {
+                    target.push_back(x);
+                }
+                // target.append(replace.abandon());
             }
         }
         _ => {
@@ -74,10 +75,10 @@ fn params_map_impl(
     mut params: ParamsMap,
 ) -> Result<Vec<ParamsMap>, String> {
     // trace!(
-    //     "Pattern: {}, traget: {}, mapping: {:?}",
-    //     pattern,
-    //     target,
-    //     params
+    // 	   "Pattern: {}, traget: {}, mapping: {:?}",
+    // 	   pattern,
+    // 	   target,
+    // 	   params
     // );
     let mut result = vec![];
 
@@ -111,19 +112,19 @@ fn params_map_impl(
                             match params_map_impl(y, x, r) {
                                 Ok(mut p) => {
                                     // trace!(
-                                    //     "New mapping: [{}]",
-                                    //     p.iter()
-                                    //         .map(|m| {
-                                    //             format!(
-                                    //                 "{{ {} }}",
-                                    //                 m.iter()
-                                    //                     .map(|(x, y)| format!("{}: {}", x, y))
-                                    //                     .collect::<Vec<String>>()
-                                    //                     .join(",")
-                                    //             )
-                                    //         })
-                                    //         .collect::<Vec<String>>()
-                                    //         .join(",")
+                                    // 	   "New mapping: [{}]",
+                                    // 	   p.iter()
+                                    // 		   .map(|m| {
+                                    // 			   format!(
+                                    // 				   "{{ {} }}",
+                                    // 				   m.iter()
+                                    // 					   .map(|(x, y)| format!("{}: {}", x, y))
+                                    // 					   .collect::<Vec<String>>()
+                                    // 					   .join(",")
+                                    // 			   )
+                                    // 		   })
+                                    // 		   .collect::<Vec<String>>()
+                                    // 		   .join(",")
                                     // );
                                     new_result.append(&mut p)
                                 }
@@ -215,7 +216,7 @@ fn params_map_impl(
 mod tree_utils_tests {
     use super::*;
     use bigdecimal::BigDecimal as Decimal;
-    use core::{symbols::symbols_tests::setup, trees::linked::fully::tr};
+    use predefine::setup;
 
     #[test]
     fn simple_param_map_test() {

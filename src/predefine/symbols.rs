@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Once};
 
-use core::symbols::{add_symbol, Symbol, SymbolAttr, SymbolAttrValue};
+use statement::symbols::{add_symbol, Symbol, SymbolAttr, SymbolAttrValue};
 
 static INIT: Once = Once::new();
 

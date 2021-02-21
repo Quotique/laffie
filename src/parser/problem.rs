@@ -68,7 +68,7 @@ impl<'a> ProblemParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{core::term::Term, parser::LangParser, predefine::setup};
+    use crate::{parser::LangParser, predefine::setup, statement::term::Term};
     use trees::tr;
 
     #[test]

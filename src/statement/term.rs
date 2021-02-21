@@ -191,19 +191,19 @@ pub fn display_string(node: &Node<Term>) -> String {
                         );
                     }
                     node.iter()
-                            .map(|x| {
-                                if let Term::Symbol(id) = x.data {
-                                    let symbol = symbol_by_id(id).unwrap();
-                                    if let Some(other_weight) = symbol.display_weight() {
-                                        if weight <= other_weight {
-                                            return format!("({})", display_string(x));
-                                        }
+                        .map(|x| {
+                            if let Term::Symbol(id) = x.data {
+                                let symbol = symbol_by_id(id).unwrap();
+                                if let Some(other_weight) = symbol.display_weight() {
+                                    if weight <= other_weight {
+                                        return format!("({})", display_string(x));
                                     }
                                 }
-                                display_string(x)
-                            })
-                            .collect::<Vec::<String>>()
-                            .join(symbol.to_string().as_str())
+                            }
+                            display_string(x)
+                        })
+                        .collect::<Vec<String>>()
+                        .join(symbol.to_string().as_str())
                 }
                 None => {
                     // Prefix notation is default
