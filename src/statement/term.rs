@@ -46,12 +46,12 @@ fn parse_node(
     node_type: NodeType,
 ) -> Result<StatementTree, String> {
     let mut result = tr(Term::parse(
-        src_node.data.clone(),
+        src_node.data().clone(),
         params,
         last_param_id,
         &node_type,
     ));
-    if result.root().data.is_symbol() {
+    if result.root().data().is_symbol() {
         for child in src_node.iter() {
             result.push_back(parse_node(
                 &child,
@@ -60,8 +60,8 @@ fn parse_node(
                 node_type.clone(),
             )?);
         }
-    } else if !src_node.is_leaf() {
-        return Err(format!("Node {} can't contains childs!", &src_node.data));
+    } else if !src_node.degree() == 0 {
+        return Err(format!("Node {} can't contains childs!", &src_node.data()));
     }
 
     Ok(result)
@@ -175,9 +175,9 @@ impl Term {
 }
 
 pub fn display_string(node: &Node<Term>) -> String {
-    match node.data {
+    match node.data() {
         Term::Symbol(id) => {
-            let symbol = symbol_by_id(id).unwrap();
+            let symbol = symbol_by_id(*id).unwrap();
             match symbol.display_weight() {
                 Some(weight) => {
                     if node.degree() < 2 {
@@ -192,8 +192,8 @@ pub fn display_string(node: &Node<Term>) -> String {
                     }
                     node.iter()
                         .map(|x| {
-                            if let Term::Symbol(id) = x.data {
-                                let symbol = symbol_by_id(id).unwrap();
+                            if let Term::Symbol(id) = x.data() {
+                                let symbol = symbol_by_id(*id).unwrap();
                                 if let Some(other_weight) = symbol.display_weight() {
                                     if weight <= other_weight {
                                         return format!("({})", display_string(x));
@@ -218,7 +218,7 @@ pub fn display_string(node: &Node<Term>) -> String {
                 }
             }
         }
-        _ => node.data.to_string(),
+        _ => node.data().to_string(),
     }
 }
 

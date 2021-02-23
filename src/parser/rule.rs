@@ -23,16 +23,16 @@ impl<'a> RuleParser<'a> {
     }
 
     pub fn parse(self) -> Result<Rule, SemanticError> {
-        if self.syntax_tree.root().data != "Rule" {
+        if self.syntax_tree.root().data() != "Rule" {
             return Err(SemanticError::UnexpectedWord(
-                self.syntax_tree.root().data.clone(),
+                self.syntax_tree.root().data().clone(),
             ));
         }
         let mut builder = RuleBuilder::new();
         let mut params = ParamsMap::new();
 
         for child in self.syntax_tree.iter() {
-            match child.data.as_str() {
+            match child.data().as_str() {
                 "=>" | "<=>" => {
                     builder = builder
                         .with_statement(
@@ -59,7 +59,7 @@ impl<'a> RuleParser<'a> {
                         builder = builder.with_attribute(attr, value)
                     }
                 }
-                _ => return Err(SemanticError::UnexpectedWord(child.data.clone())),
+                _ => return Err(SemanticError::UnexpectedWord(child.data().clone())),
             }
         }
 
@@ -73,7 +73,7 @@ impl<'a> RuleParser<'a> {
         attr: &Node,
         params: &mut ParamsMap,
     ) -> Result<(RuleAttr, RuleAttrValue), SemanticError> {
-        match attr.data.as_str() {
+        match attr.data().as_str() {
             "subtree" => Ok((RuleAttr::Subtree, RuleAttrValue::None)),
             "equivalence" => Ok((RuleAttr::Equivalence, RuleAttrValue::None)),
             "replace" => Ok((RuleAttr::Replace, RuleAttrValue::None)),
@@ -86,8 +86,8 @@ impl<'a> RuleParser<'a> {
                 }
                 Ok((
                     RuleAttr::Level,
-                    RuleAttrValue::UInt(attr.first().unwrap().data.parse::<u64>().map_err(
-                        |_| SemanticError::UnexpectedWord(attr.first().unwrap().data.clone()),
+                    RuleAttrValue::UInt(attr.front().unwrap().data().parse::<u64>().map_err(
+                        |_| SemanticError::UnexpectedWord(attr.front().unwrap().data().clone()),
                     )?),
                 ))
             }
@@ -99,13 +99,13 @@ impl<'a> RuleParser<'a> {
                     )));
                 }
 
-                let target = StatementParser::new(attr.first().unwrap())
+                let target = StatementParser::new(attr.front().unwrap())
                     .with_params(params)
                     .parse()
                     .map_err(SemanticError::Other)?;
                 Ok((RuleAttr::Target, RuleAttrValue::Target(target)))
             }
-            _ => Err(SemanticError::UnexpectedWord(attr.data.clone())),
+            _ => Err(SemanticError::UnexpectedWord(attr.data().clone())),
         }
     }
 }
@@ -170,6 +170,63 @@ mod tests {
         assert_eq!(
             rule.attribute(&RuleAttr::Level),
             Some(&RuleAttrValue::UInt(1))
+        );
+    }
+
+    #[test]
+    fn rule_parse_2_test() {
+        setup();
+        let test = r#"rule {
+					attr level(0),problem_target(proof([a/b is known]));
+					a/b is known <=> [true];
+					a is known;
+					b is known
+				};"#;
+
+        let states = LangParser::new().parse(test).unwrap();
+        assert_eq!(states.len(), 1);
+
+        let result = RuleParser::with(&states[0]).parse();
+        assert!(result.is_ok());
+
+        let rule = result.unwrap();
+        assert_eq!(
+            rule.pattern,
+            (tr(Term::with_symbol_name("is").unwrap()) /
+                (tr(Term::with_symbol_name("/").unwrap()) /
+                    tr(Term::Param(1)) /
+                    tr(Term::Param(2))) /
+                tr(Term::with_symbol_name("known").unwrap()))
+            .into()
+        );
+
+        assert_eq!(
+            rule.replace,
+            (tr(Term::with_symbol_name("true").unwrap())).into()
+        );
+        assert_eq!(rule.requirements.len(), 2);
+        assert_eq!(
+            rule.requirements[0],
+            (tr(Term::with_symbol_name("is").unwrap()) /
+                tr(Term::Param(1)) /
+                tr(Term::with_symbol_name("known").unwrap()))
+            .into()
+        );
+        assert_eq!(
+            rule.requirements[1],
+            (tr(Term::with_symbol_name("is").unwrap()) /
+                tr(Term::Param(2)) /
+                tr(Term::with_symbol_name("known").unwrap()))
+            .into()
+        );
+
+        assert_eq!(rule.attrs.len(), 4);
+
+        assert!(rule.attribute(&RuleAttr::Subtree).is_some());
+        assert!(rule.attribute(&RuleAttr::Equivalence).is_some());
+        assert_eq!(
+            rule.attribute(&RuleAttr::Level),
+            Some(&RuleAttrValue::UInt(0))
         );
     }
 }

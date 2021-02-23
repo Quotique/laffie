@@ -26,7 +26,7 @@ impl Statement {
     }
 
     pub fn inpl_normalize(&mut self) {
-        crate::predefine::operations::normalize(self.tree.root_mut());
+        crate::predefine::operations::normalize(&mut self.tree.root_mut());
     }
 
     pub fn symbols(&self) -> HashSet<u64> {
@@ -53,7 +53,7 @@ impl Statement {
 
     pub fn apply_map(&self, params: &ReverseParamsMap) -> Self {
         let mut result = self.clone();
-        apply_map(result.tree.root_mut(), params);
+        apply_map(&mut result.tree.root_mut(), params);
         result
     }
 
@@ -62,22 +62,22 @@ impl Statement {
         target: &'a mut Self,
     ) -> Option<(Vec<ReverseParamsMap>, &'a mut Node<Term>)> {
         let mut queue = VecDeque::new();
-        queue.push_back(target.tree.root_mut());
+        queue.push_back(target.tree.root_mut().get_mut());
 
-        while let Some(node) = queue.pop_front() {
-            if let Ok(mapping) = params_map(node, self.tree.root()) {
+        while let Some(mut node) = queue.pop_front() {
+            if let Ok(mapping) = params_map(&mut node, self.tree.root()) {
                 return Some((mapping, node));
             }
 
             for i in node.iter_mut() {
-                queue.push_back(i);
+                queue.push_back(i.get_mut());
             }
         }
         None
     }
 
     pub fn swap_node(&mut self, node: &mut Node<Term>) {
-        swap_node(self.tree.root_mut(), node)
+        swap_node(&mut self.tree.root_mut(), node)
     }
 
     // fn contains(term: &Term, tree: &Node<Term>) -> bool {

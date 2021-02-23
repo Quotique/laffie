@@ -21,9 +21,9 @@ pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
         r_childs.push(t);
     }
 
-    let r_data = r.data.clone();
-    r.data = l.data.clone();
-    l.data = r_data;
+    let r_data = r.data().clone();
+    *r.data_mut() = l.data().clone();
+    *l.data_mut() = r_data;
     //(l.root_mut().data, r.root_mut().data) = (r.root().data, l.root().data);
     for i in l_childs {
         r.push_back(i);
@@ -44,12 +44,12 @@ pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
 // }
 
 pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
-    match target.data {
+    match target.data() {
         Term::Param(id) => {
             let replace = params.get(&id);
             if let Some(r) = replace {
                 let mut replace = r.clone();
-                target.data = r.root().data.clone();
+                *target.data_mut() = r.root().data().clone();
                 while target.pop_back().is_some() {}
                 while let Some(x) = replace.pop_front() {
                     target.push_back(x);
@@ -58,8 +58,8 @@ pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
             }
         }
         _ => {
-            for i in target.iter_mut() {
-                apply_map(i, params);
+            for mut i in target.iter_mut() {
+                apply_map(&mut i, params);
             }
         }
     }
@@ -82,7 +82,7 @@ fn params_map_impl(
     // );
     let mut result = vec![];
 
-    match (&pattern.data, &target.data) {
+    match (&pattern.data(), &target.data()) {
         (Term::Symbol(p_id), Term::Symbol(t_id)) => {
             if p_id != t_id {
                 return Err(format!("Expect symbol {}, found: {}", p_id, t_id));
@@ -96,13 +96,13 @@ fn params_map_impl(
                     let mut loc_result = vec![params.clone()];
                     let mut parts = vec![tr(Term::Symbol(*p_id)); pattern.degree()];
                     for (id, child) in target.iter().enumerate() {
-                        parts[i.as_vec()[id]].push_back(child.to_owned());
+                        parts[i.as_vec()[id]].push_back(child.deep_clone());
                     }
 
-                    for mut p in parts.iter_mut() {
+                    for p in parts.iter_mut() {
                         if p.degree() == 1 {
                             let mut child = p.pop_front().unwrap();
-                            swap_node(&mut p, &mut child);
+                            swap_node(&mut p.root_mut(), &mut child.root_mut());
                         }
                     }
 
@@ -175,7 +175,8 @@ fn params_map_impl(
         (Term::Symbol(p_id), _) => {
             return Err(format!(
                 "Expect symbol id: {}, found target: {:?}",
-                p_id, &target.data
+                p_id,
+                &target.data()
             ));
         }
         (Term::Param(id), _) => {
@@ -183,30 +184,38 @@ fn params_map_impl(
                 let node = params.get(id).unwrap();
                 let _ = params_map(node, target)?;
             } else {
-                params.insert(*id, target.to_owned()); // subtree_clone(target));
+                params.insert(*id, target.deep_clone()); // subtree_clone(target));
             }
 
             result.push(params);
         }
         (Term::Number(value), Term::Number(other_value)) => {
             if value != other_value {
-                return Err(format!("Expect Number {}, found {:?}", value, target.data));
+                return Err(format!(
+                    "Expect Number {}, found {:?}",
+                    value,
+                    target.data()
+                ));
             }
 
             result.push(params);
         }
         (Term::Number(_), _) => {
-            return Err(format!("Expect Number, found: {:?}", target.data));
+            return Err(format!("Expect Number, found: {:?}", target.data()));
         }
         (Term::Variable(value), Term::Variable(other_value)) => {
             if value != other_value {
-                return Err(format!("Expect Varible {}, found {:?}", value, target.data));
+                return Err(format!(
+                    "Expect Varible {}, found {:?}",
+                    value,
+                    target.data()
+                ));
             }
 
             result.push(params);
         }
         (Term::Variable(_), _) => {
-            return Err(format!("Expect Varible, found: {:?}", target.data));
+            return Err(format!("Expect Varible, found: {:?}", target.data()));
         }
     }
     Ok(result)
@@ -306,7 +315,7 @@ mod tree_utils_tests {
             Ok(map) => {
                 assert_eq!(map.len(), 1);
                 let mut test = tr(Term::Symbol(1)) / tr(Term::Param(1));
-                apply_map(&mut test, &map[0]);
+                apply_map(&mut test.root_mut(), &map[0]);
 
                 assert_eq!(
                     test,

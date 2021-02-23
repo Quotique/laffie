@@ -54,7 +54,7 @@ impl DirectoryParser {
         let mut result = vec![];
         Self::load_dir(Path::new(self.problems_path.as_str()), &["pbl"], &mut |s| {
             trace!("New problem cb: {}", s);
-            if s.root().data == "Problem" {
+            if s.root().data() == "Problem" {
                 match ProblemParser::with(&s).parse() {
                     Ok(p) => result.push(p),
                     Err(e) => error!("Problem not parsed: {}", e),

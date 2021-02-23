@@ -112,12 +112,12 @@ impl RuleBuilder {
             return Err(RuleBuilderError::WrongArgsCount);
         }
 
-        if root.data == Term::with_symbol_name("=>").unwrap() {
+        if *root.data() == Term::with_symbol_name("=>").unwrap() {
             return Ok((
                 Statement::from(childs.pop_front().unwrap()),
                 Statement::from(childs.pop_back().unwrap()),
             ));
-        } else if root.data == Term::with_symbol_name("<=>").unwrap() {
+        } else if *root.data() == Term::with_symbol_name("<=>").unwrap() {
             self.attributes
                 .push((RuleAttr::Equivalence, RuleAttrValue::None));
 
@@ -125,7 +125,7 @@ impl RuleBuilder {
                 Statement::from(childs.pop_front().unwrap()),
                 Statement::from(childs.pop_back().unwrap()),
             ));
-        } else if root.data == Term::with_symbol_name("==").unwrap() {
+        } else if *root.data() == Term::with_symbol_name("==").unwrap() {
             self.attributes
                 .push((RuleAttr::Equivalence, RuleAttrValue::None));
             self.attributes

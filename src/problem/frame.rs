@@ -119,7 +119,7 @@ impl Frame {
 
         let subproblem = ProblemBuilder::new()
             .with_target(MarkedStatement::from(Arc::new(Statement::from(
-                tr(Term::with_symbol_name("proof").unwrap()) / statement.root().to_owned(),
+                tr(Term::with_symbol_name("proof").unwrap()) / statement.root().deep_clone(),
             ))))
             .expect("Can't build subproblem")
             .with_conditions(self.stack.iter().cloned())
@@ -144,7 +144,7 @@ impl Frame {
         let subproblem = ProblemBuilder::new()
             .with_target(MarkedStatement::from(Arc::new(Statement::from(
                 tr(Term::with_symbol_name("transform").unwrap()) /
-                    self[index].statement.root().to_owned(),
+                    self[index].statement.root().deep_clone(),
             ))))
             .expect("Can't build subproblem")
             .with_conditions(self.stack.iter().cloned())

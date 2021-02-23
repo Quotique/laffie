@@ -1,7 +1,6 @@
 #![allow(clippy::all)]
 
-use std::iter::FromIterator;
-use trees::linked::fully::{tr, Tree, Forest};
+use trees::{tr, Tree};
 
 grammar;
 
@@ -28,7 +27,9 @@ Statement: Tree<String> = {
 Problem: Tree<String> = {
     "problem" "{" <c:Conditions> "}" => {
         let mut t = tr(String::from("Problem"));
-        t.append(Forest::from_iter(c.iter().map(|x| x.clone())));
+        for i in c.iter().cloned() {
+            t.push_back(i);
+        }
         t
     },
 };
@@ -52,7 +53,9 @@ Declare: Tree<String> = {
     "symbol" <s:ExtStr> => tr(String::from("Declare")) /(tr(String::from("Symbol"))/tr(String::from(s))),
     "symbol" <s:ExtStr> "{" "attr" <a:Attributes> "}" => {
         let mut t = tr(String::from("Attrs"));
-        t.append(Forest::from_iter(a.iter().map(|x| x.clone())));
+        for i in a.iter().cloned() {
+            t.push_back(i);
+        }
         tr(String::from("Declare")) /(tr(String::from("Symbol"))/tr(String::from(s))) /t
     }
 };
@@ -68,7 +71,9 @@ RuleExt: Tree<String> = {
         let mut t = tr(String::from("Rule"));
         t.push_back(r);
         let mut pred = tr(String::from("Predicates"));
-        pred.append(Forest::from_iter(p.iter().map(|x| x.clone())));
+        for i in p.iter().cloned() {
+            pred.push_back(i);
+        }
         t.push_back(pred);
         t
     },
@@ -76,9 +81,13 @@ RuleExt: Tree<String> = {
         let mut t = tr(String::from("Rule"));
         t.push_back(r);
         let mut pred = tr(String::from("Predicates"));
-        pred.append(Forest::from_iter(p.iter().map(|x| x.clone())));
+        for i in p.iter().cloned() {
+            pred.push_back(i);
+        }
         let mut attr = tr(String::from("Attributes"));
-        attr.append(Forest::from_iter(a.iter().map(|x| x.clone())));
+        for i in a.iter().cloned() {
+            attr.push_back(i);
+        }
         t.push_back(pred);
         t.push_back(attr);
         t
@@ -147,7 +156,9 @@ Eval: Tree<String> = {
     Term => tr(String::from(<>)),
     <t:Term> "(" <a:Args> ")" => {
         let mut t = tr(String::from(t));
-        t.append(Forest::from_iter(a.iter().map(|x| x.clone())));
+        for i in a.iter().cloned() {
+            t.push_back(i);
+        }
         t
     },
     <o:SumOp> <e:Eval> => tr(String::from(o))/e

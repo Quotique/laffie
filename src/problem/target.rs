@@ -19,14 +19,14 @@ impl Target {
     pub fn try_from(value: Statement, rules: Arc<RulesEngine>) -> Result<Self, SemanticError> {
         let (root, mut childs) = value.destruct();
 
-        if root.data.is_symbol_name("find") {
+        if root.data().is_symbol_name("find") {
             if childs.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(format!("")));
             }
             Ok(Self::Find(MarkedStatement::from(Arc::new(
                 Statement::from(childs.pop_front().unwrap()),
             ))))
-        } else if root.data.is_symbol_name("proof") {
+        } else if root.data().is_symbol_name("proof") {
             if childs.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(format!("")));
             }
@@ -37,7 +37,7 @@ impl Target {
                 childs.pop_front().unwrap(),
             ))));
             Ok(Self::Proof(frame))
-        } else if root.data.is_symbol_name("transform") {
+        } else if root.data().is_symbol_name("transform") {
             if childs.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(format!("")));
             }
@@ -59,15 +59,15 @@ impl Target {
         match self {
             Self::Find(x) => {
                 if statement_root.degree() != 2 ||
-                    (!statement_root.data.is_symbol_name("==") &&
-                        !statement_root.data.is_symbol_name("in"))
+                    (!statement_root.data().is_symbol_name("==") &&
+                        !statement_root.data().is_symbol_name("in"))
                 {
                     return None;
                 }
 
-                if statement_root.first().unwrap() == x.statement.root() {
+                if statement_root.front().unwrap() == x.statement.root() {
                     let is_known = tr(Term::with_symbol_name("is").unwrap()) /
-                        statement_root.last().unwrap().to_owned() /
+                        statement_root.back().unwrap().deep_clone() /
                         tr(Term::with_symbol_name("known").unwrap());
 
                     return Some(Suppose {

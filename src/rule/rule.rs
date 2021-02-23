@@ -99,7 +99,11 @@ impl Rule {
             }
             return Ok(());
         }
-        if (*target.statement).root().data.is_symbol_name("transform") {
+        if (*target.statement)
+            .root()
+            .data()
+            .is_symbol_name("transform")
+        {
             // Only transform rules for transform
             return Err(RuleDeclineReason::TargetMissmatch);
         }
@@ -153,7 +157,7 @@ impl Rule {
     fn apply_subtree(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {
         let mut statement = (*arg.statement).clone();
         let state = &statement as *const Statement;
-        let (maps, node) = self
+        let (maps, mut node) = self
             .pattern
             .find_subtree_map_mut(&mut statement)
             .ok_or_else(|| RuleDeclineReason::ParamsMappingErr("no match".into()))?;
@@ -162,7 +166,7 @@ impl Rule {
             .iter()
             .map(|x| {
                 let mut replace = self.replace.apply_map(&x);
-                replace.swap_node(node);
+                replace.swap_node(&mut node);
                 let clone = unsafe { (*state).normalize() };
                 Suppose {
                     requirements: self

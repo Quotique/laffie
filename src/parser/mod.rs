@@ -64,7 +64,7 @@ impl fmt::Display for SemanticError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use trees::linked::fully::tr;
+    use trees::tr;
 
     #[test]
     fn predicate_parse_test() {

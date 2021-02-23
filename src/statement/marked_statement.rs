@@ -99,7 +99,7 @@ impl MarkedStatement {
                 .build()
                 .map_err(|e| trace!("Error rule build: {}", e))
             {
-                if rule.pattern.root().data.is_variable() {
+                if rule.pattern.root().data().is_variable() {
                     trace!("New rule: {}", rule);
                     let rule = Arc::new(RwLock::new(rule));
                     self.as_rule = Some(rule.clone());

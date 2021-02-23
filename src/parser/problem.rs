@@ -19,9 +19,9 @@ impl<'a> ProblemParser<'a> {
     }
 
     pub fn parse(self) -> Result<Problem, SemanticError> {
-        if self.syntax_tree.root().data != "Problem" {
+        if self.syntax_tree.root().data() != "Problem" {
             return Err(SemanticError::UnexpectedWord(
-                self.syntax_tree.root().data.clone(),
+                self.syntax_tree.root().data().clone(),
             ));
         }
         let mut hasher = DefaultHasher::new();
@@ -32,7 +32,7 @@ impl<'a> ProblemParser<'a> {
         let mut builder = ProblemBuilder::new().with_id(hash);
 
         for child in self.syntax_tree.iter() {
-            if child.data == "Target" {
+            if child.data() == "Target" {
                 if child.degree() != 1 {
                     return Err(SemanticError::WorngArgCount(format!(
                         "target: expect 1 found {}",
@@ -42,7 +42,7 @@ impl<'a> ProblemParser<'a> {
 
                 builder = builder
                     .with_target(MarkedStatement::from(Arc::new(
-                        StatementParser::new(child.first().unwrap())
+                        StatementParser::new(child.front().unwrap())
                             .with_params(&mut params)
                             .with_variables()
                             .parse()

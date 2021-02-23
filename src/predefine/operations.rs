@@ -14,13 +14,13 @@ const MAX_DEC_CONVERSION_EXP: i64 = 6;
 
 fn evaluate(root: &mut Node<Term>) -> bool {
     let mut result = false;
-    if let Some(symbol) = &root.data.symbol() {
+    if let Some(symbol) = &root.data().symbol() {
         match symbol.name.as_str() {
             "+" => {
                 if root.degree() >= 2 {
                     let mut sum = Decimal::from(0);
                     while let Some(last) = root.pop_back() {
-                        if let Term::Number(d) = &last.data {
+                        if let Term::Number(d) = &last.data() {
                             sum += d;
                             result = true;
                         } else {
@@ -29,7 +29,7 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                         }
                     }
                     if root.degree() == 0 {
-                        root.data = Term::Number(sum);
+                        *root.data_mut() = Term::Number(sum);
                     } else if !sum.is_zero() {
                         root.push_back(tr(Term::Number(sum)));
                     }
@@ -38,7 +38,7 @@ fn evaluate(root: &mut Node<Term>) -> bool {
             "*" => {
                 let mut mul = Decimal::from(1);
                 while let Some(last) = root.pop_back() {
-                    if let Term::Number(d) = &last.data {
+                    if let Term::Number(d) = &last.data() {
                         mul *= d;
                         result = true;
                     } else {
@@ -47,14 +47,14 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                     }
                 }
                 if root.degree() == 0 {
-                    root.data = Term::Number(mul);
+                    *root.data_mut() = Term::Number(mul);
                 } else if (root.degree() == 1) & mul.is_one() {
-                    let mut last = root.onto_iter().next().unwrap().depart();
+                    let mut last = root.front_mut().unwrap().detach();
                     while let Some(x) = last.pop_front() {
                         root.push_back(x);
                     }
                     // root.append(last.abandon());
-                    root.data = last.data.clone();
+                    *root.data_mut() = last.data().clone();
                 } else if !mul.is_one() {
                     root.push_back(tr(Term::Number(mul)));
                 }
@@ -62,8 +62,8 @@ fn evaluate(root: &mut Node<Term>) -> bool {
             "-" => match root.degree() {
                 1 => {
                     let last = root.pop_back().unwrap();
-                    if let Term::Number(d) = &last.data {
-                        root.data = Term::Number(-d);
+                    if let Term::Number(d) = &last.data() {
+                        *root.data_mut() = Term::Number(-d);
                         result = true;
                     } else {
                         root.push_back(last);
@@ -71,9 +71,9 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                 }
                 2 => {
                     if let (Term::Number(d1), Term::Number(d2)) =
-                        (&root.first().unwrap().data, &root.last().unwrap().data)
+                        (&root.front().unwrap().data(), &root.back().unwrap().data())
                     {
-                        root.data = Term::Number(d1 - d2);
+                        *root.data_mut() = Term::Number(d1 - d2);
                         result = true;
                         root.pop_back();
                         root.pop_back();
@@ -85,7 +85,7 @@ fn evaluate(root: &mut Node<Term>) -> bool {
             },
             "/" => {
                 if let (Term::Number(d1), Term::Number(d2)) =
-                    (&root.first().unwrap().data, &root.last().unwrap().data)
+                    (&root.front().unwrap().data(), &root.back().unwrap().data())
                 {
                     let (num_m, num_e) = d1.clone().into_bigint_and_exponent();
                     let (den_m, den_e) = d2.clone().into_bigint_and_exponent();
@@ -110,9 +110,9 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                     root.pop_back();
 
                     if den_m.is_one() {
-                        root.data = Term::Number(Decimal::from(num_m));
+                        *root.data_mut() = Term::Number(Decimal::from(num_m));
                     } else if (BigInt::from(MAX_DEC_CONVERSION_VALUE) % den_m.clone()).is_zero() {
-                        root.data = Term::Number(Decimal::new(
+                        *root.data_mut() = Term::Number(Decimal::new(
                             num_m * (BigInt::from(MAX_DEC_CONVERSION_VALUE) / den_m),
                             MAX_DEC_CONVERSION_EXP,
                         ));
@@ -124,7 +124,7 @@ fn evaluate(root: &mut Node<Term>) -> bool {
             }
             "^" => {
                 if let (Term::Number(d1), Term::Number(d2)) =
-                    (&root.first().unwrap().data, &root.last().unwrap().data)
+                    (&root.front().unwrap().data(), &root.back().unwrap().data())
                 {
                     if let Some(e) = d2.to_i8() {
                         result = true;
@@ -132,9 +132,9 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                         let result = Decimal::new(m.pow(e.abs() as u32), exp * (e.abs() as i64));
                         while root.pop_front().is_some() {}
                         if e >= 0 {
-                            root.data = Term::Number(result);
+                            *root.data_mut() = Term::Number(result);
                         } else {
-                            root.data = Term::Symbol(symbol_by_name("/").unwrap().id);
+                            *root.data_mut() = Term::Symbol(symbol_by_name("/").unwrap().id);
                             root.push_back(tr(Term::Number(Decimal::one())));
                             root.push_back(tr(Term::Number(result)));
                             evaluate(root);
@@ -150,12 +150,12 @@ fn evaluate(root: &mut Node<Term>) -> bool {
 
 fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
     let mut result = false;
-    if let Some(symbol) = &root.data.symbol() {
+    if let Some(symbol) = &root.data().symbol() {
         if symbol.attrs.contains_key(&SymbolAttr::Associative) {
             let root_degree = root.degree();
             for _ in 0..root_degree {
                 let mut child = root.pop_front().unwrap();
-                if let Some(child_symbol) = &child.data.symbol() {
+                if let Some(child_symbol) = &child.data().symbol() {
                     if child_symbol.id == symbol.id {
                         while let Some(node) = child.pop_front() {
                             root.push_back(node);
@@ -167,7 +167,7 @@ fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
                 root.push_back(child);
             }
             // for mut child in root.forest_mut().onto_iter() {
-            //     if let Some(child_symbol) = &child.data.symbol() {
+            //     if let Some(child_symbol) = &child.data().symbol() {
             //         if child_symbol.id == symbol.id {
             //             println!("Hui22 {} {} {}", root, root.degree(),
             // root.node_count());             println!("Hui221 {}
@@ -196,7 +196,7 @@ fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
 
 fn commutative_reorder(root: &mut Node<Term>) -> bool {
     let mut result = false;
-    if let Some(symbol) = &root.data.symbol() {
+    if let Some(symbol) = &root.data().symbol() {
         if symbol.attrs.contains_key(&SymbolAttr::Commutative) {
             result = true;
             let mut to_sort = vec![];
@@ -205,22 +205,22 @@ fn commutative_reorder(root: &mut Node<Term>) -> bool {
                 to_sort.push(Rc::new(t));
             }
             // Symbol < Param < Varible < Number
-            to_sort.sort_by(|x, y| match &x.data {
-                Term::Symbol(id_l) => match &y.data {
+            to_sort.sort_by(|x, y| match &x.data() {
+                Term::Symbol(id_l) => match &y.data() {
                     Term::Symbol(id_r) => id_l.cmp(id_r),
                     _ => std::cmp::Ordering::Less,
                 },
-                Term::Param(id_l) => match &y.data {
+                Term::Param(id_l) => match &y.data() {
                     Term::Symbol(_) => std::cmp::Ordering::Greater,
                     Term::Param(id_r) => id_l.cmp(id_r),
                     _ => std::cmp::Ordering::Less,
                 },
-                Term::Variable(id_l) => match &y.data {
+                Term::Variable(id_l) => match &y.data() {
                     Term::Variable(id_r) => id_l.cmp(id_r),
                     Term::Number(_) => std::cmp::Ordering::Less,
                     _ => std::cmp::Ordering::Greater,
                 },
-                Term::Number(d1) => match &y.data {
+                Term::Number(d1) => match &y.data() {
                     Term::Number(d2) => d1.cmp(d2),
                     _ => std::cmp::Ordering::Greater,
                 },
@@ -235,8 +235,8 @@ fn commutative_reorder(root: &mut Node<Term>) -> bool {
 
 pub fn normalize(root: &mut Node<Term>) -> bool {
     let mut result = false;
-    for i in root.iter_mut() {
-        result |= normalize(i);
+    for mut i in root.iter_mut() {
+        result |= normalize(&mut i);
     }
 
     result |= associative_nesting_remove(root);
@@ -247,55 +247,55 @@ pub fn normalize(root: &mut Node<Term>) -> bool {
 }
 
 pub fn is_true(statement: &Node<Term>) -> bool {
-    if let Term::Symbol(id) = &statement.data {
+    if let Term::Symbol(id) = &statement.data() {
         if *id == symbol_by_name("==").unwrap().id {
             if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.first().unwrap().data,
-                &statement.last().unwrap().data,
+                &statement.front().unwrap().data(),
+                &statement.back().unwrap().data(),
             ) {
                 return d1 == d2;
             }
         } else if *id == symbol_by_name("!=").unwrap().id {
             if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.first().unwrap().data,
-                &statement.last().unwrap().data,
+                &statement.front().unwrap().data(),
+                &statement.back().unwrap().data(),
             ) {
                 return d1 != d2;
             }
         } else if *id == symbol_by_name("<").unwrap().id {
             if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.first().unwrap().data,
-                &statement.last().unwrap().data,
+                &statement.front().unwrap().data(),
+                &statement.back().unwrap().data(),
             ) {
                 return d1 < d2;
             }
         } else if *id == symbol_by_name("<=").unwrap().id {
             if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.first().unwrap().data,
-                &statement.last().unwrap().data,
+                &statement.front().unwrap().data(),
+                &statement.back().unwrap().data(),
             ) {
                 return d1 <= d2;
             }
         } else if *id == symbol_by_name(">").unwrap().id {
             if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.first().unwrap().data,
-                &statement.last().unwrap().data,
+                &statement.front().unwrap().data(),
+                &statement.back().unwrap().data(),
             ) {
                 return d1 > d2;
             }
         } else if *id == symbol_by_name(">=").unwrap().id {
             if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.first().unwrap().data,
-                &statement.last().unwrap().data,
+                &statement.front().unwrap().data(),
+                &statement.back().unwrap().data(),
             ) {
                 return d1 >= d2;
             }
         } else if *id == symbol_by_name("is").unwrap().id {
             if let (Term::Number(_), Term::Symbol(known_id)) = (
-                &statement.first().unwrap().data,
-                &statement.last().unwrap().data,
+                &statement.front().unwrap().data(),
+                &statement.back().unwrap().data(),
             ) {
-                return known_id == &symbol_by_name("known").unwrap().id;
+                return *known_id == symbol_by_name("known").unwrap().id;
             }
         } else if *id == symbol_by_name("true").unwrap().id {
             return true;
@@ -516,7 +516,7 @@ mod operations_tests {
                 tr(Term::Number(Decimal::from(2))) /
                 tr(Term::Number(Decimal::from(3))));
 
-        assert!(commutative_reorder(test_tree.root_mut()));
+        assert!(commutative_reorder(test_tree.root_mut().get_mut()));
         assert_eq!(
             test_tree,
             tr(Term::Symbol(2)) /

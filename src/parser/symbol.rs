@@ -13,8 +13,8 @@ impl<'a> SymbolParser<'a> {
     }
 
     pub fn parse(self) -> Result<Symbol, SemanticError> {
-        if self.ast.data != "Declare" {
-            return Err(SemanticError::UnexpectedWord(self.ast.data.clone()));
+        if self.ast.data() != "Declare" {
+            return Err(SemanticError::UnexpectedWord(self.ast.data().clone()));
         }
         let mut symbol = Symbol {
             id:    0,
@@ -23,9 +23,9 @@ impl<'a> SymbolParser<'a> {
         };
 
         for sym_child in self.ast.iter() {
-            if sym_child.data == "Symbol" {
-                symbol.name = sym_child.first().unwrap().data.clone();
-            } else if sym_child.data == "Attrs" {
+            if sym_child.data() == "Symbol" {
+                symbol.name = sym_child.front().unwrap().data().clone();
+            } else if sym_child.data() == "Attrs" {
                 for attr in sym_child.iter() {
                     let a = Self::parse_attr(attr)?;
                     symbol.attrs.insert(a.0, a.1);
@@ -39,26 +39,26 @@ impl<'a> SymbolParser<'a> {
     }
 
     fn parse_attr(data: &Node) -> Result<(SymbolAttr, SymbolAttrValue), SemanticError> {
-        match data.data.as_str() {
+        match data.data().as_str() {
             "infix" => {
                 let c = data
-                    .first()
+                    .front()
                     .ok_or_else(|| SemanticError::Other("infix(w) argument is required!".into()))?;
-                let w = u64::from_str(&c.data)
+                let w = u64::from_str(&c.data())
                     .map_err(|_| SemanticError::Other("Infix argument must be u64".into()))?;
                 Ok((SymbolAttr::Infix, SymbolAttrValue::UInt(w)))
             }
             "display" => {
                 let s = data
-                    .first()
+                    .front()
                     .ok_or_else(|| SemanticError::Other("display(s) argument is required!".into()))?
-                    .data
+                    .data()
                     .clone();
                 Ok((SymbolAttr::Display, SymbolAttrValue::UStr(s)))
             }
             "associative" => Ok((SymbolAttr::Associative, SymbolAttrValue::None)),
             "commutative" => Ok((SymbolAttr::Commutative, SymbolAttrValue::None)),
-            _ => Err(SemanticError::UnexpectedWord(data.data.clone())),
+            _ => Err(SemanticError::UnexpectedWord(data.data().clone())),
         }
     }
 }
