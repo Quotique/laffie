@@ -1,7 +1,7 @@
-use std::{collections::HashMap, fmt};
-
 use multi_map::MultiMap;
 use parking_lot::RwLock;
+
+use std::{collections::HashMap, fmt};
 
 lazy_static! {
     static ref ALL_SYMBOLS: RwLock<MultiMap<u64, String, Symbol>> = RwLock::new(MultiMap::new());

@@ -1,5 +1,5 @@
 use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive, Zero};
-use num::{integer::gcd, traits::Pow};
+use num::{integer::gcd, traits::Pow, Integer};
 use num_bigint::{BigInt, ToBigInt};
 use std::{cmp::max, rc::Rc};
 use trees::{tr, Node};
@@ -142,6 +142,27 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                     }
                 }
             }
+            "sqrt" => {
+                if root.degree() == 1 {
+                    let last = root.pop_back().unwrap();
+                    if let Term::Number(d) = &last.data() {
+                        let (mut m, mut e) = d.as_bigint_and_exponent();
+                        if e.is_odd() {
+                            m *= 10;
+                            e -= 1;
+                        }
+                        let r = m.sqrt();
+                        if m == &r * &r {
+                            *root.data_mut() = Term::Number(Decimal::new(r, e / 2));
+                            result = true;
+                        }
+                    } else {
+                        root.push_back(last);
+                    }
+                } else {
+                    panic!("'sqrt' is binary operator!");
+                }
+            }
             _ => {}
         }
     }
@@ -166,29 +187,6 @@ fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
                 }
                 root.push_back(child);
             }
-            // for mut child in root.forest_mut().onto_iter() {
-            //     if let Some(child_symbol) = &child.data().symbol() {
-            //         if child_symbol.id == symbol.id {
-            //             println!("Hui22 {} {} {}", root, root.degree(),
-            // root.node_count());             println!("Hui221 {}
-            // {} {}", child_symbol, child.degree(), child.node_count());
-            //             while let Some(node) = child.pop_front() {
-            //                 println!("Hui23 {} {} {}", root, root.degree(),
-            // root.node_count());                 println!("Hui231
-            // {} {} {}", child_symbol, child.degree(), child.node_count());
-            //                 child.insert_before(node);
-            //                 println!("Hui232 {} {} {}", root, root.degree(),
-            // root.node_count());             }
-            //             println!("Hui24 {} {} {}", root, root.degree(),
-            // root.node_count());             println!("Hui241 {}
-            // {} {}", child_symbol, child.degree(), child.node_count());
-            //             child.depart();
-            //             println!("Hui25 {} {} {}", root, root.degree(),
-            // root.node_count());             result = true;
-            //             continue;
-            //         }
-            //     }
-            // }
         }
     }
     result
