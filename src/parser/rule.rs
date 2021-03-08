@@ -59,7 +59,10 @@ impl<'a> RuleParser<'a> {
                         builder = builder.with_attribute(attr, value)
                     }
                 }
-                _ => return Err(SemanticError::UnexpectedWord(child.data().clone())),
+                _ => {
+                    error!("{:?}", child);
+                    return Err(SemanticError::UnexpectedWord(child.data().clone()));
+                }
             }
         }
 
@@ -114,7 +117,7 @@ impl<'a> RuleParser<'a> {
 mod tests {
     use super::*;
     use crate::{
-        parser::LangParser,
+        parser::ra,
         predefine::setup,
         rule::{RuleAttr, RuleAttrValue},
         statement::term::Term,
@@ -131,10 +134,8 @@ mod tests {
                         a!=0;
                       }"#;
 
-        let states = LangParser::new().parse(test).unwrap();
-        assert_eq!(states.len(), 1);
-
-        let result = RuleParser::with(&states[0]).parse();
+        let states = ra::lang_rule(test).unwrap();
+        let result = RuleParser::with(&states).parse();
         assert!(result.is_ok());
 
         let rule = result.unwrap();
@@ -177,16 +178,14 @@ mod tests {
     fn rule_parse_2_test() {
         setup();
         let test = r#"rule {
-					attr level(0),problem_target(proof([a/b is known]));
-					a/b is known <=> [true];
-					a is known;
+					attr level(0),problem_target(proof(a/b is known));
+					a/b is known <=> true;
+					a is known,
 					b is known
-				};"#;
+				}"#;
 
-        let states = LangParser::new().parse(test).unwrap();
-        assert_eq!(states.len(), 1);
-
-        let result = RuleParser::with(&states[0]).parse();
+        let states = ra::lang_rule(test).unwrap();
+        let result = RuleParser::with(&states).parse();
         assert!(result.is_ok());
 
         let rule = result.unwrap();

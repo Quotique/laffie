@@ -5,15 +5,15 @@ symbol && {
 rule {
     attr level(0),problem_target(transform(x)),subtree,replace;
     
-    [a] && [b] <=> [b];
+    a && b <=> b;
 
-    a is true
+    a is true;
 };
 
 rule {
     attr level(0),problem_target(transform(x)),subtree,replace;
 
-    [a] && [b] <=> [a];
+    a && b <=> a;
 
-    a is false
+    a is false;
 };

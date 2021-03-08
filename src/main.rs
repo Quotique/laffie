@@ -11,6 +11,7 @@ extern crate multi_map;
 extern crate num;
 extern crate num_bigint;
 extern crate parking_lot;
+extern crate peg;
 extern crate serde;
 extern crate trees;
 

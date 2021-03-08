@@ -221,7 +221,7 @@ mod solution_tests {
     fn check_answer_find_test() {
         setup();
 
-        let problem = parse_problem("problem {x == 1; target find x;};");
+        let problem = parse_problem("problem {target find(x); x == 1;}");
         let rules = Arc::new(RulesEngine::new());
         let mut solution = Solution::new(problem, rules, Dumper::default());
         assert!(solution.solve().is_ok());
@@ -232,7 +232,7 @@ mod solution_tests {
     fn check_answer_proof_test() {
         setup();
 
-        let problem = parse_problem("problem { x == 2; target proof (x > 0); }; ");
+        let problem = parse_problem("problem { target proof(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::new());
         let mut solution = Solution::new(problem, rules, Dumper::default());
         assert!(solution.solve().is_ok());

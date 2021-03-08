@@ -66,14 +66,14 @@ impl<'a> SymbolParser<'a> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use parser::LangParser;
+    use parser::ra;
 
     #[test]
     fn parser_test() {
         let test_str = "symbol + { attr infix(10) }";
-        let states = LangParser::new().parse(test_str).unwrap();
+        let states = ra::symbol(test_str).unwrap();
 
-        let sym = SymbolParser::new(&states[0]).parse().unwrap();
+        let sym = SymbolParser::new(&states).parse().unwrap();
         let mut expect_attr = HashMap::new();
         expect_attr.insert(SymbolAttr::Infix, SymbolAttrValue::UInt(10));
         assert_eq!(

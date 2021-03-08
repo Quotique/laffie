@@ -3,18 +3,19 @@ use std::fmt;
 #[cfg(test)]
 use crate::statement::Statement;
 
-pub mod lang;
+mod grammar;
 mod problem;
 mod rule;
 mod statement;
 mod symbol;
 
+pub use self::grammar::ra;
+
 pub type Tree = trees::Tree<String>;
 pub type Node = trees::Node<String>;
 
 pub use self::{
-    lang::StatementsParser as LangParser, problem::ProblemParser, rule::RuleParser,
-    statement::StatementParser, symbol::SymbolParser,
+    problem::ProblemParser, rule::RuleParser, statement::StatementParser, symbol::SymbolParser,
 };
 
 #[derive(Clone, Debug)]
@@ -29,14 +30,14 @@ pub enum SemanticError {
 #[allow(dead_code)]
 #[cfg(test)]
 pub fn statement_with_params(text: &str) -> Statement {
-    let states = LangParser::new().parse(text).unwrap();
+    let states = ra::statements(text).unwrap();
     StatementParser::new(&states[0]).parse().unwrap()
 }
 
 #[allow(dead_code)]
 #[cfg(test)]
 pub fn statement_with_vars(text: &str) -> Statement {
-    let states = LangParser::new().parse(text).unwrap();
+    let states = ra::statements(text).unwrap();
     StatementParser::new(&states[0])
         .with_variables()
         .parse()
@@ -46,8 +47,8 @@ pub fn statement_with_vars(text: &str) -> Statement {
 #[allow(dead_code)]
 #[cfg(test)]
 pub fn parse_problem(text: &str) -> crate::problem::Problem {
-    let states = LangParser::new().parse(text).unwrap();
-    ProblemParser::with(&states[0]).parse().unwrap()
+    let states = ra::problem(text).unwrap();
+    ProblemParser::with(&states).parse().unwrap()
 }
 
 impl fmt::Display for SemanticError {
@@ -58,106 +59,5 @@ impl fmt::Display for SemanticError {
             Self::MissingWord(w) => write!(f, "Missing word {}", w),
             Self::Other(e) => write!(f, "Semantic error: {}", e),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use trees::tr;
-
-    #[test]
-    fn predicate_parse_test() {
-        let test = "x in Real; x is Unknown;";
-        let states = lang::StatementsParser::new().parse(test).unwrap();
-
-        assert_eq!(states.len(), 2);
-        assert_eq!(
-            states[0],
-            tr(String::from("in")) / tr(String::from("x")) / tr(String::from("Real"))
-        );
-        assert_eq!(
-            states[1],
-            tr(String::from("is")) / tr(String::from("x")) / tr(String::from("Unknown"))
-        );
-    }
-
-    #[test]
-    fn rule_parse_test() {
-        let test = r#"x*(y+z) == 0 => y+z == 0 || x == 0;
-                      -sin(x) == 0 => x == Pi*n && n in Z;
-                      a is true <=> [a]"#;
-
-        let states = lang::StatementsParser::new().parse(test).unwrap();
-        assert_eq!(states.len(), 3);
-        assert_eq!(
-            states[0],
-            tr(String::from("=>")) /
-                (tr(String::from("==")) /
-                    (tr(String::from("*")) /
-                        tr(String::from("x")) /
-                        (tr(String::from("+")) /
-                            tr(String::from("y")) /
-                            tr(String::from("z")))) /
-                    tr(String::from("0"))) /
-                (tr(String::from("||")) /
-                    (tr(String::from("==")) /
-                        (tr(String::from("+")) /
-                            tr(String::from("y")) /
-                            tr(String::from("z"))) /
-                        tr(String::from("0"))) /
-                    (tr(String::from("==")) / tr(String::from("x")) / tr(String::from("0"))))
-        );
-    }
-
-    #[test]
-    fn extended_rule_parse_test() {
-        let test = r#"rule {
-                a*x+b==0 => x==b/a;
-                a!=0;
-            }"#;
-        let states = lang::StatementsParser::new().parse(test).unwrap();
-        assert_eq!(states.len(), 1);
-        assert_eq!(
-            states[0],
-            tr(String::from("Rule")) /
-                (tr(String::from("=>")) /
-                    (tr(String::from("==")) /
-                        (tr(String::from("+")) /
-                            (tr(String::from("*")) /
-                                tr(String::from("a")) /
-                                tr(String::from("x"))) /
-                            tr(String::from("b"))) /
-                        tr(String::from("0"))) /
-                    (tr(String::from("==")) /
-                        tr(String::from("x")) /
-                        (tr(String::from("/")) /
-                            tr(String::from("b")) /
-                            tr(String::from("a"))))) /
-                (tr(String::from("Predicates")) /
-                    (tr(String::from("!=")) / tr(String::from("a")) / tr(String::from("0"))))
-        );
-    }
-
-    #[test]
-    fn problem_parse_test() {
-        let test = r#"problem {
-                        2*x+5 == 0;
-                        target find x;
-                    };"#;
-        let states = lang::StatementsParser::new().parse(test).unwrap();
-        assert_eq!(states.len(), 1);
-        assert_eq!(
-            states[0],
-            tr(String::from("Problem")) /
-                (tr(String::from("==")) /
-                    (tr(String::from("+")) /
-                        (tr(String::from("*")) /
-                            tr(String::from("2")) /
-                            tr(String::from("x"))) /
-                        tr(String::from("5"))) /
-                    tr(String::from("0"))) /
-                (tr(String::from("Target")) / (tr(String::from("find")) / tr(String::from("x"))))
-        )
     }
 }

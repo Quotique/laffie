@@ -3,10 +3,10 @@ symbol + {
 };
 
 rule {
-    attr level(0),problem_target(proof([a+b is known]));
+    attr level(0),problem_target(proof(a+b is known));
 
-    a+b is known <=> [true];
+    a+b is known <=> true;
 
-    a is known;
-    b is known
+    a is known,
+    b is known;
 };

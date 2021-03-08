@@ -68,21 +68,19 @@ impl<'a> ProblemParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parser::LangParser, predefine::setup, statement::term::Term};
+    use crate::{parser::ra, predefine::setup, statement::term::Term};
     use trees::tr;
 
     #[test]
     fn problem_parse_test() {
         setup();
         let test = r#"problem {
+                        target find(x);
                         2*x+5 == 0;
-                        target find x;
-                    };"#;
+                    }"#;
 
-        let states = LangParser::new().parse(test).unwrap();
-        assert_eq!(states.len(), 1);
-
-        let result = ProblemParser::with(&states[0]).parse();
+        let states = ra::problem(test).unwrap();
+        let result = ProblemParser::with(&states).parse();
         assert!(result.is_ok());
 
         let problem = result.unwrap();

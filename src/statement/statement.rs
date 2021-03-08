@@ -64,8 +64,8 @@ impl Statement {
         let mut queue = VecDeque::new();
         queue.push_back(target.tree.root_mut().get_mut());
 
-        while let Some(mut node) = queue.pop_front() {
-            if let Ok(mapping) = params_map(&mut node, self.tree.root()) {
+        while let Some(node) = queue.pop_front() {
+            if let Ok(mapping) = params_map(&node, self.tree.root()) {
                 return Some((mapping, node));
             }
 

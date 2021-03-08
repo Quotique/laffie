@@ -48,7 +48,7 @@ impl<'a> StatementParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parser::LangParser, predefine::setup, statement::term::Term};
+    use crate::{parser::ra, predefine::setup, statement::term::Term};
 
     use trees::tr;
 
@@ -57,7 +57,7 @@ mod tests {
         setup();
 
         let test = "a*x + b == 0";
-        let states = LangParser::new().parse(test).unwrap();
+        let states = ra::statements(test).unwrap();
         assert_eq!(states.len(), 1);
 
         let result = StatementParser::new(&states[0]).parse();

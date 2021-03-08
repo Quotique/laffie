@@ -3,9 +3,9 @@ symbol sqrt {
 };
 
 rule {
-    attr level(0),problem_target(proof([sqrt(a) is known]));
+    attr level(0),problem_target(proof(sqrt(a) is known));
 
-    sqrt(a) is known <=> [true];
+    sqrt(a) is known <=> true;
 
-    a is known
+    a is known;
 };

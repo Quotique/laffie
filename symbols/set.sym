@@ -3,26 +3,26 @@ symbol set {
 };
 
 rule {
-    attr level(0),problem_target(proof([set(a) is known]));
+    attr level(0),problem_target(proof(set(a) is known));
 
-    set(a) is known <=> [true];
+    set(a) is known <=> true;
 
-    a is known
+    a is known;
 };
 
 rule {
-    attr level(0),problem_target(proof([set(a, b) is known]));
+    attr level(0),problem_target(proof(set(a, b) is known));
     
-    set(a, b) is known <=> [true];
+    set(a, b) is known <=> true;
 
-    a is known;
-    b is known
+    a is known,
+    b is known;
 };
 
 symbol empty_set;
 
 rule {
-    attr level(0),problem_target(proof([empty_set is known]));
+    attr level(0),problem_target(proof(empty_set is known));
 
-    empty_set is known <=> [true];
+    empty_set is known <=> true;
 };

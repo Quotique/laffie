@@ -186,7 +186,7 @@ pub mod tests {
     use super::*;
 
     use crate::{
-        parser::{statement_with_vars, LangParser, RuleParser, StatementParser},
+        parser::{ra, statement_with_vars, RuleParser, StatementParser},
         predefine::setup,
         statement::MarkedStatement,
     };
@@ -200,7 +200,7 @@ pub mod tests {
                             a!=0;
                         }"#;
 
-        RuleParser::with(&LangParser::new().parse(test_rule).unwrap()[0])
+        RuleParser::with(&ra::lang_rule(test_rule).unwrap())
             .parse()
             .unwrap()
     }
@@ -209,10 +209,10 @@ pub mod tests {
         setup();
         let test_rule = r#"rule {
                             attr subtree,level(1);
-                            [--a] <=> [a];
+                            --a <=> a;
                         }"#;
 
-        RuleParser::with(&LangParser::new().parse(test_rule).unwrap()[0])
+        RuleParser::with(&ra::lang_rule(test_rule).unwrap())
             .parse()
             .unwrap()
     }
@@ -221,7 +221,7 @@ pub mod tests {
         setup();
         let test_statement = r#"2 + x == 0"#;
         MarkedStatement::from(Arc::new(
-            StatementParser::new(&LangParser::new().parse(test_statement).unwrap()[0])
+            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
                 .with_variables()
                 .parse()
                 .unwrap(),
@@ -232,7 +232,7 @@ pub mod tests {
         setup();
         let test_statement = r#"x + (-(-2)) == 0"#;
         MarkedStatement::from(Arc::new(
-            StatementParser::new(&LangParser::new().parse(test_statement).unwrap()[0])
+            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
                 .with_variables()
                 .parse()
                 .unwrap(),
@@ -241,9 +241,9 @@ pub mod tests {
 
     fn test_target() -> MarkedStatement {
         setup();
-        let test_statement = r#"[find(x)]"#;
+        let test_statement = r#"find(x)"#;
         MarkedStatement::from(Arc::new(
-            StatementParser::new(&LangParser::new().parse(test_statement).unwrap()[0])
+            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
                 .with_variables()
                 .parse()
                 .unwrap(),

@@ -5,19 +5,19 @@ symbol - {
 rule {
     attr level(0),problem_target(transform(x)),subtree,replace;
 
-    [--a] <=> [a];
+    --a <=> a;
 };
 
 rule {
     attr level(0),problem_target(transform(x)),subtree,replace;
 
-    [a-b] => [a+(-b)];
+    a-b => a+(-b);
 };
 
 rule {
-    attr level(0),problem_target(proof([-a is known]));
+    attr level(0),problem_target(proof(-a is known));
 
-    -a is known <=> [true];
+    -a is known <=> true;
 
-    a is known
+    a is known;
 };

@@ -1,5 +1,5 @@
 use crate::{
-    parser::{lang, ProblemParser, RuleParser, SymbolParser},
+    parser::{ra, ProblemParser, RuleParser, SymbolParser},
     predefine::setup,
     problem::Problem,
     rule::RulesEngine,
@@ -99,7 +99,7 @@ impl DirectoryParser {
     fn load_file<F: FnMut(&Tree<String>)>(file: &Path, cb: &mut F) -> io::Result<()> {
         info!("Processing file: {}", file.to_string_lossy());
         let content = fs::read_to_string(file)?;
-        let states = lang::StatementsParser::new().parse(&content[..]).unwrap();
+        let states = ra::any(&content[..]).unwrap();
         for s in states {
             cb(&s);
         }
