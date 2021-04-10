@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt,
     iter::Iterator,
     ops::{Index, IndexMut},
     sync::Arc,
@@ -11,7 +12,7 @@ use crate::{
     predefine::operations::is_true,
     rule::{Rule, RulesEngine, SharedRule, Suppose},
     statement::{term::Term, MarkedStatement, Statement},
-    utils::{Dumper, DumperSink},
+    utils::{Dumper, DumperSink, VecDisplay},
 };
 
 use super::{
@@ -27,6 +28,18 @@ pub struct Frame {
 
     rules_engine: Arc<RulesEngine>,
     dumper:       Dumper,
+}
+
+impl fmt::Debug for Frame {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", VecDisplay(&self.stack))
+    }
+}
+
+impl fmt::Display for Frame {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl Frame {
@@ -128,8 +141,8 @@ impl Frame {
         let mut solution =
             Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
 
-        if solution.solve().is_err() {
-            trace!("Can't proof: {}", statement);
+        if let Err(e) = solution.solve() {
+            trace!("Can't proof {}: {}", statement, e);
             return false;
         }
         true
@@ -184,11 +197,17 @@ impl Frame {
         rules.append(&mut local_rules);
         for rule in rules {
             let rule = rule.read();
+            trace!(target: "rule_selection", "Rule: {}", rule);
+
             if !filter(&rule) {
+                trace!(target: "rule_selection", "Rule: {} rejected by filter", rule);
                 continue;
             }
 
-            if let Ok(result) = rule.apply(statement, target) {
+            if let Ok(result) = rule
+                .apply(statement, target)
+                .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
+            {
                 let mut res = vec![];
                 for sup in result {
                     let mut proofed = true;
@@ -196,14 +215,17 @@ impl Frame {
                         continue;
                     }
 
+                    trace!(target: "rule_selection", "Suppose: {}", sup);
                     for req in sup.requirements {
                         if !self.proof(req.as_ref()) {
+                            trace!(target: "rule_selection", "Can't proof: {} suppose rejected", req);
                             proofed = false;
                             break;
                         }
                     }
 
                     if proofed {
+                        trace!(target: "rule_selection", "Suppose: proofed, resolution applied");
                         res.push(sup.resolution);
                     }
                 }

@@ -1,3 +1,21 @@
 symbol == {
     attr infix(500),display("=")
 };
+
+rule {
+    attr replace,level(0),problem_target(find(x));
+
+    a == b <=> a - b == 0;
+
+    b != 0;
+};
+
+rule {
+    attr level(1),problem_target(find(x)),one(a),zero(b);
+
+    x*a + b == 0 => x == - b/a;
+
+    a != 0,
+    b is known;
+};
+

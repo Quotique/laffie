@@ -1,5 +1,11 @@
 problem {
     target find(x);
 
+    x^2+x-6 == 0;
+};
+
+problem {
+    target find(x);
+
     3*x^2+2*x-5 == 0;
 };

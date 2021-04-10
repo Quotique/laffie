@@ -25,6 +25,13 @@ problem {
 problem {
     target find(x);
 
+    x+3 == 0;
+};
+
+
+problem {
+    target find(x);
+
     2*x+5 == 0;
 };
 
@@ -32,6 +39,12 @@ problem {
     target find(x);
 
     2*x-5 == 0;
+};
+
+problem {
+    target find(x);
+
+    2*(x+4) + 3*(x-5) == 0;
 };
 
 problem {

@@ -1,9 +1,15 @@
-use crate::statement::{symbols::symbol_by_id, MarkedStatement, Statement};
+use crate::{
+    statement::{symbols::symbol_by_id, MarkedStatement, Statement},
+    utils::VecDisplay,
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt,
+    str::FromStr,
     sync::Arc,
 };
+
+use anyhow::{bail, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RuleAttr {
@@ -12,6 +18,8 @@ pub enum RuleAttr {
     Replace,
     Target,
     Level,
+    Zero,
+    One,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,6 +60,34 @@ pub struct Rule {
     pub pattern_symbols: HashSet<u64>,
 }
 
+impl FromStr for RuleAttr {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "subtree" => Ok(RuleAttr::Subtree),
+            "equivalence" => Ok(RuleAttr::Equivalence),
+            "replace" => Ok(RuleAttr::Replace),
+            "level" => Ok(RuleAttr::Level),
+            "problem_target" => Ok(RuleAttr::Target),
+            "zero" => Ok(RuleAttr::Zero),
+            "one" => Ok(RuleAttr::One),
+            _ => bail!(""),
+        }
+    }
+}
+
+impl fmt::Display for Suppose {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "[{}] => {}",
+            VecDisplay(&self.requirements),
+            self.resolution,
+        )
+    }
+}
+
 impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -65,6 +101,10 @@ impl fmt::Display for Rule {
 impl Rule {
     pub fn attribute(&self, attr: &RuleAttr) -> Option<&RuleAttrValue> {
         self.attrs.get(attr)
+    }
+
+    pub fn is_tautology(&self) -> bool {
+        self.pattern == self.replace
     }
 
     pub fn is_statement_suitable(
@@ -94,7 +134,7 @@ impl Rule {
     pub fn is_target_suitable(&self, target: &MarkedStatement) -> Result<(), RuleDeclineReason> {
         if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Target) {
             if pattern.map(&target.statement).is_err() {
-                trace!("no match");
+                trace!(target: "rule_selection", "no match target: {}, required: {}", target, pattern);
                 return Err(RuleDeclineReason::TargetMissmatch);
             }
             return Ok(());
@@ -168,14 +208,16 @@ impl Rule {
                 let mut replace = self.replace.apply_map(&x);
                 replace.swap_node(&mut node);
                 let clone = unsafe { (*state).normalize() };
-                Suppose {
+                let suppose = Suppose {
                     requirements: self
                         .requirements
                         .iter()
                         .map(|r| Arc::new(r.apply_map(&x)))
                         .collect(),
                     resolution:   MarkedStatement::from(Arc::new(clone)).with_parent(arg.id),
-                }
+                };
+                trace!(target: "rule_selection", "New suppose: {}", suppose);
+                suppose
             })
             .collect())
     }
@@ -200,9 +242,11 @@ pub mod tests {
                             a!=0;
                         }"#;
 
-        RuleParser::with(&ra::lang_rule(test_rule).unwrap())
+        let mut rules = RuleParser::with(&ra::lang_rule(test_rule).unwrap())
             .parse()
-            .unwrap()
+            .unwrap();
+        assert_eq!(rules.len(), 1);
+        rules.pop().unwrap()
     }
 
     fn subtree_rule() -> Rule {
@@ -212,9 +256,11 @@ pub mod tests {
                             --a <=> a;
                         }"#;
 
-        RuleParser::with(&ra::lang_rule(test_rule).unwrap())
+        let mut rules = RuleParser::with(&ra::lang_rule(test_rule).unwrap())
             .parse()
-            .unwrap()
+            .unwrap();
+        assert_eq!(rules.len(), 1);
+        rules.pop().unwrap()
     }
 
     fn test_statement() -> MarkedStatement {

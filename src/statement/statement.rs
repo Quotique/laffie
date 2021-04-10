@@ -1,24 +1,36 @@
 use super::{
     term::{display_string, StatementTree, Term},
-    tree_utils::{apply_map, params_map, swap_node},
+    tree_utils::{apply_map, params_map, replace, swap_node},
 };
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     convert::From,
     fmt,
-    hash::{Hash, Hasher},
+    hash::Hash,
 };
-use trees::Node;
+use trees::{tr, Node};
 
 pub type ParamsMap = HashMap<String, u64>;
 pub type ReverseParamsMap = HashMap<u64, StatementTree>;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Statement {
     tree: StatementTree,
 }
 
 impl Statement {
+    pub fn one() -> Self {
+        Self {
+            tree: tr(Term::Number(1.into())),
+        }
+    }
+
+    pub fn zero() -> Self {
+        Self {
+            tree: tr(Term::Number(0.into())),
+        }
+    }
+
     pub fn normalize(&self) -> Self {
         let mut copy = self.clone();
         copy.inpl_normalize();
@@ -40,6 +52,14 @@ impl Statement {
 
     pub fn root(&self) -> &trees::Node<Term> {
         self.tree.root()
+    }
+
+    pub fn replace(&mut self, src: &Self, dst: &Self) {
+        replace(self.root_mut().get_mut(), src.root(), dst.root())
+    }
+
+    pub fn root_mut(&mut self) -> std::pin::Pin<&mut trees::Node<Term>> {
+        self.tree.root_mut()
     }
 
     pub fn destruct(mut self) -> (StatementTree, trees::Forest<Term>) {
@@ -65,7 +85,9 @@ impl Statement {
         queue.push_back(target.tree.root_mut().get_mut());
 
         while let Some(node) = queue.pop_front() {
-            if let Ok(mapping) = params_map(&node, self.tree.root()) {
+            if let Ok(mapping) = params_map(&node, self.tree.root()).map_err(
+                |_| trace!(target: "pattern_match", "No match for {} to {}", self.tree, node),
+            ) {
                 return Some((mapping, node));
             }
 
@@ -79,30 +101,11 @@ impl Statement {
     pub fn swap_node(&mut self, node: &mut Node<Term>) {
         swap_node(&mut self.tree.root_mut(), node)
     }
-
-    // fn contains(term: &Term, tree: &Node<Term>) -> bool {
-    //     if &tree.data == term {
-    //         return true;
-    //     }
-
-    //     for i in tree.iter() {
-    //         if Self::contains(term, i) {
-    //             return true;
-    //         }
-    //     }
-    //     false
-    // }
 }
 
 impl From<StatementTree> for Statement {
     fn from(source: StatementTree) -> Self {
         Self { tree: source }
-    }
-}
-
-impl Hash for Statement {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.tree.root().hash(state);
     }
 }
 

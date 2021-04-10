@@ -12,7 +12,7 @@ pub fn log_init(config: &Config) {
         .format(|out, message, record| {
             out.finish(format_args!(
                 "{}[{}][{}] {}",
-                chrono::Utc::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                chrono::Utc::now().format("[%H:%M:%S]"),
                 record.target(),
                 record.level(),
                 message

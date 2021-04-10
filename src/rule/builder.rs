@@ -16,6 +16,8 @@ pub struct RuleBuilder {
     requirements: Vec<Statement>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
     symbol_id:    u64,
+
+    replaces: Vec<(RuleAttr, Statement)>,
 }
 
 impl From<Statement> for RuleBuilder {
@@ -45,6 +47,7 @@ impl RuleBuilder {
             symbol_id:    symbol_by_name("AnySymbol")
                 .expect("System symbol AnySymbol is not found")
                 .id,
+            replaces:     Vec::new(),
         }
     }
 
@@ -71,11 +74,15 @@ impl RuleBuilder {
     }
 
     pub fn with_attribute(mut self, attr: RuleAttr, value: RuleAttrValue) -> Self {
-        self.attributes.push((attr, value));
+        match (&attr, &value) {
+            (RuleAttr::Zero, RuleAttrValue::Target(s)) |
+            (RuleAttr::One, RuleAttrValue::Target(s)) => self.replaces.push((attr, s.clone())),
+            _ => self.attributes.push((attr, value)),
+        }
         self
     }
 
-    pub fn build(mut self) -> Result<Rule, RuleBuilderError> {
+    pub fn build(mut self) -> Result<Vec<Rule>, RuleBuilderError> {
         let (pattern, replace) = self.split_statement()?;
         let mut attrs: HashMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
         attrs.insert(RuleAttr::Subtree, RuleAttrValue::None);
@@ -85,20 +92,51 @@ impl RuleBuilder {
         } else {
             return Err(RuleBuilderError::MissingLevelAttribute);
         };
+        let mut result = vec![];
+        for set in 0..(2_u64).pow(self.replaces.len() as u32) {
+            let mut pattern = pattern.clone();
+            let mut replace = replace.clone();
+            let mut reqs = self.requirements.clone();
 
-        Ok(Rule {
-            id:        self.rule_id,
-            level:     *level as usize,
-            symbol_id: self.symbol_id,
+            for i in 0..self.replaces.len() {
+                let elem = 0b1 << i;
+                if set & elem == elem {
+                    match self.replaces.get(i) {
+                        Some((RuleAttr::One, src)) => {
+                            pattern.replace(src, &Statement::one());
+                            replace.replace(src, &Statement::one());
+                            for i in reqs.iter_mut() {
+                                i.replace(src, &Statement::one());
+                            }
+                        }
+                        Some((RuleAttr::Zero, src)) => {
+                            pattern.replace(src, &Statement::zero());
+                            replace.replace(src, &Statement::zero());
+                            for i in reqs.iter_mut() {
+                                i.replace(src, &Statement::zero());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
 
-            attrs:           attrs,
-            pattern_symbols: pattern.symbols(),
+            pattern.inpl_normalize();
+            replace.inpl_normalize();
 
-            pattern: pattern,
-            replace: replace,
-
-            requirements: self.requirements,
-        })
+            result.push(Rule {
+                id:              self.rule_id,
+                level:           *level as usize,
+                symbol_id:       self.symbol_id,
+                attrs:           attrs.clone(),
+                pattern_symbols: pattern.symbols(),
+                pattern:         pattern,
+                replace:         replace,
+                requirements:    reqs,
+            });
+        }
+        result.retain(|x| !x.is_tautology());
+        Ok(result)
     }
 
     fn split_statement(&mut self) -> Result<(Statement, Statement), RuleBuilderError> {

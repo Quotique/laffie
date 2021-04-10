@@ -7,6 +7,7 @@ use trees::{tr, Node};
 use statement::{
     symbols::{symbol_by_name, SymbolAttr},
     term::Term,
+    tree_utils::swap_node,
 };
 
 const MAX_DEC_CONVERSION_VALUE: i64 = 1_000_000;
@@ -32,6 +33,11 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                         *root.data_mut() = Term::Number(sum);
                     } else if !sum.is_zero() {
                         root.push_back(tr(Term::Number(sum)));
+                    }
+
+                    if result && root.degree() == 1 {
+                        let mut child = root.pop_front().unwrap();
+                        swap_node(root, &mut child.root_mut());
                     }
                 }
             }
@@ -83,10 +89,8 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                     panic!("'-' is binary operator!");
                 }
             },
-            "/" => {
-                if let (Term::Number(d1), Term::Number(d2)) =
-                    (&root.front().unwrap().data(), &root.back().unwrap().data())
-                {
+            "/" => match (&root.front().unwrap().data(), &root.back().unwrap().data()) {
+                (Term::Number(d1), Term::Number(d2)) => {
                     let (num_m, num_e) = d1.clone().into_bigint_and_exponent();
                     let (den_m, den_e) = d2.clone().into_bigint_and_exponent();
 
@@ -121,7 +125,14 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                         root.push_back(tr(Term::Number(Decimal::from(den_m))));
                     }
                 }
-            }
+                (_, Term::Number(d)) => {
+                    if d.is_one() {
+                        let mut child = root.pop_front().unwrap();
+                        swap_node(root, &mut child.root_mut());
+                    }
+                }
+                (_, _) => {}
+            },
             "^" => {
                 if let (Term::Number(d1), Term::Number(d2)) =
                     (&root.front().unwrap().data(), &root.back().unwrap().data())
@@ -160,7 +171,7 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                         root.push_back(last);
                     }
                 } else {
-                    panic!("'sqrt' is binary operator!");
+                    panic!("'sqrt' is unary operator!");
                 }
             }
             _ => {}

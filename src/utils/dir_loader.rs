@@ -38,12 +38,14 @@ impl DirectoryParser {
                 if let Ok(sym) = SymbolParser::new(s).parse() {
                     let sym = add_symbol(sym);
                     last_sym.replace(sym);
-                } else if let Ok(rule) = RuleParser::with(&s)
+                } else if let Ok(rules) = RuleParser::with(&s)
                     .with_symbol_id(last_sym.as_ref().unwrap().id)
                     .parse()
                     .map_err(|e| error!("Rule not parsed: {}", e))
                 {
-                    result.register_raw_rule(rule);
+                    for rule in rules {
+                        result.register_raw_rule(rule);
+                    }
                 }
             },
         )?;

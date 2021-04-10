@@ -3,6 +3,7 @@ use crate::{
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
     statement::ParamsMap,
 };
+use std::str::FromStr;
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
@@ -22,7 +23,7 @@ impl<'a> RuleParser<'a> {
         self
     }
 
-    pub fn parse(self) -> Result<Rule, SemanticError> {
+    pub fn parse(self) -> Result<Vec<Rule>, SemanticError> {
         if self.syntax_tree.root().data() != "Rule" {
             return Err(SemanticError::UnexpectedWord(
                 self.syntax_tree.root().data().clone(),
@@ -77,9 +78,10 @@ impl<'a> RuleParser<'a> {
         params: &mut ParamsMap,
     ) -> Result<(RuleAttr, RuleAttrValue), SemanticError> {
         match attr.data().as_str() {
-            "subtree" => Ok((RuleAttr::Subtree, RuleAttrValue::None)),
-            "equivalence" => Ok((RuleAttr::Equivalence, RuleAttrValue::None)),
-            "replace" => Ok((RuleAttr::Replace, RuleAttrValue::None)),
+            "subtree" | "equivalence" | "replace" => Ok((
+                RuleAttr::from_str(attr.data().as_str()).unwrap(),
+                RuleAttrValue::None,
+            )),
             "level" => {
                 if attr.degree() != 1 {
                     return Err(SemanticError::WorngArgCount(format!(
@@ -94,7 +96,7 @@ impl<'a> RuleParser<'a> {
                     )?),
                 ))
             }
-            "problem_target" => {
+            "problem_target" | "zero" | "one" => {
                 if attr.degree() != 1 {
                     return Err(SemanticError::WorngArgCount(format!(
                         "Wrong target arguments count: {} expect 1",
@@ -106,7 +108,10 @@ impl<'a> RuleParser<'a> {
                     .with_params(params)
                     .parse()
                     .map_err(SemanticError::Other)?;
-                Ok((RuleAttr::Target, RuleAttrValue::Target(target)))
+                Ok((
+                    RuleAttr::from_str(attr.data().as_str()).unwrap(),
+                    RuleAttrValue::Target(target),
+                ))
             }
             _ => Err(SemanticError::UnexpectedWord(attr.data().clone())),
         }
@@ -138,7 +143,10 @@ mod tests {
         let result = RuleParser::with(&states).parse();
         assert!(result.is_ok());
 
-        let rule = result.unwrap();
+        let mut rules = result.unwrap();
+        assert_eq!(rules.len(), 1);
+        let rule = rules.pop().unwrap();
+
         assert_eq!(
             rule.pattern,
             (tr(Term::with_symbol_name("==").unwrap()) /
@@ -188,7 +196,10 @@ mod tests {
         let result = RuleParser::with(&states).parse();
         assert!(result.is_ok());
 
-        let rule = result.unwrap();
+        let mut rules = result.unwrap();
+        assert_eq!(rules.len(), 1);
+        let rule = rules.pop().unwrap();
+
         assert_eq!(
             rule.pattern,
             (tr(Term::with_symbol_name("is").unwrap()) /
@@ -227,5 +238,22 @@ mod tests {
             rule.attribute(&RuleAttr::Level),
             Some(&RuleAttrValue::UInt(0))
         );
+    }
+
+    #[test]
+    fn arg_reduction_test() {
+        setup();
+        let test = r#"rule {
+                        attr replace,level(1),one(a),zero(b);
+                        a * x + b == 0 => x == -b / a;
+                        a!=0;
+                      }"#;
+
+        let states = ra::lang_rule(test).unwrap();
+        let result = RuleParser::with(&states).parse();
+        assert!(result.is_ok());
+
+        let rules = result.unwrap();
+        assert_eq!(rules.len(), 3);
     }
 }

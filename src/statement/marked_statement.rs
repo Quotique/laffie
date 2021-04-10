@@ -95,10 +95,11 @@ impl MarkedStatement {
             .with_attribute(RuleAttr::Level, RuleAttrValue::UInt(level))
             .with_statement((*self.statement).clone())
         {
-            if let Ok(rule) = builder
+            if let Ok(mut rule) = builder
                 .build()
                 .map_err(|e| trace!("Error rule build: {}", e))
             {
+                let rule = rule.pop().unwrap();
                 if rule.pattern.root().data().is_variable() {
                     trace!("New rule: {}", rule);
                     let rule = Arc::new(RwLock::new(rule));

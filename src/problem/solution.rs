@@ -12,10 +12,10 @@ pub const MAX_SUBPROBLEM_LEVEL: usize = 10;
 pub const MAX_LEVEL: usize = 20;
 
 pub struct PerfStats {
-    problem_hash:   u64,
-    cycles_count:   usize,
-    solution_depth: usize,
-    absolute_time:  f64,
+    _problem_hash:   u64,
+    cycles_count:    usize,
+    _solution_depth: usize,
+    absolute_time:   f64,
 }
 
 pub struct Solution {
@@ -52,10 +52,10 @@ impl fmt::Display for SolutionError {
 impl PerfStats {
     pub fn new(problem: &Problem) -> PerfStats {
         PerfStats {
-            problem_hash:   problem.id,
-            cycles_count:   0,
-            solution_depth: 0,
-            absolute_time:  0.,
+            _problem_hash:   problem.id,
+            cycles_count:    0,
+            _solution_depth: 0,
+            absolute_time:   0.,
         }
     }
 }
@@ -86,7 +86,7 @@ impl Solution {
 
     pub fn solve(&mut self) -> Result<(), SolutionError> {
         self.stack.dumper().subproblem_start(&self.problem);
-        // trace!("Subproblem: {}, {:?}", self.target, self.conditions);
+        trace!(target: "subproblems", "Subproblem: {}, {:?}", self.target, self.problem.conditions);
         if self.problem.subproblem_level > MAX_SUBPROBLEM_LEVEL {
             return Err(SolutionError::MaxSubproblemLevelExceed);
         }
@@ -105,6 +105,7 @@ impl Solution {
 
             let index = self.stack.pick_condition()?;
             let level = self.stack[index].weight;
+            trace!(target: "subproblem", "Subproblem level: {}", level);
             if level > MAX_LEVEL {
                 return Err(SolutionError::NoSolutionsFound);
             }

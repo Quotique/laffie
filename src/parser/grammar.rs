@@ -101,6 +101,10 @@ peg::parser! {
             x:(@) _ "<" _ y:@ { tr(String::from("<"))/x/y }
             x:(@) _ ">" _ y:@ { tr(String::from(">"))/x/y }
             --
+            "-" _ x:@ { tr(String::from("-"))/x }
+            "+" _ x:@ { tr(String::from("+"))/x }
+            "!" _ x:@ { tr(String::from("!"))/x }
+            --
             x:(@) _ "+" _ y:@ { tr(String::from("+"))/x/y }
             x:(@) _ "-" _ y:@ { tr(String::from("-"))/x/y }
             --
@@ -108,10 +112,6 @@ peg::parser! {
             x:(@) _ "/" _ y:@ { tr(String::from("/"))/x/y }
             --
             x:@ "^" y:(@) { tr(String::from("^"))/x/y }
-            --
-            "-" _ x:@ { tr(String::from("-"))/x }
-            "+" _ x:@ { tr(String::from("+"))/x }
-            "!" _ x:@ { tr(String::from("!"))/x }
             --
             e:eval() { e }
             i:ident() { i }
@@ -244,6 +244,17 @@ mod tests {
                             tr(String::from("x"))) /
                         tr(String::from("5"))) /
                     tr(String::from("0")))
+        )
+    }
+
+    #[test]
+    fn priority_test() {
+        let test = r#"-a/b"#;
+        let states = ra::statements(test).unwrap();
+        assert_eq!(
+            states[0],
+            tr(String::from("-")) /
+                (tr(String::from("/")) / tr(String::from("a")) / tr(String::from("b")))
         )
     }
 }

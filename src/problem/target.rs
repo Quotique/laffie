@@ -6,13 +6,33 @@ use crate::{
     statement::{term::Term, MarkedStatement, Statement},
     utils::Dumper,
 };
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 use trees::tr;
 
 pub enum Target {
     Find(MarkedStatement),
     Proof(Frame),
     Transform(Frame),
+}
+
+impl fmt::Debug for Target {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Target::Find(s) => write!(f, "Find: {:?}", s),
+            Target::Proof(s) => write!(f, "Proof: {:?}", s),
+            Target::Transform(s) => write!(f, "Transform {:?}", s),
+        }
+    }
+}
+
+impl fmt::Display for Target {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Target::Find(s) => write!(f, "Find: {:?}", s),
+            Target::Proof(s) => write!(f, "Proof: {:?}", s),
+            Target::Transform(s) => write!(f, "Transform {:?}", s),
+        }
+    }
 }
 
 impl Target {

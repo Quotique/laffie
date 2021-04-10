@@ -15,6 +15,12 @@ rule {
 };
 
 rule {
+    attr level(0),problem_target(transform(x)),subtree,replace;
+
+    -a/b => (-a)/b;
+};
+
+rule {
     attr level(0),problem_target(proof(-a is known));
 
     -a is known <=> true;
