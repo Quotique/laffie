@@ -1,7 +1,10 @@
 {
   "logger": {
     "filename": "output.log",
-    "level": "Trace"
+    "level": "Trace",
+    "target_levels": {
+      "pattern_match": "Info"
+    }
   },
   "symbols_dir": "symbols",
   "problems_dir": "problems"

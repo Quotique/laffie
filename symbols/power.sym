@@ -10,4 +10,10 @@ rule {
         ((b^2 - 4*a*c) >= 0 && x in set( (-b+sqrt(b^2 - 4 * a * c))/(2*a), (-b-sqrt(b^2 - 4 * a * c))/(2*a) ));
 
     a != 0;
+};
+
+rule {
+    attr replace,level(1),problem_target(transform(x)),one(c);
+
+    (a^n)*a*c <=> (a^(n+1))*c;
 }

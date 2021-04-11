@@ -1,14 +1,29 @@
+use std::collections::HashMap;
 use std::str::FromStr;
+
+use log::LevelFilter;
+use serde::{de, Deserialize};
+
+#[derive(Debug, Deserialize)]
+pub struct Level(#[serde(deserialize_with = "deserialize_level")] LevelFilter);
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub filename: String,
-    pub level:    String,
+    pub filename:      String,
+    pub level:         Level,
+    pub target_levels: HashMap<String, Level>,
+}
+
+fn deserialize_level<'de, D>(deserializer: D) -> Result<LevelFilter, D::Error>
+where
+    D: de::Deserializer<'de>,
+{
+    let s = <String>::deserialize(deserializer)?;
+    Ok(LevelFilter::from_str(s.as_str()).map_err(de::Error::custom)?)
 }
 
 pub fn log_init(config: &Config) {
-    let log_level = log::LevelFilter::from_str(&config.level).unwrap_or(log::LevelFilter::Debug);
-    fern::Dispatch::new()
+    let mut logger = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
                 "{}[{}][{}] {}",
@@ -18,14 +33,17 @@ pub fn log_init(config: &Config) {
                 message
             ))
         })
-        .level(log_level)
+        .level(config.level.0);
+    for (target, level) in config.target_levels.iter() {
+        logger = logger.level_for(target.clone(), level.0);
+    }
+    logger
         //.chain(std::io::stdout())
         .chain(fern::log_file(&config.filename).unwrap())
         .apply()
         .unwrap();
 
     info!(target: "init", "Log initialized with params: {:?}", config);
-    info!(target: "init", "Current log level: {:?}", log_level);
 }
 
 #[allow(dead_code)]

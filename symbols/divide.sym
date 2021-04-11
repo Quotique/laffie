@@ -12,7 +12,7 @@ rule {
 };
 
 rule {
-    attr level(2),problem_target(transform(x)),subtree,replace;
+    attr level(2),problem_target(transform(x)),subtree,replace,zero(e);
 
     a/b + c/d + e <=> (a*d + b*c)/(b*d) + e;
 };

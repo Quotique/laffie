@@ -131,7 +131,7 @@ fn params_map_impl(
                         let mut new_result = vec![];
                         for r in loc_result.into_iter() {
                             if let Ok(mut p) = params_map_impl(y, x, r) {
-                                trace!("New mapping: [{}]", display_mapping(&p));
+                                trace!(target: "pattern_match", "New mapping: [{}]", display_mapping(&p));
                                 new_result.append(&mut p);
                             }
                         }
