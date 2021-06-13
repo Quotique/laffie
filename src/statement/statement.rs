@@ -38,7 +38,7 @@ impl Statement {
     }
 
     pub fn inpl_normalize(&mut self) {
-        crate::predefine::operations::normalize(&mut self.tree.root_mut());
+        crate::predefine::normalize(&mut self.tree.root_mut());
     }
 
     pub fn symbols(&self) -> HashSet<u64> {

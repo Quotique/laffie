@@ -1,7 +1,7 @@
 use super::{frame::Frame, solution::MAX_LEVEL};
 use crate::{
     parser::SemanticError,
-    predefine::operations::is_true,
+    predefine::is_true,
     rule::{RuleAttr, RulesEngine, SharedRule, Suppose},
     statement::{term::Term, MarkedStatement, Statement},
     utils::Dumper,

@@ -172,6 +172,13 @@ impl Term {
         }
         false
     }
+
+    pub fn is_number_value(&self, value: &Decimal) -> bool {
+        if let Term::Number(num) = &self {
+            return num == value;
+        }
+        false
+    }
 }
 
 pub fn display_string(node: &Node<Term>) -> String {

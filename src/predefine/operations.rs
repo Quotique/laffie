@@ -10,6 +10,8 @@ use statement::{
     tree_utils::swap_node,
 };
 
+use super::math::{multiply, plus};
+
 const MAX_DEC_CONVERSION_VALUE: i64 = 1_000_000;
 const MAX_DEC_CONVERSION_EXP: i64 = 6;
 
@@ -19,51 +21,53 @@ fn evaluate(root: &mut Node<Term>) -> bool {
         match symbol.name.as_str() {
             "+" => {
                 if root.degree() >= 2 {
-                    let mut sum = Decimal::from(0);
-                    while let Some(last) = root.pop_back() {
-                        if let Term::Number(d) = &last.data() {
-                            sum += d;
-                            result = true;
-                        } else {
-                            root.push_back(last);
-                            break;
-                        }
-                    }
-                    if root.degree() == 0 {
-                        *root.data_mut() = Term::Number(sum);
-                    } else if !sum.is_zero() {
-                        root.push_back(tr(Term::Number(sum)));
-                    }
+                    // let mut sum = Decimal::from(0);
+                    // while let Some(last) = root.pop_back() {
+                    //     if let Term::Number(d) = &last.data() {
+                    //         sum += d;
+                    //         result = true;
+                    //     } else {
+                    //         root.push_back(last);
+                    //         break;
+                    //     }
+                    // }
+                    // if root.degree() == 0 {
+                    //     *root.data_mut() = Term::Number(sum);
+                    // } else if !sum.is_zero() {
+                    //     root.push_back(tr(Term::Number(sum)));
+                    // }
 
-                    if result && root.degree() == 1 {
-                        let mut child = root.pop_front().unwrap();
-                        swap_node(root, &mut child.root_mut());
-                    }
+                    // if result && root.degree() == 1 {
+                    //     let mut child = root.pop_front().unwrap();
+                    //     swap_node(root, &mut child.root_mut());
+                    // }
+                    result = plus(root);
                 }
             }
             "*" => {
-                let mut mul = Decimal::from(1);
-                while let Some(last) = root.pop_back() {
-                    if let Term::Number(d) = &last.data() {
-                        mul *= d;
-                        result = true;
-                    } else {
-                        root.push_back(last);
-                        break;
-                    }
-                }
-                if root.degree() == 0 {
-                    *root.data_mut() = Term::Number(mul);
-                } else if (root.degree() == 1) & mul.is_one() {
-                    let mut last = root.front_mut().unwrap().detach();
-                    while let Some(x) = last.pop_front() {
-                        root.push_back(x);
-                    }
-                    // root.append(last.abandon());
-                    *root.data_mut() = last.data().clone();
-                } else if !mul.is_one() {
-                    root.push_back(tr(Term::Number(mul)));
-                }
+                result = multiply(root);
+                // let mut mul = Decimal::from(1);
+                // while let Some(last) = root.pop_back() {
+                //     if let Term::Number(d) = &last.data() {
+                //         mul *= d;
+                //         result = true;
+                //     } else {
+                //         root.push_back(last);
+                //         break;
+                //     }
+                // }
+                // if root.degree() == 0 {
+                //     *root.data_mut() = Term::Number(mul);
+                // } else if (root.degree() == 1) & mul.is_one() {
+                //     let mut last = root.front_mut().unwrap().detach();
+                //     while let Some(x) = last.pop_front() {
+                //         root.push_back(x);
+                //     }
+                //     // root.append(last.abandon());
+                //     *root.data_mut() = last.data().clone();
+                // } else if !mul.is_one() {
+                //     root.push_back(tr(Term::Number(mul)));
+                // }
             }
             "-" => match root.degree() {
                 1 => {
@@ -251,6 +255,7 @@ pub fn normalize(root: &mut Node<Term>) -> bool {
     result |= associative_nesting_remove(root);
     result |= commutative_reorder(root);
     result |= evaluate(root);
+    result |= commutative_reorder(root); // TODO: reorder once
 
     result
 }
@@ -356,6 +361,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
         assert!(evaluate(&mut test_tree1.root_mut()));
+        commutative_reorder(&mut test_tree1.root_mut());
         assert_eq!(
             test_tree1,
             tr(Term::Symbol(2)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(8)))
@@ -381,6 +387,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
         assert!(evaluate(&mut test_tree.root_mut()));
+        commutative_reorder(&mut test_tree.root_mut());
         assert_eq!(
             test_tree,
             tr(Term::Symbol(7)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(10)))

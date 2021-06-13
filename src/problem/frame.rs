@@ -9,7 +9,7 @@ use std::{
 use trees::tr;
 
 use crate::{
-    predefine::operations::is_true,
+    predefine::is_true,
     rule::{Rule, RulesEngine, SharedRule, Suppose},
     statement::{term::Term, MarkedStatement, Statement},
     utils::{Dumper, DumperSink, VecDisplay},
