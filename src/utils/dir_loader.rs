@@ -38,7 +38,7 @@ impl DirectoryParser {
                 if let Ok(sym) = SymbolParser::new(s).parse() {
                     let sym = add_symbol(sym);
                     last_sym.replace(sym);
-                } else if let Ok(rules) = RuleParser::with(&s)
+                } else if let Ok(rules) = RuleParser::with(s)
                     .with_symbol_id(last_sym.as_ref().unwrap().id)
                     .parse()
                     .map_err(|e| error!("Rule not parsed: {}", e))
@@ -57,7 +57,7 @@ impl DirectoryParser {
         Self::load_dir(Path::new(self.problems_path.as_str()), &["pbl"], &mut |s| {
             trace!("New problem cb: {}", s);
             if s.root().data() == "Problem" {
-                match ProblemParser::with(&s).parse() {
+                match ProblemParser::with(s).parse() {
                     Ok(p) => result.push(p),
                     Err(e) => error!("Problem not parsed: {}", e),
                 }

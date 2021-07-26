@@ -7,11 +7,17 @@ use std::{
     convert::From,
     fmt,
     hash::Hash,
+    ops::{Index, IndexMut},
 };
 use trees::{tr, Node};
 
 pub type ParamsMap = HashMap<String, u64>;
 pub type ReverseParamsMap = HashMap<u64, StatementTree>;
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct NodePosition {
+    coordinates: Vec<usize>,
+}
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Statement {
@@ -77,29 +83,63 @@ impl Statement {
         result
     }
 
-    pub fn find_subtree_map_mut<'a>(
-        &self,
-        target: &'a mut Self,
-    ) -> Option<(Vec<ReverseParamsMap>, &'a mut Node<Term>)> {
+    pub fn find_subtree_map(&self, target: &Self) -> Vec<(Vec<ReverseParamsMap>, NodePosition)> {
+        let mut result = vec![];
         let mut queue = VecDeque::new();
-        queue.push_back(target.tree.root_mut().get_mut());
+        queue.push_back((target.tree.root(), NodePosition::root()));
 
-        while let Some(node) = queue.pop_front() {
-            if let Ok(mapping) = params_map(&node, self.tree.root()).map_err(
+        while let Some((node, pos)) = queue.pop_front() {
+            if let Ok(mapping) = params_map(node, self.tree.root()).map_err(
                 |_| trace!(target: "pattern_match", "No match for {} to {}", self.tree, node),
             ) {
-                return Some((mapping, node));
+                result.push((mapping, pos.clone()));
             }
 
-            for i in node.iter_mut() {
-                queue.push_back(i.get_mut());
+            for (num, i) in node.iter().enumerate() {
+                queue.push_back((i, pos.clone().child(num)));
             }
         }
-        None
+        result
     }
 
     pub fn swap_node(&mut self, node: &mut Node<Term>) {
         swap_node(&mut self.tree.root_mut(), node)
+    }
+}
+
+impl NodePosition {
+    fn root() -> Self {
+        Self {
+            coordinates: vec![],
+        }
+    }
+
+    fn child(mut self, num: usize) -> Self {
+        self.coordinates.push(num);
+        self
+    }
+}
+
+impl IndexMut<&NodePosition> for Statement {
+    fn index_mut(&mut self, pos: &NodePosition) -> &mut Self::Output {
+        let mut root = self.tree.root_mut().get_mut();
+        for i in pos.coordinates.iter() {
+            let next_root = root.iter_mut().nth(*i).expect("Bad position").get_mut();
+            root = next_root;
+        }
+        root
+    }
+}
+
+impl Index<&NodePosition> for Statement {
+    type Output = Node<Term>;
+
+    fn index(&self, pos: &NodePosition) -> &Self::Output {
+        let mut root = self.tree.root();
+        for i in pos.coordinates.iter() {
+            root = root.iter().nth(*i).expect("Bad position");
+        }
+        root
     }
 }
 
@@ -111,12 +151,12 @@ impl From<StatementTree> for Statement {
 
 impl fmt::Debug for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", display_string(&self.tree.root()))
+        write!(f, "{}", display_string(self.tree.root()))
     }
 }
 
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", display_string(&self.tree.root()))
+        write!(f, "{}", display_string(self.tree.root()))
     }
 }

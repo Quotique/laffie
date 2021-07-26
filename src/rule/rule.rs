@@ -184,10 +184,10 @@ impl Rule {
                 requirements: self
                     .requirements
                     .iter()
-                    .map(|r| Arc::new(r.apply_map(&x)))
+                    .map(|r| Arc::new(r.apply_map(x)))
                     .collect(),
                 resolution:   MarkedStatement::from(Arc::new(
-                    self.replace.apply_map(&x).normalize(),
+                    self.replace.apply_map(x).normalize(),
                 ))
                 .with_parent(arg.id),
             })
@@ -195,31 +195,33 @@ impl Rule {
     }
 
     fn apply_subtree(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        let mut statement = (*arg.statement).clone();
-        let state = &statement as *const Statement;
-        let (maps, mut node) = self
-            .pattern
-            .find_subtree_map_mut(&mut statement)
-            .ok_or_else(|| RuleDeclineReason::ParamsMappingErr("no match".into()))?;
+        let maps = self.pattern.find_subtree_map(&arg.statement);
+        if maps.is_empty() {
+            return Err(RuleDeclineReason::ParamsMappingErr("no match".into()));
+        }
 
-        Ok(maps
-            .iter()
-            .map(|x| {
-                let mut replace = self.replace.apply_map(&x);
-                replace.swap_node(&mut node);
-                let clone = unsafe { (*state).normalize() };
+        let mut result = vec![];
+        for (maps, pos) in maps.iter() {
+            for i in maps.iter() {
+                let mut replace = self.replace.apply_map(i);
+                let mut src = (*arg.statement).clone();
+                replace.swap_node(&mut src[pos]);
+                src.inpl_normalize();
+
                 let suppose = Suppose {
                     requirements: self
                         .requirements
                         .iter()
-                        .map(|r| Arc::new(r.apply_map(&x)))
+                        .map(|r| Arc::new(r.apply_map(i)))
                         .collect(),
-                    resolution:   MarkedStatement::from(Arc::new(clone)).with_parent(arg.id),
+                    resolution:   MarkedStatement::from(Arc::new(src)).with_parent(arg.id),
                 };
                 trace!(target: "rule_selection", "New suppose: {}", suppose);
-                suppose
-            })
-            .collect())
+                result.push(suppose);
+            }
+        }
+
+        Ok(result)
     }
 }
 
@@ -349,6 +351,45 @@ pub mod tests {
             *suppose[0].resolution.statement,
             statement_with_vars("x + 2 == 0")
         );
+    }
+
+    #[test]
+    fn subtree_apply_test_2() {
+        setup();
+        let test_rule = r#"rule {
+                attr level(0),problem_target(transform(x)),subtree,replace;
+                a && b <=> b;
+
+                a is true;
+            }"#;
+
+        let mut rules = RuleParser::with(&ra::lang_rule(test_rule).unwrap())
+            .parse()
+            .unwrap();
+        assert_eq!(rules.len(), 1);
+        let rule = rules.pop().unwrap();
+
+        let test_statement = r#"(x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 < 0 && x in empty_set) || (3600 >= 0 && x in set(1, 2)))"#;
+        let ss = ra::statements(test_statement).unwrap();
+        let ss = StatementParser::new(&ss[0])
+            .with_variables()
+            .parse()
+            .unwrap();
+        let mut statement = MarkedStatement::from(Arc::new(ss));
+
+        let test_statement = r#"transform(a)"#;
+        let target = MarkedStatement::from(Arc::new(
+            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
+                .with_variables()
+                .parse()
+                .unwrap(),
+        ));
+        statement.weight = 0;
+
+        let suppose = rule.apply(&mut statement, &target);
+        assert!(suppose.is_ok());
+        let suppose = suppose.unwrap();
+        assert_eq!(suppose.len(), 3);
     }
 
     #[test]

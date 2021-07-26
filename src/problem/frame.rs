@@ -118,7 +118,7 @@ impl Frame {
 
     pub fn suppose_proof(&self, suppose: &Suppose) -> bool {
         for req in suppose.requirements.iter() {
-            if !self.proof(&req) {
+            if !self.proof(req) {
                 return false;
             }
         }

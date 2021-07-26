@@ -48,7 +48,7 @@ pub fn replace<F: Clone + PartialEq + Unpin>(arg: &mut Node<F>, src: &Node<F>, d
 pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
     match target.data() {
         Term::Param(id) => {
-            let replace = params.get(&id);
+            let replace = params.get(id);
             if let Some(r) = replace {
                 let mut replace = r.clone();
                 *target.data_mut() = r.root().data().clone();
@@ -169,11 +169,11 @@ fn params_map_impl(
                     result = new_result;
                 }
 
-                if !result.is_empty() {
-                    return Ok(result);
+                return if !result.is_empty() {
+                    Ok(result)
                 } else {
-                    return Err("No mapping found".into());
-                }
+                    Err("No mapping found".into())
+                };
             }
         }
         (Term::Symbol(p_id), _) => {

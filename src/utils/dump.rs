@@ -54,7 +54,7 @@ impl Default for Dumper {
 
 impl DumperSink for Dumper {
     fn subproblem_start(&mut self, problem: &Problem) {
-        self.sink.lock().unwrap().subproblem_start(&problem);
+        self.sink.lock().unwrap().subproblem_start(problem);
     }
 
     fn subproblem_end(&mut self) {

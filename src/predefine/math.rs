@@ -123,7 +123,7 @@ fn merge_mul_const(mut root: Tree<Term>, d: Decimal) -> Tree<Term> {
         root.push_front(tr(Term::Number(d)));
         root
     } else {
-        tr(Term::with_symbol_name("*").unwrap()) / tr(Term::Number(d)) / root.to_owned()
+        tr(Term::with_symbol_name("*").unwrap()) / tr(Term::Number(d)) / root
     }
 }
 

@@ -115,7 +115,7 @@ peg::parser! {
             --
             e:eval() { e }
             i:ident() { i }
-            "(" a:arithmetic() ")" {a}
+            "(" _  a:arithmetic() _ ")" {a}
         }
 
         rule eval() -> Tree<String> = t:ident() "(" _ a:commasep(<arithmetic()>) _ ")" {

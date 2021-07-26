@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use log::LevelFilter;
 use serde::{de, Deserialize};
@@ -19,7 +18,7 @@ where
     D: de::Deserializer<'de>,
 {
     let s = <String>::deserialize(deserializer)?;
-    Ok(LevelFilter::from_str(s.as_str()).map_err(de::Error::custom)?)
+    LevelFilter::from_str(s.as_str()).map_err(de::Error::custom)
 }
 
 pub fn log_init(config: &Config) {
@@ -48,7 +47,7 @@ pub fn log_init(config: &Config) {
 
 #[allow(dead_code)]
 pub fn stdout_log_init(level: &str) {
-    let log_level = log::LevelFilter::from_str(&level).unwrap_or(log::LevelFilter::Debug);
+    let log_level = log::LevelFilter::from_str(level).unwrap_or(log::LevelFilter::Debug);
     fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(

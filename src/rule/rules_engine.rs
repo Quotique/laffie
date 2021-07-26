@@ -56,14 +56,14 @@ impl RulesEngine {
             .unwrap_or(&empty_level);
         let result = once(&symbol_by_name("AnySymbol").unwrap().id)
             .chain(statement.symbols.iter())
-            .flat_map(|symbol_id| level.get(symbol_id).clone().into_iter())
+            .flat_map(|symbol_id| level.get(symbol_id).into_iter())
             .flat_map(|i| i.iter())
             .filter(|rule| {
                 let rule = rule.read();
-                rule.is_statement_suitable(&statement).map_err(|e| {
+                rule.is_statement_suitable(statement).map_err(|e| {
                     trace!(target: "rule_selection", "Rule {} rejected for statement {} by reason {:?}", rule, statement, e);
                 }).is_ok() &&
-                    rule.is_target_suitable(&target).map_err(|e| {
+                    rule.is_target_suitable(target).map_err(|e| {
                     trace!(target: "rule_selection", "Rule {} rejected for statement {} by reason {:?}", rule, statement, e);
                 }).is_ok()
             })

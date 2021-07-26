@@ -105,7 +105,7 @@ impl Target {
                             resolution:   statement.clone(),
                         });
                     }
-                    if is_true(&i.statement.root()) {
+                    if is_true(i.statement.root()) {
                         return Some(Suppose {
                             requirements: vec![],
                             resolution:   statement.clone(),

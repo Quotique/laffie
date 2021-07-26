@@ -53,12 +53,7 @@ fn parse_node(
     ));
     if result.root().data().is_symbol() {
         for child in src_node.iter() {
-            result.push_back(parse_node(
-                &child,
-                params,
-                last_param_id,
-                node_type.clone(),
-            )?);
+            result.push_back(parse_node(child, params, last_param_id, node_type.clone())?);
         }
     } else if !src_node.degree() == 0 {
         return Err(format!("Node {} can't contains childs!", &src_node.data()));

@@ -86,7 +86,7 @@ fn main() {
         )
         .get_matches();
 
-    let settings = Settings::new(&matches.value_of("config").unwrap())
+    let settings = Settings::new(matches.value_of("config").unwrap())
         .map_err(|e| {
             println!("Config error: {:?}", e);
             e

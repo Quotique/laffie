@@ -44,7 +44,7 @@ impl<'a> SymbolParser<'a> {
                 let c = data
                     .front()
                     .ok_or_else(|| SemanticError::Other("infix(w) argument is required!".into()))?;
-                let w = u64::from_str(&c.data())
+                let w = u64::from_str(c.data())
                     .map_err(|_| SemanticError::Other("Infix argument must be u64".into()))?;
                 Ok((SymbolAttr::Infix, SymbolAttrValue::UInt(w)))
             }
