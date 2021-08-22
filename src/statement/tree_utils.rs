@@ -9,6 +9,7 @@ use std::{collections::HashMap, iter::Iterator, ops::Deref};
 use trees::{tr, Node, Tree};
 
 pub type ParamsMap = HashMap<u64, StatementTree>;
+pub type VariablesMap = HashMap<u64, StatementTree>;
 type TreeNode = Node<Term>;
 
 pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
@@ -43,6 +44,28 @@ pub fn replace<F: Clone + PartialEq + Unpin>(arg: &mut Node<F>, src: &Node<F>, d
             swap_node(child.get_mut(), &mut dst.deep_clone().root_mut());
         }
     });
+}
+
+pub fn apply_variable_map(target: &mut TreeNode, variables: &VariablesMap) {
+    match target.data() {
+        Term::Variable(id) => {
+            let replace = variables.get(id);
+            if let Some(r) = replace {
+                let mut replace = r.clone();
+                *target.data_mut() = r.root().data().clone();
+                while target.pop_back().is_some() {}
+                while let Some(x) = replace.pop_front() {
+                    target.push_back(x);
+                }
+                // target.append(replace.abandon());
+            }
+        }
+        _ => {
+            for mut i in target.iter_mut() {
+                apply_variable_map(&mut i, variables);
+            }
+        }
+    }
 }
 
 pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {

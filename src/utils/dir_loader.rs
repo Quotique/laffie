@@ -44,6 +44,7 @@ impl DirectoryParser {
                     .map_err(|e| error!("Rule not parsed: {}", e))
                 {
                     for rule in rules {
+                        trace!("New rule: {}", rule);
                         result.register_raw_rule(rule);
                     }
                 }

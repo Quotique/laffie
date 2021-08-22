@@ -10,7 +10,10 @@ use statement::{
     tree_utils::swap_node,
 };
 
-use super::math::{multiply, plus};
+use super::{
+    math::{multiply, plus},
+    replace::replace,
+};
 
 const MAX_DEC_CONVERSION_VALUE: i64 = 1_000_000;
 const MAX_DEC_CONVERSION_EXP: i64 = 6;
@@ -21,53 +24,11 @@ fn evaluate(root: &mut Node<Term>) -> bool {
         match symbol.name.as_str() {
             "+" => {
                 if root.degree() >= 2 {
-                    // let mut sum = Decimal::from(0);
-                    // while let Some(last) = root.pop_back() {
-                    //     if let Term::Number(d) = &last.data() {
-                    //         sum += d;
-                    //         result = true;
-                    //     } else {
-                    //         root.push_back(last);
-                    //         break;
-                    //     }
-                    // }
-                    // if root.degree() == 0 {
-                    //     *root.data_mut() = Term::Number(sum);
-                    // } else if !sum.is_zero() {
-                    //     root.push_back(tr(Term::Number(sum)));
-                    // }
-
-                    // if result && root.degree() == 1 {
-                    //     let mut child = root.pop_front().unwrap();
-                    //     swap_node(root, &mut child.root_mut());
-                    // }
                     result = plus(root);
                 }
             }
             "*" => {
                 result = multiply(root);
-                // let mut mul = Decimal::from(1);
-                // while let Some(last) = root.pop_back() {
-                //     if let Term::Number(d) = &last.data() {
-                //         mul *= d;
-                //         result = true;
-                //     } else {
-                //         root.push_back(last);
-                //         break;
-                //     }
-                // }
-                // if root.degree() == 0 {
-                //     *root.data_mut() = Term::Number(mul);
-                // } else if (root.degree() == 1) & mul.is_one() {
-                //     let mut last = root.front_mut().unwrap().detach();
-                //     while let Some(x) = last.pop_front() {
-                //         root.push_back(x);
-                //     }
-                //     // root.append(last.abandon());
-                //     *root.data_mut() = last.data().clone();
-                // } else if !mul.is_one() {
-                //     root.push_back(tr(Term::Number(mul)));
-                // }
             }
             "-" => match root.degree() {
                 1 => {
@@ -170,6 +131,8 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                         if m == &r * &r {
                             *root.data_mut() = Term::Number(Decimal::new(r, e / 2));
                             result = true;
+                        } else {
+                            root.push_back(last);
                         }
                     } else {
                         root.push_back(last);
@@ -177,6 +140,9 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                 } else {
                     panic!("'sqrt' is unary operator!");
                 }
+            }
+            "replace" => {
+                result = replace(root);
             }
             _ => {}
         }
@@ -310,6 +276,12 @@ pub fn is_true(statement: &Node<Term>) -> bool {
                 &statement.back().unwrap().data(),
             ) {
                 return *known_id == symbol_by_name("known").unwrap().id;
+            }
+            if let (Term::Variable(_), Term::Symbol(sym_varible_id)) = (
+                &statement.front().unwrap().data(),
+                &statement.back().unwrap().data(),
+            ) {
+                return *sym_varible_id == symbol_by_name("variable").unwrap().id;
             }
         } else if *id == symbol_by_name("true").unwrap().id {
             return true;

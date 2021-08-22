@@ -1,0 +1,6 @@
+---
+source: src/predefine/replace.rs
+expression: state
+
+---
+!=(264, 0)

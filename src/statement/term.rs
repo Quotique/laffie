@@ -104,6 +104,13 @@ impl Term {
         None
     }
 
+    pub fn variable_id(&self) -> Option<u64> {
+        if let Term::Variable(id) = self {
+            return Some(*id);
+        }
+        None
+    }
+
     #[allow(dead_code)]
     pub fn is_symbol(&self) -> bool {
         if let Term::Symbol(_) = &self {
