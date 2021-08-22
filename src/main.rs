@@ -41,7 +41,7 @@ use utils::{log_init, DirectoryParser, Dumper, DumperConfig, Settings};
 
 fn main() {
     let matches = App::new("Minerva")
-        .version("0.2.0-pre-alpha")
+        .version(env!("CARGO_PKG_VERSION"))
         .author("Quotique <just.std@gmail.com>")
         .about("Minerva core develop/debug enviroment")
         .arg(

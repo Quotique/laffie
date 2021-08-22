@@ -13,5 +13,11 @@ problem {
 problem {
     target find(x);
 
-    (x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 < 0 && x in empty_set) || (3600 >= 0 && x in set(1, 2)));
+    x == 1 && x != 0;
+};
+
+problem {
+    target find(x);
+
+    (x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 < 0 && x in empty_set) || (3600 >= 0 && x in set(1, 4)));
 }

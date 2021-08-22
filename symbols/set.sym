@@ -12,14 +12,22 @@ rule {
 
 rule {
     attr level(0),problem_target(proof(set(a, b) is known));
-    
+
     set(a, b) is known <=> true;
 
     a is known,
     b is known;
 };
 
-symbol empty_set;
+rule {
+    attr level(3),problem_target(transform(x)),subtree,replace;
+
+    a in set(b, c) <=> a == b || a == c;
+};
+
+symbol empty_set {
+    attr display("∅")
+};
 
 rule {
     attr level(0),problem_target(proof(empty_set is known));

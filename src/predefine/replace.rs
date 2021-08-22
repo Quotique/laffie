@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
-use bigdecimal::BigDecimal as Decimal;
-use trees::{tr, Node, Tree};
+use trees::{Node, Tree};
 
 use statement::{
     term::Term,
@@ -12,7 +9,7 @@ pub fn replace(root: &mut Node<Term>) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }
-    if root.bfs().iter.find(|x| x.data.is_param()).is_some() {
+    if root.bfs().iter.any(|x| x.data.is_param()) {
         return false;
     }
 
