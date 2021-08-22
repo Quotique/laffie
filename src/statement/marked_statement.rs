@@ -97,7 +97,7 @@ impl MarkedStatement {
         {
             if let Ok(mut rule) = builder
                 .build()
-                .map_err(|e| trace!("Error rule build: {}", e))
+                .map_err(|e| trace!("Error rule build: {} for  {}", e, self.statement))
             {
                 let rule = rule.pop().unwrap();
                 if rule.pattern.root().data().is_variable() {

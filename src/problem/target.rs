@@ -76,6 +76,19 @@ impl Target {
     pub fn is_answer(&self, statement: &MarkedStatement) -> Option<Suppose> {
         let statement_root = statement.statement.root();
 
+        if statement_root.data().is_symbol_name("answer") && statement_root.degree() == 1 {
+            return Some(Suppose {
+                requirements: vec![],
+                resolution:   MarkedStatement::from(Arc::from(Statement::from(
+                    (*statement.statement)
+                        .clone()
+                        .root_mut()
+                        .pop_front()
+                        .unwrap(),
+                ))),
+            });
+        }
+
         match self {
             Self::Find(x) => {
                 if statement_root.degree() != 2 ||

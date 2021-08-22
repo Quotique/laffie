@@ -16,4 +16,13 @@ rule {
     a || b <=> b;
 
     a is false;
+};
+
+rule {
+    attr level(0),problem_target(find(x)),subtree,replace;
+
+    x == a || x == b => answer(x in set(a, b));
+
+    a is known,
+    b is known;
 }

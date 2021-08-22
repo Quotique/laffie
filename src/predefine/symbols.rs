@@ -50,5 +50,7 @@ pub fn setup() {
         Symbol::add_with_name("transform");
         Symbol::add_with_name("replace");
         Symbol::add_with_name("variable");
+
+        Symbol::add_with_name("answer");
     });
 }

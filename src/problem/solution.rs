@@ -119,7 +119,6 @@ impl Solution {
             if !self.target.is_transform() {
                 if let Some(simplified) = self.stack.transform(index) {
                     self.stack[index].replaced = true;
-                    // let _ =
                     self.stack.add_condition(simplified).unwrap();
                     continue;
                 } else {
