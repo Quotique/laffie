@@ -104,14 +104,18 @@ pub fn display_string(node: &Node<Term>) -> String {
                 }
                 None => {
                     // Prefix notation is default
-                    format!(
-                        "{}({})",
-                        symbol,
-                        node.iter()
-                            .map(|x| display_string(x))
-                            .collect::<Vec::<String>>()
-                            .join(", ")
-                    )
+                    if node.degree() > 0 {
+                        format!(
+                            "{}({})",
+                            symbol,
+                            node.iter()
+                                .map(|x| display_string(x))
+                                .collect::<Vec::<String>>()
+                                .join(", ")
+                        )
+                    } else {
+                        format!("{}", symbol,)
+                    }
                 }
             }
         }

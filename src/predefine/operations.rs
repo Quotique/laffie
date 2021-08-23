@@ -62,11 +62,11 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                     let (num_e, den_e) = (num_e - max(num_e, den_e), den_e - max(num_e, den_e));
                     let (num_m, den_m) = (
                         num_m *
-                            Decimal::new(1.into(), num_e)
+                            Decimal::new(10.into(), num_e)
                                 .to_bigint()
                                 .expect("Unable to get bigint"),
                         den_m *
-                            Decimal::new(1.into(), den_e)
+                            Decimal::new(10.into(), den_e)
                                 .to_bigint()
                                 .expect("Unable to get bigint"),
                     );
@@ -81,10 +81,13 @@ fn evaluate(root: &mut Node<Term>) -> bool {
                     if den_m.is_one() {
                         *root.data_mut() = Term::Number(Decimal::from(num_m));
                     } else if (BigInt::from(MAX_DEC_CONVERSION_VALUE) % den_m.clone()).is_zero() {
-                        *root.data_mut() = Term::Number(Decimal::new(
-                            num_m * (BigInt::from(MAX_DEC_CONVERSION_VALUE) / den_m),
-                            MAX_DEC_CONVERSION_EXP,
-                        ));
+                        *root.data_mut() = Term::Number(
+                            Decimal::new(
+                                num_m * (BigInt::from(MAX_DEC_CONVERSION_VALUE) / den_m),
+                                MAX_DEC_CONVERSION_EXP,
+                            )
+                            .normalized(),
+                        );
                     } else {
                         root.push_back(tr(Term::Number(Decimal::from(num_m))));
                         root.push_back(tr(Term::Number(Decimal::from(den_m))));
@@ -451,7 +454,7 @@ mod operations_tests {
         // 30 / 4.5 -> 2/3
         let mut test_tree = tr(Term::Symbol(8)) /
             tr(Term::Number(Decimal::from(30))) /
-            tr(Term::Number(Decimal::from(4.5)));
+            tr(Term::Number(Decimal::from((45.into(), 1))));
         assert!(evaluate(&mut test_tree.root_mut()));
         assert_eq!(
             test_tree,
@@ -480,11 +483,11 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(-2)));
         assert!(evaluate(&mut test_tree.root_mut()));
-        assert_eq!(test_tree, tr(Term::Number(Decimal::from(0.25))));
+        assert_eq!(test_tree, tr(Term::Number(Decimal::from((25.into(), 2)))));
 
         // 0.5 ^ (-2) -> 4
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
-            tr(Term::Number(Decimal::from(0.5))) /
+            tr(Term::Number(Decimal::from((5.into(), 1)))) /
             tr(Term::Number(Decimal::from(-2)));
         assert!(evaluate(&mut test_tree.root_mut()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(4))));
