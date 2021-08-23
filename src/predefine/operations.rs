@@ -292,11 +292,13 @@ pub fn is_true(statement: &Node<Term>) -> bool {
 
 #[cfg(test)]
 mod operations_tests {
-    use super::*;
     use bigdecimal::{BigDecimal as Decimal, Num};
+    use trees::tr;
+
     use predefine::setup;
     use statement::symbols::symbol_by_name;
-    use trees::tr;
+
+    use super::*;
 
     #[test]
     fn associative_nesting_remove_test() {
@@ -328,7 +330,7 @@ mod operations_tests {
 
         // x+1+2+5 -> x+8
         let mut test_tree1 = tr(Term::Symbol(2)) /
-            tr(Term::Variable(1)) /
+            tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
@@ -336,7 +338,9 @@ mod operations_tests {
         commutative_reorder(&mut test_tree1.root_mut());
         assert_eq!(
             test_tree1,
-            tr(Term::Symbol(2)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(8)))
+            tr(Term::Symbol(2)) /
+                tr(Term::Variable("x".parse().unwrap())) /
+                tr(Term::Number(Decimal::from(8)))
         );
     }
 
@@ -354,7 +358,7 @@ mod operations_tests {
 
         // x*1*2*5 -> x*10
         let mut test_tree = tr(Term::Symbol(7)) /
-            tr(Term::Variable(1)) /
+            tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
@@ -362,14 +366,17 @@ mod operations_tests {
         commutative_reorder(&mut test_tree.root_mut());
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(7)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(10)))
+            tr(Term::Symbol(7)) /
+                tr(Term::Variable("x".parse().unwrap())) /
+                tr(Term::Number(Decimal::from(10)))
         );
 
         // x*1 -> x
-        let mut test_tree =
-            tr(Term::Symbol(7)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(1)));
+        let mut test_tree = tr(Term::Symbol(7)) /
+            tr(Term::Variable("x".parse().unwrap())) /
+            tr(Term::Number(Decimal::from(1)));
         assert!(evaluate(&mut test_tree.root_mut()));
-        assert_eq!(test_tree, tr(Term::Variable(1)));
+        assert_eq!(test_tree, tr(Term::Variable("x".parse().unwrap())));
     }
 
     #[test]
@@ -384,12 +391,15 @@ mod operations_tests {
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(8))));
 
         // x - 2 -> x - 2
-        let mut test_tree =
-            tr(Term::Symbol(3)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(2)));
+        let mut test_tree = tr(Term::Symbol(3)) /
+            tr(Term::Variable("x".parse().unwrap())) /
+            tr(Term::Number(Decimal::from(2)));
         assert!(!evaluate(&mut test_tree.root_mut()));
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(3)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(2)))
+            tr(Term::Symbol(3)) /
+                tr(Term::Variable("x".parse().unwrap())) /
+                tr(Term::Number(Decimal::from(2)))
         );
     }
 
@@ -405,12 +415,15 @@ mod operations_tests {
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(5))));
 
         // x / 2 -> x / 2
-        let mut test_tree =
-            tr(Term::Symbol(8)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(2)));
+        let mut test_tree = tr(Term::Symbol(8)) /
+            tr(Term::Variable("x".parse().unwrap())) /
+            tr(Term::Number(Decimal::from(2)));
         assert!(!evaluate(&mut test_tree.root_mut()));
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(8)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(2)))
+            tr(Term::Symbol(8)) /
+                tr(Term::Variable("x".parse().unwrap())) /
+                tr(Term::Number(Decimal::from(2)))
         );
 
         // 2 / 5 -> 0.4
@@ -498,8 +511,10 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5))) /
-            (tr(Term::Symbol(7)) / tr(Term::Number(Decimal::from(2))) / tr(Term::Variable(1))) /
-            tr(Term::Variable(1)) /
+            (tr(Term::Symbol(7)) /
+                tr(Term::Number(Decimal::from(2))) /
+                tr(Term::Variable("x".parse().unwrap()))) /
+            tr(Term::Variable("x".parse().unwrap())) /
             (tr(Term::Symbol(2)) /
                 tr(Term::Number(Decimal::from(2))) /
                 tr(Term::Number(Decimal::from(3))));
@@ -513,8 +528,8 @@ mod operations_tests {
                     tr(Term::Number(Decimal::from(3)))) /
                 (tr(Term::Symbol(7)) /
                     tr(Term::Number(Decimal::from(2))) /
-                    tr(Term::Variable(1))) /
-                tr(Term::Variable(1)) /
+                    tr(Term::Variable("x".parse().unwrap()))) /
+                tr(Term::Variable("x".parse().unwrap())) /
                 tr(Term::Number(Decimal::from(1))) /
                 tr(Term::Number(Decimal::from(2))) /
                 tr(Term::Number(Decimal::from(5)))

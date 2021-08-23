@@ -23,14 +23,14 @@ mod tests {
         assert_eq!(states.len(), 1);
 
         let mut result = StatementParser::new(&states[0]).parse().unwrap();
-		result.inpl_normalize();
+        result.inpl_normalize();
 
         let test_norm = "2*x^2 + 4*x + 6 == 0";
         let states = ra::statements(test_norm).unwrap();
         assert_eq!(states.len(), 1);
 
         let mut result_norm = StatementParser::new(&states[0]).parse().unwrap();
-		result_norm.inpl_normalize();
-		assert_eq!(result, result_norm);
+        result_norm.inpl_normalize();
+        assert_eq!(result, result_norm);
     }
 }

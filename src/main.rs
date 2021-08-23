@@ -2,12 +2,13 @@
 #![allow(clippy::module_inception)]
 #![feature(iter_intersperse)]
 
-extern crate anyhow;
 extern crate bigdecimal;
 extern crate chrono;
 extern crate clap;
 extern crate colored;
 extern crate config;
+extern crate derive_more;
+extern crate eyre;
 extern crate fern;
 extern crate multi_map;
 extern crate num;
@@ -15,6 +16,7 @@ extern crate num_bigint;
 extern crate parking_lot;
 extern crate peg;
 extern crate serde;
+extern crate smartstring;
 extern crate trees;
 
 #[macro_use]

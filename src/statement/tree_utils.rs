@@ -1,15 +1,17 @@
-use super::{
-    symbols::{symbol_by_id, SymbolAttr},
-    term::{StatementTree, Term},
-};
-use utils::SubsetIterator;
-
-use anyhow::Result;
 use std::{collections::HashMap, iter::Iterator, ops::Deref};
+
+use eyre::{bail, ensure, Result};
 use trees::{tr, Node, Tree};
 
-pub type ParamsMap = HashMap<u64, StatementTree>;
-pub type VariablesMap = HashMap<u64, StatementTree>;
+use utils::SubsetIterator;
+
+use super::{
+    symbols::{symbol_by_id, SymbolAttr},
+    term::{Param, StatementTree, Term, Variable},
+};
+
+pub type ParamsMap = HashMap<Param, StatementTree>;
+pub type VariablesMap = HashMap<Variable, StatementTree>;
 type TreeNode = Node<Term>;
 
 pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
@@ -46,66 +48,70 @@ pub fn replace<F: Clone + PartialEq + Unpin>(arg: &mut Node<F>, src: &Node<F>, d
     });
 }
 
-pub fn apply_variable_map(target: &mut TreeNode, variables: &VariablesMap) {
-    match target.data() {
-        Term::Variable(id) => {
-            let replace = variables.get(id);
-            if let Some(r) = replace {
-                let mut replace = r.clone();
-                *target.data_mut() = r.root().data().clone();
-                while target.pop_back().is_some() {}
-                while let Some(x) = replace.pop_front() {
-                    target.push_back(x);
-                }
-                // target.append(replace.abandon());
-            }
-        }
-        _ => {
-            for mut i in target.iter_mut() {
-                apply_variable_map(&mut i, variables);
+pub trait NodeMapping {
+    fn apply_variable_map(&mut self, variables: &VariablesMap);
+
+    fn apply_param_map(&mut self, params: &ParamsMap);
+
+    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Vec<StatementTree>> + '_>;
+
+    fn params_map(&self, pattern: &TreeNode) -> Result<Vec<ParamsMap>>;
+}
+
+impl NodeMapping for TreeNode {
+    fn apply_variable_map(&mut self, variables: &VariablesMap) {
+        if let Some(mut v) = self
+            .data()
+            .variable()
+            .map(|x| variables.get(x))
+            .flatten()
+            .cloned()
+        {
+            swap_node(self, &mut v.root_mut());
+        } else {
+            for mut i in self.iter_mut() {
+                i.apply_variable_map(variables);
             }
         }
     }
-}
 
-pub fn apply_map(target: &mut TreeNode, params: &ParamsMap) {
-    match target.data() {
-        Term::Param(id) => {
-            let replace = params.get(id);
-            if let Some(r) = replace {
-                let mut replace = r.clone();
-                *target.data_mut() = r.root().data().clone();
-                while target.pop_back().is_some() {}
-                while let Some(x) = replace.pop_front() {
-                    target.push_back(x);
-                }
-                // target.append(replace.abandon());
-            }
-        }
-        _ => {
-            for mut i in target.iter_mut() {
-                apply_map(&mut i, params);
+    fn apply_param_map(&mut self, params: &ParamsMap) {
+        if let Some(mut v) = self
+            .data()
+            .param()
+            .map(|x| params.get(x))
+            .flatten()
+            .cloned()
+        {
+            swap_node(self, &mut v.root_mut());
+        } else {
+            for mut i in self.iter_mut() {
+                i.apply_param_map(params);
             }
         }
     }
-}
 
-fn subsets(target: &TreeNode, count: usize) -> impl Iterator<Item = Vec<Tree<Term>>> + '_ {
-    SubsetIterator::new(target.degree(), count).map(move |i| {
-        let s = target.data().symbol().unwrap();
-        let mut parts = vec![tr(Term::Symbol(s.id)); count];
-        for (id, child) in target.iter().enumerate() {
-            parts[i.as_vec()[id]].push_back(child.deep_clone());
-        }
-
-        for p in parts.iter_mut() {
-            if p.degree() == 1 {
-                let mut child = p.pop_front().unwrap();
-                swap_node(&mut p.root_mut(), &mut child.root_mut());
+    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Vec<StatementTree>> + '_> {
+        Box::new(SubsetIterator::new(self.degree(), count).map(move |i| {
+            let s = self.data().symbol().unwrap();
+            let mut parts = vec![tr(Term::Symbol(s.id)); count];
+            for (id, child) in self.iter().enumerate() {
+                parts[i.as_vec()[id]].push_back(child.deep_clone());
             }
-        }
-        parts
-    })
+
+            for p in parts.iter_mut() {
+                if p.degree() == 1 {
+                    let mut child = p.pop_front().unwrap();
+                    swap_node(&mut p.root_mut(), &mut child.root_mut());
+                }
+            }
+            parts
+        }))
+    }
+
+    fn params_map(&self, pattern: &TreeNode) -> Result<Vec<ParamsMap>> {
+        params_map_impl(self, pattern, ParamsMap::new())
+    }
 }
 
 fn display_mapping(map: &[ParamsMap]) -> String {
@@ -126,29 +132,23 @@ fn display_mapping(map: &[ParamsMap]) -> String {
     )
 }
 
-pub fn params_map(target: &TreeNode, pattern: &TreeNode) -> Result<Vec<ParamsMap>, String> {
-    params_map_impl(target, pattern, ParamsMap::new())
-}
-
 fn params_map_impl(
     target: &TreeNode,
     pattern: &TreeNode,
     mut params: ParamsMap,
-) -> Result<Vec<ParamsMap>, String> {
+) -> Result<Vec<ParamsMap>> {
     trace!(target: "pattern_match", "Pattern: {}, traget: {}, mapping: {:?}", pattern, target, params);
     let mut result = vec![];
 
     match (&pattern.data(), &target.data()) {
         (Term::Symbol(p_id), Term::Symbol(t_id)) => {
-            if p_id != t_id {
-                return Err(format!("Expect symbol {}, found: {}", p_id, t_id));
-            }
+            ensure!(p_id == t_id, "Expect symbol {}, found: {}", p_id, t_id);
             let sym = symbol_by_id(*p_id).unwrap();
 
             if sym.attrs.contains_key(&SymbolAttr::Associative) &&
                 sym.attrs.contains_key(&SymbolAttr::Commutative)
             {
-                for parts in subsets(target, pattern.degree()) {
+                for parts in target.subsets(pattern.degree()) {
                     let mut loc_result = vec![params.clone()];
                     for (x, y) in pattern.iter().zip(parts.iter()) {
                         let mut new_result = vec![];
@@ -166,17 +166,16 @@ fn params_map_impl(
                 if !result.is_empty() {
                     return Ok(result);
                 } else {
-                    return Err("No mapping found".into());
+                    bail!("No mapping found");
                 }
             } else {
                 result.push(params);
-                if pattern.degree() != target.degree() {
-                    return Err(format!(
-                        "Argument size missmatch: {} {}",
-                        pattern.degree(),
-                        target.degree()
-                    ));
-                }
+                ensure!(
+                    pattern.degree() == target.degree(),
+                    "Argument size missmatch: {} {}",
+                    pattern.degree(),
+                    target.degree()
+                );
 
                 for (x, y) in pattern.iter().zip(target.iter()) {
                     let mut new_result = vec![];
@@ -195,82 +194,94 @@ fn params_map_impl(
                 return if !result.is_empty() {
                     Ok(result)
                 } else {
-                    Err("No mapping found".into())
+                    bail!("No mapping found");
                 };
             }
         }
         (Term::Symbol(p_id), _) => {
-            return Err(format!(
+            bail!(
                 "Expect symbol id: {}, found target: {:?}",
                 p_id,
                 &target.data()
-            ));
+            );
         }
-        (Term::Param(id), _) => {
-            if params.contains_key(id) {
-                let node = params.get(id).unwrap();
-                let _ = params_map(node, target)?;
+        (Term::Param(p), _) => {
+            if params.contains_key(p) {
+                let node = params.get(p).unwrap();
+                let _ = node.params_map(target)?;
             } else {
-                params.insert(*id, target.deep_clone()); // subtree_clone(target));
+                params.insert(p.clone(), target.deep_clone());
             }
 
             result.push(params);
         }
         (Term::Number(value), Term::Number(other_value)) => {
-            if value != other_value {
-                return Err(format!(
-                    "Expect Number {}, found {:?}",
-                    value,
-                    target.data()
-                ));
-            }
+            ensure!(
+                value == other_value,
+                "Expect Number {}, found {:?}",
+                value,
+                target.data()
+            );
 
             result.push(params);
         }
         (Term::Number(_), _) => {
-            return Err(format!("Expect Number, found: {:?}", target.data()));
+            bail!("Expect Number, found: {:?}", target.data());
         }
         (Term::Variable(value), Term::Variable(other_value)) => {
-            if value != other_value {
-                return Err(format!(
-                    "Expect Varible {}, found {:?}",
-                    value,
-                    target.data()
-                ));
-            }
+            ensure!(
+                value == other_value,
+                "Expect Varible {}, found {:?}",
+                value,
+                target.data()
+            );
 
             result.push(params);
         }
         (Term::Variable(_), _) => {
-            return Err(format!("Expect Varible, found: {:?}", target.data()));
+            bail!("Expect Varible, found: {:?}", target.data());
         }
     }
     Ok(result)
 }
 
 #[cfg(test)]
-mod tree_utils_tests {
-    use super::*;
-    use bigdecimal::BigDecimal as Decimal;
-    use parser::{ra, StatementParser};
+mod tests {
+    use parser::{ra, statement_with_params, statement_with_vars, StatementParser};
     use predefine::setup;
-    use statement::{ParamsMap, Statement};
+    use statement::Statement;
+
+    use super::*;
+
+    fn dump_mapping(map: &[ParamsMap]) -> String {
+        let mut result: String = Default::default();
+        result += "[";
+        for m in map {
+            let mut v: Vec<_> = m.iter().collect();
+            v.sort_by(|x, y| x.0.cmp(y.0));
+            result += "{";
+            for x in v {
+                result += &format!(" {}: {},", x.0, x.1);
+            }
+            result += "}";
+        }
+
+        result += "]";
+
+        result
+    }
 
     #[test]
     fn replace_test() {
         setup();
-        let mut map = ParamsMap::new();
 
         let mut test_state = StatementParser::new(&ra::statements("a/(a+b)").unwrap()[0])
-            .with_params(&mut map)
             .parse()
             .unwrap();
         let test_pattern = StatementParser::new(&ra::statements("(a+b)").unwrap()[0])
-            .with_params(&mut map)
             .parse()
             .unwrap();
         let test_replace = StatementParser::new(&ra::statements("c").unwrap()[0])
-            .with_params(&mut map)
             .parse()
             .unwrap();
 
@@ -282,7 +293,9 @@ mod tree_utils_tests {
         assert_eq!(
             test_state,
             Statement::from(
-                tr(Term::with_symbol_name("/").unwrap()) / tr(Term::Param(1)) / tr(Term::Param(3))
+                tr(Term::with_symbol_name("/").unwrap()) /
+                    tr(Term::Param("a".parse().unwrap())) /
+                    tr(Term::Param("c".parse().unwrap()))
             )
         );
     }
@@ -290,103 +303,64 @@ mod tree_utils_tests {
     #[test]
     fn simple_param_map_test() {
         setup();
-        let tree = tr(Term::Symbol(1)) /
-            (tr(Term::Symbol(2)) / tr(Term::Variable(1)) / tr(Term::Number(Decimal::from(1)))) /
-            tr(Term::Number(Decimal::from(0)));
-        let pattern = tr(Term::Symbol(1)) /
-            (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Param(2))) /
-            tr(Term::Number(Decimal::from(0)));
-        match params_map(&tree, &pattern) {
-            Ok(maps) => {
-                assert_eq!(maps.len(), 2);
-                let res: Vec<(Tree<Term>, Tree<Term>)> = maps
-                    .iter()
-                    .map(|x| (x.get(&1).unwrap().clone(), x.get(&2).unwrap().clone()))
-                    .collect();
-                assert!(res.contains(&(tr(Term::Number(Decimal::from(1))), tr(Term::Variable(1)))));
-                assert!(res.contains(&(tr(Term::Number(Decimal::from(1))), tr(Term::Variable(1)))));
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-                unreachable!();
-            }
-        }
+
+        let statement = statement_with_vars("x + 1 == 0");
+        let pattern = statement_with_params("a + b == 0");
+
+        let maps = statement
+            .root()
+            .params_map(pattern.root())
+            .map_err(|e| println!("Error: {}", e))
+            .unwrap();
+        insta::assert_debug_snapshot!(dump_mapping(&maps));
     }
 
     #[test]
     fn same_param_map_test() {
         setup();
-        let tree = tr(Term::Symbol(1)) /
-            (tr(Term::Symbol(2)) / tr(Term::Symbol(3)) / tr(Term::Symbol(4))) /
-            tr(Term::Symbol(3));
-        let pattern = tr(Term::Symbol(1)) /
-            (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) /
-            tr(Term::Param(2));
-        match params_map(&tree, &pattern) {
-            Ok(map) => {
-                assert_eq!(map.len(), 1);
-                assert_eq!(*map[0].get(&1).unwrap(), (tr(Term::Symbol(3))));
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-                unreachable!();
-            }
-        }
+
+        let statement = statement_with_vars("x + 1 == x");
+        let pattern = statement_with_params("a + 1 == a");
+
+        let maps = statement
+            .root()
+            .params_map(pattern.root())
+            .map_err(|e| println!("Error: {}", e))
+            .unwrap();
+        insta::assert_debug_snapshot!(dump_mapping(&maps));
     }
 
     #[test]
     fn subtree_param_map_test() {
         setup();
-        let tree = tr(Term::Symbol(1)) /
-            (tr(Term::Symbol(2)) /
-                (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2))) /
-                tr(Term::Symbol(4))) /
-            (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2)));
-        let pattern = tr(Term::Symbol(1)) /
-            (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) /
-            tr(Term::Param(2));
-        match params_map(&tree, &pattern) {
-            Ok(map) => {
-                assert_eq!(map.len(), 1);
-                assert_eq!(
-                    *map[0].get(&1).unwrap(),
-                    (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2)))
-                );
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-                unreachable!();
-            }
-        }
+
+        let statement = statement_with_vars("(x - 1) + 4 == x - 1");
+        let pattern = statement_with_params("a + 4 == b");
+
+        let maps = statement
+            .root()
+            .params_map(pattern.root())
+            .map_err(|e| println!("Error: {}", e))
+            .unwrap();
+        insta::assert_debug_snapshot!(dump_mapping(&maps));
     }
 
     #[test]
     fn apply_param_map_test() {
         setup();
-        let tree = tr(Term::Symbol(1)) /
-            (tr(Term::Symbol(2)) /
-                (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2))) /
-                tr(Term::Symbol(4))) /
-            (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2)));
-        let pattern = tr(Term::Symbol(1)) /
-            (tr(Term::Symbol(2)) / tr(Term::Param(1)) / tr(Term::Symbol(4))) /
-            tr(Term::Param(2));
-        match params_map(&tree, &pattern) {
-            Ok(map) => {
-                assert_eq!(map.len(), 1);
-                let mut test = tr(Term::Symbol(1)) / tr(Term::Param(1));
-                apply_map(&mut test.root_mut(), &map[0]);
 
-                assert_eq!(
-                    test,
-                    tr(Term::Symbol(1)) /
-                        (tr(Term::Symbol(3)) / tr(Term::Symbol(1)) / tr(Term::Symbol(2)))
-                );
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-                unreachable!();
-            }
-        }
+        let statement = statement_with_vars("(x - 1) + 4 == x - 1");
+        let pattern = statement_with_params("a + 4 == b");
+
+        let maps = statement
+            .root()
+            .params_map(pattern.root())
+            .map_err(|e| println!("Error: {}", e))
+            .unwrap();
+        assert_eq!(maps.len(), 1);
+
+        let mut test = statement_with_params("a + 1");
+        test.root_mut().apply_param_map(&maps[0]);
+        insta::assert_debug_snapshot!(test);
     }
 }

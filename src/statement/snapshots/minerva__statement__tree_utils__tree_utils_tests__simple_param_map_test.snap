@@ -1,0 +1,35 @@
+---
+source: src/statement/tree_utils.rs
+expression: maps
+
+---
+[
+    {
+        Param(
+            "a",
+        ): Number(
+            BigDecimal("1"),
+        )@0x7fe508001d68 ,
+        Param(
+            "b",
+        ): Variable(
+            Variable(
+                "x",
+            ),
+        )@0x7fe508001b58 ,
+    },
+    {
+        Param(
+            "a",
+        ): Variable(
+            Variable(
+                "x",
+            ),
+        )@0x7fe5080022f8 ,
+        Param(
+            "b",
+        ): Number(
+            BigDecimal("1"),
+        )@0x7fe508001be8 ,
+    },
+]

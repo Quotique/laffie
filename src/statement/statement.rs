@@ -1,7 +1,3 @@
-use super::{
-    term::{display_string, StatementTree, Term},
-    tree_utils::{apply_map, params_map, replace, swap_node},
-};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     convert::From,
@@ -9,10 +5,17 @@ use std::{
     hash::Hash,
     ops::{Index, IndexMut},
 };
+
+use eyre::Result;
 use trees::{tr, Node};
 
-pub type ParamsMap = HashMap<String, u64>;
-pub type ReverseParamsMap = HashMap<u64, StatementTree>;
+use super::{
+    semantic_parser::{ParserNode, TreeExtends},
+    term::{display_string, Param, StatementTree, Term},
+    tree_utils::{replace, swap_node, NodeMapping},
+};
+
+pub type ParamsMap = HashMap<Param, StatementTree>;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct NodePosition {
@@ -25,6 +28,20 @@ pub struct Statement {
 }
 
 impl Statement {
+    #[inline]
+    pub fn try_parse_statement(node: &ParserNode) -> Result<Self> {
+        Ok(Self {
+            tree: StatementTree::try_parse_statement(node)?,
+        })
+    }
+
+    #[inline]
+    pub fn try_parse_rule(node: &ParserNode) -> Result<Self> {
+        Ok(Self {
+            tree: StatementTree::try_parse_rule(node)?,
+        })
+    }
+
     pub fn one() -> Self {
         Self {
             tree: tr(Term::Number(1.into())),
@@ -73,23 +90,23 @@ impl Statement {
         (self.tree, childs)
     }
 
-    pub fn map(&self, target: &Self) -> Result<Vec<ReverseParamsMap>, String> {
-        params_map(target.tree.root(), self.tree.root())
+    pub fn map(&self, target: &Self) -> Result<Vec<ParamsMap>> {
+        target.tree.root().params_map(self.tree.root())
     }
 
-    pub fn apply_map(&self, params: &ReverseParamsMap) -> Self {
+    pub fn apply_map(&self, params: &ParamsMap) -> Self {
         let mut result = self.clone();
-        apply_map(&mut result.tree.root_mut(), params);
+        result.tree.root_mut().apply_param_map(params);
         result
     }
 
-    pub fn find_subtree_map(&self, target: &Self) -> Vec<(Vec<ReverseParamsMap>, NodePosition)> {
+    pub fn find_subtree_map(&self, target: &Self) -> Vec<(Vec<ParamsMap>, NodePosition)> {
         let mut result = vec![];
         let mut queue = VecDeque::new();
         queue.push_back((target.tree.root(), NodePosition::root()));
 
         while let Some((node, pos)) = queue.pop_front() {
-            if let Ok(mapping) = params_map(node, self.tree.root()).map_err(
+            if let Ok(mapping) = node.params_map(self.tree.root()).map_err(
                 |_| trace!(target: "pattern_match", "No match for {} to {}", self.tree, node),
             ) {
                 result.push((mapping, pos.clone()));

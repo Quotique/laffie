@@ -1,91 +1,28 @@
+use std::{fmt, hash::Hash};
+
 pub use bigdecimal::{BigDecimal as Decimal, Signed};
-use std::{collections::HashMap, fmt, hash::Hash, str::FromStr};
-use trees::{tr, Node, Tree};
+use derive_more::{Display, From, FromStr, Into};
+pub use smartstring::alias::String as CompactString;
+use trees::{Node, Tree};
 
 use super::symbols::{symbol_by_id, symbol_by_name, Symbol};
 
 pub type StatementTree = Tree<Term>;
-// type ParamsMap = HashMap<u64, StatementTree>;
-pub type ParamsNameMap = HashMap<String, u64>;
-type ParserNode = Node<String>;
+
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
+pub struct Param(CompactString);
+#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
+pub struct Variable(CompactString);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
     Symbol(u64),
-    Param(u64),
-    Variable(u64),
+    Param(Param),
+    Variable(Variable),
     Number(Decimal),
 }
 
-#[derive(Clone)]
-pub enum NodeType {
-    Statement,
-    Rule,
-}
-
-pub fn parse_statement_node(
-    src_node: &ParserNode,
-    params: &mut ParamsNameMap,
-    last_param_id: &mut u64,
-) -> Result<StatementTree, String> {
-    parse_node(src_node, params, last_param_id, NodeType::Statement)
-}
-
-pub fn parse_rule_node(
-    src_node: &ParserNode,
-    params: &mut ParamsNameMap,
-    last_param_id: &mut u64,
-) -> Result<StatementTree, String> {
-    parse_node(src_node, params, last_param_id, NodeType::Rule)
-}
-
-fn parse_node(
-    src_node: &ParserNode,
-    params: &mut ParamsNameMap,
-    last_param_id: &mut u64,
-    node_type: NodeType,
-) -> Result<StatementTree, String> {
-    let mut result = tr(Term::parse(
-        src_node.data().clone(),
-        params,
-        last_param_id,
-        &node_type,
-    ));
-    if result.root().data().is_symbol() {
-        for child in src_node.iter() {
-            result.push_back(parse_node(child, params, last_param_id, node_type.clone())?);
-        }
-    } else if !src_node.degree() == 0 {
-        return Err(format!("Node {} can't contains childs!", &src_node.data()));
-    }
-
-    Ok(result)
-}
-
 impl Term {
-    fn parse(
-        data: String,
-        params: &mut ParamsNameMap,
-        last_param_id: &mut u64,
-        node_type: &NodeType,
-    ) -> Self {
-        if let Ok(value) = Decimal::from_str(&data) {
-            Term::Number(value)
-        } else if let Some(symbol) = symbol_by_name(&data) {
-            Term::Symbol(symbol.id)
-        } else {
-            let id = *params.entry(data).or_insert_with(|| {
-                *last_param_id += 1;
-                *last_param_id
-            });
-
-            match node_type {
-                NodeType::Rule => Term::Param(id),
-                NodeType::Statement => Term::Variable(id),
-            }
-        }
-    }
-
     pub fn with_symbol_name(name: &str) -> Option<Self> {
         symbol_by_name(name).map(|s| Self::Symbol(s.id))
     }
@@ -104,73 +41,24 @@ impl Term {
         None
     }
 
-    pub fn variable_id(&self) -> Option<u64> {
-        if let Term::Variable(id) = self {
-            return Some(*id);
+    pub fn variable(&self) -> Option<&Variable> {
+        if let Term::Variable(v) = &self {
+            return Some(v);
+        }
+        None
+    }
+
+    pub fn param(&self) -> Option<&Param> {
+        if let Term::Param(p) = &self {
+            return Some(p);
         }
         None
     }
 
     #[allow(dead_code)]
-    pub fn is_symbol(&self) -> bool {
-        if let Term::Symbol(_) = &self {
-            return true;
-        }
-        false
-    }
-
-    #[allow(dead_code)]
-    pub fn is_param(&self) -> bool {
-        if let Term::Param(_) = &self {
-            return true;
-        }
-        false
-    }
-
-    #[allow(dead_code)]
-    pub fn is_number(&self) -> bool {
-        if let Term::Number(_) = &self {
-            return true;
-        }
-        false
-    }
-
-    #[allow(dead_code)]
-    pub fn is_variable(&self) -> bool {
-        if let Term::Variable(_) = &self {
-            return true;
-        }
-        false
-    }
-
-    #[allow(dead_code)]
-    pub fn is_param_id(&self, id: u64) -> bool {
-        if let Term::Param(s_id) = &self {
-            return *s_id == id;
-        }
-        false
-    }
-
-    #[allow(dead_code)]
-    pub fn is_symbol_id(&self, id: u64) -> bool {
-        if let Term::Symbol(s_id) = &self {
-            return *s_id == id;
-        }
-        false
-    }
-
-    #[allow(dead_code)]
-    pub fn is_variable_id(&self, id: u64) -> bool {
-        if let Term::Variable(s_id) = &self {
-            return *s_id == id;
-        }
-        false
-    }
-
-    #[allow(dead_code)]
     pub fn is_symbol_name(&self, name: &str) -> bool {
         if let Some(s) = symbol_by_name(name) {
-            return self.is_symbol_id(s.id);
+            return self.symbol_id() == Some(s.id);
         }
         false
     }
@@ -238,7 +126,7 @@ impl fmt::Display for Term {
                 let s = symbol_by_id(*id).unwrap();
                 write!(f, "{}", s.name)
             }
-            Term::Param(id) => write!(f, "p{}", id),
+            Term::Param(id) => write!(f, "{}", id),
             Term::Number(value) => {
                 if value.is_negative() {
                     write!(f, "({})", value)
@@ -246,7 +134,7 @@ impl fmt::Display for Term {
                     write!(f, "{}", value)
                 }
             }
-            Term::Variable(id) => write!(f, "x{}", id),
+            Term::Variable(id) => write!(f, "{}", id),
         }
     }
 }

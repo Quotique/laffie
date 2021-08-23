@@ -1,7 +1,7 @@
 use super::{statement::StatementParser, SemanticError, Tree};
 use crate::{
     problem::{Problem, ProblemBuilder},
-    statement::{MarkedStatement, ParamsMap},
+    statement::MarkedStatement,
 };
 use std::{
     collections::hash_map::DefaultHasher,
@@ -27,7 +27,6 @@ impl<'a> ProblemParser<'a> {
         let mut hasher = DefaultHasher::new();
         self.syntax_tree.root().hash(&mut hasher);
         let hash = hasher.finish();
-        let mut params = ParamsMap::new();
 
         let mut builder = ProblemBuilder::new().with_id(hash);
 
@@ -43,19 +42,17 @@ impl<'a> ProblemParser<'a> {
                 builder = builder
                     .with_target(MarkedStatement::from(Arc::new(
                         StatementParser::new(child.front().unwrap())
-                            .with_params(&mut params)
                             .with_variables()
                             .parse()
-                            .map_err(SemanticError::Other)?,
+                            .map_err(|e| SemanticError::Other(e.to_string()))?,
                     )))
                     .map_err(|e| SemanticError::Other(e.to_string()))?;
             } else {
                 builder = builder.with_condition(MarkedStatement::from(Arc::new(
                     StatementParser::new(child)
-                        .with_params(&mut params)
                         .with_variables()
                         .parse()
-                        .map_err(SemanticError::Other)?,
+                        .map_err(|e| SemanticError::Other(e.to_string()))?,
                 )));
             }
         }
@@ -91,7 +88,7 @@ mod tests {
                 (tr(Term::with_symbol_name("+").unwrap()) /
                     (tr(Term::with_symbol_name("*").unwrap()) /
                         tr(Term::Number(2.into())) /
-                        tr(Term::Variable(1))) /
+                        tr(Term::Variable("x".parse().unwrap()))) /
                     tr(Term::Number(5.into()))) /
                 tr(Term::Number(0.into())))
             .into()

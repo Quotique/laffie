@@ -2,14 +2,14 @@ use trees::{Node, Tree};
 
 use statement::{
     term::Term,
-    tree_utils::{apply_variable_map, swap_node, VariablesMap},
+    tree_utils::{swap_node, NodeMapping, VariablesMap},
 };
 
 pub fn replace(root: &mut Node<Term>) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }
-    if root.bfs().iter.any(|x| x.data.is_param()) {
+    if root.bfs().iter.any(|x| x.data.param().is_some()) {
         return false;
     }
 
@@ -18,7 +18,7 @@ pub fn replace(root: &mut Node<Term>) -> bool {
 
     let mut statement = root.pop_front().expect("must be");
 
-    apply_variable_map(&mut statement.root_mut(), &map);
+    statement.root_mut().apply_variable_map(&map);
 
     swap_node(root, &mut statement.root_mut());
     true
@@ -32,8 +32,8 @@ fn into_variable_map(mut state: Tree<Term>) -> VariablesMap {
     }
     let var = state.front().expect("must be");
 
-    if let Some(id) = var.data().variable_id() {
-        result.insert(id, state.pop_back().unwrap());
+    if let Some(v) = var.data().variable() {
+        result.insert(v.clone(), state.pop_back().unwrap());
     }
     result
 }

@@ -1,13 +1,11 @@
-use crate::statement::{
-    term::{parse_rule_node, parse_statement_node},
-    ParamsMap, Statement,
-};
+use eyre::Result;
+
+use crate::statement::Statement;
 
 use super::Node;
 
 pub struct StatementParser<'a> {
     ast:      &'a Node,
-    params:   Option<&'a mut ParamsMap>,
     with_var: bool,
 }
 
@@ -15,14 +13,8 @@ impl<'a> StatementParser<'a> {
     pub fn new(syntax_tree: &'a Node) -> Self {
         Self {
             ast:      syntax_tree,
-            params:   None,
             with_var: false,
         }
-    }
-
-    pub fn with_params(mut self, params: &'a mut ParamsMap) -> Self {
-        self.params = Some(params);
-        self
     }
 
     pub fn with_variables(mut self) -> Self {
@@ -30,18 +22,12 @@ impl<'a> StatementParser<'a> {
         self
     }
 
-    pub fn parse(self) -> Result<Statement, String> {
-        let mut empty_params = ParamsMap::new();
-        let params: &mut ParamsMap = self.params.unwrap_or(&mut empty_params);
-
-        let mut params_count: u64 = *params.values().max().unwrap_or(&0);
-
-        let root = if self.with_var {
-            parse_statement_node(self.ast, params, &mut params_count)?
+    pub fn parse(self) -> Result<Statement> {
+        Ok(if self.with_var {
+            Statement::try_parse_statement(self.ast)?
         } else {
-            parse_rule_node(self.ast, params, &mut params_count)?
-        };
-        Ok(root.into())
+            Statement::try_parse_rule(self.ast)?
+        })
     }
 }
 
@@ -67,9 +53,9 @@ mod tests {
             (tr(Term::with_symbol_name("==").unwrap()) /
                 (tr(Term::with_symbol_name("+").unwrap()) /
                     (tr(Term::with_symbol_name("*").unwrap()) /
-                        tr(Term::Param(1)) /
-                        tr(Term::Param(2))) /
-                    tr(Term::Param(3))) /
+                        tr(Term::Param("a".parse().unwrap())) /
+                        tr(Term::Param("x".parse().unwrap()))) /
+                    tr(Term::Param("b".parse().unwrap()))) /
                 tr(Term::Number(0.into())))
             .into()
         );

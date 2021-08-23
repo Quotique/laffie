@@ -1,8 +1,5 @@
 use super::{statement::StatementParser, Node, SemanticError, Tree};
-use crate::{
-    rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
-    statement::ParamsMap,
-};
+use crate::rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder};
 use std::str::FromStr;
 
 pub struct RuleParser<'a> {
@@ -30,7 +27,6 @@ impl<'a> RuleParser<'a> {
             ));
         }
         let mut builder = RuleBuilder::new();
-        let mut params = ParamsMap::new();
 
         for child in self.syntax_tree.iter() {
             match child.data().as_str() {
@@ -38,9 +34,8 @@ impl<'a> RuleParser<'a> {
                     builder = builder
                         .with_statement(
                             StatementParser::new(child)
-                                .with_params(&mut params)
                                 .parse()
-                                .map_err(SemanticError::Other)?,
+                                .map_err(|e| SemanticError::Other(e.to_string()))?,
                         )
                         .map_err(|e| SemanticError::Other(e.to_string()))?;
                 }
@@ -48,15 +43,14 @@ impl<'a> RuleParser<'a> {
                     for req in child.iter() {
                         builder = builder.with_require(
                             StatementParser::new(req)
-                                .with_params(&mut params)
                                 .parse()
-                                .map_err(SemanticError::Other)?,
+                                .map_err(|e| SemanticError::Other(e.to_string()))?,
                         )
                     }
                 }
                 "Attributes" => {
                     for attr in child.iter() {
-                        let (attr, value) = RuleParser::parse_attribute(attr, &mut params)?;
+                        let (attr, value) = RuleParser::parse_attribute(attr)?;
                         builder = builder.with_attribute(attr, value)
                     }
                 }
@@ -73,10 +67,7 @@ impl<'a> RuleParser<'a> {
             .map_err(|e| SemanticError::Other(e.to_string()))
     }
 
-    fn parse_attribute(
-        attr: &Node,
-        params: &mut ParamsMap,
-    ) -> Result<(RuleAttr, RuleAttrValue), SemanticError> {
+    fn parse_attribute(attr: &Node) -> Result<(RuleAttr, RuleAttrValue), SemanticError> {
         match attr.data().as_str() {
             "subtree" | "equivalence" | "replace" => Ok((
                 RuleAttr::from_str(attr.data().as_str()).unwrap(),
@@ -105,9 +96,8 @@ impl<'a> RuleParser<'a> {
                 }
 
                 let target = StatementParser::new(attr.front().unwrap())
-                    .with_params(params)
                     .parse()
-                    .map_err(SemanticError::Other)?;
+                    .map_err(|e| SemanticError::Other(e.to_string()))?;
                 Ok((
                     RuleAttr::from_str(attr.data().as_str()).unwrap(),
                     RuleAttrValue::Target(target),
@@ -151,8 +141,8 @@ mod tests {
             rule.pattern,
             (tr(Term::with_symbol_name("==").unwrap()) /
                 (tr(Term::with_symbol_name("+").unwrap()) /
-                    tr(Term::Param(1)) /
-                    tr(Term::Param(2))) /
+                    tr(Term::Param("a".parse().unwrap())) /
+                    tr(Term::Param("x".parse().unwrap()))) /
                 tr(Term::Number(0.into())))
             .into()
         );
@@ -160,15 +150,16 @@ mod tests {
         assert_eq!(
             rule.replace,
             (tr(Term::with_symbol_name("==").unwrap()) /
-                tr(Term::Param(2)) /
-                (tr(Term::with_symbol_name("-").unwrap()) / tr(Term::Param(1))))
+                tr(Term::Param("x".parse().unwrap())) /
+                (tr(Term::with_symbol_name("-").unwrap()) /
+                    tr(Term::Param("a".parse().unwrap()))))
             .into()
         );
         assert_eq!(rule.requirements.len(), 1);
         assert_eq!(
             rule.requirements[0],
             (tr(Term::with_symbol_name("!=").unwrap()) /
-                tr(Term::Param(1)) /
+                tr(Term::Param("a".parse().unwrap())) /
                 tr(Term::Number(0.into())))
             .into()
         );
@@ -204,8 +195,8 @@ mod tests {
             rule.pattern,
             (tr(Term::with_symbol_name("is").unwrap()) /
                 (tr(Term::with_symbol_name("/").unwrap()) /
-                    tr(Term::Param(1)) /
-                    tr(Term::Param(2))) /
+                    tr(Term::Param("a".parse().unwrap())) /
+                    tr(Term::Param("b".parse().unwrap()))) /
                 tr(Term::with_symbol_name("known").unwrap()))
             .into()
         );
@@ -218,14 +209,14 @@ mod tests {
         assert_eq!(
             rule.requirements[0],
             (tr(Term::with_symbol_name("is").unwrap()) /
-                tr(Term::Param(1)) /
+                tr(Term::Param("a".parse().unwrap())) /
                 tr(Term::with_symbol_name("known").unwrap()))
             .into()
         );
         assert_eq!(
             rule.requirements[1],
             (tr(Term::with_symbol_name("is").unwrap()) /
-                tr(Term::Param(2)) /
+                tr(Term::Param("b".parse().unwrap())) /
                 tr(Term::with_symbol_name("known").unwrap()))
             .into()
         );

@@ -9,7 +9,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{bail, Result};
+use eyre::{bail, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RuleAttr {
@@ -61,7 +61,7 @@ pub struct Rule {
 }
 
 impl FromStr for RuleAttr {
-    type Err = anyhow::Error;
+    type Err = eyre::Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
@@ -176,7 +176,7 @@ impl Rule {
         let maps = self
             .pattern
             .map(&arg.statement)
-            .map_err(RuleDeclineReason::ParamsMappingErr)?;
+            .map_err(|e| RuleDeclineReason::ParamsMappingErr(e.to_string()))?;
 
         Ok(maps
             .iter()

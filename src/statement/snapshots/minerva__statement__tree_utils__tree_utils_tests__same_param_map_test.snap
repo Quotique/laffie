@@ -1,0 +1,16 @@
+---
+source: src/statement/tree_utils.rs
+expression: maps
+
+---
+[
+    {
+        Param(
+            "a",
+        ): Variable(
+            Variable(
+                "x",
+            ),
+        )@0x7fe4d0002008 ,
+    },
+]

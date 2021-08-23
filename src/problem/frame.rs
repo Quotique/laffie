@@ -296,25 +296,19 @@ impl IndexMut<usize> for Frame {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use crate::statement::term::Term;
     use std::{
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
         sync::Arc,
     };
-    use trees::tr;
+
+    use crate::parser::statement_with_params;
+
+    use super::*;
 
     #[test]
     fn hash_test() {
-        let statement: Statement = (tr(Term::with_symbol_name("==").unwrap()) /
-            (tr(Term::with_symbol_name("+").unwrap()) /
-                (tr(Term::with_symbol_name("*").unwrap()) /
-                    tr(Term::Param(1)) /
-                    tr(Term::Param(2))) /
-                tr(Term::Param(3))) /
-            tr(Term::Number(0.into())))
-        .into();
+        let statement: Statement = statement_with_params("a*x + c == 0");
         let mut s = DefaultHasher::new();
         statement.hash(&mut s);
         let hash_1 = s.finish();

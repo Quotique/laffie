@@ -52,5 +52,8 @@ pub fn setup() {
         Symbol::add_with_name("variable");
 
         Symbol::add_with_name("answer");
+
+        Symbol::add_with_name("set");
+        Symbol::add_with_name("empty_set");
     });
 }
