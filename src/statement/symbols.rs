@@ -8,12 +8,16 @@ use super::term::StatementNode;
 
 pub struct Ordering(Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>);
 pub struct Calculator(Box<dyn Fn(&mut StatementNode) -> bool>);
+pub struct TruthChecker(Box<dyn Fn(&StatementNode) -> bool>);
 
 unsafe impl Sync for Ordering {}
 unsafe impl Send for Ordering {}
 
 unsafe impl Sync for Calculator {}
 unsafe impl Send for Calculator {}
+
+unsafe impl Sync for TruthChecker {}
+unsafe impl Send for TruthChecker {}
 
 impl fmt::Debug for Ordering {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -22,6 +26,12 @@ impl fmt::Debug for Ordering {
 }
 
 impl fmt::Debug for Calculator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "")
+    }
+}
+
+impl fmt::Debug for TruthChecker {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "")
     }
@@ -39,8 +49,15 @@ impl PartialEq for Calculator {
     }
 }
 
+impl PartialEq for TruthChecker {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
 impl Eq for Ordering {}
 impl Eq for Calculator {}
+impl Eq for TruthChecker {}
 
 lazy_static! {
     static ref ALL_SYMBOLS: RwLock<MultiMap<u64, String, Symbol>> = RwLock::new(MultiMap::new());
@@ -65,15 +82,17 @@ pub enum SymbolAttrValue {
 #[derive(Builder, Clone, Debug, PartialEq, Eq)]
 pub struct Symbol {
     #[builder(default = "0")]
-    pub id:         u64,
+    pub id:            u64,
     #[builder(setter(into))]
-    pub name:       String,
+    pub name:          String,
     #[builder(default)]
-    pub attrs:      HashMap<SymbolAttr, SymbolAttrValue>,
+    pub attrs:         HashMap<SymbolAttr, SymbolAttrValue>,
     #[builder(default = "Arc::new(None)", setter(into))]
-    pub arg_order:  Arc<Option<Ordering>>,
+    pub arg_order:     Arc<Option<Ordering>>,
     #[builder(default = "Arc::new(None)", setter(into))]
-    pub calculator: Arc<Option<Calculator>>,
+    pub calculator:    Arc<Option<Calculator>>,
+    #[builder(default = "Arc::new(None)", setter(into))]
+    pub truth_checker: Arc<Option<TruthChecker>>,
 }
 
 impl SymbolBuilder {
@@ -91,6 +110,14 @@ impl SymbolBuilder {
         calculator: Box<dyn Fn(&mut StatementNode) -> bool>,
     ) -> &mut Self {
         self.calculator = Some(Arc::new(Some(Calculator(calculator))));
+        self
+    }
+
+    pub fn with_truth_checker(
+        &mut self,
+        truth_checker: Box<dyn Fn(&StatementNode) -> bool>,
+    ) -> &mut Self {
+        self.truth_checker = Some(Arc::new(Some(TruthChecker(truth_checker))));
         self
     }
 }
@@ -130,6 +157,14 @@ impl Symbol {
 
     pub fn add_with_name(name: &str) {
         add_symbol(Symbol::builder().name(name).build().unwrap());
+    }
+
+    pub fn check_truth(&self, node: &StatementNode) -> bool {
+        if let Some(c) = self.truth_checker.as_ref() {
+            c.0(node)
+        } else {
+            false
+        }
     }
 
     pub fn evaluate(&self, node: &mut StatementNode) -> bool {
@@ -195,7 +230,15 @@ mod tests {
         setup();
 
         let sym = symbol_by_id(1).unwrap();
-        assert_eq!(sym, Symbol::builder().id(1).name("==").build().unwrap())
+        assert_eq!(
+            sym,
+            Symbol::builder()
+                .id(1)
+                .name("==")
+                .with_truth_checker(Box::new(|_| false))
+                .build()
+                .unwrap()
+        )
     }
 
     #[test]
@@ -203,6 +246,14 @@ mod tests {
         setup();
 
         let sym = symbol_by_name(&String::from("==")).unwrap();
-        assert_eq!(sym, Symbol::builder().id(1).name("==").build().unwrap())
+        assert_eq!(
+            sym,
+            Symbol::builder()
+                .id(1)
+                .name("==")
+                .with_truth_checker(Box::new(|_| false))
+                .build()
+                .unwrap()
+        )
     }
 }

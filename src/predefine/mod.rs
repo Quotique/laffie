@@ -1,10 +1,7 @@
 mod operations;
 mod symbols;
 
-pub use self::{
-    operations::{is_true, normalize},
-    symbols::setup,
-};
+pub use self::{operations::normalize, symbols::setup};
 
 #[cfg(test)]
 mod tests {

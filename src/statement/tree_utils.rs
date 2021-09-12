@@ -57,6 +57,8 @@ pub trait NodeMapping {
     fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>>;
 
     fn evaluate(&mut self) -> bool;
+
+    fn check_truth(&self) -> bool;
 }
 
 impl NodeMapping for StatementNode {
@@ -117,6 +119,13 @@ impl NodeMapping for StatementNode {
     fn evaluate(&mut self) -> bool {
         if let Some(symbol) = &self.data().symbol() {
             return symbol.evaluate(self);
+        }
+        false
+    }
+
+    fn check_truth(&self) -> bool {
+        if let Some(symbol) = &self.data().symbol() {
+            return symbol.check_truth(self);
         }
         false
     }

@@ -9,9 +9,8 @@ use std::{
 use trees::tr;
 
 use crate::{
-    predefine::is_true,
     rule::{Rule, RulesEngine, SharedRule, Suppose},
-    statement::{term::Term, MarkedStatement, Statement},
+    statement::{term::Term, tree_utils::NodeMapping, MarkedStatement, Statement},
     utils::{Dumper, DumperSink, VecDisplay},
 };
 
@@ -126,7 +125,7 @@ impl Frame {
     }
 
     pub fn proof(&self, statement: &Statement) -> bool {
-        if is_true(statement.root()) {
+        if statement.root().check_truth() {
             return true;
         }
 

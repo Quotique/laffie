@@ -1,9 +1,8 @@
 use super::{frame::Frame, solution::MAX_LEVEL};
 use crate::{
     parser::SemanticError,
-    predefine::is_true,
     rule::{RuleAttr, RulesEngine, SharedRule, Suppose},
-    statement::{term::Term, MarkedStatement, Statement},
+    statement::{term::Term, tree_utils::NodeMapping, MarkedStatement, Statement},
     utils::Dumper,
 };
 use std::{fmt, sync::Arc};
@@ -118,7 +117,7 @@ impl Target {
                             resolution:   statement.clone(),
                         });
                     }
-                    if is_true(i.statement.root()) {
+                    if i.statement.root().check_truth() {
                         return Some(Suppose {
                             requirements: vec![],
                             resolution:   statement.clone(),

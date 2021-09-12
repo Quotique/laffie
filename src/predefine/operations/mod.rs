@@ -2,14 +2,22 @@ use std::rc::Rc;
 use trees::Node;
 
 use statement::{
-    symbols::{symbol_by_name, SymbolAttr},
+    symbols::SymbolAttr,
     term::{StatementNode, Term},
     tree_utils::NodeMapping,
 };
 
 pub mod divide;
+pub mod equal;
+pub mod inequal;
+pub mod is;
+pub mod less;
+pub mod less_or_equal;
 pub mod minus;
+pub mod more;
+pub mod more_or_equal;
 pub mod mul;
+pub mod op_true;
 pub mod plus;
 pub mod power;
 pub mod replace;
@@ -92,70 +100,6 @@ pub fn normalize(root: &mut StatementNode) -> bool {
     result |= commutative_reorder(root); // TODO: reorder once
 
     result
-}
-
-pub fn is_true(statement: &StatementNode) -> bool {
-    if let Term::Symbol(id) = &statement.data() {
-        if *id == symbol_by_name("==").unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.front().unwrap().data(),
-                &statement.back().unwrap().data(),
-            ) {
-                return d1 == d2;
-            }
-        } else if *id == symbol_by_name("!=").unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.front().unwrap().data(),
-                &statement.back().unwrap().data(),
-            ) {
-                return d1 != d2;
-            }
-        } else if *id == symbol_by_name("<").unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.front().unwrap().data(),
-                &statement.back().unwrap().data(),
-            ) {
-                return d1 < d2;
-            }
-        } else if *id == symbol_by_name("<=").unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.front().unwrap().data(),
-                &statement.back().unwrap().data(),
-            ) {
-                return d1 <= d2;
-            }
-        } else if *id == symbol_by_name(">").unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.front().unwrap().data(),
-                &statement.back().unwrap().data(),
-            ) {
-                return d1 > d2;
-            }
-        } else if *id == symbol_by_name(">=").unwrap().id {
-            if let (Term::Number(d1), Term::Number(d2)) = (
-                &statement.front().unwrap().data(),
-                &statement.back().unwrap().data(),
-            ) {
-                return d1 >= d2;
-            }
-        } else if *id == symbol_by_name("is").unwrap().id {
-            if let (Term::Number(_), Term::Symbol(known_id)) = (
-                &statement.front().unwrap().data(),
-                &statement.back().unwrap().data(),
-            ) {
-                return *known_id == symbol_by_name("known").unwrap().id;
-            }
-            if let (Term::Variable(_), Term::Symbol(sym_varible_id)) = (
-                &statement.front().unwrap().data(),
-                &statement.back().unwrap().data(),
-            ) {
-                return *sym_varible_id == symbol_by_name("variable").unwrap().id;
-            }
-        } else if *id == symbol_by_name("true").unwrap().id {
-            return true;
-        }
-    }
-    false
 }
 
 #[cfg(test)]

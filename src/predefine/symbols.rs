@@ -1,42 +1,40 @@
-use std::{collections::HashMap, sync::Once};
+use std::sync::Once;
 
-use statement::symbols::{add_symbol, Symbol, SymbolAttr, SymbolAttrValue};
+use statement::symbols::{add_symbol, Symbol};
 
-use super::operations::{divide, minus, mul, plus, power, replace, sqrt};
+use super::operations::{
+    divide, equal, inequal, is, less, less_or_equal, minus, more, more_or_equal, mul, op_true,
+    plus, power, replace, sqrt,
+};
 
 static INIT: Once = Once::new();
 
 pub fn setup() {
     INIT.call_once(|| {
-        Symbol::add_with_name("=="); // 1
-
-        let mut attr = HashMap::new();
-        attr.insert(SymbolAttr::Associative, SymbolAttrValue::None);
-        attr.insert(SymbolAttr::Commutative, SymbolAttrValue::None);
+        add_symbol(equal::symbol());
 
         add_symbol(plus::symbol());
         add_symbol(minus::symbol());
-        Symbol::add_with_name("!="); // 4
-        Symbol::add_with_name(">"); // 5
-        Symbol::add_with_name("<"); // 6
+        add_symbol(inequal::symbol());
+        add_symbol(more::symbol());
+        add_symbol(less::symbol());
 
         add_symbol(mul::symbol());
         add_symbol(divide::symbol());
-        Symbol::add_with_name("<="); // 9
-        Symbol::add_with_name(">="); // 10
+        add_symbol(less_or_equal::symbol());
+        add_symbol(more_or_equal::symbol());
         add_symbol(power::symbol()); // 11
-        Symbol::add_with_name("is"); // 12
+        add_symbol(is::symbol());
         Symbol::add_with_name("known"); // 13
         Symbol::add_with_name("in"); // 14
         Symbol::add_with_name("find");
         Symbol::add_with_name("AnySymbol");
-        Symbol::add_with_name("==");
         Symbol::add_with_name("=>");
         Symbol::add_with_name("<=>");
         Symbol::add_with_name("&&");
         Symbol::add_with_name("||");
 
-        Symbol::add_with_name("true");
+        add_symbol(op_true::symbol());
         Symbol::add_with_name("false");
 
         add_symbol(sqrt::symbol());
