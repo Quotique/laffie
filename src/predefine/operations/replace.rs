@@ -1,11 +1,20 @@
-use trees::{Node, Tree};
+use trees::Tree;
 
 use statement::{
-    term::Term,
+    symbols::Symbol,
+    term::{StatementNode, Term},
     tree_utils::{swap_node, NodeMapping, VariablesMap},
 };
 
-pub fn replace(root: &mut Node<Term>) -> bool {
+pub fn symbol() -> Symbol {
+    Symbol::builder()
+        .name("replace")
+        .with_calculator(Box::new(replace))
+        .build()
+        .unwrap()
+}
+
+pub fn replace(root: &mut StatementNode) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }

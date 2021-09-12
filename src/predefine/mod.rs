@@ -1,6 +1,4 @@
-mod math;
 mod operations;
-mod replace;
 mod symbols;
 
 pub use self::{

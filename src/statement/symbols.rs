@@ -1,7 +1,46 @@
+use derive_builder::Builder;
 use multi_map::MultiMap;
 use parking_lot::RwLock;
 
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, sync::Arc};
+
+use super::term::StatementNode;
+
+pub struct Ordering(Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>);
+pub struct Calculator(Box<dyn Fn(&mut StatementNode) -> bool>);
+
+unsafe impl Sync for Ordering {}
+unsafe impl Send for Ordering {}
+
+unsafe impl Sync for Calculator {}
+unsafe impl Send for Calculator {}
+
+impl fmt::Debug for Ordering {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "")
+    }
+}
+
+impl fmt::Debug for Calculator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "")
+    }
+}
+
+impl PartialEq for Ordering {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl PartialEq for Calculator {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for Ordering {}
+impl Eq for Calculator {}
 
 lazy_static! {
     static ref ALL_SYMBOLS: RwLock<MultiMap<u64, String, Symbol>> = RwLock::new(MultiMap::new());
@@ -23,11 +62,37 @@ pub enum SymbolAttrValue {
     UStr(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Builder, Clone, Debug, PartialEq, Eq)]
 pub struct Symbol {
-    pub id:    u64,
-    pub name:  String,
-    pub attrs: HashMap<SymbolAttr, SymbolAttrValue>,
+    #[builder(default = "0")]
+    pub id:         u64,
+    #[builder(setter(into))]
+    pub name:       String,
+    #[builder(default)]
+    pub attrs:      HashMap<SymbolAttr, SymbolAttrValue>,
+    #[builder(default = "Arc::new(None)", setter(into))]
+    pub arg_order:  Arc<Option<Ordering>>,
+    #[builder(default = "Arc::new(None)", setter(into))]
+    pub calculator: Arc<Option<Calculator>>,
+}
+
+impl SymbolBuilder {
+    pub fn with_attr(&mut self, name: SymbolAttr, value: SymbolAttrValue) -> &mut Self {
+        if self.attrs.is_none() {
+            self.attrs = Some(HashMap::default());
+        }
+        self.attrs.as_mut().unwrap().insert(name, value);
+
+        self
+    }
+
+    pub fn with_calculator(
+        &mut self,
+        calculator: Box<dyn Fn(&mut StatementNode) -> bool>,
+    ) -> &mut Self {
+        self.calculator = Some(Arc::new(Some(Calculator(calculator))));
+        self
+    }
 }
 
 pub fn symbol_by_id(id: u64) -> Option<Symbol> {
@@ -52,6 +117,10 @@ pub fn add_symbol(mut symbol: Symbol) -> Symbol {
 }
 
 impl Symbol {
+    pub fn builder() -> SymbolBuilder {
+        SymbolBuilder::default()
+    }
+
     pub fn display_weight(&self) -> Option<u64> {
         if let Some(SymbolAttrValue::UInt(v)) = self.attrs.get(&SymbolAttr::Infix) {
             return Some(*v);
@@ -59,13 +128,16 @@ impl Symbol {
         None
     }
 
-    #[allow(dead_code)]
     pub fn add_with_name(name: &str) {
-        add_symbol(Symbol {
-            id:    0,
-            name:  String::from(name),
-            attrs: HashMap::new(),
-        });
+        add_symbol(Symbol::builder().name(name).build().unwrap());
+    }
+
+    pub fn evaluate(&self, node: &mut StatementNode) -> bool {
+        if let Some(c) = self.calculator.as_ref() {
+            c.0(node)
+        } else {
+            false
+        }
     }
 }
 
@@ -94,11 +166,15 @@ mod tests {
             attr.insert(SymbolAttr::Associative, SymbolAttrValue::None);
             attr.insert(SymbolAttr::Commutative, SymbolAttrValue::None);
 
-            add_symbol(Symbol {
-                id:    0,
-                name:  "+".into(), // 2
-                attrs: attr,
-            });
+            add_symbol(
+                Symbol::builder()
+                    .name("+")
+                    .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(10))
+                    .with_attr(SymbolAttr::Associative, SymbolAttrValue::None)
+                    .with_attr(SymbolAttr::Commutative, SymbolAttrValue::None)
+                    .build()
+                    .unwrap(),
+            );
             Symbol::add_with_name("-"); // 3
             Symbol::add_with_name("!="); // 4
             Symbol::add_with_name(">"); // 5
@@ -119,14 +195,7 @@ mod tests {
         setup();
 
         let sym = symbol_by_id(1).unwrap();
-        assert_eq!(
-            sym,
-            Symbol {
-                id:    1,
-                name:  "==".into(),
-                attrs: HashMap::new(),
-            }
-        )
+        assert_eq!(sym, Symbol::builder().id(1).name("==").build().unwrap())
     }
 
     #[test]
@@ -134,13 +203,6 @@ mod tests {
         setup();
 
         let sym = symbol_by_name(&String::from("==")).unwrap();
-        assert_eq!(
-            sym,
-            Symbol {
-                id:    1,
-                name:  "==".into(),
-                attrs: HashMap::new(),
-            }
-        )
+        assert_eq!(sym, Symbol::builder().id(1).name("==").build().unwrap())
     }
 }

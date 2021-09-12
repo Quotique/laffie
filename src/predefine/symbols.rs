@@ -2,6 +2,8 @@ use std::{collections::HashMap, sync::Once};
 
 use statement::symbols::{add_symbol, Symbol, SymbolAttr, SymbolAttrValue};
 
+use super::operations::{divide, minus, mul, plus, power, replace, sqrt};
+
 static INIT: Once = Once::new();
 
 pub fn setup() {
@@ -12,25 +14,17 @@ pub fn setup() {
         attr.insert(SymbolAttr::Associative, SymbolAttrValue::None);
         attr.insert(SymbolAttr::Commutative, SymbolAttrValue::None);
 
-        add_symbol(Symbol {
-            id:    0,
-            name:  "+".into(), // 2
-            attrs: attr.clone(),
-        });
-        Symbol::add_with_name("-"); // 3
+        add_symbol(plus::symbol());
+        add_symbol(minus::symbol());
         Symbol::add_with_name("!="); // 4
         Symbol::add_with_name(">"); // 5
         Symbol::add_with_name("<"); // 6
 
-        add_symbol(Symbol {
-            id:    0,
-            name:  "*".into(), // 7
-            attrs: attr,
-        });
-        Symbol::add_with_name("/"); // 8
+        add_symbol(mul::symbol());
+        add_symbol(divide::symbol());
         Symbol::add_with_name("<="); // 9
         Symbol::add_with_name(">="); // 10
-        Symbol::add_with_name("^"); // 11
+        add_symbol(power::symbol()); // 11
         Symbol::add_with_name("is"); // 12
         Symbol::add_with_name("known"); // 13
         Symbol::add_with_name("in"); // 14
@@ -45,9 +39,12 @@ pub fn setup() {
         Symbol::add_with_name("true");
         Symbol::add_with_name("false");
 
+        add_symbol(sqrt::symbol());
+
         Symbol::add_with_name("find");
         Symbol::add_with_name("proof");
         Symbol::add_with_name("transform");
+        add_symbol(replace::symbol());
         Symbol::add_with_name("replace");
         Symbol::add_with_name("variable");
 

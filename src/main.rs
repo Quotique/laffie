@@ -1,12 +1,12 @@
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::module_inception)]
-#![feature(iter_intersperse)]
 
 extern crate bigdecimal;
 extern crate chrono;
 extern crate clap;
 extern crate colored;
 extern crate config;
+extern crate derive_builder;
 extern crate derive_more;
 extern crate eyre;
 extern crate fern;

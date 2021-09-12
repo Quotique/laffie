@@ -7,12 +7,11 @@ use utils::SubsetIterator;
 
 use super::{
     symbols::{symbol_by_id, SymbolAttr},
-    term::{Param, StatementTree, Term, Variable},
+    term::{Param, StatementNode, StatementTree, Term, Variable},
 };
 
 pub type ParamsMap = HashMap<Param, StatementTree>;
 pub type VariablesMap = HashMap<Variable, StatementTree>;
-type TreeNode = Node<Term>;
 
 pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
     let mut l_childs: Vec<Tree<F>> = vec![];
@@ -55,10 +54,12 @@ pub trait NodeMapping {
 
     fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Vec<StatementTree>> + '_>;
 
-    fn params_map(&self, pattern: &TreeNode) -> Result<Vec<ParamsMap>>;
+    fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>>;
+
+    fn evaluate(&mut self) -> bool;
 }
 
-impl NodeMapping for TreeNode {
+impl NodeMapping for StatementNode {
     fn apply_variable_map(&mut self, variables: &VariablesMap) {
         if let Some(mut v) = self
             .data()
@@ -109,8 +110,15 @@ impl NodeMapping for TreeNode {
         }))
     }
 
-    fn params_map(&self, pattern: &TreeNode) -> Result<Vec<ParamsMap>> {
+    fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>> {
         params_map_impl(self, pattern, ParamsMap::new())
+    }
+
+    fn evaluate(&mut self) -> bool {
+        if let Some(symbol) = &self.data().symbol() {
+            return symbol.evaluate(self);
+        }
+        false
     }
 }
 
@@ -133,8 +141,8 @@ fn display_mapping(map: &[ParamsMap]) -> String {
 }
 
 fn params_map_impl(
-    target: &TreeNode,
-    pattern: &TreeNode,
+    target: &StatementNode,
+    pattern: &StatementNode,
     mut params: ParamsMap,
 ) -> Result<Vec<ParamsMap>> {
     trace!(target: "pattern_match", "Pattern: {}, traget: {}, mapping: {:?}", pattern, target, params);

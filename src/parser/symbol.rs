@@ -1,7 +1,7 @@
 use super::{Node, SemanticError};
 use crate::statement::{Symbol, SymbolAttr, SymbolAttrValue};
 
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
 pub struct SymbolParser<'a> {
     ast: &'a Node,
@@ -16,26 +16,22 @@ impl<'a> SymbolParser<'a> {
         if self.ast.data() != "Declare" {
             return Err(SemanticError::UnexpectedWord(self.ast.data().clone()));
         }
-        let mut symbol = Symbol {
-            id:    0,
-            name:  String::default(),
-            attrs: HashMap::new(),
-        };
+
+        let mut builder = Symbol::builder();
 
         for sym_child in self.ast.iter() {
             if sym_child.data() == "Symbol" {
-                symbol.name = sym_child.front().unwrap().data().clone();
+                builder.name(sym_child.front().unwrap().data().clone());
             } else if sym_child.data() == "Attrs" {
                 for attr in sym_child.iter() {
                     let a = Self::parse_attr(attr)?;
-                    symbol.attrs.insert(a.0, a.1);
+                    builder.with_attr(a.0, a.1);
                 }
             }
         }
-        if symbol.name.is_empty() {
-            return Err(SemanticError::MissingWord("Symbol".into()));
-        }
-        Ok(symbol)
+        builder
+            .build()
+            .map_err(|e| SemanticError::MissingWord(e.to_string()))
     }
 
     fn parse_attr(data: &Node) -> Result<(SymbolAttr, SymbolAttrValue), SemanticError> {
@@ -74,15 +70,13 @@ pub mod tests {
         let states = ra::symbol(test_str).unwrap();
 
         let sym = SymbolParser::new(&states).parse().unwrap();
-        let mut expect_attr = HashMap::new();
-        expect_attr.insert(SymbolAttr::Infix, SymbolAttrValue::UInt(10));
         assert_eq!(
             sym,
-            Symbol {
-                id:    0,
-                name:  "+".into(),
-                attrs: expect_attr,
-            }
+            Symbol::builder()
+                .name("+")
+                .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(10))
+                .build()
+                .unwrap()
         );
     }
 }

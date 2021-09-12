@@ -1,157 +1,22 @@
-use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive, Zero};
-use num::{integer::gcd, traits::Pow, Integer};
-use num_bigint::{BigInt, ToBigInt};
-use std::{cmp::max, rc::Rc};
-use trees::{tr, Node};
+use std::rc::Rc;
+use trees::Node;
 
 use statement::{
     symbols::{symbol_by_name, SymbolAttr},
-    term::Term,
-    tree_utils::swap_node,
+    term::{StatementNode, Term},
+    tree_utils::NodeMapping,
 };
 
-use super::{
-    math::{multiply, plus},
-    replace::replace,
-};
+pub mod divide;
+pub mod minus;
+pub mod mul;
+pub mod plus;
+pub mod power;
+pub mod replace;
+pub mod sqrt;
 
-const MAX_DEC_CONVERSION_VALUE: i64 = 1_000_000;
-const MAX_DEC_CONVERSION_EXP: i64 = 6;
-
-fn evaluate(root: &mut Node<Term>) -> bool {
-    let mut result = false;
-    if let Some(symbol) = &root.data().symbol() {
-        match symbol.name.as_str() {
-            "+" => {
-                if root.degree() >= 2 {
-                    result = plus(root);
-                }
-            }
-            "*" => {
-                result = multiply(root);
-            }
-            "-" => match root.degree() {
-                1 => {
-                    let last = root.pop_back().unwrap();
-                    if let Term::Number(d) = &last.data() {
-                        *root.data_mut() = Term::Number(-d);
-                        result = true;
-                    } else {
-                        root.push_back(last);
-                    }
-                }
-                2 => {
-                    if let (Term::Number(d1), Term::Number(d2)) =
-                        (&root.front().unwrap().data(), &root.back().unwrap().data())
-                    {
-                        *root.data_mut() = Term::Number(d1 - d2);
-                        result = true;
-                        root.pop_back();
-                        root.pop_back();
-                    }
-                }
-                _ => {
-                    panic!("'-' is binary operator!");
-                }
-            },
-            "/" => match (&root.front().unwrap().data(), &root.back().unwrap().data()) {
-                (Term::Number(d1), Term::Number(d2)) => {
-                    let (num_m, num_e) = d1.clone().into_bigint_and_exponent();
-                    let (den_m, den_e) = d2.clone().into_bigint_and_exponent();
-
-                    let (num_e, den_e) = (num_e - max(num_e, den_e), den_e - max(num_e, den_e));
-                    let (num_m, den_m) = (
-                        num_m *
-                            Decimal::new(10.into(), num_e)
-                                .to_bigint()
-                                .expect("Unable to get bigint"),
-                        den_m *
-                            Decimal::new(10.into(), den_e)
-                                .to_bigint()
-                                .expect("Unable to get bigint"),
-                    );
-
-                    let g = gcd(num_m.clone(), den_m.clone());
-                    let (num_m, den_m) = (num_m / g.clone(), den_m / g);
-
-                    result = true;
-                    root.pop_back();
-                    root.pop_back();
-
-                    if den_m.is_one() {
-                        *root.data_mut() = Term::Number(Decimal::from(num_m));
-                    } else if (BigInt::from(MAX_DEC_CONVERSION_VALUE) % den_m.clone()).is_zero() {
-                        *root.data_mut() = Term::Number(
-                            Decimal::new(
-                                num_m * (BigInt::from(MAX_DEC_CONVERSION_VALUE) / den_m),
-                                MAX_DEC_CONVERSION_EXP,
-                            )
-                            .normalized(),
-                        );
-                    } else {
-                        root.push_back(tr(Term::Number(Decimal::from(num_m))));
-                        root.push_back(tr(Term::Number(Decimal::from(den_m))));
-                    }
-                }
-                (_, Term::Number(d)) => {
-                    if d.is_one() {
-                        let mut child = root.pop_front().unwrap();
-                        swap_node(root, &mut child.root_mut());
-                    }
-                }
-                (_, _) => {}
-            },
-            "^" => {
-                if let (Term::Number(d1), Term::Number(d2)) =
-                    (&root.front().unwrap().data(), &root.back().unwrap().data())
-                {
-                    if let Some(e) = d2.to_i8() {
-                        result = true;
-                        let (m, exp) = d1.as_bigint_and_exponent();
-                        let result = Decimal::new(m.pow(e.abs() as u32), exp * (e.abs() as i64));
-                        while root.pop_front().is_some() {}
-                        if e >= 0 {
-                            *root.data_mut() = Term::Number(result);
-                        } else {
-                            *root.data_mut() = Term::Symbol(symbol_by_name("/").unwrap().id);
-                            root.push_back(tr(Term::Number(Decimal::one())));
-                            root.push_back(tr(Term::Number(result)));
-                            evaluate(root);
-                        }
-                    }
-                }
-            }
-            "sqrt" => {
-                if root.degree() == 1 {
-                    let last = root.pop_back().unwrap();
-                    if let Term::Number(d) = &last.data() {
-                        let (mut m, mut e) = d.as_bigint_and_exponent();
-                        if e.is_odd() {
-                            m *= 10;
-                            e -= 1;
-                        }
-                        let r = m.sqrt();
-                        if m == &r * &r {
-                            *root.data_mut() = Term::Number(Decimal::new(r, e / 2));
-                            result = true;
-                        } else {
-                            root.push_back(last);
-                        }
-                    } else {
-                        root.push_back(last);
-                    }
-                } else {
-                    panic!("'sqrt' is unary operator!");
-                }
-            }
-            "replace" => {
-                result = replace(root);
-            }
-            _ => {}
-        }
-    }
-    result
-}
+pub const MAX_DEC_CONVERSION_VALUE: i64 = 1_000_000;
+pub const MAX_DEC_CONVERSION_EXP: i64 = 6;
 
 fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
     let mut result = false;
@@ -215,7 +80,7 @@ fn commutative_reorder(root: &mut Node<Term>) -> bool {
     result
 }
 
-pub fn normalize(root: &mut Node<Term>) -> bool {
+pub fn normalize(root: &mut StatementNode) -> bool {
     let mut result = false;
     for mut i in root.iter_mut() {
         result |= normalize(&mut i);
@@ -223,13 +88,13 @@ pub fn normalize(root: &mut Node<Term>) -> bool {
 
     result |= associative_nesting_remove(root);
     result |= commutative_reorder(root);
-    result |= evaluate(root);
+    result |= root.evaluate();
     result |= commutative_reorder(root); // TODO: reorder once
 
     result
 }
 
-pub fn is_true(statement: &Node<Term>) -> bool {
+pub fn is_true(statement: &StatementNode) -> bool {
     if let Term::Symbol(id) = &statement.data() {
         if *id == symbol_by_name("==").unwrap().id {
             if let (Term::Number(d1), Term::Number(d2)) = (
@@ -328,7 +193,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(evaluate(&mut test_tree1.root_mut()));
+        assert!(test_tree1.root_mut().evaluate());
         assert_eq!(test_tree1, tr(Term::Number(Decimal::from(8))));
 
         // x+1+2+5 -> x+8
@@ -337,7 +202,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(evaluate(&mut test_tree1.root_mut()));
+        assert!(test_tree1.root_mut().evaluate());
         commutative_reorder(&mut test_tree1.root_mut());
         assert_eq!(
             test_tree1,
@@ -356,7 +221,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(10))));
 
         // x*1*2*5 -> x*10
@@ -365,7 +230,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         commutative_reorder(&mut test_tree.root_mut());
         assert_eq!(
             test_tree,
@@ -378,7 +243,7 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(7)) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(1)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Variable("x".parse().unwrap())));
     }
 
@@ -390,14 +255,14 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(3)) /
             tr(Term::Number(Decimal::from(10))) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(8))));
 
         // x - 2 -> x - 2
         let mut test_tree = tr(Term::Symbol(3)) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(!evaluate(&mut test_tree.root_mut()));
+        assert!(!test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
             tr(Term::Symbol(3)) /
@@ -414,14 +279,14 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(8)) /
             tr(Term::Number(Decimal::from(10))) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(5))));
 
         // x / 2 -> x / 2
         let mut test_tree = tr(Term::Symbol(8)) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(!evaluate(&mut test_tree.root_mut()));
+        assert!(!test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
             tr(Term::Symbol(8)) /
@@ -433,7 +298,7 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(8)) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
             tr(Term::Number(Decimal::from_str_radix("0.4", 10).unwrap()))
@@ -443,7 +308,7 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(8)) /
             tr(Term::Number(Decimal::from(30))) /
             tr(Term::Number(Decimal::from(45)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
             tr(Term::Symbol(8)) /
@@ -455,7 +320,7 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(8)) /
             tr(Term::Number(Decimal::from(30))) /
             tr(Term::Number(Decimal::from((45.into(), 1))));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
             tr(Term::Symbol(8)) /
@@ -475,28 +340,28 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(4))));
 
         // 2 ^ (-2) -> 0.25
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(-2)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from((25.into(), 2)))));
 
         // 0.5 ^ (-2) -> 4
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
             tr(Term::Number(Decimal::from((5.into(), 1)))) /
             tr(Term::Number(Decimal::from(-2)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(4))));
 
         // 3 ^ (-2) -> 1/9
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
             tr(Term::Number(Decimal::from(3))) /
             tr(Term::Number(Decimal::from(-2)));
-        assert!(evaluate(&mut test_tree.root_mut()));
+        assert!(test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
             tr(Term::Symbol(div_sym.id)) /

@@ -8,6 +8,7 @@ use trees::{Node, Tree};
 use super::symbols::{symbol_by_id, symbol_by_name, Symbol};
 
 pub type StatementTree = Tree<Term>;
+pub type StatementNode = Node<Term>;
 
 #[derive(Clone, Debug, Display, PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
 pub struct Param(CompactString);
