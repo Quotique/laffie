@@ -1,4 +1,5 @@
-use std::rc::Rc;
+use std::{cmp::Ordering, rc::Rc};
+
 use trees::Node;
 
 use statement::{
@@ -49,6 +50,25 @@ fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
     result
 }
 
+fn default_ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
+    // Symbol < Param < Varible < Number
+    match (left.data(), right.data()) {
+        (Term::Symbol(id_l), Term::Symbol(id_r)) => id_l.cmp(id_r),
+        (Term::Symbol(_), _) => Ordering::Less,
+
+        (Term::Param(id_l), Term::Param(id_r)) => id_l.cmp(id_r),
+        (Term::Param(_), Term::Symbol(_)) => Ordering::Greater,
+        (Term::Param(_), _) => Ordering::Less,
+
+        (Term::Variable(id_l), Term::Variable(id_r)) => id_l.cmp(id_r),
+        (Term::Variable(_), Term::Number(_)) => Ordering::Less,
+        (Term::Variable(_), _) => Ordering::Greater,
+
+        (Term::Number(d1), Term::Number(d2)) => d1.cmp(d2),
+        (Term::Number(_), _) => Ordering::Greater,
+    }
+}
+
 fn commutative_reorder(root: &mut Node<Term>) -> bool {
     let mut result = false;
     if let Some(symbol) = &root.data().symbol() {
@@ -59,27 +79,13 @@ fn commutative_reorder(root: &mut Node<Term>) -> bool {
             while let Some(t) = root.pop_front() {
                 to_sort.push(Rc::new(t));
             }
-            // Symbol < Param < Varible < Number
-            to_sort.sort_by(|x, y| match &x.data() {
-                Term::Symbol(id_l) => match &y.data() {
-                    Term::Symbol(id_r) => id_l.cmp(id_r),
-                    _ => std::cmp::Ordering::Less,
-                },
-                Term::Param(id_l) => match &y.data() {
-                    Term::Symbol(_) => std::cmp::Ordering::Greater,
-                    Term::Param(id_r) => id_l.cmp(id_r),
-                    _ => std::cmp::Ordering::Less,
-                },
-                Term::Variable(id_l) => match &y.data() {
-                    Term::Variable(id_r) => id_l.cmp(id_r),
-                    Term::Number(_) => std::cmp::Ordering::Less,
-                    _ => std::cmp::Ordering::Greater,
-                },
-                Term::Number(d1) => match &y.data() {
-                    Term::Number(d2) => d1.cmp(d2),
-                    _ => std::cmp::Ordering::Greater,
-                },
+
+            to_sort.sort_by(|x, y| {
+                symbol
+                    .arg_order(x.root(), y.root())
+                    .unwrap_or_else(|| default_ordering(x.root(), y.root()))
             });
+
             while let Some(t) = to_sort.pop() {
                 root.push_front(Rc::try_unwrap(t).unwrap());
             }
@@ -168,7 +174,7 @@ mod operations_tests {
         assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(10))));
 
-        // x*1*2*5 -> x*10
+        // x*1*2*5 -> 10*x
         let mut test_tree = tr(Term::Symbol(7)) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(1))) /
@@ -179,8 +185,8 @@ mod operations_tests {
         assert_eq!(
             test_tree,
             tr(Term::Symbol(7)) /
-                tr(Term::Variable("x".parse().unwrap())) /
-                tr(Term::Number(Decimal::from(10)))
+                tr(Term::Number(Decimal::from(10))) /
+                tr(Term::Variable("x".parse().unwrap()))
         );
 
         // x*1 -> x

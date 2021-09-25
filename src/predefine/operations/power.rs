@@ -44,3 +44,11 @@ pub fn power(root: &mut StatementNode) -> bool {
 
     result
 }
+
+pub fn power_argument(root: &StatementNode) -> &StatementNode {
+    if root.data().is_symbol_name("^") {
+        root.front().unwrap()
+    } else {
+        root
+    }
+}

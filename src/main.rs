@@ -26,12 +26,13 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
-mod statement;
+extern crate state_macro;
 
 mod parser;
 mod predefine;
 mod problem;
 mod rule;
+mod statement;
 mod utils;
 
 use clap::{App, Arg};

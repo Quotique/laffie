@@ -3,6 +3,11 @@ name = "minerva"
 version = "0.3.1"
 authors = ["Alexander <just.std@gmail.com>"]
 
+[lib]
+name = "state_macro"
+path = "src/statement/proc_macro.rs"
+proc-macro = true
+
 [dependencies]
 bigdecimal = "0.2"
 chrono = "0.4"
@@ -25,5 +30,7 @@ regex = "1"
 serde_derive = "1.0"
 serde = "1.0"
 smartstring = "0.2"
+syn = "1.0"
 trees = "0.4"
+quote = "1.0"
 

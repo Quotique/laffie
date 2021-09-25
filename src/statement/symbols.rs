@@ -1,63 +1,19 @@
+use std::{collections::HashMap, fmt, sync::Arc};
+
 use derive_builder::Builder;
 use multi_map::MultiMap;
 use parking_lot::RwLock;
 
-use std::{collections::HashMap, fmt, sync::Arc};
+use state_macro::FuncAttr;
 
 use super::term::StatementNode;
 
+#[derive(FuncAttr)]
 pub struct Ordering(Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>);
+#[derive(FuncAttr)]
 pub struct Calculator(Box<dyn Fn(&mut StatementNode) -> bool>);
+#[derive(FuncAttr)]
 pub struct TruthChecker(Box<dyn Fn(&StatementNode) -> bool>);
-
-unsafe impl Sync for Ordering {}
-unsafe impl Send for Ordering {}
-
-unsafe impl Sync for Calculator {}
-unsafe impl Send for Calculator {}
-
-unsafe impl Sync for TruthChecker {}
-unsafe impl Send for TruthChecker {}
-
-impl fmt::Debug for Ordering {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "")
-    }
-}
-
-impl fmt::Debug for Calculator {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "")
-    }
-}
-
-impl fmt::Debug for TruthChecker {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "")
-    }
-}
-
-impl PartialEq for Ordering {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
-}
-
-impl PartialEq for Calculator {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
-}
-
-impl PartialEq for TruthChecker {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
-}
-
-impl Eq for Ordering {}
-impl Eq for Calculator {}
-impl Eq for TruthChecker {}
 
 lazy_static! {
     static ref ALL_SYMBOLS: RwLock<MultiMap<u64, String, Symbol>> = RwLock::new(MultiMap::new());
@@ -120,6 +76,14 @@ impl SymbolBuilder {
         self.truth_checker = Some(Arc::new(Some(TruthChecker(truth_checker))));
         self
     }
+
+    pub fn with_ordering(
+        &mut self,
+        ordering: Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>,
+    ) -> &mut Self {
+        self.arg_order = Some(Arc::new(Some(Ordering(ordering))));
+        self
+    }
 }
 
 pub fn symbol_by_id(id: u64) -> Option<Symbol> {
@@ -173,6 +137,14 @@ impl Symbol {
         } else {
             false
         }
+    }
+
+    pub fn arg_order(
+        &self,
+        left: &StatementNode,
+        right: &StatementNode,
+    ) -> Option<std::cmp::Ordering> {
+        self.arg_order.as_ref().as_ref().map(|o| o.0(left, right))
     }
 }
 

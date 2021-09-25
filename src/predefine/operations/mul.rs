@@ -1,15 +1,15 @@
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use bigdecimal::BigDecimal as Decimal;
 use trees::{tr, Tree};
 
 use crate::statement::{
-    symbols::{Symbol, SymbolAttr, SymbolAttrValue},
+    symbols::{symbol_by_id, Symbol, SymbolAttr, SymbolAttrValue},
     term::{StatementNode, Term},
     tree_utils::swap_node,
 };
 
-use super::plus::plus;
+use super::{plus::plus, power::power_argument};
 
 pub fn symbol() -> Symbol {
     Symbol::builder()
@@ -17,6 +17,7 @@ pub fn symbol() -> Symbol {
         .with_attr(SymbolAttr::Associative, SymbolAttrValue::None)
         .with_attr(SymbolAttr::Commutative, SymbolAttrValue::None)
         .with_calculator(Box::new(multiply))
+        .with_ordering(Box::new(ordering))
         .build()
         .unwrap()
 }
@@ -95,5 +96,27 @@ fn extract_power(root: &mut StatementNode) -> Tree<Term> {
         power
     } else {
         tr(Term::Number(Decimal::from(1)))
+    }
+}
+
+fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
+    // Number < Param < Variable < Symbol
+    match (power_argument(left).data(), power_argument(right).data()) {
+        (Term::Number(left), Term::Number(right)) => left.cmp(right),
+        (Term::Number(_), _) => Ordering::Less,
+
+        (Term::Param(left), Term::Param(right)) => left.cmp(right),
+        (Term::Param(_), Term::Number(_)) => Ordering::Greater,
+        (Term::Param(_), _) => Ordering::Less,
+
+        (Term::Variable(left), Term::Variable(right)) => left.cmp(right),
+        (Term::Variable(_), Term::Symbol(_)) => Ordering::Less,
+        (Term::Variable(_), _) => Ordering::Greater,
+
+        (Term::Symbol(left), Term::Symbol(right)) => symbol_by_id(*left)
+            .unwrap()
+            .name
+            .cmp(&symbol_by_id(*right).unwrap().name),
+        (Term::Symbol(_), _) => Ordering::Greater,
     }
 }

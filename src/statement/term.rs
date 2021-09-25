@@ -56,6 +56,13 @@ impl Term {
         None
     }
 
+    pub fn number(&self) -> Option<&Decimal> {
+        if let Term::Number(d) = &self {
+            return Some(d);
+        }
+        None
+    }
+
     #[allow(dead_code)]
     pub fn is_symbol_name(&self, name: &str) -> bool {
         if let Some(s) = symbol_by_name(name) {
