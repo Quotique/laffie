@@ -79,58 +79,6 @@ impl Term {
     }
 }
 
-pub fn display_string(node: &Node<Term>) -> String {
-    match node.data() {
-        Term::Symbol(id) => {
-            let symbol = symbol_by_id(*id).unwrap();
-            match symbol.display_weight() {
-                Some(weight) => {
-                    if node.degree() < 2 {
-                        return format!(
-                            "{}{}",
-                            symbol,
-                            node.iter()
-                                .map(|x| display_string(x))
-                                .collect::<Vec::<String>>()
-                                .join(", ")
-                        );
-                    }
-                    node.iter()
-                        .map(|x| {
-                            if let Term::Symbol(id) = x.data() {
-                                let symbol = symbol_by_id(*id).unwrap();
-                                if let Some(other_weight) = symbol.display_weight() {
-                                    if weight <= other_weight {
-                                        return format!("({})", display_string(x));
-                                    }
-                                }
-                            }
-                            display_string(x)
-                        })
-                        .collect::<Vec<String>>()
-                        .join(symbol.to_string().as_str())
-                }
-                None => {
-                    // Prefix notation is default
-                    if node.degree() > 0 {
-                        format!(
-                            "{}({})",
-                            symbol,
-                            node.iter()
-                                .map(|x| display_string(x))
-                                .collect::<Vec::<String>>()
-                                .join(", ")
-                        )
-                    } else {
-                        format!("{}", symbol,)
-                    }
-                }
-            }
-        }
-        _ => node.data().to_string(),
-    }
-}
-
 impl fmt::Display for Term {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

@@ -1,11 +1,12 @@
 use crate::statement::{
-    symbols::Symbol,
+    symbols::{Symbol, SymbolAttr, SymbolAttrValue},
     term::{StatementNode, Term},
 };
 
 pub fn symbol() -> Symbol {
     Symbol::builder()
         .name("-")
+        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(300))
         .with_calculator(Box::new(minus))
         .build()
         .unwrap()

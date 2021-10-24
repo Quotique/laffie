@@ -1,11 +1,12 @@
 use statement::{
-    symbols::Symbol,
+    symbols::{Symbol, SymbolAttr, SymbolAttrValue},
     term::{StatementNode, Term},
 };
 
 pub fn symbol() -> Symbol {
     Symbol::builder()
         .name("==")
+        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(500))
         .with_truth_checker(Box::new(equal))
         .build()
         .unwrap()

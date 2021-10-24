@@ -11,7 +11,8 @@ use trees::{tr, Node};
 
 use super::{
     semantic_parser::{ParserNode, TreeExtends},
-    term::{display_string, Param, StatementTree, Term},
+    statement_display::display_string,
+    term::{Param, StatementTree, Term},
     tree_utils::{replace, swap_node, NodeMapping},
 };
 

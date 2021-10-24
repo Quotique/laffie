@@ -16,6 +16,7 @@ pub fn symbol() -> Symbol {
         .name("+")
         .with_attr(SymbolAttr::Associative, SymbolAttrValue::None)
         .with_attr(SymbolAttr::Commutative, SymbolAttrValue::None)
+        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(300))
         .with_calculator(Box::new(plus))
         .with_ordering(Box::new(ordering))
         .build()

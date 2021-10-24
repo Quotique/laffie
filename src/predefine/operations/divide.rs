@@ -6,7 +6,7 @@ use num_bigint::{BigInt, ToBigInt};
 use trees::tr;
 
 use crate::statement::{
-    symbols::Symbol,
+    symbols::{Symbol, SymbolAttr, SymbolAttrValue},
     term::{StatementNode, Term},
     tree_utils::swap_node,
 };
@@ -16,6 +16,7 @@ use super::{MAX_DEC_CONVERSION_EXP, MAX_DEC_CONVERSION_VALUE};
 pub fn symbol() -> Symbol {
     Symbol::builder()
         .name("/")
+        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(200))
         .with_calculator(Box::new(divide))
         .build()
         .unwrap()

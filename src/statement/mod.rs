@@ -4,6 +4,7 @@ pub mod term;
 mod marked_statement;
 mod semantic_parser;
 mod statement;
+mod statement_display;
 pub mod tree_utils;
 
 pub use self::{
