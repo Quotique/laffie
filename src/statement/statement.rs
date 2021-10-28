@@ -4,17 +4,27 @@ use std::{
     fmt,
     hash::Hash,
     ops::{Index, IndexMut},
+    str::FromStr,
 };
 
-use eyre::Result;
+use bigdecimal::BigDecimal as Decimal;
+use eyre::{ensure, Result};
 use trees::{tr, Node};
 
+use crate::parser::Node as ParserNode;
+
 use super::{
-    semantic_parser::{ParserNode, TreeExtends},
     statement_display::display_string,
-    term::{Param, StatementTree, Term},
+    symbols::symbol_by_name,
+    term::{Param, StatementTree, Term, Variable},
     tree_utils::{replace, swap_node, NodeMapping},
 };
+
+#[derive(Clone, Copy)]
+enum NodeType {
+    Statement,
+    Rule,
+}
 
 pub type ParamsMap = HashMap<Param, StatementTree>;
 
@@ -32,14 +42,14 @@ impl Statement {
     #[inline]
     pub fn try_parse_statement(node: &ParserNode) -> Result<Self> {
         Ok(Self {
-            tree: StatementTree::try_parse_statement(node)?,
+            tree: Self::try_parse_impl(node, NodeType::Statement)?,
         })
     }
 
     #[inline]
     pub fn try_parse_rule(node: &ParserNode) -> Result<Self> {
         Ok(Self {
-            tree: StatementTree::try_parse_rule(node)?,
+            tree: Self::try_parse_impl(node, NodeType::Rule)?,
         })
     }
 
@@ -122,6 +132,40 @@ impl Statement {
 
     pub fn swap_node(&mut self, node: &mut Node<Term>) {
         swap_node(&mut self.tree.root_mut(), node)
+    }
+
+    fn try_parse_impl(node: &ParserNode, node_type: NodeType) -> Result<StatementTree> {
+        let mut tree = tr(Self::parse_term(node.data().as_str(), &node_type));
+        if tree.root().data().symbol_id().is_some() {
+            for child in node.iter() {
+                tree.push_back(Self::try_parse_impl(child, node_type)?);
+            }
+        } else {
+            ensure!(
+                node.degree() == 0,
+                "Node {} can't contains children!",
+                &node.data()
+            );
+        }
+
+        Ok(tree)
+    }
+
+    fn parse_term(data: &str, node_type: &NodeType) -> Term {
+        if let Ok(value) = Decimal::from_str(data) {
+            Term::Number(value)
+        } else if let Some(symbol) = symbol_by_name(data) {
+            Term::Symbol(symbol.id)
+        } else {
+            match node_type {
+                NodeType::Rule => {
+                    Term::Param(Param::from_str(data).expect("unable to create param"))
+                }
+                NodeType::Statement => {
+                    Term::Variable(Variable::from_str(data).expect("unable to create variable"))
+                }
+            }
+        }
     }
 }
 
