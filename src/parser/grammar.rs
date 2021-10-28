@@ -1,5 +1,9 @@
 use trees::{tr, Tree};
 
+fn tree(data: &str) -> Tree<String> {
+    tr(String::from(data))
+}
+
 peg::parser! {
     pub grammar ra() for str {
         use peg::ParseLiteral;
@@ -12,13 +16,16 @@ peg::parser! {
 
         rule semicolonsep<T>(x: rule<T>) -> Vec<T> = v:( (_ a:x() { a }) ** ";") ";"? {v}
 
-        rule keyword(id: &'static str) = ##parse_string_literal(id) !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
+        rule keyword(id: &'static str) =
+            ##parse_string_literal(id) !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
 
-        rule ident() -> Tree<String> = _ s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) {tr(String::from(s))}
+        rule ident() -> Tree<String> =
+            _ s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) { tree(s) }
 
         rule attrs() -> Vec<Tree<String>> = _ keyword("attr") _ a:commasep(<arithmetic()>) { a }
 
-        pub rule any() -> Vec<Tree<String>> = _ s:semicolonsep(<problem()/lang_rule()/symbol()>) _ { s }
+        pub rule any() -> Vec<Tree<String>> =
+            _ s:semicolonsep(<problem()/lang_rule()/symbol()>) _ { s }
 
         pub rule statements() -> Vec<Tree<String>> = _ c:semicolonsep(<arithmetic()>) { c }
 
@@ -27,7 +34,7 @@ peg::parser! {
                 _ c:semicolonsep(<arithmetic()>)
             _ "}"
             {
-                let mut p = tr(String::from("Problem")) /(tr(String::from("Target")) / t);
+                let mut p = tree("Problem") /(tree("Target") / t);
                 for i in c.iter().cloned() {
                     p.push_back(i);
                 }
@@ -42,18 +49,14 @@ peg::parser! {
                 {
                     match a {
                         Some(a) => {
-                            let mut t = tr(String::from("Attrs"));
+                            let mut t = tree("Attrs");
                             for i in a.iter().cloned() {
                                 t.push_back(i);
                             }
-                            tr(String::from("Declare")) / (
-                                tr(String::from("Symbol")) /
-                                tr(String::from(s))) / t
+                            tree("Declare") / (tree("Symbol") / tree(s)) / t
                         }
                         None => {
-                            tr(String::from("Declare")) / (
-                                tr(String::from("Symbol")) / tr(String::from(s))
-                            )
+                            tree("Declare") / (tree("Symbol") / tree(s))
                         }
                     }
                 }
@@ -66,15 +69,15 @@ peg::parser! {
                 _ ";"?
             _ "}"
             {
-                let mut t = tr(String::from("Rule"));
+                let mut t = tree("Rule");
                 t.push_back(r);
-                let mut pred = tr(String::from("Predicates"));
+                let mut pred = tree("Predicates");
                 for i in p.iter().cloned() {
                     pred.push_back(i);
                 }
                 t.push_back(pred);
                 if let Some(a) = a {
-                    let mut attr = tr(String::from("Attributes"));
+                    let mut attr = tree("Attributes");
                     for i in a.iter().cloned() {
                         attr.push_back(i);
                     }
@@ -86,32 +89,34 @@ peg::parser! {
         pub rule arithmetic() -> Tree<String> = precedence!{
             s:string() { tr(s) }
             --
-            x:(@) _ "=>" _ y:@ { tr(String::from("=>"))/x/y }
-            x:(@) _ "<=>" _ y:@ { tr(String::from("<=>"))/x/y }
+            x:(@) _ "=>" _ y:@ { tree("=>")/x/y }
+            x:(@) _ "<=>" _ y:@ { tree("<=>")/x/y }
             --
-            x:(@) _ "||" _ y:@ { tr(String::from("||"))/x/y }
-            x:(@) _ "&&" _ y:@ { tr(String::from("&&"))/x/y }
+            x:(@) _ "||" _ y:@ { tree("||")/x/y }
+            x:(@) _ "&&" _ y:@ { tree("&&")/x/y }
             --
-            x:(@) _ "is" _ y:@ { tr(String::from("is"))/x/y }
-            x:(@) _ "in" _ y:@ { tr(String::from("in"))/x/y }
-            x:(@) _ "==" _ y:@ { tr(String::from("=="))/x/y }
-            x:(@) _ "!=" _ y:@ { tr(String::from("!="))/x/y }
-            x:(@) _ "<=" _ y:@ { tr(String::from("<="))/x/y }
-            x:(@) _ ">=" _ y:@ { tr(String::from(">="))/x/y }
-            x:(@) _ "<" _ y:@ { tr(String::from("<"))/x/y }
-            x:(@) _ ">" _ y:@ { tr(String::from(">"))/x/y }
+            x:(@) _ "is" _ y:@ { tree("is")/x/y }
+            x:(@) _ "in" _ y:@ { tree("in")/x/y }
+            x:(@) _ "==" _ y:@ { tree("==")/x/y }
+            x:(@) _ "!=" _ y:@ { tree("!=")/x/y }
+            x:(@) _ "<=" _ y:@ { tree("<=")/x/y }
+            x:(@) _ ">=" _ y:@ { tree(">=")/x/y }
+            x:(@) _ "<" _ y:@ { tree("<")/x/y }
+            x:(@) _ ">" _ y:@ { tree(">")/x/y }
             --
-            "-" _ x:@ { tr(String::from("-"))/x }
-            "+" _ x:@ { tr(String::from("+"))/x }
-            "!" _ x:@ { tr(String::from("!"))/x }
+            x:(@) _ "as" _ y:ident() { tree("as")/x/y }
             --
-            x:(@) _ "+" _ y:@ { tr(String::from("+"))/x/y }
-            x:(@) _ "-" _ y:@ { tr(String::from("-"))/x/y }
+            "-" _ x:@ { tree("-")/x }
+            "+" _ x:@ { tree("+")/x }
+            "!" _ x:@ { tree("!")/x }
             --
-            x:(@) _ "*" _ y:@ { tr(String::from("*"))/x/y }
-            x:(@) _ "/" _ y:@ { tr(String::from("/"))/x/y }
+            x:(@) _ "+" _ y:@ { tree("+")/x/y }
+            x:(@) _ "-" _ y:@ { tree("-")/x/y }
             --
-            x:@ "^" y:(@) { tr(String::from("^"))/x/y }
+            x:(@) _ "*" _ y:@ { tree("*")/x/y }
+            x:(@) _ "/" _ y:@ { tree("/")/x/y }
+            --
+            x:@ "^" y:(@) { tree("^")/x/y }
             --
             e:eval() { e }
             i:ident() { i }
@@ -130,8 +135,6 @@ peg::parser! {
             "\"" s:quoted_char()* "\"" { s.into_iter().collect() }
 
         rule quoted_char() -> char = !("\"" / "\\") c:$([_]) { c.chars().next().unwrap() }
-
-    //    rule problem() -> Tree<String> = keyword("problem") _ "{" c:commasep<Tree<String>> "}"
     }
 }
 
@@ -148,10 +151,21 @@ mod tests {
     fn args_test() {
         assert_eq!(
             ra::arithmetic("sum(one + three, two)"),
-            Ok(tr(String::from("sum")) /
-                (tr(String::from("+")) / tr(String::from("one")) / tr(String::from("three"))) /
-                tr(String::from("two")))
+            Ok(tree("sum") / (tree("+") / tree("one") / tree("three")) / tree("two"))
         );
+    }
+
+    #[test]
+    fn bindings_test() {
+        let test = "set(a, b) as S is Known";
+        let states = ra::statements(test).unwrap();
+        assert_eq!(states.len(), 1);
+        assert_eq!(
+            states[0],
+            tree("is") /
+                (tree("as") / (tree("set") / tree("a") / tree("b")) / tree("S")) /
+                tree("Known")
+        )
     }
 
     #[test]
@@ -160,14 +174,8 @@ mod tests {
         let states = ra::statements(test).unwrap();
 
         assert_eq!(states.len(), 2);
-        assert_eq!(
-            states[0],
-            tr(String::from("in")) / tr(String::from("x")) / tr(String::from("Real"))
-        );
-        assert_eq!(
-            states[1],
-            tr(String::from("is")) / tr(String::from("x")) / tr(String::from("Unknown"))
-        );
+        assert_eq!(states[0], tree("in") / tree("x") / tree("Real"));
+        assert_eq!(states[1], tree("is") / tree("x") / tree("Unknown"));
     }
 
     #[test]
@@ -180,21 +188,13 @@ mod tests {
         assert_eq!(states.len(), 3);
         assert_eq!(
             states[0],
-            tr(String::from("=>")) /
-                (tr(String::from("==")) /
-                    (tr(String::from("*")) /
-                        tr(String::from("x")) /
-                        (tr(String::from("+")) /
-                            tr(String::from("y")) /
-                            tr(String::from("z")))) /
-                    tr(String::from("0"))) /
-                (tr(String::from("||")) /
-                    (tr(String::from("==")) /
-                        (tr(String::from("+")) /
-                            tr(String::from("y")) /
-                            tr(String::from("z"))) /
-                        tr(String::from("0"))) /
-                    (tr(String::from("==")) / tr(String::from("x")) / tr(String::from("0"))))
+            tree("=>") /
+                (tree("==") /
+                    (tree("*") / tree("x") / (tree("+") / tree("y") / tree("z"))) /
+                    tree("0")) /
+                (tree("||") /
+                    (tree("==") / (tree("+") / tree("y") / tree("z")) / tree("0")) /
+                    (tree("==") / tree("x") / tree("0")))
         );
     }
 
@@ -207,22 +207,13 @@ mod tests {
         let states = ra::lang_rule(test).unwrap();
         assert_eq!(
             states,
-            tr(String::from("Rule")) /
-                (tr(String::from("=>")) /
-                    (tr(String::from("==")) /
-                        (tr(String::from("+")) /
-                            (tr(String::from("*")) /
-                                tr(String::from("a")) /
-                                tr(String::from("x"))) /
-                            tr(String::from("b"))) /
-                        tr(String::from("0"))) /
-                    (tr(String::from("==")) /
-                        tr(String::from("x")) /
-                        (tr(String::from("/")) /
-                            tr(String::from("b")) /
-                            tr(String::from("a"))))) /
-                (tr(String::from("Predicates")) /
-                    (tr(String::from("!=")) / tr(String::from("a")) / tr(String::from("0"))))
+            tree("Rule") /
+                (tree("=>") /
+                    (tree("==") /
+                        (tree("+") / (tree("*") / tree("a") / tree("x")) / tree("b")) /
+                        tree("0")) /
+                    (tree("==") / tree("x") / (tree("/") / tree("b") / tree("a")))) /
+                (tree("Predicates") / (tree("!=") / tree("a") / tree("0")))
         );
     }
 
@@ -235,15 +226,11 @@ mod tests {
         let states = ra::problem(test).unwrap();
         assert_eq!(
             states,
-            tr(String::from("Problem")) /
-                (tr(String::from("Target")) / (tr(String::from("find")) / tr(String::from("x")))) /
-                (tr(String::from("==")) /
-                    (tr(String::from("+")) /
-                        (tr(String::from("*")) /
-                            tr(String::from("2")) /
-                            tr(String::from("x"))) /
-                        tr(String::from("5"))) /
-                    tr(String::from("0")))
+            tree("Problem") /
+                (tree("Target") / (tree("find") / tree("x"))) /
+                (tree("==") /
+                    (tree("+") / (tree("*") / tree("2") / tree("x")) / tree("5")) /
+                    tree("0"))
         )
     }
 
@@ -251,10 +238,6 @@ mod tests {
     fn priority_test() {
         let test = r#"-a/b"#;
         let states = ra::statements(test).unwrap();
-        assert_eq!(
-            states[0],
-            tr(String::from("-")) /
-                (tr(String::from("/")) / tr(String::from("a")) / tr(String::from("b")))
-        )
+        assert_eq!(states[0], tree("-") / (tree("/") / tree("a") / tree("b")))
     }
 }
