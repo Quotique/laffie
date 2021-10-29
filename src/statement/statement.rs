@@ -28,40 +28,57 @@ enum NodeType {
 
 pub type ParamsMap = HashMap<Param, StatementTree>;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodePosition {
     coordinates: Vec<usize>,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Statement {
-    tree: StatementTree,
+    tree:  StatementTree,
+    binds: HashMap<Param, NodePosition>,
 }
 
 impl Statement {
     #[inline]
     pub fn try_parse_statement(node: &ParserNode) -> Result<Self> {
+        let mut positions_map = Default::default();
         Ok(Self {
-            tree: Self::try_parse_impl(node, NodeType::Statement)?,
+            tree:  Self::try_parse_impl(
+                node,
+                NodeType::Statement,
+                Default::default(),
+                &mut positions_map,
+            )?,
+            binds: positions_map,
         })
     }
 
     #[inline]
     pub fn try_parse_rule(node: &ParserNode) -> Result<Self> {
+        let mut positions_map = Default::default();
         Ok(Self {
-            tree: Self::try_parse_impl(node, NodeType::Rule)?,
+            tree:  Self::try_parse_impl(
+                node,
+                NodeType::Rule,
+                Default::default(),
+                &mut positions_map,
+            )?,
+            binds: positions_map,
         })
     }
 
     pub fn one() -> Self {
         Self {
-            tree: tr(Term::Number(1.into())),
+            tree:  tr(Term::Number(1.into())),
+            binds: Default::default(),
         }
     }
 
     pub fn zero() -> Self {
         Self {
-            tree: tr(Term::Number(0.into())),
+            tree:  tr(Term::Number(0.into())),
+            binds: Default::default(),
         }
     }
 
@@ -134,11 +151,35 @@ impl Statement {
         swap_node(&mut self.tree.root_mut(), node)
     }
 
-    fn try_parse_impl(node: &ParserNode, node_type: NodeType) -> Result<StatementTree> {
+    fn try_parse_impl(
+        mut node: &ParserNode,
+        node_type: NodeType,
+        node_position: NodePosition,
+        positions_map: &mut HashMap<Param, NodePosition>,
+    ) -> Result<StatementTree> {
+        while node.data() == "as" {
+            let param =
+                Param::from_str(node.back().unwrap().data()).expect("unable to create param");
+            ensure!(
+                positions_map
+                    .insert(param.clone(), node_position.clone())
+                    .is_none(),
+                "Multiple definition of param {}",
+                param
+            );
+
+            node = node.front().unwrap();
+        }
+
         let mut tree = tr(Self::parse_term(node.data().as_str(), &node_type));
         if tree.root().data().symbol_id().is_some() {
-            for child in node.iter() {
-                tree.push_back(Self::try_parse_impl(child, node_type)?);
+            for (num, child) in node.iter().enumerate() {
+                tree.push_back(Self::try_parse_impl(
+                    child,
+                    node_type,
+                    node_position.clone().child(num),
+                    positions_map,
+                )?);
             }
         } else {
             ensure!(
@@ -169,6 +210,14 @@ impl Statement {
     }
 }
 
+impl Default for NodePosition {
+    fn default() -> Self {
+        Self {
+            coordinates: vec![],
+        }
+    }
+}
+
 impl NodePosition {
     fn root() -> Self {
         Self {
@@ -179,6 +228,12 @@ impl NodePosition {
     fn child(mut self, num: usize) -> Self {
         self.coordinates.push(num);
         self
+    }
+}
+
+impl Hash for Statement {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.tree.hash(state);
     }
 }
 
@@ -207,7 +262,10 @@ impl Index<&NodePosition> for Statement {
 
 impl From<StatementTree> for Statement {
     fn from(source: StatementTree) -> Self {
-        Self { tree: source }
+        Self {
+            tree:  source,
+            binds: Default::default(),
+        }
     }
 }
 
@@ -220,5 +278,27 @@ impl fmt::Debug for Statement {
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", display_string(self.tree.root()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use parser::statement_with_params;
+    use predefine::setup;
+
+    #[test]
+    fn binds_test() {
+        setup();
+
+        let test = "set(a, b) as S is known <=> true";
+
+        let statement = statement_with_params(test);
+
+        insta::assert_debug_snapshot!(statement);
+        assert_eq!(
+            statement.binds.get(&Param::from_str("S").unwrap()),
+            Some(NodePosition::root().child(0).child(0)).as_ref()
+        );
     }
 }
