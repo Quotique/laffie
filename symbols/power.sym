@@ -6,8 +6,8 @@ rule {
     attr level(1),problem_target(find(x)),one(a),one(b),zero(c);
 
     a * x^2 + b * x + c == 0 => 
-        ((b^2 - 4*a*c) < 0 && x in empty_set) || 
-        ((b^2 - 4*a*c) >= 0 && x in set( (-b+sqrt(b^2 - 4 * a * c))/(2*a), (-b-sqrt(b^2 - 4 * a * c))/(2*a) ));
+        (((b^2 - 4*a*c) as D) < 0 && x in empty_set) || 
+        (D >= 0 && x in set( (-b+sqrt(D))/(2*a), (-b-sqrt(D))/(2*a) ));
 
     a != 0;
 };

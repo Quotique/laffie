@@ -138,22 +138,20 @@ mod tests {
         let rule = rules.pop().unwrap();
 
         assert_eq!(
-            rule.pattern,
+            rule.pattern_node().deep_clone(),
             (tr(Term::with_symbol_name("==").unwrap()) /
                 (tr(Term::with_symbol_name("+").unwrap()) /
                     tr(Term::Param("a".parse().unwrap())) /
                     tr(Term::Param("x".parse().unwrap()))) /
                 tr(Term::Number(0.into())))
-            .into()
         );
 
         assert_eq!(
-            rule.replace,
+            rule.replace_node().deep_clone(),
             (tr(Term::with_symbol_name("==").unwrap()) /
                 tr(Term::Param("x".parse().unwrap())) /
                 (tr(Term::with_symbol_name("-").unwrap()) /
                     tr(Term::Param("a".parse().unwrap()))))
-            .into()
         );
         assert_eq!(rule.requirements.len(), 1);
         assert_eq!(
@@ -192,18 +190,17 @@ mod tests {
         let rule = rules.pop().unwrap();
 
         assert_eq!(
-            rule.pattern,
+            rule.pattern_node().deep_clone(),
             (tr(Term::with_symbol_name("is").unwrap()) /
                 (tr(Term::with_symbol_name("/").unwrap()) /
                     tr(Term::Param("a".parse().unwrap())) /
                     tr(Term::Param("b".parse().unwrap()))) /
                 tr(Term::with_symbol_name("known").unwrap()))
-            .into()
         );
 
         assert_eq!(
-            rule.replace,
-            (tr(Term::with_symbol_name("true").unwrap())).into()
+            rule.replace_node().deep_clone(),
+            (tr(Term::with_symbol_name("true").unwrap()))
         );
         assert_eq!(rule.requirements.len(), 2);
         assert_eq!(

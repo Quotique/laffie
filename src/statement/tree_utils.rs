@@ -1,4 +1,8 @@
-use std::{collections::HashMap, iter::Iterator, ops::Deref};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    iter::Iterator,
+    ops::Deref,
+};
 
 use eyre::{bail, ensure, Result};
 use trees::{tr, Node, Tree};
@@ -6,6 +10,7 @@ use trees::{tr, Node, Tree};
 use utils::SubsetIterator;
 
 use super::{
+    index::NodePosition,
     symbols::{symbol_by_id, SymbolAttr},
     term::{Param, StatementNode, StatementTree, Term, Variable},
 };
@@ -48,20 +53,52 @@ pub fn replace<F: Clone + PartialEq + Unpin>(arg: &mut Node<F>, src: &Node<F>, d
 }
 
 pub trait NodeMapping {
+    fn find_subtree_map(&self, target: &Self) -> Vec<(Vec<ParamsMap>, NodePosition)>;
+
     fn apply_variable_map(&mut self, variables: &VariablesMap);
 
     fn apply_param_map(&mut self, params: &ParamsMap);
 
     fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Vec<StatementTree>> + '_>;
 
-    fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>>;
+    // fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>>;
+    fn map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>>;
 
     fn evaluate(&mut self) -> bool;
 
     fn check_truth(&self) -> bool;
+
+    fn symbols(&self) -> HashSet<u64>;
 }
 
 impl NodeMapping for StatementNode {
+    fn symbols(&self) -> HashSet<u64> {
+        self.bfs()
+            .iter
+            .filter_map(|x| x.data.symbol_id())
+            .collect::<HashSet<u64>>()
+    }
+
+    fn find_subtree_map(&self, target: &Self) -> Vec<(Vec<ParamsMap>, NodePosition)> {
+        let mut result = vec![];
+        let mut queue = VecDeque::new();
+        queue.push_back((target, NodePosition::root()));
+
+        while let Some((node, pos)) = queue.pop_front() {
+            if let Ok(mapping) = self
+                .map(node)
+                .map_err(|_| trace!(target: "pattern_match", "No match for {} to {}", self, node))
+            {
+                result.push((mapping, pos.clone()));
+            }
+
+            for (num, i) in node.iter().enumerate() {
+                queue.push_back((i, pos.clone().child(num)));
+            }
+        }
+        result
+    }
+
     fn apply_variable_map(&mut self, variables: &VariablesMap) {
         if let Some(mut v) = self
             .data()
@@ -112,8 +149,11 @@ impl NodeMapping for StatementNode {
         }))
     }
 
-    fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>> {
-        params_map_impl(self, pattern, ParamsMap::new())
+    // fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>> {
+    //     params_map_impl(self, pattern, ParamsMap::new())
+    // }
+    fn map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>> {
+        params_map_impl(pattern, self, ParamsMap::new())
     }
 
     fn evaluate(&mut self) -> bool {
@@ -225,7 +265,7 @@ fn params_map_impl(
         (Term::Param(p), _) => {
             if params.contains_key(p) {
                 let node = params.get(p).unwrap();
-                let _ = node.params_map(target)?;
+                let _ = target.map(node)?;
             } else {
                 params.insert(p.clone(), target.deep_clone());
             }
@@ -324,9 +364,9 @@ mod tests {
         let statement = statement_with_vars("x + 1 == 0");
         let pattern = statement_with_params("a + b == 0");
 
-        let maps = statement
+        let maps = pattern
             .root()
-            .params_map(pattern.root())
+            .map(statement.root())
             .map_err(|e| println!("Error: {}", e))
             .unwrap();
         insta::assert_debug_snapshot!(dump_mapping(&maps));
@@ -339,9 +379,9 @@ mod tests {
         let statement = statement_with_vars("x + 1 == x");
         let pattern = statement_with_params("a + 1 == a");
 
-        let maps = statement
+        let maps = pattern
             .root()
-            .params_map(pattern.root())
+            .map(statement.root())
             .map_err(|e| println!("Error: {}", e))
             .unwrap();
         insta::assert_debug_snapshot!(dump_mapping(&maps));
@@ -354,9 +394,9 @@ mod tests {
         let statement = statement_with_vars("(x - 1) + 4 == x - 1");
         let pattern = statement_with_params("a + 4 == b");
 
-        let maps = statement
+        let maps = pattern
             .root()
-            .params_map(pattern.root())
+            .map(statement.root())
             .map_err(|e| println!("Error: {}", e))
             .unwrap();
         insta::assert_debug_snapshot!(dump_mapping(&maps));
@@ -369,9 +409,9 @@ mod tests {
         let statement = statement_with_vars("(x - 1) + 4 == x - 1");
         let pattern = statement_with_params("a + 4 == b");
 
-        let maps = statement
+        let maps = pattern
             .root()
-            .params_map(pattern.root())
+            .map(statement.root())
             .map_err(|e| println!("Error: {}", e))
             .unwrap();
         assert_eq!(maps.len(), 1);

@@ -1,9 +1,8 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet},
     convert::From,
     fmt,
     hash::Hash,
-    ops::{Index, IndexMut},
     str::FromStr,
 };
 
@@ -14,6 +13,7 @@ use trees::{tr, Node};
 use crate::parser::Node as ParserNode;
 
 use super::{
+    index::NodePosition,
     statement_display::display_string,
     symbols::symbol_by_name,
     term::{Param, StatementTree, Term, Variable},
@@ -28,15 +28,10 @@ enum NodeType {
 
 pub type ParamsMap = HashMap<Param, StatementTree>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NodePosition {
-    coordinates: Vec<usize>,
-}
-
 #[derive(Clone, PartialEq, Eq)]
 pub struct Statement {
-    tree:  StatementTree,
-    binds: HashMap<Param, NodePosition>,
+    pub(super) tree: StatementTree,
+    pub binds:       HashMap<Param, NodePosition>,
 }
 
 impl Statement {
@@ -119,31 +114,12 @@ impl Statement {
     }
 
     pub fn map(&self, target: &Self) -> Result<Vec<ParamsMap>> {
-        target.tree.root().params_map(self.tree.root())
+        self.tree.root().map(target.tree.root())
     }
 
     pub fn apply_map(&self, params: &ParamsMap) -> Self {
         let mut result = self.clone();
         result.tree.root_mut().apply_param_map(params);
-        result
-    }
-
-    pub fn find_subtree_map(&self, target: &Self) -> Vec<(Vec<ParamsMap>, NodePosition)> {
-        let mut result = vec![];
-        let mut queue = VecDeque::new();
-        queue.push_back((target.tree.root(), NodePosition::root()));
-
-        while let Some((node, pos)) = queue.pop_front() {
-            if let Ok(mapping) = node.params_map(self.tree.root()).map_err(
-                |_| trace!(target: "pattern_match", "No match for {} to {}", self.tree, node),
-            ) {
-                result.push((mapping, pos.clone()));
-            }
-
-            for (num, i) in node.iter().enumerate() {
-                queue.push_back((i, pos.clone().child(num)));
-            }
-        }
         result
     }
 
@@ -210,53 +186,9 @@ impl Statement {
     }
 }
 
-impl Default for NodePosition {
-    fn default() -> Self {
-        Self {
-            coordinates: vec![],
-        }
-    }
-}
-
-impl NodePosition {
-    fn root() -> Self {
-        Self {
-            coordinates: vec![],
-        }
-    }
-
-    fn child(mut self, num: usize) -> Self {
-        self.coordinates.push(num);
-        self
-    }
-}
-
 impl Hash for Statement {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.tree.hash(state);
-    }
-}
-
-impl IndexMut<&NodePosition> for Statement {
-    fn index_mut(&mut self, pos: &NodePosition) -> &mut Self::Output {
-        let mut root = self.tree.root_mut().get_mut();
-        for i in pos.coordinates.iter() {
-            let next_root = root.iter_mut().nth(*i).expect("Bad position").get_mut();
-            root = next_root;
-        }
-        root
-    }
-}
-
-impl Index<&NodePosition> for Statement {
-    type Output = Node<Term>;
-
-    fn index(&self, pos: &NodePosition) -> &Self::Output {
-        let mut root = self.tree.root();
-        for i in pos.coordinates.iter() {
-            root = root.iter().nth(*i).expect("Bad position");
-        }
-        root
     }
 }
 

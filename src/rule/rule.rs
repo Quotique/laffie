@@ -1,5 +1,8 @@
 use crate::{
-    statement::{symbols::symbol_by_id, MarkedStatement, Statement},
+    statement::{
+        symbols::symbol_by_id, MarkedStatement, NodeMapping, NodePosition, ParamsMap, Statement,
+        StatementNode,
+    },
     utils::VecDisplay,
 };
 use std::{
@@ -52,8 +55,10 @@ pub struct Rule {
 
     pub attrs: HashMap<RuleAttr, RuleAttrValue>,
 
-    pub pattern: Statement,
-    pub replace: Statement,
+    pub statement: Statement,
+    pub pattern:   NodePosition,
+    pub replace:   NodePosition,
+    pub binds:     ParamsMap,
 
     pub requirements: Vec<Statement>,
 
@@ -92,8 +97,8 @@ impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} => {} id: {}, level: {}, reqs: {:?}",
-            self.pattern, self.replace, self.id, self.level, self.requirements
+            "{} id: {}, level: {}, reqs: {:?}",
+            self.statement, self.id, self.level, self.requirements
         )
     }
 }
@@ -104,7 +109,7 @@ impl Rule {
     }
 
     pub fn is_tautology(&self) -> bool {
-        self.pattern == self.replace
+        self.pattern_node() == self.replace_node()
     }
 
     pub fn is_statement_suitable(
@@ -172,10 +177,20 @@ impl Rule {
         }
     }
 
+    #[inline]
+    pub fn pattern_node(&self) -> &StatementNode {
+        &self.statement[&self.pattern]
+    }
+
+    #[inline]
+    pub fn replace_node(&self) -> &StatementNode {
+        &self.statement[&self.replace]
+    }
+
     fn apply_root(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {
         let maps = self
-            .pattern
-            .map(&arg.statement)
+            .pattern_node()
+            .map(arg.statement.root())
             .map_err(|e| RuleDeclineReason::ParamsMappingErr(e.to_string()))?;
 
         Ok(maps
@@ -187,7 +202,9 @@ impl Rule {
                     .map(|r| Arc::new(r.apply_map(x)))
                     .collect(),
                 resolution:   MarkedStatement::from(Arc::new(
-                    self.replace.apply_map(x).normalize(),
+                    Statement::from(self.replace_node().deep_clone())
+                        .apply_map(x)
+                        .normalize(),
                 ))
                 .with_parent(arg.id),
             })
@@ -195,7 +212,7 @@ impl Rule {
     }
 
     fn apply_subtree(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        let maps = self.pattern.find_subtree_map(&arg.statement);
+        let maps = self.pattern_node().find_subtree_map(arg.statement.root());
         if maps.is_empty() {
             return Err(RuleDeclineReason::ParamsMappingErr("no match".into()));
         }
@@ -203,7 +220,9 @@ impl Rule {
         let mut result = vec![];
         for (maps, pos) in maps.iter() {
             for i in maps.iter() {
-                let mut replace = self.replace.apply_map(i);
+                let replace = Statement::from(self.replace_node().deep_clone());
+
+                let mut replace = replace.apply_map(&self.binds).apply_map(i);
                 let mut src = (*arg.statement).clone();
                 replace.swap_node(&mut src[pos]);
                 src.inpl_normalize();
@@ -263,6 +282,32 @@ pub mod tests {
             .unwrap();
         assert_eq!(rules.len(), 1);
         rules.pop().unwrap()
+    }
+
+    fn rule_with_binds() -> Rule {
+        setup();
+        let test_rule = r#"rule {
+                            attr level(1);
+                            a/((b + c) as D) == 0 <=> a == 0 && D != 0;
+                        }"#;
+
+        let mut rules = RuleParser::with(&ra::lang_rule(test_rule).unwrap())
+            .parse()
+            .unwrap();
+        assert_eq!(rules.len(), 1);
+        rules.pop().unwrap()
+    }
+
+    fn test_statement_fraction() -> MarkedStatement {
+        setup();
+        let test_statement = r#"2/(x + 1) == 0"#;
+
+        MarkedStatement::from(Arc::new(
+            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
+                .with_variables()
+                .parse()
+                .unwrap(),
+        ))
     }
 
     fn test_statement() -> MarkedStatement {
@@ -403,6 +448,21 @@ pub mod tests {
         assert_eq!(
             rule.apply(&mut statement, &target).err(),
             Some(RuleDeclineReason::AlreadyApplied)
+        );
+    }
+
+    #[test]
+    fn bind_apply_test() {
+        let rule = rule_with_binds();
+        let mut statement = test_statement_fraction();
+        let target = test_target();
+
+        statement.weight = 1;
+        let suppose = rule.apply(&mut statement, &target).unwrap();
+        assert_eq!(suppose[0].requirements.len(), 0);
+        assert_eq!(
+            *suppose[0].resolution.statement,
+            statement_with_vars("2 == 0 && x + 1 != 0")
         );
     }
 }

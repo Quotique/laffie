@@ -1,6 +1,8 @@
-use super::rule::{Rule, RuleAttr, RuleAttrValue};
-use crate::statement::{symbols::symbol_by_name, term::Term, Statement};
 use std::{collections::HashMap, convert::From, fmt};
+
+use crate::statement::{symbols::symbol_by_name, NodeMapping, NodePosition, Statement};
+
+use super::rule::{Rule, RuleAttr, RuleAttrValue};
 
 #[derive(Clone, Debug)]
 pub enum RuleBuilderError {
@@ -83,7 +85,30 @@ impl RuleBuilder {
     }
 
     pub fn build(mut self) -> Result<Vec<Rule>, RuleBuilderError> {
-        let (pattern, replace) = self.split_statement()?;
+        let statement = self
+            .statement
+            .take()
+            .ok_or(RuleBuilderError::BadStatementRoot)?;
+
+        let root_sym = statement
+            .root()
+            .data()
+            .symbol()
+            .ok_or(RuleBuilderError::BadStatementRoot)?;
+
+        match root_sym.name.as_str() {
+            "=>" => {}
+            "<=>" | "==" => {
+                self.attributes
+                    .push((RuleAttr::Equivalence, RuleAttrValue::None));
+            }
+            _ => return Err(RuleBuilderError::BadStatementRoot),
+        }
+
+        if statement.root().degree() != 2 {
+            return Err(RuleBuilderError::WrongArgsCount);
+        }
+
         let mut attrs: HashMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
         attrs.insert(RuleAttr::Subtree, RuleAttrValue::None);
 
@@ -94,8 +119,7 @@ impl RuleBuilder {
         };
         let mut result = vec![];
         for set in 0..(2_u64).pow(self.replaces.len() as u32) {
-            let mut pattern = pattern.clone();
-            let mut replace = replace.clone();
+            let mut statement = statement.clone();
             let mut reqs = self.requirements.clone();
 
             for i in 0..self.replaces.len() {
@@ -103,15 +127,13 @@ impl RuleBuilder {
                 if set & elem == elem {
                     match self.replaces.get(i) {
                         Some((RuleAttr::One, src)) => {
-                            pattern.replace(src, &Statement::one());
-                            replace.replace(src, &Statement::one());
+                            statement.replace(src, &Statement::one());
                             for i in reqs.iter_mut() {
                                 i.replace(src, &Statement::one());
                             }
                         }
                         Some((RuleAttr::Zero, src)) => {
-                            pattern.replace(src, &Statement::zero());
-                            replace.replace(src, &Statement::zero());
+                            statement.replace(src, &Statement::zero());
                             for i in reqs.iter_mut() {
                                 i.replace(src, &Statement::zero());
                             }
@@ -120,61 +142,28 @@ impl RuleBuilder {
                     }
                 }
             }
+            let binds = statement
+                .binds
+                .iter()
+                .map(|(param, pos)| (param.clone(), statement[pos].deep_clone()))
+                .collect();
 
-            pattern.inpl_normalize();
-            replace.inpl_normalize();
+            statement.inpl_normalize();
 
             result.push(Rule {
-                id:              self.rule_id,
-                level:           *level as usize,
-                symbol_id:       self.symbol_id,
-                attrs:           attrs.clone(),
-                pattern_symbols: pattern.symbols(),
-                pattern:         pattern,
-                replace:         replace,
-                requirements:    reqs,
+                id: self.rule_id,
+                level: *level as usize,
+                symbol_id: self.symbol_id,
+                attrs: attrs.clone(),
+                pattern_symbols: statement.root().front().unwrap().symbols(),
+                statement,
+                pattern: NodePosition::default().child(0),
+                replace: NodePosition::default().child(1),
+                binds,
+                requirements: reqs,
             });
         }
         result.retain(|x| !x.is_tautology());
         Ok(result)
-    }
-
-    fn split_statement(&mut self) -> Result<(Statement, Statement), RuleBuilderError> {
-        let (root, mut childs) = self
-            .statement
-            .take()
-            .ok_or(RuleBuilderError::BadStatementRoot)?
-            .destruct();
-
-        if childs.degree() != 2 {
-            return Err(RuleBuilderError::WrongArgsCount);
-        }
-
-        if *root.data() == Term::with_symbol_name("=>").unwrap() {
-            return Ok((
-                Statement::from(childs.pop_front().unwrap()),
-                Statement::from(childs.pop_back().unwrap()),
-            ));
-        } else if *root.data() == Term::with_symbol_name("<=>").unwrap() {
-            self.attributes
-                .push((RuleAttr::Equivalence, RuleAttrValue::None));
-
-            return Ok((
-                Statement::from(childs.pop_front().unwrap()),
-                Statement::from(childs.pop_back().unwrap()),
-            ));
-        } else if *root.data() == Term::with_symbol_name("==").unwrap() {
-            self.attributes
-                .push((RuleAttr::Equivalence, RuleAttrValue::None));
-            self.attributes
-                .push((RuleAttr::Subtree, RuleAttrValue::None));
-
-            return Ok((
-                Statement::from(childs.pop_front().unwrap()),
-                Statement::from(childs.pop_back().unwrap()),
-            ));
-        }
-
-        Err(RuleBuilderError::BadStatementRoot)
     }
 }

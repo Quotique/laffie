@@ -75,12 +75,6 @@ impl MarkedStatement {
         self
     }
 
-    // pub fn normalize(self) -> Self {
-    //     let mut copy = self.clone();
-    //     copy.statement = Arc::new(self.statement.normalize());
-    //     copy
-    // }
-
     pub fn rule(&mut self, id: usize, level: u64) -> Option<Arc<RwLock<Rule>>> {
         if self.not_rule {
             return None;
@@ -100,7 +94,7 @@ impl MarkedStatement {
                 .map_err(|e| trace!("Error rule build: {} for  {}", e, self.statement))
             {
                 let rule = rule.pop().unwrap();
-                if rule.pattern.root().data().variable().is_some() {
+                if rule.pattern_node().data().variable().is_some() {
                     trace!("New rule: {}", rule);
                     let rule = Arc::new(RwLock::new(rule));
                     self.as_rule = Some(rule.clone());
