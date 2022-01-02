@@ -22,6 +22,8 @@ peg::parser! {
         rule ident() -> Tree<String> =
             _ s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) { tree(s) }
 
+        rule placeholder() -> Tree<String> = ".." { tree("..") }
+
         rule attrs() -> Vec<Tree<String>> = _ keyword("attr") _ a:commasep(<arithmetic()>) { a }
 
         pub rule any() -> Vec<Tree<String>> =
@@ -119,6 +121,7 @@ peg::parser! {
             x:@ "^" y:(@) { tree("^")/x/y }
             --
             e:eval() { e }
+            p:placeholder() { p }
             i:ident() { i }
             "(" _  a:arithmetic() _ ")" {a}
         }
@@ -239,5 +242,16 @@ mod tests {
         let test = r#"-a/b"#;
         let states = ra::statements(test).unwrap();
         assert_eq!(states[0], tree("-") / (tree("/") / tree("a") / tree("b")))
+    }
+
+    #[test]
+    fn placeholder_test() {
+        let test = "set(..) as S is Known";
+        let states = ra::statements(test).unwrap();
+        assert_eq!(states.len(), 1);
+        assert_eq!(
+            states[0],
+            tree("is") / (tree("as") / (tree("set") / tree("..")) / tree("S")) / tree("Known")
+        )
     }
 }

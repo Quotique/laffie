@@ -59,9 +59,8 @@ pub trait NodeMapping {
 
     fn apply_param_map(&mut self, params: &ParamsMap);
 
-    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Vec<StatementTree>> + '_>;
+    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = StatementTree> + '_>;
 
-    // fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>>;
     fn map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>>;
 
     fn evaluate(&mut self) -> bool;
@@ -131,7 +130,7 @@ impl NodeMapping for StatementNode {
         }
     }
 
-    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Vec<StatementTree>> + '_> {
+    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = StatementTree> + '_> {
         Box::new(SubsetIterator::new(self.degree(), count).map(move |i| {
             let s = self.data().symbol().unwrap();
             let mut parts = vec![tr(Term::Symbol(s.id)); count];
@@ -145,13 +144,14 @@ impl NodeMapping for StatementNode {
                     swap_node(&mut p.root_mut(), &mut child.root_mut());
                 }
             }
-            parts
+            let mut result = tr(Term::Symbol(s.id));
+            for p in parts.into_iter() {
+                result.push_back(p);
+            }
+            result
         }))
     }
 
-    // fn params_map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>> {
-    //     params_map_impl(self, pattern, ParamsMap::new())
-    // }
     fn map(&self, pattern: &StatementNode) -> Result<Vec<ParamsMap>> {
         params_map_impl(pattern, self, ParamsMap::new())
     }
@@ -189,6 +189,44 @@ fn display_mapping(map: &[ParamsMap]) -> String {
     )
 }
 
+fn params_map_arguments(
+    target: &StatementNode,
+    pattern: &StatementNode,
+    result: &mut Vec<ParamsMap>,
+) -> Result<()> {
+    let placeholder_pos = pattern.iter().enumerate().find_map(|(pos, x)| {
+        if x.data().is_placeholder() {
+            Some(pos)
+        } else {
+            None
+        }
+    });
+    let args_delta = target.degree() as i64 - pattern.degree() as i64;
+    ensure!(
+        placeholder_pos.is_some() && args_delta >= 0 ||
+            placeholder_pos.is_none() && args_delta == 0,
+        "Argument size missmatch: {} {}",
+        pattern.degree(),
+        target.degree()
+    );
+
+    for (p, t) in pattern.iter().zip(target.iter()) {
+        let mut new_result = vec![];
+        if p.data().is_placeholder() {
+            continue;
+        }
+        for r in result.drain(..) {
+            if let Ok(mut p) = params_map_impl(t, p, r) {
+                trace!(target: "pattern_match", "New mapping: [{}]", display_mapping(&p));
+                new_result.append(&mut p);
+            }
+        }
+        *result = new_result;
+    }
+
+    Ok(())
+}
+
 fn params_map_impl(
     target: &StatementNode,
     pattern: &StatementNode,
@@ -207,52 +245,19 @@ fn params_map_impl(
             {
                 for parts in target.subsets(pattern.degree()) {
                     let mut loc_result = vec![params.clone()];
-                    for (x, y) in pattern.iter().zip(parts.iter()) {
-                        let mut new_result = vec![];
-                        for r in loc_result.into_iter() {
-                            if let Ok(mut p) = params_map_impl(y, x, r) {
-                                trace!(target: "pattern_match", "New mapping: [{}]", display_mapping(&p));
-                                new_result.append(&mut p);
-                            }
-                        }
-                        loc_result = new_result;
-                    }
+                    params_map_arguments(&parts, pattern, &mut loc_result).expect("must match");
                     result.append(&mut loc_result);
                 }
 
-                if !result.is_empty() {
-                    return Ok(result);
-                } else {
-                    bail!("No mapping found");
-                }
+                ensure!(!result.is_empty(), "No mapping found");
+                return Ok(result);
             } else {
                 result.push(params);
-                ensure!(
-                    pattern.degree() == target.degree(),
-                    "Argument size missmatch: {} {}",
-                    pattern.degree(),
-                    target.degree()
-                );
 
-                for (x, y) in pattern.iter().zip(target.iter()) {
-                    let mut new_result = vec![];
-                    for r in result.into_iter() {
-                        match params_map_impl(y, x, r) {
-                            Ok(mut p) => {
-                                // trace!("New mapping: {:?}", p);
-                                new_result.append(&mut p)
-                            }
-                            Err(_e) => {} // trace!("Bad mapping: {}", e),
-                        }
-                    }
-                    result = new_result;
-                }
+                params_map_arguments(target, pattern, &mut result)?;
 
-                return if !result.is_empty() {
-                    Ok(result)
-                } else {
-                    bail!("No mapping found");
-                };
+                ensure!(!result.is_empty(), "No mapping found");
+                return Ok(result);
             }
         }
         (Term::Symbol(p_id), _) => {
@@ -297,6 +302,9 @@ fn params_map_impl(
         }
         (Term::Variable(_), _) => {
             bail!("Expect Varible, found: {:?}", target.data());
+        }
+        (Term::Placeholder, _) => {
+            bail!("Mapping placeholder")
         }
     }
     Ok(result)
@@ -419,5 +427,20 @@ mod tests {
         let mut test = statement_with_params("a + 1");
         test.root_mut().apply_param_map(&maps[0]);
         insta::assert_debug_snapshot!(test);
+    }
+
+    #[test]
+    fn placeholder_test() {
+        setup();
+
+        let pattern = statement_with_params("set(a, ..) is known");
+        let statement = statement_with_vars("set(3, 5, 7) is known");
+
+        let maps = pattern
+            .root()
+            .map(statement.root())
+            .map_err(|e| println!("Error: {}", e))
+            .unwrap();
+        insta::assert_debug_snapshot!(dump_mapping(&maps));
     }
 }

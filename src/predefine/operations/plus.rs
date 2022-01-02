@@ -120,7 +120,7 @@ fn cummulative_power(root: &StatementNode) -> Decimal {
         let mut result = Decimal::from(0);
         for i in root.iter() {
             match i.data() {
-                Term::Number(_) => {}
+                Term::Number(_) | Term::Placeholder => {}
                 Term::Symbol(_) if i.data().is_symbol_name("^") => {
                     result = result +
                         if let Some(v) = i.back().unwrap().data().number() {
@@ -164,7 +164,7 @@ fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
         Ordering::Greater => return Ordering::Less,
     }
 
-    // Symbol < Param < Variable < Number
+    // Symbol < Param < Variable < Number < Placeholder
     match (mean_arg(left).data(), mean_arg(right).data()) {
         (Term::Symbol(left), Term::Symbol(right)) => symbol_by_id(*left)
             .unwrap()
@@ -178,10 +178,15 @@ fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
 
         (Term::Variable(left), Term::Variable(right)) => left.cmp(right),
         (Term::Variable(_), Term::Number(_)) => Ordering::Less,
+        (Term::Variable(_), Term::Placeholder) => Ordering::Less,
         (Term::Variable(_), _) => Ordering::Greater,
 
         (Term::Number(left), Term::Number(right)) => left.cmp(right),
+        (Term::Number(_), Term::Placeholder) => Ordering::Less,
         (Term::Number(_), _) => Ordering::Greater,
+
+        (Term::Placeholder, Term::Placeholder) => Ordering::Equal,
+        (Term::Placeholder, _) => Ordering::Greater,
     }
 }
 

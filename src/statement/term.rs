@@ -21,6 +21,7 @@ pub enum Term {
     Param(Param),
     Variable(Variable),
     Number(Decimal),
+    Placeholder,
 }
 
 impl Term {
@@ -77,6 +78,13 @@ impl Term {
         }
         false
     }
+
+    pub fn is_placeholder(&self) -> bool {
+        if let Term::Placeholder = &self {
+            return true;
+        }
+        false
+    }
 }
 
 impl fmt::Display for Term {
@@ -95,6 +103,7 @@ impl fmt::Display for Term {
                 }
             }
             Term::Variable(id) => write!(f, "{}", id),
+            Term::Placeholder => write!(f, ".."),
         }
     }
 }

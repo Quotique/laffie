@@ -169,7 +169,9 @@ impl Statement {
     }
 
     fn parse_term(data: &str, node_type: &NodeType) -> Term {
-        if let Ok(value) = Decimal::from_str(data) {
+        if data == ".." {
+            Term::Placeholder
+        } else if let Ok(value) = Decimal::from_str(data) {
             Term::Number(value)
         } else if let Some(symbol) = symbol_by_name(data) {
             Term::Symbol(symbol.id)

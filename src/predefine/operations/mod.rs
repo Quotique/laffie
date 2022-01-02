@@ -51,7 +51,7 @@ fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
 }
 
 fn default_ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
-    // Symbol < Param < Varible < Number
+    // Symbol < Param < Varible < Number < Placeholder
     match (left.data(), right.data()) {
         (Term::Symbol(id_l), Term::Symbol(id_r)) => id_l.cmp(id_r),
         (Term::Symbol(_), _) => Ordering::Less,
@@ -62,10 +62,15 @@ fn default_ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
 
         (Term::Variable(id_l), Term::Variable(id_r)) => id_l.cmp(id_r),
         (Term::Variable(_), Term::Number(_)) => Ordering::Less,
+        (Term::Variable(_), Term::Placeholder) => Ordering::Less,
         (Term::Variable(_), _) => Ordering::Greater,
 
         (Term::Number(d1), Term::Number(d2)) => d1.cmp(d2),
+        (Term::Number(_), Term::Placeholder) => Ordering::Less,
         (Term::Number(_), _) => Ordering::Greater,
+
+        (Term::Placeholder, Term::Placeholder) => Ordering::Equal,
+        (Term::Placeholder, _) => Ordering::Greater,
     }
 }
 

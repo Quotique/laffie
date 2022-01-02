@@ -101,7 +101,7 @@ fn extract_power(root: &mut StatementNode) -> Tree<Term> {
 }
 
 fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
-    // Number < Param < Variable < Symbol
+    // Number < Param < Variable < Symbol < Placeholder
     match (power_argument(left).data(), power_argument(right).data()) {
         (Term::Number(left), Term::Number(right)) => left.cmp(right),
         (Term::Number(_), _) => Ordering::Less,
@@ -112,12 +112,17 @@ fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
 
         (Term::Variable(left), Term::Variable(right)) => left.cmp(right),
         (Term::Variable(_), Term::Symbol(_)) => Ordering::Less,
+        (Term::Variable(_), Term::Placeholder) => Ordering::Less,
         (Term::Variable(_), _) => Ordering::Greater,
 
         (Term::Symbol(left), Term::Symbol(right)) => symbol_by_id(*left)
             .unwrap()
             .name
             .cmp(&symbol_by_id(*right).unwrap().name),
+        (Term::Symbol(_), Term::Placeholder) => Ordering::Less,
         (Term::Symbol(_), _) => Ordering::Greater,
+
+        (Term::Placeholder, Term::Placeholder) => Ordering::Equal,
+        (Term::Placeholder, _) => Ordering::Greater,
     }
 }
