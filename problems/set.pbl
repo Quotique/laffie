@@ -1,0 +1,17 @@
+problem {
+    target proof(set(5) is known);
+
+    x == 1;
+};
+
+problem {
+    target proof(set(5, 1) is known);
+
+    x == 1;
+};
+
+problem {
+    target proof(set(5, 1, 2) is known);
+
+    x == 1;
+};

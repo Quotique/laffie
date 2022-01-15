@@ -1,6 +1,6 @@
 use crate::{
     statement::{
-        symbols::symbol_by_id, MarkedStatement, NodeMapping, NodePosition, ParamsMap, Statement,
+        symbols::symbol_by_id, MarkedStatement, NodePosition, ParamsMapping, Statement,
         StatementNode,
     },
     utils::VecDisplay,
@@ -58,7 +58,7 @@ pub struct Rule {
     pub statement: Statement,
     pub pattern:   NodePosition,
     pub replace:   NodePosition,
-    pub binds:     ParamsMap,
+    pub binds:     ParamsMapping,
 
     pub requirements: Vec<Statement>,
 
@@ -188,9 +188,8 @@ impl Rule {
     }
 
     fn apply_root(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        let maps = self
-            .pattern_node()
-            .map(arg.statement.root())
+        let maps = ParamsMapping::mapper(arg.statement.root(), self.pattern_node())
+            .try_map()
             .map_err(|e| RuleDeclineReason::ParamsMappingErr(e.to_string()))?;
 
         Ok(maps
@@ -212,7 +211,7 @@ impl Rule {
     }
 
     fn apply_subtree(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        let maps = self.pattern_node().find_subtree_map(arg.statement.root());
+        let maps = ParamsMapping::subtree_map(arg.statement.root(), self.pattern_node());
         if maps.is_empty() {
             return Err(RuleDeclineReason::ParamsMappingErr("no match".into()));
         }
@@ -231,7 +230,7 @@ impl Rule {
                     requirements: self
                         .requirements
                         .iter()
-                        .map(|r| Arc::new(r.apply_map(i)))
+                        .map(|r| Arc::new(r.apply_map(&self.binds).apply_map(i)))
                         .collect(),
                     resolution:   MarkedStatement::from(Arc::new(src)).with_parent(arg.id),
                 };

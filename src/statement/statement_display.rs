@@ -64,7 +64,7 @@ mod tests {
     fn symbol_display_test() {
         setup();
 
-        for (statement, display) in vec![
+        for (statement, display) in &[
             ("a + b + c", "a+b+c"),
             ("a*(b+c)", "a*(b+c)"),
             ("a*b + c", "a*b+c"),
@@ -75,7 +75,7 @@ mod tests {
         ] {
             let statement = statement_with_params(statement);
 
-            assert_eq!(display_string(statement.root()).as_str(), display);
+            assert_eq!(display_string(statement.root()).as_str(), *display);
         }
     }
 }

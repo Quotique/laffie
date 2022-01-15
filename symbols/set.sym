@@ -11,12 +11,12 @@ rule {
 };
 
 rule {
-    attr level(0),problem_target(proof(set(a, b) is known));
+    attr level(0),problem_target(proof(set(a, ..) is known));
 
-    set(a, b) is known <=> true;
+    set(a, .. as S) is known <=> true;
 
     a is known,
-    b is known;
+    set(S) is known;
 };
 
 rule {

@@ -10,10 +10,15 @@ use super::symbols::{symbol_by_id, symbol_by_name, Symbol};
 pub type StatementTree = Tree<Term>;
 pub type StatementNode = Node<Term>;
 
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
+#[derive(Clone, Debug, Display)]
+#[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
 pub struct Param(CompactString);
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
+#[derive(Clone, Debug, Display)]
+#[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
 pub struct Variable(CompactString);
+#[derive(Clone, Copy, Debug, Display)]
+#[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
+pub struct Placeholder(u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
@@ -21,7 +26,7 @@ pub enum Term {
     Param(Param),
     Variable(Variable),
     Number(Decimal),
-    Placeholder,
+    Placeholder(Placeholder),
 }
 
 impl Term {
@@ -64,6 +69,13 @@ impl Term {
         None
     }
 
+    pub fn placeholder(&self) -> Option<&Placeholder> {
+        if let Term::Placeholder(p) = &self {
+            return Some(p);
+        }
+        None
+    }
+
     #[allow(dead_code)]
     pub fn is_symbol_name(&self, name: &str) -> bool {
         if let Some(s) = symbol_by_name(name) {
@@ -75,13 +87,6 @@ impl Term {
     pub fn is_number_value(&self, value: &Decimal) -> bool {
         if let Term::Number(num) = &self {
             return num == value;
-        }
-        false
-    }
-
-    pub fn is_placeholder(&self) -> bool {
-        if let Term::Placeholder = &self {
-            return true;
         }
         false
     }
@@ -103,7 +108,7 @@ impl fmt::Display for Term {
                 }
             }
             Term::Variable(id) => write!(f, "{}", id),
-            Term::Placeholder => write!(f, ".."),
+            Term::Placeholder(_) => write!(f, ".."),
         }
     }
 }

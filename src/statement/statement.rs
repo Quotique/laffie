@@ -14,10 +14,11 @@ use crate::parser::Node as ParserNode;
 
 use super::{
     index::NodePosition,
+    mapping::ParamsMapping,
     statement_display::display_string,
     symbols::symbol_by_name,
-    term::{Param, StatementTree, Term, Variable},
-    tree_utils::{replace, swap_node, NodeMapping},
+    term::{Param, Placeholder, StatementTree, Term, Variable},
+    tree_utils::{replace, swap_node},
 };
 
 #[derive(Clone, Copy)]
@@ -26,9 +27,7 @@ enum NodeType {
     Rule,
 }
 
-pub type ParamsMap = HashMap<Param, StatementTree>;
-
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Eq)]
 pub struct Statement {
     pub(super) tree: StatementTree,
     pub binds:       HashMap<Param, NodePosition>,
@@ -44,6 +43,7 @@ impl Statement {
                 NodeType::Statement,
                 Default::default(),
                 &mut positions_map,
+                &mut 0,
             )?,
             binds: positions_map,
         })
@@ -58,6 +58,7 @@ impl Statement {
                 NodeType::Rule,
                 Default::default(),
                 &mut positions_map,
+                &mut 0,
             )?,
             binds: positions_map,
         })
@@ -113,13 +114,13 @@ impl Statement {
         (self.tree, childs)
     }
 
-    pub fn map(&self, target: &Self) -> Result<Vec<ParamsMap>> {
-        self.tree.root().map(target.tree.root())
+    pub fn map(&self, target: &Self) -> Result<Vec<ParamsMapping>> {
+        ParamsMapping::mapper(target.tree.root(), self.tree.root()).try_map()
     }
 
-    pub fn apply_map(&self, params: &ParamsMap) -> Self {
+    pub fn apply_map(&self, params: &ParamsMapping) -> Self {
         let mut result = self.clone();
-        result.tree.root_mut().apply_param_map(params);
+        params.apply(&mut result.tree.root_mut());
         result
     }
 
@@ -132,6 +133,7 @@ impl Statement {
         node_type: NodeType,
         node_position: NodePosition,
         positions_map: &mut HashMap<Param, NodePosition>,
+        last_placeholder_id: &mut u64,
     ) -> Result<StatementTree> {
         while node.data() == "as" {
             let param =
@@ -147,7 +149,11 @@ impl Statement {
             node = node.front().unwrap();
         }
 
-        let mut tree = tr(Self::parse_term(node.data().as_str(), &node_type));
+        let mut tree = tr(Self::parse_term(
+            node.data().as_str(),
+            &node_type,
+            last_placeholder_id,
+        ));
         if tree.root().data().symbol_id().is_some() {
             for (num, child) in node.iter().enumerate() {
                 tree.push_back(Self::try_parse_impl(
@@ -155,6 +161,7 @@ impl Statement {
                     node_type,
                     node_position.clone().child(num),
                     positions_map,
+                    last_placeholder_id,
                 )?);
             }
         } else {
@@ -168,9 +175,10 @@ impl Statement {
         Ok(tree)
     }
 
-    fn parse_term(data: &str, node_type: &NodeType) -> Term {
+    fn parse_term(data: &str, node_type: &NodeType, last_placeholder_id: &mut u64) -> Term {
         if data == ".." {
-            Term::Placeholder
+            *last_placeholder_id += 1;
+            Term::Placeholder(Placeholder::from(*last_placeholder_id))
         } else if let Ok(value) = Decimal::from_str(data) {
             Term::Number(value)
         } else if let Some(symbol) = symbol_by_name(data) {
@@ -191,6 +199,12 @@ impl Statement {
 impl Hash for Statement {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.tree.hash(state);
+    }
+}
+
+impl PartialEq for Statement {
+    fn eq(&self, other: &Statement) -> bool {
+        self.tree.eq(&other.tree)
     }
 }
 
@@ -233,6 +247,29 @@ mod tests {
         assert_eq!(
             statement.binds.get(&Param::from_str("S").unwrap()),
             Some(NodePosition::root().child(0).child(0)).as_ref()
+        );
+    }
+
+    #[test]
+    fn placeholder_test() {
+        setup();
+
+        let test = "set(a, ..) is known <=> true";
+
+        let statement = statement_with_params(test);
+
+        assert_eq!(
+            statement
+                .root()
+                .front()
+                .unwrap()
+                .front()
+                .unwrap()
+                .back()
+                .unwrap()
+                .data()
+                .placeholder(),
+            Some(&Placeholder::from(1))
         );
     }
 }

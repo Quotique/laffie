@@ -142,7 +142,7 @@ impl RuleBuilder {
                     }
                 }
             }
-            let binds = statement
+            let binds: HashMap<_, _> = statement
                 .binds
                 .iter()
                 .map(|(param, pos)| (param.clone(), statement[pos].deep_clone()))
@@ -159,7 +159,7 @@ impl RuleBuilder {
                 statement,
                 pattern: NodePosition::default().child(0),
                 replace: NodePosition::default().child(1),
-                binds,
+                binds: binds.into(),
                 requirements: reqs,
             });
         }

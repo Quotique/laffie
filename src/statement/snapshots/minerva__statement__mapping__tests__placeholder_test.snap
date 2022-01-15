@@ -1,0 +1,6 @@
+---
+source: src/statement/mapping.rs
+expression: dump_mapping(&maps)
+
+---
+"[{ a: 3, ..1: [5, 7],}]"

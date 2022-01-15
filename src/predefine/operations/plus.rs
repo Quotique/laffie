@@ -120,17 +120,16 @@ fn cummulative_power(root: &StatementNode) -> Decimal {
         let mut result = Decimal::from(0);
         for i in root.iter() {
             match i.data() {
-                Term::Number(_) | Term::Placeholder => {}
+                Term::Number(_) | Term::Placeholder(_) => {}
                 Term::Symbol(_) if i.data().is_symbol_name("^") => {
-                    result = result +
-                        if let Some(v) = i.back().unwrap().data().number() {
-                            v.clone()
-                        } else {
-                            Decimal::from(1)
-                        };
+                    result += if let Some(v) = i.back().unwrap().data().number() {
+                        v.clone()
+                    } else {
+                        Decimal::from(1)
+                    };
                 }
                 Term::Symbol(_) | Term::Variable(_) | Term::Param(_) => {
-                    result = result + Decimal::from(1);
+                    result += Decimal::from(1);
                 }
             }
         }
@@ -178,15 +177,15 @@ fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
 
         (Term::Variable(left), Term::Variable(right)) => left.cmp(right),
         (Term::Variable(_), Term::Number(_)) => Ordering::Less,
-        (Term::Variable(_), Term::Placeholder) => Ordering::Less,
+        (Term::Variable(_), Term::Placeholder(_)) => Ordering::Less,
         (Term::Variable(_), _) => Ordering::Greater,
 
         (Term::Number(left), Term::Number(right)) => left.cmp(right),
-        (Term::Number(_), Term::Placeholder) => Ordering::Less,
+        (Term::Number(_), Term::Placeholder(_)) => Ordering::Less,
         (Term::Number(_), _) => Ordering::Greater,
 
-        (Term::Placeholder, Term::Placeholder) => Ordering::Equal,
-        (Term::Placeholder, _) => Ordering::Greater,
+        (Term::Placeholder(_), Term::Placeholder(_)) => Ordering::Equal,
+        (Term::Placeholder(_), _) => Ordering::Greater,
     }
 }
 
