@@ -1,4 +1,6 @@
 /target
+*/target
+*/*/target
 dumps*
 **/*.rs.bk
 *.log
