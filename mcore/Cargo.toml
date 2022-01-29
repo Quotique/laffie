@@ -4,17 +4,11 @@ version = "0.4.0"
 edition = "2018"
 authors = ["Alexander <just.std@gmail.com>"]
 
-# [lib]
-# name = "state_macro"
-# path = "src/statement/proc_macro.rs"
-# proc-macro = true
-
 [dependencies]
 macros = { path = "../macros" }
 
 bigdecimal = "0.2"
 chrono = "0.4"
-clap = "3.0.0-beta.2"
 colored = "1.9"
 config = "0.9"
 derive_more = "0.99"

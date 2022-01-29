@@ -13,3 +13,9 @@ pub mod problem;
 pub mod rule;
 pub mod statement;
 pub mod utils;
+
+use std::env;
+
+pub fn version_str() -> String {
+    env!("CARGO_PKG_VERSION").to_owned()
+}

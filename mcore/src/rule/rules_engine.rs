@@ -18,6 +18,9 @@ pub struct RulesEngine {
     last_id:   RuleId,
 }
 
+unsafe impl Send for RulesEngine {}
+unsafe impl Sync for RulesEngine {}
+
 impl RulesEngine {
     pub fn register_raw_rule(&mut self, rule: Rule) {
         self.register_rule(Arc::new(RwLock::new(rule)))

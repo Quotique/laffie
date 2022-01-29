@@ -3,5 +3,6 @@
 members = [
     "mcore",
     "macros",
-    "bin/cli"
+    "bin/cli",
+    "bin/tgbot",
 ]
