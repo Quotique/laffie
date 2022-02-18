@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use colored::*;
 
 use mcore::{
@@ -12,7 +12,7 @@ use mcore::{
 };
 
 fn main() {
-    let matches = App::new("Minerva")
+    let matches = Command::new("Minerva")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Quotique <just.std@gmail.com>")
         .about("Minerva core develop/debug enviroment")
@@ -21,7 +21,7 @@ fn main() {
                 .short('c')
                 .long("config")
                 .value_name("FILE")
-                .about("Sets a custom config file")
+                .help("Sets a custom config file")
                 .default_value("./config/local.json")
                 .takes_value(true),
         )
@@ -30,7 +30,7 @@ fn main() {
                 .short('o')
                 .long("only")
                 .value_name("ID")
-                .about("Runs only spcified problem")
+                .help("Runs only spcified problem")
                 .takes_value(true),
         )
         .arg(
@@ -38,7 +38,7 @@ fn main() {
                 .short('s')
                 .long("symbols")
                 .value_name("DIR")
-                .about("Specify symbols path")
+                .help("Specify symbols path")
                 .takes_value(true),
         )
         .arg(
@@ -46,14 +46,14 @@ fn main() {
                 .short('p')
                 .long("problems")
                 .value_name("DIR")
-                .about("Specify problems path")
+                .help("Specify problems path")
                 .takes_value(true),
         )
         .arg(
             Arg::new("dump")
                 .short('d')
                 .long("dump")
-                .about("Dump solution trace into a file")
+                .help("Dump solution trace into a file")
                 .takes_value(false),
         )
         .get_matches();

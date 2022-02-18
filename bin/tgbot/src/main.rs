@@ -2,7 +2,7 @@ mod static_data;
 
 use std::{env, sync::Arc};
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use futures::{stream::Stream, Future};
 use telebot::{functions::*, Bot};
 
@@ -44,7 +44,7 @@ fn run_bot(engine: Arc<RulesEngine>) {
     let problem = bot
         .new_cmd("/problem")
         .and_then(move |(bot, msg)| {
-            let text = format!("problem {}", msg.text.unwrap().clone());
+            let text = format!("problem {}", msg.text.unwrap());
 
             match solve(text, engine.clone()) {
                 Ok(s) => bot.message(msg.chat.id, s).send(),
@@ -65,7 +65,7 @@ fn run_bot(engine: Arc<RulesEngine>) {
 }
 
 fn main() {
-    let matches = App::new("LaffieBot")
+    let matches = Command::new("LaffieBot")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Quotique <just.std@gmail.com>")
         .about("Telegram interface for Minerva Core")
@@ -74,7 +74,7 @@ fn main() {
                 .short('c')
                 .long("config")
                 .value_name("FILE")
-                .about("Sets a custom config file")
+                .help("Sets a custom config file")
                 .default_value("./config/local.json")
                 .takes_value(true),
         )
@@ -83,7 +83,7 @@ fn main() {
                 .short('s')
                 .long("symbols")
                 .value_name("DIR")
-                .about("Specify symbols path")
+                .help("Specify symbols path")
                 .takes_value(true),
         )
         .get_matches();

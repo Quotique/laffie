@@ -13,7 +13,7 @@ fn symbol_display(symbol: Symbol, node: &StatementNode) -> String {
             "{}{}",
             symbol,
             node.iter()
-                .map(|x| display_string(x))
+                .map(display_string)
                 .collect::<Vec::<String>>()
                 .join(", ")
         ),
@@ -46,7 +46,7 @@ fn prefix_symbol_display(symbol: Symbol, node: &StatementNode) -> String {
             "{}({})",
             symbol,
             node.iter()
-                .map(|x| display_string(x))
+                .map(display_string)
                 .collect::<Vec::<String>>()
                 .join(", ")
         )

@@ -40,14 +40,14 @@ impl Target {
 
         if root.data().is_symbol_name("find") {
             if childs.degree() != 1 {
-                return Err(SemanticError::WorngArgCount(format!("")));
+                return Err(SemanticError::WorngArgCount(String::default()));
             }
             Ok(Self::Find(MarkedStatement::from(Arc::new(
                 Statement::from(childs.pop_front().unwrap()),
             ))))
         } else if root.data().is_symbol_name("proof") {
             if childs.degree() != 1 {
-                return Err(SemanticError::WorngArgCount(format!("")));
+                return Err(SemanticError::WorngArgCount(String::default()));
             }
 
             let mut frame = Frame::new(rules, Dumper::default());
@@ -58,7 +58,7 @@ impl Target {
             Ok(Self::Proof(frame))
         } else if root.data().is_symbol_name("transform") {
             if childs.degree() != 1 {
-                return Err(SemanticError::WorngArgCount(format!("")));
+                return Err(SemanticError::WorngArgCount(String::default()));
             }
 
             let mut frame = Frame::new(rules, Dumper::default());

@@ -2,17 +2,9 @@ use std::ops::{Index, IndexMut};
 
 use super::{statement::Statement, term::StatementNode};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct NodePosition {
     coordinates: Vec<usize>,
-}
-
-impl Default for NodePosition {
-    fn default() -> Self {
-        Self {
-            coordinates: vec![],
-        }
-    }
 }
 
 impl NodePosition {
