@@ -9,7 +9,7 @@ pub use self::{
     dir_loader::DirectoryParser,
     display::VecDisplay,
     dump::{Config as DumperConfig, Dumper, DumperSink, FileDumper},
-    logger::{log_init, stdout_log_init},
+    logger::{log_init, stdout_log_init, Config as LogConfig},
     settings::Settings,
     subset::SubsetIterator,
 };

@@ -1,8 +1,11 @@
 use std::ops::{Index, IndexMut};
 
+use bincode::{Decode, Encode};
+
 use super::{statement::Statement, term::StatementNode};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Decode, Encode)]
 pub struct NodePosition {
     coordinates: Vec<usize>,
 }

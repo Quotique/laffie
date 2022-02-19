@@ -6,3 +6,4 @@ dumps*
 *.log
 Cargo.lock
 src/parser/lang.rs
+/db

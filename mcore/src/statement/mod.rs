@@ -1,11 +1,11 @@
+mod codec;
 mod index;
-pub mod symbols;
-pub mod term;
-
 mod mapping;
 mod marked_statement;
 mod statement;
 mod statement_display;
+pub mod symbols;
+pub mod term;
 pub mod tree_utils;
 
 pub use self::{

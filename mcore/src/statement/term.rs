@@ -1,7 +1,7 @@
 use std::{fmt, hash::Hash};
 
 pub use bigdecimal::{BigDecimal as Decimal, Signed};
-use derive_more::{Display, From, FromStr, Into};
+use derive_more::{AsRef, Display, From, FromStr, Into};
 pub use smartstring::alias::String as CompactString;
 use trees::{Node, Tree};
 
@@ -11,10 +11,10 @@ pub type StatementTree = Tree<Term>;
 pub type StatementNode = Node<Term>;
 
 #[derive(Clone, Debug, Display)]
-#[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
+#[derive(PartialEq, Eq, Hash, AsRef, From, FromStr, Into, Ord, PartialOrd)]
 pub struct Param(CompactString);
 #[derive(Clone, Debug, Display)]
-#[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
+#[derive(PartialEq, Eq, Hash, AsRef, From, FromStr, Into, Ord, PartialOrd)]
 pub struct Variable(CompactString);
 #[derive(Clone, Copy, Debug, Display)]
 #[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]

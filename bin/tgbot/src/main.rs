@@ -1,67 +1,31 @@
-mod static_data;
+mod commands;
+mod settings;
+mod text;
 
 use std::{env, sync::Arc};
 
 use clap::{Arg, Command};
-use futures::{stream::Stream, Future};
-use telebot::{functions::*, Bot};
+use futures::Future;
+use telebot::Bot;
 
+use database::{ProblemDb, UserDb};
 use mcore::{
-    parser::{ra, ProblemParser},
-    problem::Solution,
     rule::RulesEngine,
-    utils::{log_init, DirectoryParser, Dumper, DumperConfig, Settings},
+    utils::{log_init, DirectoryParser},
 };
 
-use static_data::Static;
+use commands::{problem_handler, problems_list_handler, start_handler};
+use settings::Settings;
 
-fn solve(problem_text: String, engine: Arc<RulesEngine>) -> Result<String, String> {
-    let states = ra::problem(&problem_text).map_err(|e| e.to_string())?;
-    let problem = ProblemParser::with(&states)
-        .parse()
-        .map_err(|e| e.to_string())?;
-
-    let mut solution = Solution::new(
-        problem,
-        engine,
-        Dumper::new(DumperConfig {
-            sink:     "none".into(),
-            filename: "".to_owned(),
-        }),
-    );
-
-    let result = match solution.solve() {
-        Ok(_) => format!("{} {}", "Solution:", solution),
-        Err(e) => format!("{} {} {}", "Solution:", e, solution),
-    };
-    let plain_bytes = strip_ansi_escapes::strip(result.as_bytes()).unwrap();
-    Ok(std::str::from_utf8(&plain_bytes).unwrap().to_owned())
-}
-
-fn run_bot(engine: Arc<RulesEngine>) {
+fn run_bot(engine: Arc<RulesEngine>, problems_db: Arc<ProblemDb>, users_db: Arc<UserDb>) {
     let mut bot = Bot::new("5171464247:AAGR6y0SYZ8zGzx_vni6ITT7dVeirLvVKHE").update_interval(200);
 
-    let problem = bot
-        .new_cmd("/problem")
-        .and_then(move |(bot, msg)| {
-            let text = format!("problem {}", msg.text.unwrap());
+    let problem = problem_handler(&mut bot, engine, problems_db.clone(), users_db.clone());
+    let problems_list = problems_list_handler(&mut bot, problems_db, users_db);
 
-            match solve(text, engine.clone()) {
-                Ok(s) => bot.message(msg.chat.id, s).send(),
-                Err(s) => bot.message(msg.chat.id, s).send(),
-            }
-        })
-        .for_each(|_| Ok(()));
+    let start = start_handler(&mut bot);
 
-    let start = bot
-        .new_cmd("/start")
-        .and_then(|(bot, msg)| {
-            let text = Static::start();
-            bot.message(msg.chat.id, text).send()
-        })
-        .for_each(|_| Ok(()));
-
-    bot.run_with(problem.join(start));
+    bot.run_with(problems_list.join(problem.join(start)));
 }
 
 fn main() {
@@ -111,5 +75,8 @@ fn main() {
     );
 
     let rules_engine = Arc::new(parser.load_rules().unwrap());
-    run_bot(rules_engine)
+    let problems_db = Arc::new(ProblemDb::open(settings.problems_db).unwrap());
+    let users_db = Arc::new(UserDb::open(settings.users_db).unwrap());
+
+    run_bot(rules_engine, problems_db, users_db)
 }
