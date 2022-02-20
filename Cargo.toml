@@ -1,9 +1,10 @@
 [workspace]
 
 members = [
-    "mcore",
-    "macros",
     "database",
+    "macros",
+    "mcore",
+    "parser",
 
     "bin/cli",
     "bin/tgbot",

@@ -1,12 +1,12 @@
-use crate::{
-    parser::{ra, ProblemParser, RuleParser, SymbolParser},
-    predefine::setup,
-    problem::Problem,
-    rule::RulesEngine,
-    statement::symbols::{add_symbol, Symbol},
-};
 use std::{fs, io, path::Path};
+
 use trees::Tree;
+
+use mcore::{
+    predefine::add_symbol, problem::Problem, rule::RulesEngine, statement::symbols::Symbol,
+};
+
+use crate::{ra, ProblemParser, RuleParser, SymbolParser};
 
 pub struct DirectoryParser {
     symbols_path:  String,
@@ -23,8 +23,6 @@ impl DirectoryParser {
 
     pub fn load_rules(&self) -> io::Result<RulesEngine> {
         info!(target: "init", "Reading rules: {:?}", self.symbols_path);
-
-        setup();
 
         self.load_symbols()?;
 

@@ -1,6 +1,6 @@
 [package]
 name = "mcore"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2018"
 authors = ["Alexander <just.std@gmail.com>"]
 
@@ -11,21 +11,23 @@ bigdecimal = "0.2"
 bincode = "2.0.0-beta.2"
 chrono = "0.4"
 colored = "1.9"
-config = "0.9"
 derive_more = "0.99"
 derive_builder = "0.10"
 eyre = "0.6"
 fern = "0.5"
-insta = "1.7"
-lazy_static = "1.3"
 log = "0.4"
 multi-map = "1.2"
 num = "0.2"
 num-bigint = "0.3"
+once_cell = "1.9"
 parking_lot = "0.11"
-peg = "0.6"
 regex = "1"
 serde_derive = "1.0"
 serde = "1.0"
 smartstring = "0.2"
 trees = "0.4"
+
+[dev-dependencies]
+parser = { path = "../parser" }
+
+insta = "1.7"

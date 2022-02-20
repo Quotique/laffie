@@ -1,13 +1,17 @@
 {
   "logger": {
-	"filename": "output.log",
-	"level": "Trace",
-	"target_levels": {
-	  "pattern_match": "Info"
-	}
+    "filename": "tgbot.log",
+    "level": "Trace",
+    "target_levels": {
+      "hyper": "Info",
+      "tokio_threadpool": "Info",
+      "tokio_reactor": "Info",
+      "want": "Info",
+      "mio": "Info",
+      "pattern_match": "Info"
+    }
   },
   "symbols_dir": "symbols",
   "problems_db": "./db/problems",
   "users_db": "./db/users"
 }
-

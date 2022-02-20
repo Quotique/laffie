@@ -1,12 +1,21 @@
-use super::{frame::Frame, solution::MAX_LEVEL};
+use std::{fmt, sync::Arc};
+
+use trees::tr;
+
 use crate::{
-    parser::SemanticError,
     rule::{RuleAttr, RulesEngine, SharedRule, Suppose},
     statement::{term::Term, tree_utils::NodeMapping, MarkedStatement, Statement},
     utils::Dumper,
 };
-use std::{fmt, sync::Arc};
-use trees::tr;
+
+use super::{frame::Frame, solution::MAX_LEVEL};
+
+// TODO: remove
+#[derive(Clone, Debug)]
+pub enum SemanticError {
+    UnexpectedWord(String),
+    WorngArgCount(String),
+}
 
 pub enum Target {
     Find(MarkedStatement),

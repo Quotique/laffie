@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::statement::{Symbol, SymbolAttr, SymbolAttrValue};
+use mcore::statement::{Symbol, SymbolAttr, SymbolAttrValue};
 
 use super::{Node, SemanticError};
 
@@ -62,7 +62,7 @@ impl<'a> SymbolParser<'a> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::parser::ra;
+    use crate::ra;
 
     use super::*;
 

@@ -57,13 +57,10 @@ fn prefix_symbol_display(symbol: Symbol, node: &StatementNode) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{parser::statement_with_params, predefine::setup};
+    use crate::statement::statement_with_params;
 
     #[test]
     fn symbol_display_test() {
-        setup();
-
         for (statement, display) in &[
             ("a + b + c", "a+b+c"),
             ("a*(b+c)", "a*(b+c)"),
@@ -75,7 +72,7 @@ mod tests {
         ] {
             let statement = statement_with_params(statement);
 
-            assert_eq!(display_string(statement.root()).as_str(), *display);
+            assert_eq!(statement.to_string(), *display);
         }
     }
 }

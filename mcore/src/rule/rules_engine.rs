@@ -1,9 +1,10 @@
-use super::rule::Rule;
-use crate::statement::{symbols::symbol_by_name, MarkedStatement};
 use std::{collections::HashMap, iter::once, sync::Arc};
 
 use parking_lot::RwLock;
 
+use crate::{predefine::symbol_by_name, statement::MarkedStatement};
+
+use super::rule::Rule;
 // TODO: move to correct place
 type SymbolId = u64;
 type Level = usize;

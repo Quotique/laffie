@@ -1,6 +1,6 @@
 use eyre::Result;
 
-use crate::statement::Statement;
+use mcore::statement::Statement;
 
 use super::Node;
 
@@ -33,15 +33,16 @@ impl<'a> StatementParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{parser::ra, predefine::setup, statement::term::Term};
-
     use trees::tr;
+
+    use mcore::statement::term::Term;
+
+    use crate::ra;
+
+    use super::*;
 
     #[test]
     fn parser_test() {
-        setup();
-
         let test = "a*x + b == 0";
         let states = ra::statements(test).unwrap();
         assert_eq!(states.len(), 1);

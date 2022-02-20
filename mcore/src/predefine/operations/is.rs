@@ -1,6 +1,9 @@
-use crate::statement::{
-    symbols::{symbol_by_name, Symbol},
-    term::{StatementNode, Term},
+use crate::{
+    predefine::symbol_by_name,
+    statement::{
+        symbols::Symbol,
+        term::{StatementNode, Term},
+    },
 };
 
 pub fn symbol() -> Symbol {

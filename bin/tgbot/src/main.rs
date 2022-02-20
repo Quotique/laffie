@@ -9,10 +9,8 @@ use futures::Future;
 use telebot::Bot;
 
 use database::{ProblemDb, UserDb};
-use mcore::{
-    rule::RulesEngine,
-    utils::{log_init, DirectoryParser},
-};
+use mcore::{rule::RulesEngine, utils::log_init};
+use parser::DirectoryParser;
 
 use commands::{problem_handler, problems_list_handler, start_handler};
 use settings::Settings;

@@ -1,5 +1,7 @@
-use super::logger::Config as LogConfig;
 use config::{Config, ConfigError, File};
+use serde_derive::Deserialize;
+
+use mcore::utils::LogConfig;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {

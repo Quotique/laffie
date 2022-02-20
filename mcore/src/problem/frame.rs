@@ -301,13 +301,11 @@ pub mod tests {
         sync::Arc,
     };
 
-    use crate::parser::statement_with_params;
-
-    use super::*;
+    use crate::statement::statement_with_params;
 
     #[test]
     fn hash_test() {
-        let statement: Statement = statement_with_params("a*x + c == 0");
+        let statement = statement_with_params("a*x + c == 0");
         let mut s = DefaultHasher::new();
         statement.hash(&mut s);
         let hash_1 = s.finish();

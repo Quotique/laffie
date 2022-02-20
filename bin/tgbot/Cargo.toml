@@ -6,6 +6,7 @@ edition = "2018"
 [dependencies]
 database = { path = "../../database" }
 mcore = { path = "../../mcore/" }
+parser = { path = "../../parser" }
 
 config = "0.9"
 clap = "3.1"

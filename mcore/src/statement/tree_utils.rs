@@ -140,40 +140,21 @@ impl NodeMapping for StatementNode {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        parser::{ra, StatementParser},
-        predefine::setup,
-        statement::Statement,
-    };
+    use crate::statement::statement_with_params;
 
     use super::*;
 
     #[test]
     fn replace_test() {
-        setup();
-
-        let mut test_state = StatementParser::new(&ra::statements("a/(a+b)").unwrap()[0])
-            .parse()
-            .unwrap();
-        let test_pattern = StatementParser::new(&ra::statements("(a+b)").unwrap()[0])
-            .parse()
-            .unwrap();
-        let test_replace = StatementParser::new(&ra::statements("c").unwrap()[0])
-            .parse()
-            .unwrap();
+        let mut test_state = statement_with_params("a/(a+b)");
+        let test_pattern = statement_with_params("(a+b)");
+        let test_replace = statement_with_params("c");
 
         replace(
             test_state.root_mut().get_mut(),
             test_pattern.root(),
             test_replace.root(),
         );
-        assert_eq!(
-            test_state,
-            Statement::from(
-                tr(Term::with_symbol_name("/").unwrap()) /
-                    tr(Term::Param("a".parse().unwrap())) /
-                    tr(Term::Param("c".parse().unwrap()))
-            )
-        );
+        assert_eq!(test_state, statement_with_params("a/c"));
     }
 }

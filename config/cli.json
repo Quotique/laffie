@@ -1,6 +1,6 @@
 {
   "logger": {
-    "filename": "output.log",
+    "filename": "cli.log",
     "level": "Trace",
     "target_levels": {
       "pattern_match": "Info"

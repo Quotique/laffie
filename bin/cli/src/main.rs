@@ -1,6 +1,8 @@
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::module_inception)]
 
+mod settings;
+
 use std::sync::Arc;
 
 use clap::{Arg, Command};
@@ -8,8 +10,11 @@ use colored::*;
 
 use mcore::{
     problem::Solution,
-    utils::{log_init, DirectoryParser, Dumper, DumperConfig, Settings},
+    utils::{log_init, Dumper, DumperConfig},
 };
+use parser::DirectoryParser;
+
+use crate::settings::Settings;
 
 fn main() {
     let matches = Command::new("Minerva")

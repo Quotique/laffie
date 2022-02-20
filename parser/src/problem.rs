@@ -1,13 +1,15 @@
-use super::{statement::StatementParser, SemanticError, Tree};
-use crate::{
-    problem::{Problem, ProblemBuilder},
-    statement::MarkedStatement,
-};
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     sync::Arc,
 };
+
+use mcore::{
+    problem::{Problem, ProblemBuilder},
+    statement::MarkedStatement,
+};
+
+use super::{statement::StatementParser, SemanticError, Tree};
 
 pub struct ProblemParser<'a> {
     syntax_tree: &'a Tree,
@@ -64,13 +66,16 @@ impl<'a> ProblemParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{parser::ra, predefine::setup, statement::term::Term};
     use trees::tr;
+
+    use mcore::statement::term::Term;
+
+    use crate::ra;
+
+    use super::*;
 
     #[test]
     fn problem_parse_test() {
-        setup();
         let test = r#"problem {
                         target find(x);
                         2*x+5 == 0;

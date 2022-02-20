@@ -211,16 +211,17 @@ impl fmt::Display for Solution {
 
 #[cfg(test)]
 mod solution_tests {
-    use super::*;
+    use std::sync::Arc;
+
     use crate::{
-        parser::{parse_problem, statement_with_vars},
-        predefine::setup,
+        problem::{parse_problem, Solution},
+        rule::RulesEngine,
+        statement::statement_with_vars,
+        utils::Dumper,
     };
 
     #[test]
     fn check_answer_find_test() {
-        setup();
-
         let problem = parse_problem("problem {target find(x); x == 1;}");
         let rules = Arc::new(RulesEngine::default());
         let mut solution = Solution::new(problem, rules, Dumper::default());
@@ -230,8 +231,6 @@ mod solution_tests {
 
     #[test]
     fn check_answer_proof_test() {
-        setup();
-
         let problem = parse_problem("problem { target proof(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solution = Solution::new(problem, rules, Dumper::default());

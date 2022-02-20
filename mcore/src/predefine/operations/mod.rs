@@ -118,14 +118,12 @@ mod operations_tests {
     use bigdecimal::{BigDecimal as Decimal, Num};
     use trees::tr;
 
-    use crate::{predefine::setup, statement::symbols::symbol_by_name};
+    use crate::predefine::symbol_by_name;
 
     use super::*;
 
     #[test]
     fn associative_nesting_remove_test() {
-        setup();
-
         // (1+2)+(1+2) -> 1+2+1+2
         let mut test_tree = tr(Term::Symbol(2)) /
             (tr(Term::Symbol(2)) /
@@ -140,8 +138,6 @@ mod operations_tests {
 
     #[test]
     fn evaluate_plus_test() {
-        setup();
-
         // 1+2+5 -> 8
         let mut test_tree1 = tr(Term::Symbol(2)) /
             tr(Term::Number(Decimal::from(1))) /
@@ -168,8 +164,6 @@ mod operations_tests {
 
     #[test]
     fn evaluate_multiply_test() {
-        setup();
-
         // 1*2*5 -> 10
         let mut test_tree = tr(Term::Symbol(7)) /
             tr(Term::Number(Decimal::from(1))) /
@@ -203,8 +197,6 @@ mod operations_tests {
 
     #[test]
     fn evaluate_minus_test() {
-        setup();
-
         // 10 - 2 -> 8
         let mut test_tree = tr(Term::Symbol(3)) /
             tr(Term::Number(Decimal::from(10))) /
@@ -227,8 +219,6 @@ mod operations_tests {
 
     #[test]
     fn evaluate_divide_test() {
-        setup();
-
         // 10 / 2 -> 5
         let mut test_tree = tr(Term::Symbol(8)) /
             tr(Term::Number(Decimal::from(10))) /
@@ -285,8 +275,6 @@ mod operations_tests {
 
     #[test]
     fn evaluate_power_test() {
-        setup();
-
         let power_sym = symbol_by_name("^").unwrap();
         let div_sym = symbol_by_name("/").unwrap();
 
@@ -326,8 +314,6 @@ mod operations_tests {
 
     #[test]
     fn commutative_reorder_test() {
-        setup();
-
         // 1+2+5+(2*x)+x+(2+3) -> (2+3)+(2*x)+x+1+2+5
         let mut test_tree = tr(Term::Symbol(2)) /
             tr(Term::Number(Decimal::from(1))) /

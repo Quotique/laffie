@@ -1,8 +1,6 @@
 use std::{collections::HashMap, fmt, sync::Arc};
 
 use derive_builder::Builder;
-use multi_map::MultiMap;
-use parking_lot::RwLock;
 
 use macros::FuncAttr;
 
@@ -14,11 +12,6 @@ pub struct Ordering(Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Orde
 pub struct Calculator(Box<dyn Fn(&mut StatementNode) -> bool>);
 #[derive(FuncAttr)]
 pub struct TruthChecker(Box<dyn Fn(&StatementNode) -> bool>);
-
-lazy_static! {
-    static ref ALL_SYMBOLS: RwLock<MultiMap<u64, String, Symbol>> = RwLock::new(MultiMap::new());
-    static ref LAST_ID: RwLock<u64> = RwLock::new(0);
-}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SymbolAttr {
@@ -86,27 +79,6 @@ impl SymbolBuilder {
     }
 }
 
-pub fn symbol_by_id(id: u64) -> Option<Symbol> {
-    ALL_SYMBOLS.read().get(&id).cloned()
-}
-
-pub fn symbol_by_name(name: &str) -> Option<Symbol> {
-    ALL_SYMBOLS.read().get_alt(&name.to_owned()).cloned()
-}
-
-pub fn add_symbol(mut symbol: Symbol) -> Symbol {
-    if let Some(s) = ALL_SYMBOLS.write().get_mut_alt(&symbol.name) {
-        s.attrs.extend(symbol.attrs.into_iter());
-        return s.clone();
-    }
-    *LAST_ID.write() += 1;
-    symbol.id = *LAST_ID.read();
-    ALL_SYMBOLS
-        .write()
-        .insert(symbol.id, symbol.name.clone(), symbol.clone());
-    symbol
-}
-
 impl Symbol {
     pub fn builder() -> SymbolBuilder {
         SymbolBuilder::default()
@@ -117,10 +89,6 @@ impl Symbol {
             return Some(*v);
         }
         None
-    }
-
-    pub fn add_with_name(name: &str) {
-        add_symbol(Symbol::builder().name(name).build().unwrap());
     }
 
     pub fn check_truth(&self, node: &StatementNode) -> bool {
@@ -159,14 +127,12 @@ impl fmt::Display for Symbol {
 
 #[cfg(test)]
 mod tests {
-    use crate::predefine::setup;
+    use crate::predefine::{symbol_by_id, symbol_by_name};
 
     use super::*;
 
     #[test]
     fn by_id_test() {
-        setup();
-
         let sym = symbol_by_id(1).unwrap();
         assert_eq!(
             sym,
@@ -182,8 +148,6 @@ mod tests {
 
     #[test]
     fn by_name_test() {
-        setup();
-
         let sym = symbol_by_name(&String::from("==")).unwrap();
         assert_eq!(
             sym,

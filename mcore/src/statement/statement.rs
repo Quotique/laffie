@@ -10,16 +10,18 @@ use bigdecimal::BigDecimal as Decimal;
 use eyre::{ensure, Result};
 use trees::{tr, Node};
 
-use crate::parser::Node as ParserNode;
+use crate::predefine::symbol_by_name;
 
 use super::{
     index::NodePosition,
     mapping::ParamsMapping,
     statement_display::display_string,
-    symbols::symbol_by_name,
     term::{Param, Placeholder, StatementTree, Term, Variable},
     tree_utils::{replace, swap_node},
 };
+
+// use crate::parser::Node as ParserNode;
+type ParserNode = Node<String>;
 
 #[derive(Clone, Copy)]
 enum NodeType {
@@ -231,14 +233,12 @@ impl fmt::Display for Statement {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parser::statement_with_params, predefine::setup};
+    use crate::statement::statement_with_params;
 
     use super::*;
 
     #[test]
     fn binds_test() {
-        setup();
-
         let test = "set(a, b) as S is known <=> true";
 
         let statement = statement_with_params(test);
@@ -252,8 +252,6 @@ mod tests {
 
     #[test]
     fn placeholder_test() {
-        setup();
-
         let test = "set(a, ..) is known <=> true";
 
         let statement = statement_with_params(test);

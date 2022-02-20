@@ -1,6 +1,8 @@
-use super::{statement::StatementParser, Node, SemanticError, Tree};
-use crate::rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder};
 use std::str::FromStr;
+
+use mcore::rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder};
+
+use super::{statement::StatementParser, Node, SemanticError, Tree};
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
@@ -110,19 +112,19 @@ impl<'a> RuleParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        parser::ra,
-        predefine::setup,
+    use trees::tr;
+
+    use mcore::{
         rule::{RuleAttr, RuleAttrValue},
         statement::term::Term,
     };
 
-    use trees::tr;
+    use crate::ra;
+
+    use super::*;
 
     #[test]
     fn rule_parse_test() {
-        setup();
         let test = r#"rule {
                         attr replace,level(1);
                         a + x == 0 => x == -a;
@@ -173,13 +175,12 @@ mod tests {
 
     #[test]
     fn rule_parse_2_test() {
-        setup();
         let test = r#"rule {
-					attr level(0),problem_target(proof(a/b is known));
-					a/b is known <=> true;
-					a is known,
-					b is known
-				}"#;
+                    attr level(0),problem_target(proof(a/b is known));
+                    a/b is known <=> true;
+                    a is known,
+                    b is known
+                }"#;
 
         let states = ra::lang_rule(test).unwrap();
         let result = RuleParser::with(&states).parse();
@@ -230,7 +231,6 @@ mod tests {
 
     #[test]
     fn arg_reduction_test() {
-        setup();
         let test = r#"rule {
                         attr replace,level(1),one(a),zero(b);
                         a * x + b == 0 => x == -b / a;

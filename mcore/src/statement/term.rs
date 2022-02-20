@@ -5,7 +5,8 @@ use derive_more::{AsRef, Display, From, FromStr, Into};
 pub use smartstring::alias::String as CompactString;
 use trees::{Node, Tree};
 
-use super::symbols::{symbol_by_id, symbol_by_name, Symbol};
+use super::symbols::Symbol;
+use crate::predefine::{symbol_by_id, symbol_by_name};
 
 pub type StatementTree = Tree<Term>;
 pub type StatementNode = Node<Term>;

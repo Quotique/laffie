@@ -2,10 +2,13 @@ use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive};
 use num::traits::Pow;
 use trees::tr;
 
-use crate::statement::{
-    symbols::{symbol_by_name, Symbol},
-    term::{StatementNode, Term},
-    tree_utils::NodeMapping,
+use crate::{
+    predefine::symbol_by_name,
+    statement::{
+        symbols::Symbol,
+        term::{StatementNode, Term},
+        tree_utils::NodeMapping,
+    },
 };
 
 pub fn symbol() -> Symbol {

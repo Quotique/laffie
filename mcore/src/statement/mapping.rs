@@ -1,21 +1,24 @@
 use std::{
-    collections::{HashMap, VecDeque},
-    iter::Iterator,
+    collections::{BTreeMap, HashMap, VecDeque},
+    fmt,
+    iter::{FromIterator, Iterator},
 };
 
 use eyre::{bail, ensure, Result};
 
+use crate::{predefine::symbol_by_id, utils::VecDisplay};
+
 use super::{
     index::NodePosition,
-    symbols::{symbol_by_id, SymbolAttr},
+    symbols::SymbolAttr,
     term::{Param, Placeholder, StatementNode, StatementTree, Term},
     tree_utils::{swap_node, NodeMapping},
 };
 
 #[derive(Debug, Clone, Default)]
 pub struct ParamsMapping {
-    params:       HashMap<Param, StatementTree>,
-    placeholders: HashMap<Placeholder, Vec<StatementTree>>,
+    params:       BTreeMap<Param, StatementTree>,
+    placeholders: BTreeMap<Placeholder, Vec<StatementTree>>,
 }
 
 pub struct Mapper<'a> {
@@ -26,7 +29,7 @@ pub struct Mapper<'a> {
 impl From<HashMap<Param, StatementTree>> for ParamsMapping {
     fn from(params: HashMap<Param, StatementTree>) -> Self {
         Self {
-            params,
+            params:       BTreeMap::from_iter(params.into_iter()),
             placeholders: Default::default(),
         }
     }
@@ -129,7 +132,7 @@ fn params_map_arguments(
         let mut new_result = vec![];
         for r in result.drain(..) {
             if let Ok(mut p) = params_map_impl(t, p, r) {
-                trace!(target: "pattern_match", "New mapping: [{}]", display_mapping(&p));
+                trace!(target: "pattern_match", "New mapping: [{}]", VecDisplay(&p));
                 new_result.append(&mut p);
             }
         }
@@ -230,62 +233,34 @@ fn params_map_impl(
     Ok(result)
 }
 
-fn display_mapping(map: &[ParamsMapping]) -> String {
-    format!(
-        "[{}]",
-        map.iter()
-            .map(|m| {
-                format!(
-                    "{{ {} }}",
-                    m.params
+impl fmt::Display for ParamsMapping {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{{ {} }}",
+            self.params
+                .iter()
+                .map(|(x, y)| format!("{}: {}", x, y))
+                .chain(
+                    self.placeholders
                         .iter()
-                        .map(|(x, y)| format!("{}: {}", x, y))
-                        .collect::<Vec<String>>()
-                        .join(",")
+                        .map(|(x, y)| format!("..{}: {}", x, VecDisplay(y)))
                 )
-            })
-            .collect::<Vec<String>>()
-            .join(",")
-    )
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        parser::{statement_with_params, statement_with_vars},
-        predefine::setup,
+        statement::{statement_with_params, statement_with_vars, ParamsMapping},
         utils::VecDisplay,
     };
 
-    use super::*;
-
-    fn dump_mapping(map: &[ParamsMapping]) -> String {
-        let mut result: String = Default::default();
-        result += "[";
-        for m in map {
-            result += "{";
-            let mut v: Vec<_> = m.params.iter().collect();
-            v.sort_by(|x, y| x.0.cmp(y.0));
-            for x in v {
-                result += &format!(" {}: {},", x.0, x.1);
-            }
-            let mut v: Vec<_> = m.placeholders.iter().collect();
-            v.sort_by(|x, y| x.0.cmp(y.0));
-            for x in v {
-                result += &format!(" ..{}: {},", x.0, VecDisplay(x.1));
-            }
-            result += "}";
-        }
-
-        result += "]";
-
-        result
-    }
-
     #[test]
     fn simple_param_map_test() {
-        setup();
-
         let statement = statement_with_vars("x + 1 == 0");
         let pattern = statement_with_params("a + b == 0");
 
@@ -293,13 +268,11 @@ mod tests {
             .try_map()
             .map_err(|e| println!("Error: {}", e))
             .unwrap();
-        insta::assert_debug_snapshot!(dump_mapping(&maps));
+        insta::assert_display_snapshot!(VecDisplay(&maps));
     }
 
     #[test]
     fn same_param_map_test() {
-        setup();
-
         let statement = statement_with_vars("x + 1 == x");
         let pattern = statement_with_params("a + 1 == a");
 
@@ -307,13 +280,11 @@ mod tests {
             .try_map()
             .map_err(|e| println!("Error: {}", e))
             .unwrap();
-        insta::assert_debug_snapshot!(dump_mapping(&maps));
+        insta::assert_display_snapshot!(VecDisplay(&maps));
     }
 
     #[test]
     fn subtree_param_map_test() {
-        setup();
-
         let statement = statement_with_vars("(x - 1) + 4 == x - 1");
         let pattern = statement_with_params("a + 4 == b");
 
@@ -321,13 +292,11 @@ mod tests {
             .try_map()
             .map_err(|e| println!("Error: {}", e))
             .unwrap();
-        insta::assert_debug_snapshot!(dump_mapping(&maps));
+        insta::assert_display_snapshot!(VecDisplay(&maps));
     }
 
     #[test]
     fn apply_param_map_test() {
-        setup();
-
         let statement = statement_with_vars("(x - 1) + 4 == x - 1");
         let pattern = statement_with_params("a + 4 == b");
 
@@ -344,8 +313,6 @@ mod tests {
 
     #[test]
     fn placeholder_test() {
-        setup();
-
         let pattern = statement_with_params("set(a, ..) is known");
         let statement = statement_with_vars("set(3, 5, 7) is known");
 
@@ -353,13 +320,11 @@ mod tests {
             .try_map()
             .map_err(|e| println!("Error: {}", e))
             .unwrap();
-        insta::assert_debug_snapshot!(dump_mapping(&maps));
+        insta::assert_display_snapshot!(VecDisplay(&maps));
     }
 
     #[test]
     fn placeholder_false_test() {
-        setup();
-
         let pattern = statement_with_params("set(a, ..) is known");
         let statement = statement_with_vars("set(3) is known");
 

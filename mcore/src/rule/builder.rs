@@ -1,6 +1,9 @@
 use std::{collections::HashMap, convert::From, fmt};
 
-use crate::statement::{symbols::symbol_by_name, NodeMapping, NodePosition, Statement};
+use crate::{
+    predefine::symbol_by_name,
+    statement::{NodeMapping, NodePosition, Statement},
+};
 
 use super::rule::{Rule, RuleAttr, RuleAttrValue};
 

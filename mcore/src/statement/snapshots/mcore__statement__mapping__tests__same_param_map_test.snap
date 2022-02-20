@@ -1,6 +1,7 @@
 ---
-source: src/statement/tree_utils.rs
-expression: dump_mapping(&maps)
+source: mcore/src/statement/mapping.rs
+assertion_line: 310
+expression: VecDisplay(&maps)
 
 ---
-"[{ a: x,}]"
+[{ a: x }]

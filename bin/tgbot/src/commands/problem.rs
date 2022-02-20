@@ -5,11 +5,11 @@ use telebot::{functions::*, Bot};
 
 use database::{ProblemDb, ProblemRecord, UserDb, UserRecord};
 use mcore::{
-    parser::{ra, ProblemParser},
     problem::Solution,
     rule::RulesEngine,
     utils::{Dumper, DumperConfig},
 };
+use parser::{ra, ProblemParser};
 
 fn problem(
     problem_text: String,

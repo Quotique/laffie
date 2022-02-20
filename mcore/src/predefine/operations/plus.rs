@@ -3,10 +3,13 @@ use std::{cmp::Ordering, collections::HashMap};
 use bigdecimal::BigDecimal as Decimal;
 use trees::{tr, Tree};
 
-use crate::statement::{
-    symbols::{symbol_by_id, Symbol, SymbolAttr, SymbolAttrValue},
-    term::{StatementNode, Term},
-    tree_utils::swap_node,
+use crate::{
+    predefine::symbol_by_id,
+    statement::{
+        symbols::{Symbol, SymbolAttr, SymbolAttrValue},
+        term::{StatementNode, Term},
+        tree_utils::swap_node,
+    },
 };
 
 use super::power::power_argument;
@@ -191,9 +194,10 @@ fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::statement_with_vars;
+    use crate::statement::statement_with_vars;
 
     use super::*;
+
     #[test]
     fn mean_arg_test() {
         let state = statement_with_vars("4*x^4");

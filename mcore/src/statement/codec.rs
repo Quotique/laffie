@@ -139,9 +139,11 @@ fn encode_node<E: bincode::enc::Encoder>(
 mod tests {
     use bincode::config;
 
-    use crate::{parser::statement_with_params, predefine::setup};
-
-    use super::*;
+    use crate::statement::{
+        statement_with_params,
+        term::{CompactString, Decimal, Term},
+        Statement,
+    };
 
     #[test]
     fn term_codec_test() {
@@ -165,8 +167,6 @@ mod tests {
 
     #[test]
     fn statement_encode_test() {
-        setup();
-
         let statement = statement_with_params("a*x+b==0 => x==-b/a");
         let config = config::standard();
 

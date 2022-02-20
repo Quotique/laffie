@@ -49,23 +49,13 @@ fn into_variable_map(mut state: Tree<Term>) -> VariablesMap {
 
 #[cfg(test)]
 mod tests {
+    use crate::statement::statement_with_vars;
+
     use super::*;
-    use crate::{
-        parser::{ra, StatementParser},
-        predefine::setup,
-    };
 
     #[test]
     fn replace_test() {
-        setup();
-
-        let test_statement = r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#;
-        let state = ra::statements(test_statement).unwrap();
-
-        let mut state = StatementParser::new(&state[0])
-            .with_variables()
-            .parse()
-            .unwrap();
+        let mut state = statement_with_vars(r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#);
 
         assert!(replace(&mut state.root_mut()));
         state.inpl_normalize();

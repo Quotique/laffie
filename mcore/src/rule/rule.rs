@@ -1,10 +1,3 @@
-use crate::{
-    statement::{
-        symbols::symbol_by_id, MarkedStatement, NodePosition, ParamsMapping, Statement,
-        StatementNode,
-    },
-    utils::VecDisplay,
-};
 use std::{
     collections::{HashMap, HashSet},
     fmt,
@@ -13,6 +6,12 @@ use std::{
 };
 
 use eyre::{bail, Result};
+
+use crate::{
+    predefine::symbol_by_id,
+    statement::{MarkedStatement, NodePosition, ParamsMapping, Statement, StatementNode},
+    utils::VecDisplay,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RuleAttr {
@@ -245,101 +244,55 @@ impl Rule {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-
-    use crate::{
-        parser::{ra, statement_with_vars, RuleParser, StatementParser},
-        predefine::setup,
-        statement::MarkedStatement,
-    };
     use std::sync::Arc;
 
-    fn base_rule() -> Rule {
-        setup();
-        let test_rule = r#"rule {
-                            attr level(1);
-                            a + x == 0 => x == -a;
-                            a!=0;
-                        }"#;
+    use crate::{
+        rule::{parse_rule, Rule, RuleDeclineReason},
+        statement::{statement_with_vars, MarkedStatement},
+    };
 
-        let mut rules = RuleParser::with(&ra::lang_rule(test_rule).unwrap())
-            .parse()
-            .unwrap();
-        assert_eq!(rules.len(), 1);
-        rules.pop().unwrap()
+    fn base_rule() -> Rule {
+        parse_rule(
+            r#"rule {
+                attr level(1);
+                a + x == 0 => x == -a;
+                a!=0;
+            }"#,
+        )
     }
 
     fn subtree_rule() -> Rule {
-        setup();
-        let test_rule = r#"rule {
-                            attr subtree,level(1);
-                            --a <=> a;
-                        }"#;
-
-        let mut rules = RuleParser::with(&ra::lang_rule(test_rule).unwrap())
-            .parse()
-            .unwrap();
-        assert_eq!(rules.len(), 1);
-        rules.pop().unwrap()
+        parse_rule(
+            r#"rule {
+                attr subtree,level(1);
+                --a <=> a;
+            }"#,
+        )
     }
 
     fn rule_with_binds() -> Rule {
-        setup();
-        let test_rule = r#"rule {
-                            attr level(1);
-                            a/((b + c) as D) == 0 <=> a == 0 && D != 0;
-                        }"#;
-
-        let mut rules = RuleParser::with(&ra::lang_rule(test_rule).unwrap())
-            .parse()
-            .unwrap();
-        assert_eq!(rules.len(), 1);
-        rules.pop().unwrap()
+        parse_rule(
+            r#"rule {
+                attr level(1);
+                a/((b + c) as D) == 0 <=> a == 0 && D != 0;
+            }"#,
+        )
     }
 
     fn test_statement_fraction() -> MarkedStatement {
-        setup();
-        let test_statement = r#"2/(x + 1) == 0"#;
-
-        MarkedStatement::from(Arc::new(
-            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
-                .with_variables()
-                .parse()
-                .unwrap(),
-        ))
+        MarkedStatement::from(Arc::new(statement_with_vars(r#"2/(x + 1) == 0"#)))
     }
 
     fn test_statement() -> MarkedStatement {
-        setup();
-        let test_statement = r#"2 + x == 0"#;
-        MarkedStatement::from(Arc::new(
-            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
-                .with_variables()
-                .parse()
-                .unwrap(),
-        ))
+        MarkedStatement::from(Arc::new(statement_with_vars(r#"2 + x == 0"#)))
     }
 
     fn test_statement_subtree() -> MarkedStatement {
-        setup();
-        let test_statement = r#"x + (-(-2)) == 0"#;
-        MarkedStatement::from(Arc::new(
-            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
-                .with_variables()
-                .parse()
-                .unwrap(),
-        ))
+        MarkedStatement::from(Arc::new(statement_with_vars(r#"x + (-(-2)) == 0"#)))
     }
 
     fn test_target() -> MarkedStatement {
-        setup();
-        let test_statement = r#"find(x)"#;
-        MarkedStatement::from(Arc::new(
-            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
-                .with_variables()
-                .parse()
-                .unwrap(),
-        ))
+        MarkedStatement::from(Arc::new(statement_with_vars(r#"find(x)"#)))
     }
 
     #[test]
@@ -399,35 +352,19 @@ pub mod tests {
 
     #[test]
     fn subtree_apply_test_2() {
-        setup();
-        let test_rule = r#"rule {
+        let rule = parse_rule(
+            r#"rule {
                 attr level(0),problem_target(transform(x)),subtree,replace;
                 a && b <=> b;
 
                 a is true;
-            }"#;
-
-        let mut rules = RuleParser::with(&ra::lang_rule(test_rule).unwrap())
-            .parse()
-            .unwrap();
-        assert_eq!(rules.len(), 1);
-        let rule = rules.pop().unwrap();
+            }"#,
+        );
 
         let test_statement = r#"(x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 < 0 && x in empty_set) || (3600 >= 0 && x in set(1, 2)))"#;
-        let ss = ra::statements(test_statement).unwrap();
-        let ss = StatementParser::new(&ss[0])
-            .with_variables()
-            .parse()
-            .unwrap();
-        let mut statement = MarkedStatement::from(Arc::new(ss));
+        let mut statement = MarkedStatement::from(Arc::new(statement_with_vars(test_statement)));
 
-        let test_statement = r#"transform(a)"#;
-        let target = MarkedStatement::from(Arc::new(
-            StatementParser::new(&ra::statements(test_statement).unwrap()[0])
-                .with_variables()
-                .parse()
-                .unwrap(),
-        ));
+        let target = MarkedStatement::from(Arc::new(statement_with_vars(r#"transform(a)"#)));
         statement.weight = 0;
 
         let suppose = rule.apply(&mut statement, &target);
