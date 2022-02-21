@@ -14,13 +14,13 @@ pub use self::{
     marked_statement::MarkedStatement,
     statement::Statement,
     symbols::{Symbol, SymbolAttr, SymbolAttrValue},
-    term::{CompactString, StatementNode},
+    term::{CompactString, StatementNode, StatementTree},
     tree_utils::NodeMapping,
 };
 
 #[cfg(test)]
 pub fn statement_with_params(text: &'static str) -> Statement {
-    let states = parser::ra::statements(text).unwrap();
+    let states = parser::lang::statements(text).unwrap();
     let statement = parser::StatementParser::new(&states[0]).parse().unwrap();
 
     unsafe { std::mem::transmute::<_, Statement>(statement) }
@@ -28,7 +28,7 @@ pub fn statement_with_params(text: &'static str) -> Statement {
 
 #[cfg(test)]
 pub fn statement_with_vars(text: &'static str) -> Statement {
-    let states = parser::ra::statements(text).unwrap();
+    let states = parser::lang::statements(text).unwrap();
     let statement = parser::StatementParser::new(&states[0])
         .with_variables()
         .parse()

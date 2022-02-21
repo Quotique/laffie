@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use mcore::statement::{Symbol, SymbolAttr, SymbolAttrValue};
 
-use super::{Node, SemanticError};
+use super::{Node, ParserError};
 
 pub struct SymbolParser<'a> {
     ast: &'a Node,
@@ -13,63 +13,78 @@ impl<'a> SymbolParser<'a> {
         Self { ast: syntax_tree }
     }
 
-    pub fn parse(self) -> Result<Symbol, SemanticError> {
-        if self.ast.data() != "Declare" {
-            return Err(SemanticError::UnexpectedWord(self.ast.data().clone()));
+    pub fn parse(self) -> Result<Symbol, ParserError> {
+        if self.ast.data().symbol != "Declare" {
+            return Err(ParserError {
+                loc: self.ast.data().location.clone(),
+                msg: "expected 'symbol'".to_owned(),
+            });
         }
 
         let mut builder = Symbol::builder();
 
         for sym_child in self.ast.iter() {
-            if sym_child.data() == "Symbol" {
-                builder.name(sym_child.front().unwrap().data().clone());
-            } else if sym_child.data() == "Attrs" {
+            if sym_child.data().symbol == "Symbol" {
+                builder.name(sym_child.front().unwrap().data().symbol.clone());
+            } else if sym_child.data().symbol == "Attrs" {
                 for attr in sym_child.iter() {
                     let a = Self::parse_attr(attr)?;
                     builder.with_attr(a.0, a.1);
                 }
             }
         }
-        builder
-            .build()
-            .map_err(|e| SemanticError::MissingWord(e.to_string()))
+        builder.build().map_err(|e| ParserError {
+            loc: self.ast.data().location.clone(),
+            msg: e.to_string(),
+        })
     }
 
-    fn parse_attr(data: &Node) -> Result<(SymbolAttr, SymbolAttrValue), SemanticError> {
-        match data.data().as_str() {
+    fn parse_attr(data: &Node) -> Result<(SymbolAttr, SymbolAttrValue), ParserError> {
+        match data.data().symbol.as_str() {
             "infix" => {
-                let c = data
-                    .front()
-                    .ok_or_else(|| SemanticError::Other("infix(w) argument is required!".into()))?;
-                let w = u64::from_str(c.data())
-                    .map_err(|_| SemanticError::Other("Infix argument must be u64".into()))?;
+                let c = data.front().ok_or_else(|| ParserError {
+                    loc: data.data().location.clone(),
+                    msg: "infix(number) argument is required!".to_owned(),
+                })?;
+                let w = u64::from_str(&c.data().symbol).map_err(|_| ParserError {
+                    loc: data.data().location.clone(),
+                    msg: "infix argument must be u64".to_owned(),
+                })?;
                 Ok((SymbolAttr::Infix, SymbolAttrValue::UInt(w)))
             }
             "display" => {
                 let s = data
                     .front()
-                    .ok_or_else(|| SemanticError::Other("display(s) argument is required!".into()))?
-                    .data()
-                    .clone();
-                Ok((SymbolAttr::Display, SymbolAttrValue::UStr(s)))
+                    .ok_or_else(|| ParserError {
+                        loc: data.data().location.clone(),
+                        msg: "display(s) argument is required!".to_owned(),
+                    })?
+                    .data();
+                Ok((
+                    SymbolAttr::Display,
+                    SymbolAttrValue::UStr(s.symbol.clone().into()),
+                ))
             }
             "associative" => Ok((SymbolAttr::Associative, SymbolAttrValue::None)),
             "commutative" => Ok((SymbolAttr::Commutative, SymbolAttrValue::None)),
-            _ => Err(SemanticError::UnexpectedWord(data.data().clone())),
+            _ => Err(ParserError {
+                loc: data.data().location.clone(),
+                msg: "unknown attribute".to_owned(),
+            }),
         }
     }
 }
 
 #[cfg(test)]
 pub mod tests {
-    use crate::ra;
+    use crate::lang;
 
     use super::*;
 
     #[test]
     fn parser_test() {
         let test_str = "symbol + { attr infix(10) }";
-        let states = ra::symbol(test_str).unwrap();
+        let states = lang::symbol(test_str).unwrap();
 
         let sym = SymbolParser::new(&states).parse().unwrap();
         assert_eq!(

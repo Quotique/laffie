@@ -9,7 +9,9 @@ use mcore::{
     statement::MarkedStatement,
 };
 
-use super::{statement::StatementParser, SemanticError, Tree};
+use crate::ParserError;
+
+use super::{statement::StatementParser, Tree};
 
 pub struct ProblemParser<'a> {
     syntax_tree: &'a Tree,
@@ -20,11 +22,12 @@ impl<'a> ProblemParser<'a> {
         Self { syntax_tree }
     }
 
-    pub fn parse(self) -> Result<Problem, SemanticError> {
-        if self.syntax_tree.root().data() != "Problem" {
-            return Err(SemanticError::UnexpectedWord(
-                self.syntax_tree.root().data().clone(),
-            ));
+    pub fn parse(self) -> Result<Problem, ParserError> {
+        if self.syntax_tree.root().data().symbol != "Problem" {
+            return Err(ParserError {
+                loc: self.syntax_tree.root().data().location.clone(),
+                msg: "expected 'problem'".to_owned(),
+            });
         }
         let mut hasher = DefaultHasher::new();
         self.syntax_tree.root().hash(&mut hasher);
@@ -33,34 +36,35 @@ impl<'a> ProblemParser<'a> {
         let mut builder = ProblemBuilder::default().with_id(hash);
 
         for child in self.syntax_tree.iter() {
-            if child.data() == "Target" {
+            if child.data().symbol == "Target" {
                 if child.degree() != 1 {
-                    return Err(SemanticError::WorngArgCount(format!(
-                        "target: expect 1 found {}",
-                        child.degree()
-                    )));
+                    return Err(ParserError {
+                        loc: child.data().location.clone(),
+                        msg: "must have one argument".to_owned(),
+                    });
                 }
 
                 builder = builder
                     .with_target(MarkedStatement::from(Arc::new(
                         StatementParser::new(child.front().unwrap())
                             .with_variables()
-                            .parse()
-                            .map_err(|e| SemanticError::Other(e.to_string()))?,
+                            .parse()?,
                     )))
-                    .map_err(|e| SemanticError::Other(e.to_string()))?;
+                    .map_err(|e| ParserError {
+                        loc: child.data().location.clone(),
+                        msg: e.to_string(),
+                    })?;
             } else {
                 builder = builder.with_condition(MarkedStatement::from(Arc::new(
-                    StatementParser::new(child)
-                        .with_variables()
-                        .parse()
-                        .map_err(|e| SemanticError::Other(e.to_string()))?,
+                    StatementParser::new(child).with_variables().parse()?,
                 )));
             }
         }
-        builder
-            .build()
-            .map_err(|e| SemanticError::Other(e.to_string()))
+        builder.build().map_err(|e| ParserError {
+            loc: self.syntax_tree.data().location.clone(),
+
+            msg: e.to_string(),
+        })
     }
 }
 
@@ -70,7 +74,7 @@ mod tests {
 
     use mcore::statement::term::Term;
 
-    use crate::ra;
+    use crate::lang;
 
     use super::*;
 
@@ -81,7 +85,7 @@ mod tests {
                         2*x+5 == 0;
                     }"#;
 
-        let states = ra::problem(test).unwrap();
+        let states = lang::problem(test).unwrap();
         let result = ProblemParser::with(&states).parse();
         assert!(result.is_ok());
 

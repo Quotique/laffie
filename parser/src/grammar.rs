@@ -1,7 +1,22 @@
+use std::convert::From;
+
 use trees::{tr, Tree};
 
-fn tree(data: &str) -> Tree<String> {
-    tr(String::from(data))
+use crate::CompactString;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Data {
+    pub symbol:   CompactString,
+    pub position: usize,
+}
+
+impl Data {
+    pub fn new(data: &str, position: usize) -> Tree<Self> {
+        tr(Self {
+            symbol: CompactString::from(data),
+            position,
+        })
+    }
 }
 
 peg::parser! {
@@ -19,67 +34,71 @@ peg::parser! {
         rule keyword(id: &'static str) =
             ##parse_string_literal(id) !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
 
-        rule ident() -> Tree<String> =
-            _ s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) { tree(s) }
+        rule ident() -> Tree<Data> =
+            _ p:position!() s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) { Data::new(s, p) }
 
-        rule placeholder() -> Tree<String> = ".." { tree("..") }
+        rule placeholder() -> Tree<Data> = p:position!() ".." { Data::new("..", p) }
 
-        rule attrs() -> Vec<Tree<String>> = _ keyword("attr") _ a:commasep(<arithmetic()>) { a }
+        rule attrs() -> Vec<Tree<Data>> = _ keyword("attr") _ a:commasep(<arithmetic()>) { a }
 
-        pub rule any() -> Vec<Tree<String>> =
+        pub rule any() -> Vec<Tree<Data>> =
             _ s:semicolonsep(<problem()/lang_rule()/symbol()>) _ { s }
 
-        pub rule statements() -> Vec<Tree<String>> = _ c:semicolonsep(<arithmetic()>) { c }
+        pub rule statements() -> Vec<Tree<Data>> = _ c:semicolonsep(<arithmetic()>) { c }
 
-        pub rule problem() -> Tree<String> = _ keyword("problem") _ "{"
-            _ keyword("target") _ t:eval() ";"
+        pub rule problem() -> Tree<Data> = _ pp:position!() keyword("problem") _ "{"
+            _ pt:position!() keyword("target") _ t:eval() ";"
                 _ c:semicolonsep(<arithmetic()>)
             _ "}"
             {
-                let mut p = tree("Problem") /(tree("Target") / t);
+                let mut p = Data::new("Problem", pp) /(Data::new("Target", pt) / t);
                 for i in c.iter().cloned() {
                     p.push_back(i);
                 }
                 p
             }
 
-        pub rule symbol() -> Tree<String> =
-            _ keyword("symbol")
-                _ s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '*' | '/' |
+        pub rule symbol() -> Tree<Data> =
+            _ ps:position!() keyword("symbol")
+                _ pn:position!() s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '*' | '/' |
                         '^' | '=' | '<' | '>' | '!' | '|' | '&' | '_' ]+)
-                _ a:("{" _ a:attrs() _ "}" { a } )?
+                _ pa:position!() a:("{" _ a:attrs() _ "}" { a } )?
                 {
                     match a {
                         Some(a) => {
-                            let mut t = tree("Attrs");
+                            let mut t = Data::new("Attrs", pa);
                             for i in a.iter().cloned() {
                                 t.push_back(i);
                             }
-                            tree("Declare") / (tree("Symbol") / tree(s)) / t
+                            Data::new("Declare", ps) /
+                                (Data::new("Symbol", ps) / Data::new(s, pn)) /
+                                t
                         }
                         None => {
-                            tree("Declare") / (tree("Symbol") / tree(s))
+                            Data::new("Declare", ps) /
+                                (Data::new("Symbol", ps) /
+                                 Data::new(s, pn))
                         }
                     }
                 }
 
-        pub rule lang_rule() -> Tree<String> =
-            _ keyword("rule") _ "{"
-                _ a:(a:attrs() _ ";" {a})?
+        pub rule lang_rule() -> Tree<Data> =
+            _ rp:position!() keyword("rule") _ "{"
+                _ ap:position!() a:(a:attrs() _ ";" {a})?
                 _ r:arithmetic() _ ";"
-                _ p:commasep(<arithmetic()>)
+                _ pp:position!() p:commasep(<arithmetic()>)
                 _ ";"?
             _ "}"
             {
-                let mut t = tree("Rule");
+                let mut t = Data::new("Rule", rp);
                 t.push_back(r);
-                let mut pred = tree("Predicates");
+                let mut pred = Data::new("Predicates", pp);
                 for i in p.iter().cloned() {
                     pred.push_back(i);
                 }
                 t.push_back(pred);
                 if let Some(a) = a {
-                    let mut attr = tree("Attributes");
+                    let mut attr = Data::new("Attributes", ap);
                     for i in a.iter().cloned() {
                         attr.push_back(i);
                     }
@@ -88,37 +107,37 @@ peg::parser! {
                 t
             }
 
-        pub rule arithmetic() -> Tree<String> = precedence!{
-            s:string() { tr(s) }
+        pub rule arithmetic() -> Tree<Data> = precedence!{
+            p:position!() s:string() { Data::new(s.as_str(), p) }
             --
-            x:(@) _ "=>" _ y:@ { tree("=>")/x/y }
-            x:(@) _ "<=>" _ y:@ { tree("<=>")/x/y }
+            x:(@) _ p:position!() "=>" _ y:@ { Data::new("=>", p)/x/y }
+            x:(@) _ p:position!() "<=>" _ y:@ { Data::new("<=>", p)/x/y }
             --
-            x:(@) _ "||" _ y:@ { tree("||")/x/y }
-            x:(@) _ "&&" _ y:@ { tree("&&")/x/y }
+            x:(@) _ p:position!() "||" _ y:@ { Data::new("||", p)/x/y }
+            x:(@) _ p:position!() "&&" _ y:@ { Data::new("&&", p)/x/y }
             --
-            x:(@) _ "is" _ y:@ { tree("is")/x/y }
-            x:(@) _ "in" _ y:@ { tree("in")/x/y }
-            x:(@) _ "==" _ y:@ { tree("==")/x/y }
-            x:(@) _ "!=" _ y:@ { tree("!=")/x/y }
-            x:(@) _ "<=" _ y:@ { tree("<=")/x/y }
-            x:(@) _ ">=" _ y:@ { tree(">=")/x/y }
-            x:(@) _ "<" _ y:@ { tree("<")/x/y }
-            x:(@) _ ">" _ y:@ { tree(">")/x/y }
+            x:(@) _ p:position!() "is" _ y:@ { Data::new("is", p)/x/y }
+            x:(@) _ p:position!() "in" _ y:@ { Data::new("in", p)/x/y }
+            x:(@) _ p:position!() "==" _ y:@ { Data::new("==", p)/x/y }
+            x:(@) _ p:position!() "!=" _ y:@ { Data::new("!=", p)/x/y }
+            x:(@) _ p:position!() "<=" _ y:@ { Data::new("<=", p)/x/y }
+            x:(@) _ p:position!() ">=" _ y:@ { Data::new(">=", p)/x/y }
+            x:(@) _ p:position!() "<" _ y:@ { Data::new("<", p)/x/y }
+            x:(@) _ p:position!() ">" _ y:@ { Data::new(">", p)/x/y }
             --
-            x:(@) _ "as" _ y:ident() { tree("as")/x/y }
+            x:(@) _ p:position!() "as" _ y:ident() { Data::new("as", p)/x/y }
             --
-            "-" _ x:@ { tree("-")/x }
-            "+" _ x:@ { tree("+")/x }
-            "!" _ x:@ { tree("!")/x }
+            p:position!() "-" _ x:@ { Data::new("-", p)/x }
+            p:position!() "+" _ x:@ { Data::new("+", p)/x }
+            p:position!() "!" _ x:@ { Data::new("!", p)/x }
             --
-            x:(@) _ "+" _ y:@ { tree("+")/x/y }
-            x:(@) _ "-" _ y:@ { tree("-")/x/y }
+            x:(@) _ p:position!() "+" _ y:@ { Data::new("+", p)/x/y }
+            x:(@) _ p:position!() "-" _ y:@ { Data::new("-", p)/x/y }
             --
-            x:(@) _ "*" _ y:@ { tree("*")/x/y }
-            x:(@) _ "/" _ y:@ { tree("/")/x/y }
+            x:(@) _ p:position!() "*" _ y:@ { Data::new("*", p)/x/y }
+            x:(@) _ p:position!() "/" _ y:@ { Data::new("/", p)/x/y }
             --
-            x:@ "^" y:(@) { tree("^")/x/y }
+            x:@ p:position!() "^" y:(@) { Data::new("^", p)/x/y }
             --
             e:eval() { e }
             p:placeholder() { p }
@@ -126,7 +145,7 @@ peg::parser! {
             "(" _  a:arithmetic() _ ")" {a}
         }
 
-        rule eval() -> Tree<String> = t:ident() "(" _ a:commasep(<arithmetic()>) _ ")" {
+        rule eval() -> Tree<Data> = t:ident() "(" _ a:commasep(<arithmetic()>) _ ")" {
             let mut t = t;
             for i in a.iter().cloned() {
                 t.push_back(i);
@@ -154,7 +173,9 @@ mod tests {
     fn args_test() {
         assert_eq!(
             ra::arithmetic("sum(one + three, two)"),
-            Ok(tree("sum") / (tree("+") / tree("one") / tree("three")) / tree("two"))
+            Ok(Data::new("sum", 0) /
+                (Data::new("+", 8) / Data::new("one", 4) / Data::new("three", 10)) /
+                Data::new("two", 17))
         );
     }
 
@@ -165,9 +186,11 @@ mod tests {
         assert_eq!(states.len(), 1);
         assert_eq!(
             states[0],
-            tree("is") /
-                (tree("as") / (tree("set") / tree("a") / tree("b")) / tree("S")) /
-                tree("Known")
+            Data::new("is", 15) /
+                (Data::new("as", 10) /
+                    (Data::new("set", 0) / Data::new("a", 4) / Data::new("b", 7)) /
+                    Data::new("S", 13)) /
+                Data::new("Known", 18)
         )
     }
 
@@ -177,8 +200,14 @@ mod tests {
         let states = ra::statements(test).unwrap();
 
         assert_eq!(states.len(), 2);
-        assert_eq!(states[0], tree("in") / tree("x") / tree("Real"));
-        assert_eq!(states[1], tree("is") / tree("x") / tree("Unknown"));
+        assert_eq!(
+            states[0],
+            Data::new("in", 2) / Data::new("x", 0) / Data::new("Real", 5)
+        );
+        assert_eq!(
+            states[1],
+            Data::new("is", 13) / Data::new("x", 11) / Data::new("Unknown", 16)
+        );
     }
 
     #[test]
@@ -191,13 +220,17 @@ mod tests {
         assert_eq!(states.len(), 3);
         assert_eq!(
             states[0],
-            tree("=>") /
-                (tree("==") /
-                    (tree("*") / tree("x") / (tree("+") / tree("y") / tree("z"))) /
-                    tree("0")) /
-                (tree("||") /
-                    (tree("==") / (tree("+") / tree("y") / tree("z")) / tree("0")) /
-                    (tree("==") / tree("x") / tree("0")))
+            Data::new("=>", 13) /
+                (Data::new("==", 8) /
+                    (Data::new("*", 1) /
+                        Data::new("x", 0) /
+                        (Data::new("+", 4) / Data::new("y", 3) / Data::new("z", 5))) /
+                    Data::new("0", 11)) /
+                (Data::new("||", 25) /
+                    (Data::new("==", 20) /
+                        (Data::new("+", 17) / Data::new("y", 16) / Data::new("z", 18)) /
+                        Data::new("0", 23)) /
+                    (Data::new("==", 30) / Data::new("x", 28) / Data::new("0", 33)))
         );
     }
 
@@ -210,13 +243,20 @@ mod tests {
         let states = ra::lang_rule(test).unwrap();
         assert_eq!(
             states,
-            tree("Rule") /
-                (tree("=>") /
-                    (tree("==") /
-                        (tree("+") / (tree("*") / tree("a") / tree("x")) / tree("b")) /
-                        tree("0")) /
-                    (tree("==") / tree("x") / (tree("/") / tree("b") / tree("a")))) /
-                (tree("Predicates") / (tree("!=") / tree("a") / tree("0")))
+            Data::new("Rule", 0) /
+                (Data::new("=>", 32) /
+                    (Data::new("==", 28) /
+                        (Data::new("+", 26) /
+                            (Data::new("*", 24) /
+                                Data::new("a", 23) /
+                                Data::new("x", 25)) /
+                            Data::new("b", 27)) /
+                        Data::new("0", 30)) /
+                    (Data::new("==", 36) /
+                        Data::new("x", 35) /
+                        (Data::new("/", 39) / Data::new("b", 38) / Data::new("a", 40)))) /
+                (Data::new("Predicates", 59) /
+                    (Data::new("!=", 60) / Data::new("a", 59) / Data::new("0", 62)))
         );
     }
 
@@ -229,11 +269,13 @@ mod tests {
         let states = ra::problem(test).unwrap();
         assert_eq!(
             states,
-            tree("Problem") /
-                (tree("Target") / (tree("find") / tree("x"))) /
-                (tree("==") /
-                    (tree("+") / (tree("*") / tree("2") / tree("x")) / tree("5")) /
-                    tree("0"))
+            Data::new("Problem", 0) /
+                (Data::new("Target", 34) / (Data::new("find", 41) / Data::new("x", 46))) /
+                (Data::new("==", 80) /
+                    (Data::new("+", 77) /
+                        (Data::new("*", 75) / Data::new("2", 74) / Data::new("x", 76)) /
+                        Data::new("5", 78)) /
+                    Data::new("0", 83))
         )
     }
 
@@ -241,7 +283,10 @@ mod tests {
     fn priority_test() {
         let test = r#"-a/b"#;
         let states = ra::statements(test).unwrap();
-        assert_eq!(states[0], tree("-") / (tree("/") / tree("a") / tree("b")))
+        assert_eq!(
+            states[0],
+            Data::new("-", 0) / (Data::new("/", 2) / Data::new("a", 1) / Data::new("b", 3))
+        )
     }
 
     #[test]
@@ -251,7 +296,11 @@ mod tests {
         assert_eq!(states.len(), 1);
         assert_eq!(
             states[0],
-            tree("is") / (tree("as") / (tree("set") / tree("..")) / tree("S")) / tree("Known")
+            Data::new("is", 13) /
+                (Data::new("as", 8) /
+                    (Data::new("set", 0) / Data::new("..", 4)) /
+                    Data::new("S", 11)) /
+                Data::new("Known", 16)
         )
     }
 }

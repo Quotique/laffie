@@ -2,7 +2,9 @@ use std::str::FromStr;
 
 use mcore::rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder};
 
-use super::{statement::StatementParser, Node, SemanticError, Tree};
+use crate::ParserError;
+
+use super::{statement::StatementParser, Node, Tree};
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
@@ -22,32 +24,28 @@ impl<'a> RuleParser<'a> {
         self
     }
 
-    pub fn parse(self) -> Result<Vec<Rule>, SemanticError> {
-        if self.syntax_tree.root().data() != "Rule" {
-            return Err(SemanticError::UnexpectedWord(
-                self.syntax_tree.root().data().clone(),
-            ));
+    pub fn parse(self) -> Result<Vec<Rule>, ParserError> {
+        if self.syntax_tree.root().data().symbol != "Rule" {
+            return Err(ParserError {
+                loc: self.syntax_tree.root().data().location.clone(),
+                msg: "expected 'rule'".to_owned(),
+            });
         }
         let mut builder = RuleBuilder::default();
 
         for child in self.syntax_tree.iter() {
-            match child.data().as_str() {
+            match child.data().symbol.as_str() {
                 "=>" | "<=>" => {
                     builder = builder
-                        .with_statement(
-                            StatementParser::new(child)
-                                .parse()
-                                .map_err(|e| SemanticError::Other(e.to_string()))?,
-                        )
-                        .map_err(|e| SemanticError::Other(e.to_string()))?;
+                        .with_statement(StatementParser::new(child).parse()?)
+                        .map_err(|e| ParserError {
+                            loc: child.data().location.clone(),
+                            msg: e.to_string(),
+                        })?;
                 }
                 "Predicates" => {
                     for req in child.iter() {
-                        builder = builder.with_require(
-                            StatementParser::new(req)
-                                .parse()
-                                .map_err(|e| SemanticError::Other(e.to_string()))?,
-                        )
+                        builder = builder.with_require(StatementParser::new(req).parse()?)
                     }
                 }
                 "Attributes" => {
@@ -57,8 +55,11 @@ impl<'a> RuleParser<'a> {
                     }
                 }
                 _ => {
-                    error!("{:?}", child);
-                    return Err(SemanticError::UnexpectedWord(child.data().clone()));
+                    error!("{:?}", child.data().symbol);
+                    return Err(ParserError {
+                        loc: child.data().location.clone(),
+                        msg: "unexpected word".to_owned(),
+                    });
                 }
             }
         }
@@ -66,46 +67,53 @@ impl<'a> RuleParser<'a> {
         builder
             .with_symbol_id(self.symbol_id)
             .build()
-            .map_err(|e| SemanticError::Other(e.to_string()))
+            .map_err(|e| ParserError {
+                loc: self.syntax_tree.data().location.clone(),
+                msg: e.to_string(),
+            })
     }
 
-    fn parse_attribute(attr: &Node) -> Result<(RuleAttr, RuleAttrValue), SemanticError> {
-        match attr.data().as_str() {
+    fn parse_attribute(attr: &Node) -> Result<(RuleAttr, RuleAttrValue), ParserError> {
+        match attr.data().symbol.as_str() {
             "subtree" | "equivalence" | "replace" => Ok((
-                RuleAttr::from_str(attr.data().as_str()).unwrap(),
+                RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
                 RuleAttrValue::None,
             )),
             "level" => {
                 if attr.degree() != 1 {
-                    return Err(SemanticError::WorngArgCount(format!(
-                        "Wrong target arguments count: {} expect 1",
-                        attr.degree()
-                    )));
+                    return Err(ParserError {
+                        loc: attr.data().location.clone(),
+                        msg: "must have one argument".to_owned(),
+                    });
                 }
+                let data = attr.front().unwrap().data();
+
                 Ok((
                     RuleAttr::Level,
-                    RuleAttrValue::UInt(attr.front().unwrap().data().parse::<u64>().map_err(
-                        |_| SemanticError::UnexpectedWord(attr.front().unwrap().data().clone()),
-                    )?),
+                    RuleAttrValue::UInt(data.symbol.parse::<u64>().map_err(|_| ParserError {
+                        loc: data.location.clone(),
+                        msg: "must be u64".to_owned(),
+                    })?),
                 ))
             }
             "problem_target" | "zero" | "one" => {
                 if attr.degree() != 1 {
-                    return Err(SemanticError::WorngArgCount(format!(
-                        "Wrong target arguments count: {} expect 1",
-                        attr.degree()
-                    )));
+                    return Err(ParserError {
+                        loc: attr.data().location.clone(),
+                        msg: "must have one argument".to_owned(),
+                    });
                 }
 
-                let target = StatementParser::new(attr.front().unwrap())
-                    .parse()
-                    .map_err(|e| SemanticError::Other(e.to_string()))?;
+                let target = StatementParser::new(attr.front().unwrap()).parse()?;
                 Ok((
-                    RuleAttr::from_str(attr.data().as_str()).unwrap(),
+                    RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
                     RuleAttrValue::Target(target),
                 ))
             }
-            _ => Err(SemanticError::UnexpectedWord(attr.data().clone())),
+            _ => Err(ParserError {
+                loc: attr.data().location.clone(),
+                msg: "unknown attribute".to_owned(),
+            }),
         }
     }
 }
@@ -119,7 +127,7 @@ mod tests {
         statement::term::Term,
     };
 
-    use crate::ra;
+    use crate::lang;
 
     use super::*;
 
@@ -131,7 +139,7 @@ mod tests {
                         a!=0;
                       }"#;
 
-        let states = ra::lang_rule(test).unwrap();
+        let states = lang::lang_rule(test).unwrap();
         let result = RuleParser::with(&states).parse();
         assert!(result.is_ok());
 
@@ -182,7 +190,7 @@ mod tests {
                     b is known
                 }"#;
 
-        let states = ra::lang_rule(test).unwrap();
+        let states = lang::lang_rule(test).unwrap();
         let result = RuleParser::with(&states).parse();
         assert!(result.is_ok());
 
@@ -237,7 +245,7 @@ mod tests {
                         a!=0;
                       }"#;
 
-        let states = ra::lang_rule(test).unwrap();
+        let states = lang::lang_rule(test).unwrap();
         let result = RuleParser::with(&states).parse();
         assert!(result.is_ok());
 

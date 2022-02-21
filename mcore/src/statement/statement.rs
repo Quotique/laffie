@@ -3,31 +3,18 @@ use std::{
     convert::From,
     fmt,
     hash::Hash,
-    str::FromStr,
 };
 
-use bigdecimal::BigDecimal as Decimal;
-use eyre::{ensure, Result};
+use eyre::Result;
 use trees::{tr, Node};
-
-use crate::predefine::symbol_by_name;
 
 use super::{
     index::NodePosition,
     mapping::ParamsMapping,
     statement_display::display_string,
-    term::{Param, Placeholder, StatementTree, Term, Variable},
+    term::{Param, StatementTree, Term},
     tree_utils::{replace, swap_node},
 };
-
-// use crate::parser::Node as ParserNode;
-type ParserNode = Node<String>;
-
-#[derive(Clone, Copy)]
-enum NodeType {
-    Statement,
-    Rule,
-}
 
 #[derive(Clone, Eq)]
 pub struct Statement {
@@ -36,34 +23,8 @@ pub struct Statement {
 }
 
 impl Statement {
-    #[inline]
-    pub fn try_parse_statement(node: &ParserNode) -> Result<Self> {
-        let mut positions_map = Default::default();
-        Ok(Self {
-            tree:  Self::try_parse_impl(
-                node,
-                NodeType::Statement,
-                Default::default(),
-                &mut positions_map,
-                &mut 0,
-            )?,
-            binds: positions_map,
-        })
-    }
-
-    #[inline]
-    pub fn try_parse_rule(node: &ParserNode) -> Result<Self> {
-        let mut positions_map = Default::default();
-        Ok(Self {
-            tree:  Self::try_parse_impl(
-                node,
-                NodeType::Rule,
-                Default::default(),
-                &mut positions_map,
-                &mut 0,
-            )?,
-            binds: positions_map,
-        })
+    pub fn new(tree: StatementTree, binds: HashMap<Param, NodePosition>) -> Self {
+        Statement { tree, binds }
     }
 
     pub fn one() -> Self {
@@ -129,73 +90,6 @@ impl Statement {
     pub fn swap_node(&mut self, node: &mut Node<Term>) {
         swap_node(&mut self.tree.root_mut(), node)
     }
-
-    fn try_parse_impl(
-        mut node: &ParserNode,
-        node_type: NodeType,
-        node_position: NodePosition,
-        positions_map: &mut HashMap<Param, NodePosition>,
-        last_placeholder_id: &mut u64,
-    ) -> Result<StatementTree> {
-        while node.data() == "as" {
-            let param =
-                Param::from_str(node.back().unwrap().data()).expect("unable to create param");
-            ensure!(
-                positions_map
-                    .insert(param.clone(), node_position.clone())
-                    .is_none(),
-                "Multiple definition of param {}",
-                param
-            );
-
-            node = node.front().unwrap();
-        }
-
-        let mut tree = tr(Self::parse_term(
-            node.data().as_str(),
-            &node_type,
-            last_placeholder_id,
-        ));
-        if tree.root().data().symbol_id().is_some() {
-            for (num, child) in node.iter().enumerate() {
-                tree.push_back(Self::try_parse_impl(
-                    child,
-                    node_type,
-                    node_position.clone().child(num),
-                    positions_map,
-                    last_placeholder_id,
-                )?);
-            }
-        } else {
-            ensure!(
-                node.degree() == 0,
-                "Node {} can't contains children!",
-                &node.data()
-            );
-        }
-
-        Ok(tree)
-    }
-
-    fn parse_term(data: &str, node_type: &NodeType, last_placeholder_id: &mut u64) -> Term {
-        if data == ".." {
-            *last_placeholder_id += 1;
-            Term::Placeholder(Placeholder::from(*last_placeholder_id))
-        } else if let Ok(value) = Decimal::from_str(data) {
-            Term::Number(value)
-        } else if let Some(symbol) = symbol_by_name(data) {
-            Term::Symbol(symbol.id)
-        } else {
-            match node_type {
-                NodeType::Rule => {
-                    Term::Param(Param::from_str(data).expect("unable to create param"))
-                }
-                NodeType::Statement => {
-                    Term::Variable(Variable::from_str(data).expect("unable to create variable"))
-                }
-            }
-        }
-    }
 }
 
 impl Hash for Statement {
@@ -233,7 +127,9 @@ impl fmt::Display for Statement {
 
 #[cfg(test)]
 mod tests {
-    use crate::statement::statement_with_params;
+    use std::str::FromStr;
+
+    use crate::statement::{statement_with_params, term::Placeholder};
 
     use super::*;
 

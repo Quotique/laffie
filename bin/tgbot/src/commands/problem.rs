@@ -9,7 +9,7 @@ use mcore::{
     rule::RulesEngine,
     utils::{Dumper, DumperConfig},
 };
-use parser::{ra, ProblemParser};
+use parser::{lang, ProblemParser};
 
 fn problem(
     problem_text: String,
@@ -17,7 +17,8 @@ fn problem(
     problems: Arc<ProblemDb>,
     user: &mut UserRecord,
 ) -> Result<String, String> {
-    let states = ra::problem(&problem_text).map_err(|e| e.to_string())?;
+    let states = lang::problem(&problem_text)
+        .map_err(|e| format!("<code>{}</code>", e.error_string(&problem_text)))?;
     let problem = ProblemParser::with(&states)
         .parse()
         .map_err(|e| e.to_string())?;
