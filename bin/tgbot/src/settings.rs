@@ -11,6 +11,7 @@ pub struct Settings {
     pub symbols_dir: Option<String>,
     pub problems_db: PathBuf,
     pub users_db:    PathBuf,
+    pub api_token:   String,
 }
 
 impl Settings {

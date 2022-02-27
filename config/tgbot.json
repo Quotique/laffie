@@ -8,10 +8,13 @@
       "tokio_reactor": "Info",
       "want": "Info",
       "mio": "Info",
-      "pattern_match": "Info"
+      "rustls": "Info",
+      "pattern_match": "Info",
+      "hyper_rustls": "Info"
     }
   },
   "symbols_dir": "symbols",
   "problems_db": "./db/problems",
-  "users_db": "./db/users"
+  "users_db": "./db/users",
+  "api_token": "5199256327:AAFZiEKFRUz7VanL5Bgd3lfhgArYdBACytM"
 }

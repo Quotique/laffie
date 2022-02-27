@@ -15,8 +15,13 @@ use parser::DirectoryParser;
 use commands::process_update;
 use settings::Settings;
 
-async fn run_bot(engine: Arc<RulesEngine>, problems_db: Arc<ProblemDb>, users_db: Arc<UserDb>) {
-    let api = Api::new("5171464247:AAGR6y0SYZ8zGzx_vni6ITT7dVeirLvVKHE");
+async fn run_bot(
+    token: &str,
+    engine: Arc<RulesEngine>,
+    problems_db: Arc<ProblemDb>,
+    users_db: Arc<UserDb>,
+) {
+    let api = Api::new(token);
 
     let mut stream = api.stream();
 
@@ -84,5 +89,5 @@ async fn main() {
     let problems_db = Arc::new(ProblemDb::open(settings.problems_db).unwrap());
     let users_db = Arc::new(UserDb::open(settings.users_db).unwrap());
 
-    run_bot(rules_engine, problems_db, users_db).await
+    run_bot(&settings.api_token, rules_engine, problems_db, users_db).await
 }
