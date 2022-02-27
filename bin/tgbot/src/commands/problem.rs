@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use futures::{future::Future, Stream};
-use telebot::{functions::*, Bot};
+use telegram_bot::*;
 
 use database::{ProblemDb, ProblemRecord, UserDb, UserRecord};
 use mcore::{
@@ -10,6 +9,8 @@ use mcore::{
     utils::{Dumper, DumperConfig},
 };
 use parser::{lang, ProblemParser};
+
+use super::Command;
 
 fn problem(
     problem_text: String,
@@ -45,30 +46,29 @@ fn problem(
     Ok(std::str::from_utf8(&plain_bytes).unwrap().to_owned())
 }
 
-pub fn handler(
-    bot: &mut Bot,
+pub async fn handler(
+    api: &Api,
+    message: &Message,
+    command: Command,
     engine: Arc<RulesEngine>,
     problems: Arc<ProblemDb>,
     users: Arc<UserDb>,
-) -> impl Future<Item = (), Error = failure::Error> {
-    bot.new_cmd("/problem")
-        .and_then(move |(bot, msg)| {
-            let text = format!("problem {}", msg.text.unwrap());
-            let user_id = msg.from.unwrap().id as u64;
-            let mut user = users
-                .get(user_id)
-                .unwrap_or_default()
-                .unwrap_or_else(|| UserRecord::new(user_id));
+) {
+    let text = format!("{} {}", command.command, command.args);
+    let user_id = i64::from(message.from.id) as u64;
+    let mut user = users
+        .get(user_id)
+        .unwrap_or_default()
+        .unwrap_or_else(|| UserRecord::new(user_id));
 
-            let result = match problem(text, engine.clone(), problems.clone(), &mut user) {
-                Ok(s) | Err(s) => bot
-                    .message(msg.chat.id, s)
-                    .parse_mode(ParseMode::HTML)
-                    .send(),
-            };
+    let chat = message.chat.clone();
 
-            users.put(&user).unwrap();
-            result
-        })
-        .for_each(|_| Ok(()))
+    match problem(text, engine.clone(), problems.clone(), &mut user) {
+        Ok(s) | Err(s) => api
+            .send(chat.text(s).parse_mode(ParseMode::Html))
+            .await
+            .unwrap(),
+    };
+
+    users.put(&user).unwrap();
 }

@@ -5,28 +5,36 @@ mod text;
 use std::{env, sync::Arc};
 
 use clap::{Arg, Command};
-use futures::Future;
-use telebot::Bot;
+use futures::StreamExt;
+use telegram_bot::*;
 
 use database::{ProblemDb, UserDb};
 use mcore::{rule::RulesEngine, utils::log_init};
 use parser::DirectoryParser;
 
-use commands::{problem_handler, problems_list_handler, start_handler};
+use commands::process_update;
 use settings::Settings;
 
-fn run_bot(engine: Arc<RulesEngine>, problems_db: Arc<ProblemDb>, users_db: Arc<UserDb>) {
-    let mut bot = Bot::new("5171464247:AAGR6y0SYZ8zGzx_vni6ITT7dVeirLvVKHE").update_interval(200);
+async fn run_bot(engine: Arc<RulesEngine>, problems_db: Arc<ProblemDb>, users_db: Arc<UserDb>) {
+    let api = Api::new("5171464247:AAGR6y0SYZ8zGzx_vni6ITT7dVeirLvVKHE");
 
-    let problem = problem_handler(&mut bot, engine, problems_db.clone(), users_db.clone());
-    let problems_list = problems_list_handler(&mut bot, problems_db, users_db);
+    let mut stream = api.stream();
 
-    let start = start_handler(&mut bot);
-
-    bot.run_with(problems_list.join(problem.join(start)));
+    while let Some(update) = stream.next().await {
+        let update = update.unwrap();
+        process_update(
+            update,
+            &api,
+            engine.clone(),
+            problems_db.clone(),
+            users_db.clone(),
+        )
+        .await;
+    }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let matches = Command::new("LaffieBot")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Quotique <just.std@gmail.com>")
@@ -76,5 +84,5 @@ fn main() {
     let problems_db = Arc::new(ProblemDb::open(settings.problems_db).unwrap());
     let users_db = Arc::new(UserDb::open(settings.users_db).unwrap());
 
-    run_bot(rules_engine, problems_db, users_db)
+    run_bot(rules_engine, problems_db, users_db).await
 }
