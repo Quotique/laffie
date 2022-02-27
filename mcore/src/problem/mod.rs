@@ -5,7 +5,7 @@ mod target;
 
 pub use self::{
     problem::{Problem, ProblemBuilder},
-    solution::Solution,
+    solution::{Solution, SolveStatus},
 };
 
 #[cfg(test)]

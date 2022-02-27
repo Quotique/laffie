@@ -25,7 +25,7 @@ fn problem(
         .map_err(|e| e.to_string())?;
 
     let record = ProblemRecord::from(&problem);
-    let record = problems.get_or_insert(record)?;
+    let mut record = problems.get_or_insert(record)?;
 
     let mut solution = Solution::new(
         problem,
@@ -42,6 +42,9 @@ fn problem(
         Ok(_) => format!("{} {}", "Solution:", solution),
         Err(e) => format!("{} {} {}", "Solution:", e, solution),
     };
+    record.runs.push(solution.perf_stats.clone());
+    problems.put(&record)?;
+
     let plain_bytes = strip_ansi_escapes::strip(result.as_bytes()).unwrap();
     Ok(std::str::from_utf8(&plain_bytes).unwrap().to_owned())
 }

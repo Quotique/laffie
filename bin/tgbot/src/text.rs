@@ -1,5 +1,7 @@
 use std::env;
 
+use chrono::{offset::Utc, DateTime};
+
 use database::ProblemRecord;
 
 const WHO_IS_STR: &str =
@@ -41,8 +43,21 @@ impl Text {
     }
 
     pub fn problem_text(problem: &ProblemRecord) -> String {
+        let answer = problem
+            .runs
+            .last()
+            .map(|x| match &x.status {
+                Ok(s) => format!(
+                    "\n<i>Ответ:</i> {} [получен: {}, циклов сканирования: {}]\n",
+                    s,
+                    DateTime::<Utc>::from(x.timestamp).format("%Y-%m-%d %T"),
+                    x.cycles_count
+                ),
+                Err(_) => "<i>Задача не решена</i>\n".to_owned(),
+            })
+            .unwrap_or("".to_owned());
         format!(
-            "<u><i>Задача</i></u> 0x{:x}\n<i>цель:</i> {}\n<i>условия:</i>\n  {}\n",
+            "<u><i>Задача</i></u> 0x{:x}\n<i>цель:</i> {}\n<i>условия:</i>\n  {}\n{}",
             problem.id,
             problem.target,
             problem
@@ -51,6 +66,7 @@ impl Text {
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>()
                 .join("\n  "),
+            answer
         )
     }
 

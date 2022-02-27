@@ -1,21 +1,30 @@
-use super::{frame::Frame, problem::Problem, target::Target};
+use std::{
+    fmt,
+    sync::Arc,
+    time::{Instant, SystemTime},
+};
+
+use bincode::{Decode, Encode};
+use colored::*;
+
 use crate::{
     rule::{RulesEngine, SharedRule},
     statement::Statement,
     utils::{Dumper, DumperSink},
 };
-use std::{fmt, sync::Arc, time::Instant};
 
-use colored::*;
+use super::{frame::Frame, problem::Problem, target::Target};
 
 pub const MAX_SUBPROBLEM_LEVEL: usize = 10;
 pub const MAX_LEVEL: usize = 20;
 
-pub struct PerfStats {
-    _problem_hash:   u64,
-    cycles_count:    usize,
-    _solution_depth: usize,
-    absolute_time:   f64,
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct SolveStatus {
+    pub timestamp: SystemTime,
+    pub status:    Result<Statement, SolutionError>,
+
+    pub cycles_count:  usize,
+    pub absolute_time: f64,
 }
 
 pub struct Solution {
@@ -27,10 +36,10 @@ pub struct Solution {
     target:      Target,
     pub answer:  Option<usize>,
 
-    pub perf_stats: PerfStats,
+    pub perf_stats: SolveStatus,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Encode, Decode)]
 pub enum SolutionError {
     StackOverflow,
     MaxSubproblemLevelExceed,
@@ -49,13 +58,13 @@ impl fmt::Display for SolutionError {
     }
 }
 
-impl PerfStats {
-    pub fn new(problem: &Problem) -> PerfStats {
-        PerfStats {
-            _problem_hash:   problem.id,
-            cycles_count:    0,
-            _solution_depth: 0,
-            absolute_time:   0.,
+impl Default for SolveStatus {
+    fn default() -> SolveStatus {
+        SolveStatus {
+            timestamp:     SystemTime::now(),
+            status:        Err(SolutionError::NoSolutionsFound),
+            cycles_count:  0,
+            absolute_time: 0.,
         }
     }
 }
@@ -74,7 +83,7 @@ impl Solution {
 
             answer: None,
 
-            perf_stats: PerfStats::new(&problem),
+            perf_stats: SolveStatus::default(),
 
             problem,
         }
@@ -94,6 +103,8 @@ impl Solution {
         let start = Instant::now();
         let result = self.solution_loop();
 
+        self.perf_stats.status =
+            result.map(|_| (*self.stack[self.answer.unwrap()].statement).clone());
         self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
         self.stack.dumper().subproblem_end();
         result

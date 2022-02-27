@@ -8,6 +8,7 @@ database = { path = "../../database" }
 mcore = { path = "../../mcore/" }
 parser = { path = "../../parser" }
 
+chrono = "0.4"
 config = "0.9"
 clap = "3.1"
 cpu-freq = "0.0.2"

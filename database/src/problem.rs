@@ -8,7 +8,7 @@ use bincode::{config, config::Configuration, Decode, Encode};
 use rocksdb::{Error, DB};
 
 use mcore::{
-    problem::Problem,
+    problem::{Problem, SolveStatus},
     statement::{MarkedStatement, Statement},
 };
 
@@ -17,6 +17,8 @@ pub struct ProblemRecord {
     pub id:         u128,
     pub conditions: Vec<Statement>,
     pub target:     Statement,
+
+    pub runs: Vec<SolveStatus>,
 }
 
 pub struct ProblemDb {
@@ -30,6 +32,8 @@ impl From<&Problem> for ProblemRecord {
             id:         value.id as u128,
             conditions: Vec::from_iter(value.conditions.iter().map(|x| (*x.statement).clone())),
             target:     (*value.target.statement).clone(),
+
+            runs: Default::default(),
         }
     }
 }
