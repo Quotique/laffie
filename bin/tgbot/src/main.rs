@@ -15,6 +15,8 @@ use parser::DirectoryParser;
 use commands::process_update;
 use settings::Settings;
 
+rust_i18n::i18n!("locales");
+
 async fn run_bot(
     token: &str,
     engine: Arc<RulesEngine>,
@@ -26,15 +28,16 @@ async fn run_bot(
     let mut stream = api.stream();
 
     while let Some(update) = stream.next().await {
-        let update = update.unwrap();
-        process_update(
-            update,
-            &api,
-            engine.clone(),
-            problems_db.clone(),
-            users_db.clone(),
-        )
-        .await;
+        if let Ok(update) = update {
+            process_update(
+                update,
+                &api,
+                engine.clone(),
+                problems_db.clone(),
+                users_db.clone(),
+            )
+            .await;
+        }
     }
 }
 

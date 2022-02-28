@@ -5,8 +5,9 @@ use rocksdb::{Error, DB};
 
 #[derive(Encode, Decode)]
 pub struct UserRecord {
-    pub id:   u64,
-    problems: BTreeSet<u128>,
+    pub id:     u64,
+    pub locale: String,
+    problems:   BTreeSet<u128>,
 }
 
 pub struct UserDb {
@@ -18,6 +19,7 @@ impl UserRecord {
     pub fn new(id: u64) -> Self {
         Self {
             id,
+            locale: "ru".to_owned(),
             problems: Default::default(),
         }
     }

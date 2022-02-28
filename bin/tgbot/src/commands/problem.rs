@@ -51,24 +51,21 @@ fn problem(
 
 pub async fn handler(
     api: &Api,
-    message: &Message,
     command: Command,
     engine: Arc<RulesEngine>,
     problems: Arc<ProblemDb>,
     users: Arc<UserDb>,
 ) {
     let text = format!("{} {}", command.command, command.args);
-    let user_id = i64::from(message.from.id) as u64;
+    let user_id = i64::from(command.user_id) as u64;
     let mut user = users
         .get(user_id)
         .unwrap_or_default()
         .unwrap_or_else(|| UserRecord::new(user_id));
 
-    let chat = message.chat.clone();
-
     match problem(text, engine.clone(), problems.clone(), &mut user) {
         Ok(s) | Err(s) => api
-            .send(chat.text(s).parse_mode(ParseMode::Html))
+            .send(command.chat_id.text(s).parse_mode(ParseMode::Html))
             .await
             .unwrap(),
     };

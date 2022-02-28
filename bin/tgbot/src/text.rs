@@ -4,26 +4,9 @@ use chrono::{offset::Utc, DateTime};
 
 use database::ProblemRecord;
 
-const WHO_IS_STR: &str =
-    r#"Laffie - пользовательский интерфейс к ядру символьной арифметики Minerva."#;
-
-const WARNING: &str = r#"
-<u><b>Внимание:</b></u> бот находится в тестовом режиме.
-Работоспособность не гарантируется."#;
-
 pub struct Text;
 
 impl Text {
-    pub fn start() -> String {
-        format!(
-            "{}{}\n\n{}\n\n{}",
-            WHO_IS_STR,
-            WARNING,
-            Self::version(),
-            Self::system()
-        )
-    }
-
     pub fn system() -> String {
         format!(
             "{} {} {} {}MHz",
@@ -68,9 +51,5 @@ impl Text {
                 .join("\n  "),
             answer
         )
-    }
-
-    pub fn empty_problems_list() -> String {
-        "Нет задач".to_string()
     }
 }
