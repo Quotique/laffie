@@ -8,4 +8,5 @@ members = [
 
     "bin/cli",
     "bin/tgbot",
+    "bin/migrate_db"
 ]

@@ -8,6 +8,7 @@ ru:
     report: "Сообщить об ошибке"
   content:
     empty_problems_list: "Нет задач"
+    reported: "Сообщение отправлено"
     start: |
       Laffie - пользовательский интерфейс к ядру символьной арифметики Minerva.
 
@@ -108,4 +109,5 @@ ru:
 
   errors:
     unknown_command: "Недопустимая команда"
+    problem_not_found: "Задача не найдена"
 

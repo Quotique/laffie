@@ -1,5 +1,7 @@
 mod problem;
 mod problems_list;
+mod report;
+mod rerun;
 
 use std::sync::Arc;
 
@@ -117,6 +119,8 @@ impl Command {
             "start" => start_handler(api, self).await,
             "problem" => problem::handler(api, self, engine, problems, users).await,
             "problems_list" => problems_list::handler(api, self, problems, users).await,
+            "rerun" => rerun::handler(api, self, engine, problems, users).await,
+            "report" => report::handler(api, self, problems, users).await,
             "help" => {
                 api.send(
                     self.chat_id

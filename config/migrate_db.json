@@ -1,0 +1,13 @@
+{
+  "logger": {
+    "filename": "cli.log",
+    "level": "Trace",
+    "target_levels": {
+      "pattern_match": "Info"
+    }
+  },
+  "problems_db": "./db/problems",
+  "users_db": "./db/users",
+  "problems_backup": "./db/backup/problems",
+  "users_backup": "./db/backup/users"
+}
