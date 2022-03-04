@@ -23,7 +23,11 @@ peg::parser! {
     pub grammar ra() for str {
         use peg::ParseLiteral;
 
-        rule _() = quiet!{[' '|'\t'|'\n']*}
+        rule line_comment() = "//" (!"\n" [_])* ("\n" / ![_])
+
+        rule whitespace_char() = ['\t' | ' ']
+
+        rule _() = quiet!{ (whitespace_char() / "\n" / line_comment())* }
 
         rule comma() = ","
 
@@ -44,7 +48,7 @@ peg::parser! {
         pub rule any() -> Vec<Tree<Data>> =
             _ s:semicolonsep(<problem()/lang_rule()/symbol()>) _ { s }
 
-        pub rule statements() -> Vec<Tree<Data>> = _ c:semicolonsep(<arithmetic()>) { c }
+        pub rule statements() -> Vec<Tree<Data>> = _ c:semicolonsep(<arithmetic()>) _ { c }
 
         pub rule problem() -> Tree<Data> = _ pp:position!() keyword("problem") _ "{"
             _ pt:position!() keyword("target") _ t:eval() ";"
@@ -127,12 +131,12 @@ peg::parser! {
             --
             x:(@) _ p:position!() "as" _ y:ident() { Data::new("as", p)/x/y }
             --
+            x:(@) _ p:position!() "+" _ y:@ { Data::new("+", p)/x/y }
+            x:(@) _ p:position!() "-" _ y:@ { Data::new("-", p)/x/y }
+            --
             p:position!() "-" _ x:@ { Data::new("-", p)/x }
             p:position!() "+" _ x:@ { Data::new("+", p)/x }
             p:position!() "!" _ x:@ { Data::new("!", p)/x }
-            --
-            x:(@) _ p:position!() "+" _ y:@ { Data::new("+", p)/x/y }
-            x:(@) _ p:position!() "-" _ y:@ { Data::new("-", p)/x/y }
             --
             x:(@) _ p:position!() "*" _ y:@ { Data::new("*", p)/x/y }
             x:(@) _ p:position!() "/" _ y:@ { Data::new("/", p)/x/y }
@@ -286,7 +290,27 @@ mod tests {
         assert_eq!(
             states[0],
             Data::new("-", 0) / (Data::new("/", 2) / Data::new("a", 1) / Data::new("b", 3))
-        )
+        );
+
+        let test = r#"-a+b"#;
+        let states = ra::statements(test).unwrap();
+        assert_eq!(
+            states[0],
+            Data::new("+", 2) / (Data::new("-", 0) / Data::new("a", 1)) / Data::new("b", 3)
+        );
+    }
+
+    #[test]
+    fn comment_test() {
+        let test = r#"// test comment before
+            -a/b // test comment near
+            //test comment after
+        "#;
+        let states = ra::statements(test).unwrap();
+        assert_eq!(
+            states[0],
+            Data::new("-", 35) / (Data::new("/", 37) / Data::new("a", 36) / Data::new("b", 38))
+        );
     }
 
     #[test]
