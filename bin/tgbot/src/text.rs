@@ -38,7 +38,7 @@ impl Text {
                 ),
                 Err(_) => "<i>Задача не решена</i>\n".to_owned(),
             })
-            .unwrap_or("".to_owned());
+            .unwrap_or_else(|| "".to_owned());
         format!(
             "<u><i>Задача</i></u> 0x{:x}\n<i>цель:</i> {}\n<i>условия:</i>\n  {}\n{}",
             problem.id,

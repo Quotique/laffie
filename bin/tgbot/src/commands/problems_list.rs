@@ -31,7 +31,7 @@ pub async fn handler(api: &Api, command: Command, problems: Arc<ProblemDb>, user
         .unwrap_or_default()
         .unwrap_or_else(|| UserRecord::new(user_id));
     match problems_list(&user, problems.clone()) {
-        Ok(problems) if problems.len() == 0 => {
+        Ok(problems) if problems.is_empty() => {
             api.send(
                 command
                     .chat_id

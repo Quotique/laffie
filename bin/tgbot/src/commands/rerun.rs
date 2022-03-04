@@ -23,7 +23,7 @@ fn rerun(
 
     let mut record = problems
         .get(problem_id)?
-        .ok_or(t!("errors.problem_not_found"))?;
+        .ok_or_else(|| t!("errors.problem_not_found"))?;
 
     let mut solution = Solution::new(
         record.clone().into(),

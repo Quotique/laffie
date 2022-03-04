@@ -17,7 +17,7 @@ fn report(
 
     let mut record = problems
         .get(problem_id)?
-        .ok_or(t!("errors.problem_not_found"))?;
+        .ok_or_else(|| t!("errors.problem_not_found"))?;
 
     if !record.reports.iter().any(|x| x == &user.id) {
         record.reports.push(user.id);

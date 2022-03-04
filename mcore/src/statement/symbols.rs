@@ -6,12 +6,19 @@ use macros::FuncAttr;
 
 use super::term::StatementNode;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TruthResult {
+    True,
+    False,
+    Unknown,
+}
+
 #[derive(FuncAttr)]
 pub struct Ordering(Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>);
 #[derive(FuncAttr)]
 pub struct Calculator(Box<dyn Fn(&mut StatementNode) -> bool>);
 #[derive(FuncAttr)]
-pub struct TruthChecker(Box<dyn Fn(&StatementNode) -> bool>);
+pub struct TruthChecker(Box<dyn Fn(&StatementNode) -> TruthResult>);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SymbolAttr {
@@ -44,6 +51,22 @@ pub struct Symbol {
     pub truth_checker: Arc<Option<TruthChecker>>,
 }
 
+impl TruthResult {
+    #[inline]
+    pub fn is_true(&self) -> bool {
+        self == &TruthResult::True
+    }
+
+    #[inline]
+    pub fn reverse(&self) -> TruthResult {
+        match self {
+            TruthResult::True => TruthResult::False,
+            TruthResult::False => TruthResult::True,
+            TruthResult::Unknown => TruthResult::Unknown,
+        }
+    }
+}
+
 impl SymbolBuilder {
     pub fn with_attr(&mut self, name: SymbolAttr, value: SymbolAttrValue) -> &mut Self {
         if self.attrs.is_none() {
@@ -64,7 +87,7 @@ impl SymbolBuilder {
 
     pub fn with_truth_checker(
         &mut self,
-        truth_checker: Box<dyn Fn(&StatementNode) -> bool>,
+        truth_checker: Box<dyn Fn(&StatementNode) -> TruthResult>,
     ) -> &mut Self {
         self.truth_checker = Some(Arc::new(Some(TruthChecker(truth_checker))));
         self
@@ -91,11 +114,11 @@ impl Symbol {
         None
     }
 
-    pub fn check_truth(&self, node: &StatementNode) -> bool {
+    pub fn check_truth(&self, node: &StatementNode) -> TruthResult {
         if let Some(c) = self.truth_checker.as_ref() {
             c.0(node)
         } else {
-            false
+            TruthResult::Unknown
         }
     }
 
@@ -140,7 +163,7 @@ mod tests {
                 .id(1)
                 .name("==")
                 .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(500))
-                .with_truth_checker(Box::new(|_| false))
+                .with_truth_checker(Box::new(|_| TruthResult::Unknown))
                 .build()
                 .unwrap()
         )
@@ -155,7 +178,7 @@ mod tests {
                 .id(1)
                 .name("==")
                 .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(500))
-                .with_truth_checker(Box::new(|_| false))
+                .with_truth_checker(Box::new(|_| TruthResult::Unknown))
                 .build()
                 .unwrap()
         )

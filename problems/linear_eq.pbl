@@ -60,3 +60,9 @@ problem {
     2*x-t == 0;
     t is known;
 };
+
+problem {
+    target find(x);
+
+    3*x+5 == 1-x;
+}

@@ -1,4 +1,7 @@
-use crate::statement::{symbols::Symbol, term::StatementNode};
+use crate::statement::{
+    symbols::{Symbol, TruthResult},
+    term::StatementNode,
+};
 
 pub fn symbol() -> Symbol {
     Symbol::builder()
@@ -8,10 +11,10 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn is_true(root: &StatementNode) -> bool {
+pub fn is_true(root: &StatementNode) -> TruthResult {
     if !root.data().is_symbol_name("true") {
-        return false;
+        return TruthResult::Unknown;
     }
 
-    true
+    TruthResult::True
 }

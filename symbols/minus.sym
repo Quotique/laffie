@@ -27,3 +27,9 @@ rule {
 
     a is known;
 };
+
+rule {
+    attr level(1),problem_target(transform(x)),subtree,replace;
+
+    -(a+b) <=> -a+(-b);
+};

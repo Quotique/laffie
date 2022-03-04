@@ -18,11 +18,13 @@ pub mod minus;
 pub mod more;
 pub mod more_or_equal;
 pub mod mul;
+pub mod op_not;
 pub mod op_true;
 pub mod plus;
 pub mod power;
 pub mod replace;
 pub mod sqrt;
+pub mod symbolic_eq;
 
 pub const MAX_DEC_CONVERSION_VALUE: i64 = 1_000_000;
 pub const MAX_DEC_CONVERSION_EXP: i64 = 6;

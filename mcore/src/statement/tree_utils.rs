@@ -8,7 +8,10 @@ use trees::{tr, Node, Tree};
 
 use crate::utils::SubsetIterator;
 
-use super::term::{Param, StatementNode, StatementTree, Term, Variable};
+use super::{
+    symbols::TruthResult,
+    term::{Param, StatementNode, StatementTree, Term, Variable},
+};
 
 pub type ParamsMap = HashMap<Param, StatementTree>;
 pub type VariablesMap = HashMap<Variable, StatementTree>;
@@ -56,7 +59,7 @@ pub trait NodeMapping {
 
     fn evaluate(&mut self) -> bool;
 
-    fn check_truth(&self) -> bool;
+    fn check_truth(&self) -> TruthResult;
 
     fn symbols(&self) -> HashSet<u64>;
 }
@@ -130,11 +133,11 @@ impl NodeMapping for StatementNode {
         false
     }
 
-    fn check_truth(&self) -> bool {
+    fn check_truth(&self) -> TruthResult {
         if let Some(symbol) = &self.data().symbol() {
             return symbol.check_truth(self);
         }
-        false
+        TruthResult::Unknown
     }
 }
 

@@ -5,8 +5,8 @@ use parking_lot::RwLock;
 use crate::statement::symbols::Symbol;
 
 use super::operations::{
-    divide, equal, inequal, is, less, less_or_equal, minus, more, more_or_equal, mul, op_true,
-    plus, power, replace, sqrt,
+    divide, equal, inequal, is, less, less_or_equal, minus, more, more_or_equal, mul, op_not,
+    op_true, plus, power, replace, sqrt, symbolic_eq,
 };
 
 fn all_symbols() -> &'static RwLock<MultiMap<u64, String, Symbol>> {
@@ -53,6 +53,8 @@ fn all_symbols() -> &'static RwLock<MultiMap<u64, String, Symbol>> {
 
         add_with_name(&mut result, "set");
         add_with_name(&mut result, "empty_set");
+        add_symbol_impl(&mut result, symbolic_eq::symbol());
+        add_symbol_impl(&mut result, op_not::symbol());
         RwLock::new(result)
     })
 }

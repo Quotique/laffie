@@ -19,3 +19,13 @@ rule {
 
     a*a*c <=> (a^2)*c;
 };
+
+rule {
+    attr level(0),problem_target(proof(a*b is known));
+
+    a*b is known <=> true;
+
+    a is known,
+    b is known;
+};
+

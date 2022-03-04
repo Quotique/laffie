@@ -125,7 +125,7 @@ impl Frame {
     }
 
     pub fn proof(&self, statement: &Statement) -> bool {
-        if statement.root().check_truth() {
+        if statement.root().check_truth().is_true() {
             return true;
         }
 

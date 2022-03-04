@@ -1,5 +1,5 @@
 use crate::statement::{
-    symbols::Symbol,
+    symbols::{Symbol, TruthResult},
     term::{StatementNode, Term},
 };
 
@@ -11,16 +11,20 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn more_or_equal(root: &StatementNode) -> bool {
+pub fn more_or_equal(root: &StatementNode) -> TruthResult {
     if !root.data().is_symbol_name(">=") {
-        return false;
+        return TruthResult::Unknown;
     }
 
     if let (Term::Number(d1), Term::Number(d2)) =
         (&root.front().unwrap().data(), &root.back().unwrap().data())
     {
-        return d1 >= d2;
+        if d1 >= d2 {
+            return TruthResult::True;
+        } else {
+            return TruthResult::False;
+        }
     }
 
-    false
+    TruthResult::Unknown
 }

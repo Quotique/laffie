@@ -126,7 +126,7 @@ impl Target {
                             resolution:   statement.clone(),
                         });
                     }
-                    if i.statement.root().check_truth() {
+                    if i.statement.root().check_truth().is_true() {
                         return Some(Suppose {
                             requirements: vec![],
                             resolution:   statement.clone(),

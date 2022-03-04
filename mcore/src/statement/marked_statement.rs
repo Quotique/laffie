@@ -93,13 +93,14 @@ impl MarkedStatement {
                 .build()
                 .map_err(|e| trace!("Error rule build: {} for  {}", e, self.statement))
             {
-                let rule = rule.pop().unwrap();
-                if rule.pattern_node().data().variable().is_some() {
-                    trace!("New rule: {}", rule);
-                    let rule = Arc::new(RwLock::new(rule));
-                    self.as_rule = Some(rule.clone());
-                    self.blocked_rules.insert(id);
-                    return Some(rule);
+                if let Some(rule) = rule.pop() {
+                    if rule.pattern_node().data().variable().is_some() {
+                        trace!("New rule: {}", rule);
+                        let rule = Arc::new(RwLock::new(rule));
+                        self.as_rule = Some(rule.clone());
+                        self.blocked_rules.insert(id);
+                        return Some(rule);
+                    }
                 }
             }
         }

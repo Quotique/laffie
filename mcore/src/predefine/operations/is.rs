@@ -1,7 +1,7 @@
 use crate::{
     predefine::symbol_by_name,
     statement::{
-        symbols::Symbol,
+        symbols::{Symbol, TruthResult},
         term::{StatementNode, Term},
     },
 };
@@ -14,21 +14,29 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn is(root: &StatementNode) -> bool {
+pub fn is(root: &StatementNode) -> TruthResult {
     if !root.data().is_symbol_name("is") {
-        return false;
+        return TruthResult::Unknown;
     }
 
     if let (Term::Number(_), Term::Symbol(known_id)) =
         (&root.front().unwrap().data(), &root.back().unwrap().data())
     {
-        return *known_id == symbol_by_name("known").unwrap().id;
+        if *known_id == symbol_by_name("known").unwrap().id {
+            return TruthResult::True;
+        } else {
+            return TruthResult::Unknown;
+        }
     }
     if let (Term::Variable(_), Term::Symbol(sym_varible_id)) =
         (&root.front().unwrap().data(), &root.back().unwrap().data())
     {
-        return *sym_varible_id == symbol_by_name("variable").unwrap().id;
+        if *sym_varible_id == symbol_by_name("variable").unwrap().id {
+            return TruthResult::True;
+        } else {
+            return TruthResult::Unknown;
+        }
     }
 
-    false
+    TruthResult::Unknown
 }

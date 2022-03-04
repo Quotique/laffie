@@ -72,6 +72,7 @@ fn merge_mul_const(mut root: Tree<Term>, d: Decimal) -> Tree<Term> {
     if d == Decimal::from(0) {
         return tr(Term::Number(Decimal::from(0)));
     }
+
     if root.data().is_number_value(&Decimal::from(1)) {
         return tr(Term::Number(d));
     }
@@ -90,9 +91,15 @@ fn extract_mul_const(root: &mut StatementNode) -> Decimal {
         *root.data_mut() = Term::Number(Decimal::from(1));
         return result;
     }
-    if !root.data().is_symbol_name("*") {
+
+    if root.data().is_symbol_name("-") {
+        let mut child = root.pop_front().unwrap();
+        swap_node(root, &mut child.root_mut());
+        return -extract_mul_const(root);
+    } else if !root.data().is_symbol_name("*") {
         return Decimal::from(1);
     }
+
     let constant = root.iter_mut().fold(Decimal::from(1), |prev, mut x| {
         if let Term::Number(d) = x.data() {
             let res = prev * d;
