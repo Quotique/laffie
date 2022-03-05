@@ -4,6 +4,7 @@ mod solution;
 mod target;
 
 pub use self::{
+    frame::Frame,
     problem::{Problem, ProblemBuilder},
     solution::{Solution, SolveStatus},
 };

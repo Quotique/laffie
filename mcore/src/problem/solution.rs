@@ -5,7 +5,6 @@ use std::{
 };
 
 use bincode::{Decode, Encode};
-use colored::*;
 
 use crate::{
     rule::{RulesEngine, SharedRule},
@@ -30,7 +29,7 @@ pub struct SolveStatus {
 pub struct Solution {
     pub problem: Problem,
 
-    stack: Frame,
+    pub stack: Frame,
 
     local_rules: Vec<SharedRule>,
     target:      Target,
@@ -174,48 +173,6 @@ impl Solution {
             } else {
                 self.stack[index].weight += 1;
             }
-        }
-    }
-}
-
-impl fmt::Display for Solution {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(a) = self.answer.as_ref() {
-            let mut trace: Vec<(usize, Vec<usize>)> = vec![];
-
-            fn visitor(stack: &Frame, id: usize, trace: &mut Vec<(usize, Vec<usize>)>) {
-                trace.push((id, stack[id].parents.clone()));
-                for i in stack[id].parents.iter() {
-                    visitor(stack, *i, trace);
-                }
-            }
-
-            visitor(&self.stack, *a, &mut trace);
-
-            while let Some(t) = trace.pop() {
-                writeln!(f)?;
-                for p in t.1.iter() {
-                    writeln!(f, "{},", self.stack[*p].statement.to_string().underline())?;
-                }
-                writeln!(
-                    f,
-                    "{}",
-                    self.stack[t.0].statement.to_string().bold().yellow()
-                )?;
-            }
-            writeln!(
-                f,
-                "{} {}",
-                "SOLVED!".green(),
-                format!(
-                    "[{} cycles, {}ms]",
-                    self.perf_stats.cycles_count, self.perf_stats.absolute_time
-                )
-                .yellow()
-            )
-        } else {
-            writeln!(f)?;
-            writeln!(f, "{}", "NOT SOLVED!".bold().blink().red())
         }
     }
 }

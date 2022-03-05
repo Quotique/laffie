@@ -5,6 +5,7 @@ members = [
     "macros",
     "mcore",
     "parser",
+    "view",
 
     "bin/cli",
     "bin/tgbot",

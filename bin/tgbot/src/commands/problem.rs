@@ -9,6 +9,7 @@ use mcore::{
     utils::{Dumper, DumperConfig},
 };
 use parser::{lang, ProblemParser};
+use view::Html;
 
 use super::Command;
 
@@ -39,14 +40,13 @@ fn problem(
     user.add_problem_id(record.id);
 
     let result = match solution.solve() {
-        Ok(_) => format!("{} {}", "Solution:", solution),
-        Err(e) => format!("{} {} {}", "Solution:", e, solution),
+        Ok(_) => format!("{} {}", "Solution:", Html(&solution)),
+        Err(e) => format!("{} {} {}", "Solution:", e, Html(&solution)),
     };
     record.runs.push(solution.perf_stats.clone());
     problems.put(&record)?;
 
-    let plain_bytes = strip_ansi_escapes::strip(result.as_bytes()).unwrap();
-    Ok(std::str::from_utf8(&plain_bytes).unwrap().to_owned())
+    Ok(result)
 }
 
 pub async fn handler(

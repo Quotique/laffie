@@ -13,6 +13,7 @@ use mcore::{
     utils::{log_init, Dumper, DumperConfig},
 };
 use parser::DirectoryParser;
+use view::Console;
 
 use crate::settings::Settings;
 
@@ -119,14 +120,14 @@ fn main() {
 
         match solution.solve() {
             Ok(_) => {
-                println!("{} {}", "Solution:".italic().blue(), solution);
+                println!("{} {}", "Solution:".italic().blue(), Console(&solution));
             }
             Err(e) => {
                 println!(
                     "{} {} {}",
                     "Solution:".italic().blue(),
                     e.to_string().red(),
-                    solution
+                    Console(&solution)
                 );
             }
         };

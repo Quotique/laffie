@@ -6,6 +6,7 @@ edition = "2018"
 [dependencies]
 mcore = { path = "../../mcore/" }
 parser = { path = "../../parser" }
+view = { path = "../../view" }
 
 clap = "3.1"
 colored = "1.9"
