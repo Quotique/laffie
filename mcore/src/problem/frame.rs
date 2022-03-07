@@ -19,7 +19,7 @@ use super::{
     solution::{Solution, SolutionError},
 };
 
-pub const STACK_SIZE: usize = 20;
+pub const STACK_SIZE: usize = 2048;
 
 pub struct Frame {
     stack: Vec<MarkedStatement>,
@@ -86,12 +86,12 @@ impl Frame {
         self.dumper.add_statement(&statement);
 
         statement.id = self.stack.len();
+        if self.stack.len() + 1 > STACK_SIZE {
+            return Err(SolutionError::StackOverflow);
+        }
         self.index
             .insert(statement.statement.clone(), self.stack.len());
         self.stack.push(statement);
-        if self.stack.len() > STACK_SIZE {
-            return Err(SolutionError::StackOverflow);
-        }
         Ok(())
     }
 

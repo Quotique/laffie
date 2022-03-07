@@ -44,7 +44,11 @@ impl fmt::Display for Target {
 }
 
 impl Target {
-    pub fn try_from(value: Statement, rules: Arc<RulesEngine>) -> Result<Self, SemanticError> {
+    pub fn try_from(
+        value: Statement,
+        rules: Arc<RulesEngine>,
+        dumper: Dumper,
+    ) -> Result<Self, SemanticError> {
         let (root, mut childs) = value.destruct();
 
         if root.data().is_symbol_name("find") {
@@ -59,7 +63,7 @@ impl Target {
                 return Err(SemanticError::WorngArgCount(String::default()));
             }
 
-            let mut frame = Frame::new(rules, Dumper::default());
+            let mut frame = Frame::new(rules, dumper);
             // TODO: error Processing
             let _ = frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
                 childs.pop_front().unwrap(),
@@ -70,7 +74,7 @@ impl Target {
                 return Err(SemanticError::WorngArgCount(String::default()));
             }
 
-            let mut frame = Frame::new(rules, Dumper::default());
+            let mut frame = Frame::new(rules, dumper);
             // TODO: error Processing
             let _ = frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
                 childs.pop_front().unwrap(),
@@ -188,15 +192,19 @@ impl Target {
                         target,
                         |_| true,
                     );
-                    if new_states.is_empty() {
-                        x[index].weight += 1;
-                    } else {
-                        for s in new_states {
-                            if x.add_condition(s).is_ok() {
-                                x[index].weight = MAX_LEVEL + 1;
-                                break;
-                            }
+
+                    for s in new_states {
+                        if x.contains(&s.statement) {
+                            continue;
                         }
+
+                        if x.add_condition(s).is_ok() {
+                            x[index].weight = MAX_LEVEL + 1;
+                            break;
+                        }
+                    }
+                    if x[index].weight != MAX_LEVEL + 1 {
+                        x[index].weight += 1;
                     }
                 }
             }

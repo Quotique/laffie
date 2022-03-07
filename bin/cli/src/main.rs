@@ -150,7 +150,7 @@ fn main() {
         if !record.reports.is_empty() {
             println!(
                 "{} {}",
-                "Reported: ".bold().blink().red(),
+                "Reported:".bold().blink().red(),
                 VecDisplay(&record.reports)
             );
         }

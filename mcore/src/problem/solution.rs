@@ -73,12 +73,12 @@ impl Solution {
         Solution {
             stack: Frame::with_statements(
                 rules.clone(),
-                dumper,
+                dumper.clone(),
                 problem.conditions.iter().cloned(),
             ),
 
             local_rules: vec![],
-            target: Target::try_from((*problem.target.statement).clone(), rules).unwrap(),
+            target: Target::try_from((*problem.target.statement).clone(), rules, dumper).unwrap(),
 
             answer: None,
 
