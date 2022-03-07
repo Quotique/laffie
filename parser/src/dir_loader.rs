@@ -1,4 +1,7 @@
-use std::{fs, io, path::Path};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 use trees::Tree;
 
@@ -9,15 +12,15 @@ use mcore::{
 use crate::{lang, NodeData, ProblemParser, RuleParser, SymbolParser};
 
 pub struct DirectoryParser {
-    symbols_path:  String,
-    problems_path: String,
+    symbols_path:  PathBuf,
+    problems_path: PathBuf,
 }
 
 impl DirectoryParser {
-    pub fn new(symbols_path: String, problems_path: String) -> Self {
+    pub fn new<P: AsRef<Path>>(symbols_path: P, problems_path: P) -> Self {
         Self {
-            symbols_path,
-            problems_path,
+            symbols_path:  PathBuf::from(symbols_path.as_ref()),
+            problems_path: PathBuf::from(problems_path.as_ref()),
         }
     }
 
@@ -30,7 +33,7 @@ impl DirectoryParser {
         let mut last_sym: Option<Symbol> = None;
 
         Self::load_dir(
-            Path::new(self.symbols_path.as_str()),
+            &self.symbols_path,
             &["sym"],
             &mut |src, s: &Tree<NodeData>| {
                 if let Ok(sym) = SymbolParser::new(s).parse() {
@@ -53,25 +56,21 @@ impl DirectoryParser {
 
     pub fn load_problems(&self) -> io::Result<Vec<Problem>> {
         let mut result = vec![];
-        Self::load_dir(
-            Path::new(self.problems_path.as_str()),
-            &["pbl"],
-            &mut |src, s| {
-                trace!("New problem cb: {}", s);
-                if s.root().data().symbol == "Problem" {
-                    match ProblemParser::with(s).parse() {
-                        Ok(p) => result.push(p),
-                        Err(e) => error!("Problem not parsed: {}", e.error_string(src)),
-                    }
+        Self::load_dir(self.problems_path.as_ref(), &["pbl"], &mut |src, s| {
+            trace!("New problem cb: {}", s);
+            if s.root().data().symbol == "Problem" {
+                match ProblemParser::with(s).parse() {
+                    Ok(p) => result.push(p),
+                    Err(e) => error!("Problem not parsed: {}", e.error_string(src)),
                 }
-            },
-        )?;
+            }
+        })?;
         Ok(result)
     }
 
     fn load_symbols(&self) -> io::Result<()> {
         Self::load_dir(
-            Path::new(self.symbols_path.as_str()),
+            &self.symbols_path,
             &["sym"],
             &mut |_, s: &Tree<NodeData>| {
                 if let Ok(sym) = SymbolParser::new(s).parse() {
@@ -101,14 +100,17 @@ impl DirectoryParser {
         Ok(())
     }
 
-    fn load_file<F: FnMut(&str, &Tree<NodeData>)>(file: &Path, cb: &mut F) -> io::Result<()> {
-        info!("Processing file: {}", file.to_string_lossy());
-        let content = fs::read_to_string(file)?;
+    fn load_file<P: AsRef<Path>, F: FnMut(&str, &Tree<NodeData>)>(
+        file: P,
+        cb: &mut F,
+    ) -> io::Result<()> {
+        info!("Processing file: {}", file.as_ref().to_string_lossy());
+        let content = fs::read_to_string(file.as_ref())?;
         let states = lang::any(content.as_str())
             .map_err(|e| {
                 error!(
                     "Unable to parse file {}: {}",
-                    file.to_string_lossy(),
+                    file.as_ref().to_string_lossy(),
                     e.error_string(content.as_str())
                 )
             })

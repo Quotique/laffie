@@ -177,6 +177,15 @@ impl ProblemDb {
         self.db.put(key, encoded)
     }
 
+    pub fn iter(&self) -> impl Iterator<Item = ProblemRecord> + '_ {
+        self.db.iterator(IteratorMode::Start).map(|(_, v)| {
+            let (decoded, _): (ProblemRecord, usize) =
+                bincode::decode_from_slice(&v[..], self.config).unwrap();
+            assert_eq!(decoded.version, VERSION);
+            decoded
+        })
+    }
+
     pub fn iter_old(&self) -> impl Iterator<Item = old::ProblemRecord> + '_ {
         self.db.iterator(IteratorMode::Start).map(|(_, v)| {
             let (decoded, _): (old::ProblemRecord, usize) =

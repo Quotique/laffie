@@ -3,68 +3,55 @@
 
 mod settings;
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
-use clap::{Arg, Command};
+use clap::Parser;
 use colored::*;
 
+use database::{ProblemDb, ProblemRecord};
 use mcore::{
-    problem::Solution,
-    utils::{log_init, Dumper, DumperConfig},
+    problem::{Problem, Solution},
+    utils::{log_init, Dumper, DumperConfig, VecDisplay},
 };
 use parser::DirectoryParser;
 use view::Console;
 
 use crate::settings::Settings;
 
-fn main() {
-    let matches = Command::new("Minerva")
-        .version(env!("CARGO_PKG_VERSION"))
-        .author("Quotique <just.std@gmail.com>")
-        .about("Minerva core develop/debug enviroment")
-        .arg(
-            Arg::new("config")
-                .short('c')
-                .long("config")
-                .value_name("FILE")
-                .help("Sets a custom config file")
-                .default_value("./config/local.json")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("only")
-                .short('o')
-                .long("only")
-                .value_name("ID")
-                .help("Runs only spcified problem")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("symbols")
-                .short('s')
-                .long("symbols")
-                .value_name("DIR")
-                .help("Specify symbols path")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("problems")
-                .short('p')
-                .long("problems")
-                .value_name("DIR")
-                .help("Specify problems path")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("dump")
-                .short('d')
-                .long("dump")
-                .help("Dump solution trace into a file")
-                .takes_value(false),
-        )
-        .get_matches();
+/// Minerva core develop/debug enviroment
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// Sets a custom config file
+    #[clap(short, long, default_value = "./config/local.json")]
+    config: PathBuf,
 
-    let settings = Settings::new(matches.value_of("config").unwrap())
+    /// Runs only spcified problem
+    #[clap(short, long, default_value = "")]
+    only: String,
+
+    /// Specify symbols path
+    #[clap(short, long)]
+    symbols: Option<PathBuf>,
+
+    /// Specify problems path
+    #[clap(short, long)]
+    problems: Option<PathBuf>,
+
+    /// Specify problems DB path
+    #[clap(short = 'd', long)]
+    problems_db: Option<PathBuf>,
+
+    /// Dump solution trace into a file
+    #[clap(short, long)]
+    trace: bool,
+}
+
+fn main() {
+    let args = Args::parse();
+    let only = args.only;
+
+    let settings = Settings::new(args.config)
         .map_err(|e| {
             println!("Config error: {:?}", e);
             e
@@ -75,17 +62,15 @@ fn main() {
     log_init(&settings.logger);
 
     let parser = DirectoryParser::new(
-        matches
-            .value_of("symbols")
-            .map(|x| x.to_owned())
+        args.symbols
+            .clone()
             .or(settings.symbols_dir)
             .unwrap_or_else(|| {
                 println!("Symbols dir is not specified");
                 std::process::exit(-1);
             }),
-        matches
-            .value_of("problems")
-            .map(|x| x.to_owned())
+        args.problems
+            .clone()
             .or(settings.problems_dir)
             .unwrap_or_else(|| {
                 println!("Problems dir is not specified");
@@ -95,21 +80,38 @@ fn main() {
 
     let rules_engine = Arc::new(parser.load_rules().unwrap());
     let problems = parser.load_problems().unwrap();
+    let db = args.problems_db.map(|x| ProblemDb::open(x).unwrap());
 
-    for p in problems {
-        if let Some(only) = matches.value_of("only") {
-            let id = format!("{:x}", p.id);
-            if !id.starts_with(only) && !id.ends_with(only) {
-                continue;
-            }
+    fn db_ext<'a>(db: &'a Option<ProblemDb>) -> Box<dyn Iterator<Item = ProblemRecord> + 'a> {
+        if let Some(db) = db {
+            Box::new(db.iter())
+        } else {
+            Box::new(std::iter::empty())
         }
+    }
+    let db_problems_iter = db_ext(&db);
+
+    for record in problems
+        .into_iter()
+        .map(|p| ProblemRecord::from(&p))
+        .chain(db_problems_iter)
+        .filter(move |x| {
+            if !only.is_empty() {
+                let id = format!("{:x}", x.id);
+                return id.starts_with(&only) || id.ends_with(&only);
+            }
+            true
+        })
+    {
+        let p: Problem = record.clone().into();
+
         println!("{} {}", "Problem".bold().green(), p);
         let p_id = p.id;
         let mut solution = Solution::new(
             p,
             rules_engine.clone(),
             Dumper::new(DumperConfig {
-                sink:     if matches.is_present("dump") {
+                sink:     if args.trace {
                     "file".into()
                 } else {
                     "none".into()
@@ -121,6 +123,20 @@ fn main() {
         match solution.solve() {
             Ok(_) => {
                 println!("{} {}", "Solution:".italic().blue(), Console(&solution));
+                if let Some(prev) = record.runs.last() {
+                    if let (Ok(prev_answer), Ok(answer)) =
+                        (&prev.status, &solution.perf_stats.status)
+                    {
+                        if answer != prev_answer {
+                            println!(
+                                "{}\nOld:{}\nNew:{}",
+                                "Answer changed: ".bold().blink().red(),
+                                prev_answer,
+                                answer
+                            );
+                        }
+                    }
+                }
             }
             Err(e) => {
                 println!(
@@ -131,5 +147,12 @@ fn main() {
                 );
             }
         };
+        if !record.reports.is_empty() {
+            println!(
+                "{} {}",
+                "Reported: ".bold().blink().red(),
+                VecDisplay(&record.reports)
+            );
+        }
     }
 }
