@@ -41,6 +41,15 @@ peg::parser! {
         rule ident() -> Tree<Data> =
             _ p:position!() s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) { Data::new(s, p) }
 
+        rule char_first_ident() -> Tree<Data> =
+            _ p:position!() s:$(['a'..='z' | 'A'..='Z']
+                ['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]*) {
+                    Data::new(s, p)
+            }
+
+        rule number() -> Tree<Data> =
+            _ p:position!() n:$(['0'..='9']+("."['0'..='9']+)?) { Data::new(n, p) }
+
         rule placeholder() -> Tree<Data> = p:position!() ".." { Data::new("..", p) }
 
         rule attrs() -> Vec<Tree<Data>> = _ keyword("attr") _ a:commasep(<arithmetic()>) { a }
@@ -143,13 +152,15 @@ peg::parser! {
             --
             x:@ p:position!() "^" y:(@) { Data::new("^", p)/x/y }
             --
+            n:number() p:position!() e:eval() { Data::new("*", p)/n/e }
             e:eval() { e }
             p:placeholder() { p }
+            n:number() p:position!() i:char_first_ident() { Data::new("*", p)/n/i }
             i:ident() { i }
             "(" _  a:arithmetic() _ ")" {a}
         }
 
-        rule eval() -> Tree<Data> = t:ident() "(" _ a:commasep(<arithmetic()>) _ ")" {
+        rule eval() -> Tree<Data> = t:char_first_ident() "(" _ a:commasep(<arithmetic()>) _ ")" {
             let mut t = t;
             for i in a.iter().cloned() {
                 t.push_back(i);
@@ -326,5 +337,29 @@ mod tests {
                     Data::new("S", 11)) /
                 Data::new("Known", 16)
         )
+    }
+
+    #[test]
+    fn short_mul_ident_test() {
+        let test = r#"6x"#;
+        let states = ra::statements(test).unwrap();
+        assert_eq!(states.len(), 1);
+
+        assert_eq!(
+            states[0],
+            Data::new("*", 1) / Data::new("6", 0) / Data::new("x", 1)
+        );
+    }
+
+    #[test]
+    fn short_mul_expr_test() {
+        let test = r#"6sin(x)"#;
+        let states = ra::statements(test).unwrap();
+        assert_eq!(states.len(), 1);
+
+        assert_eq!(
+            states[0],
+            Data::new("*", 1) / Data::new("6", 0) / (Data::new("sin", 1) / Data::new("x", 5))
+        );
     }
 }
