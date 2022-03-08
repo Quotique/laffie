@@ -77,7 +77,6 @@ impl Term {
         None
     }
 
-    #[allow(dead_code)]
     pub fn is_symbol_name(&self, name: &str) -> bool {
         if let Some(s) = symbol_by_name(name) {
             return self.symbol_id() == Some(s.id);

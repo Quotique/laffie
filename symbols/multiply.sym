@@ -3,13 +3,13 @@ symbol * {
 };
 
 rule {
-    attr replace,level(1),problem_target(transform(x));
+    attr replace,level(2),problem_target(transform(x));
 
     (a + b)*c <=> a*c + b*c;
 };
 
 rule {
-    attr replace,level(2),problem_target(transform(x));
+    attr replace,level(4),problem_target(transform(x));
 
     a*c + b*c + d <=> (a+b)*c + d;
 };

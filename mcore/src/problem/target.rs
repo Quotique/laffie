@@ -48,6 +48,7 @@ impl Target {
         value: Statement,
         rules: Arc<RulesEngine>,
         dumper: Dumper,
+        subproblem_level: usize,
     ) -> Result<Self, SemanticError> {
         let (root, mut childs) = value.destruct();
 
@@ -63,7 +64,7 @@ impl Target {
                 return Err(SemanticError::WorngArgCount(String::default()));
             }
 
-            let mut frame = Frame::new(rules, dumper);
+            let mut frame = Frame::new(rules, dumper, subproblem_level);
             // TODO: error Processing
             let _ = frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
                 childs.pop_front().unwrap(),
@@ -74,7 +75,7 @@ impl Target {
                 return Err(SemanticError::WorngArgCount(String::default()));
             }
 
-            let mut frame = Frame::new(rules, dumper);
+            let mut frame = Frame::new(rules, dumper, subproblem_level);
             // TODO: error Processing
             let _ = frame.add_condition(MarkedStatement::from(Arc::new(Statement::from(
                 childs.pop_front().unwrap(),
@@ -88,17 +89,19 @@ impl Target {
     pub fn is_answer(&self, statement: &MarkedStatement) -> Option<Suppose> {
         let statement_root = statement.statement.root();
 
-        if statement_root.data().is_symbol_name("answer") && statement_root.degree() == 1 {
-            return Some(Suppose {
-                requirements: vec![],
-                resolution:   MarkedStatement::from(Arc::from(Statement::from(
-                    (*statement.statement)
-                        .clone()
-                        .root_mut()
-                        .pop_front()
-                        .unwrap(),
-                ))),
-            });
+        if !self.is_transform() {
+            if statement_root.data().is_symbol_name("answer") && statement_root.degree() == 1 {
+                return Some(Suppose {
+                    requirements: vec![],
+                    resolution:   MarkedStatement::from(Arc::from(Statement::from(
+                        (*statement.statement)
+                            .clone()
+                            .root_mut()
+                            .pop_front()
+                            .unwrap(),
+                    ))),
+                });
+            }
         }
 
         match self {
@@ -171,7 +174,7 @@ impl Target {
                         local_rules.clone(),
                         &mut x[index],
                         target,
-                        |rule| rule.attribute(&RuleAttr::Equivalence).is_some(),
+                        |rule| rule.contains_attribute(&RuleAttr::Equivalence),
                     );
                     if new_states.is_empty() {
                         x[index].weight += 1;
@@ -193,6 +196,9 @@ impl Target {
                         |_| true,
                     );
 
+                    if new_states.is_empty() {
+                        x[index].weight += 1;
+                    }
                     for s in new_states {
                         if x.contains(&s.statement) {
                             continue;
@@ -202,9 +208,6 @@ impl Target {
                             x[index].weight = MAX_LEVEL + 1;
                             break;
                         }
-                    }
-                    if x[index].weight != MAX_LEVEL + 1 {
-                        x[index].weight += 1;
                     }
                 }
             }

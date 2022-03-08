@@ -20,6 +20,8 @@ pub struct ProblemBuilder {
     id:         u64,
     conditions: Vec<MarkedStatement>,
     target:     Option<MarkedStatement>,
+
+    subproblem_level: usize,
 }
 
 impl ProblemBuilder {
@@ -50,12 +52,17 @@ impl ProblemBuilder {
         self
     }
 
+    pub fn with_level(mut self, level: usize) -> Self {
+        self.subproblem_level = level;
+        self
+    }
+
     pub fn build(self) -> Result<Problem, ProblemBuilderError> {
         Ok(Problem {
             id:               self.id,
             conditions:       self.conditions,
             target:           self.target.ok_or(ProblemBuilderError::NoTargetFound)?,
-            subproblem_level: 0,
+            subproblem_level: self.subproblem_level,
         })
     }
 }

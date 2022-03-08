@@ -20,8 +20,8 @@ pub struct MarkedStatement {
     pub symbols:   HashSet<u64>,
     as_rule:       Option<Arc<RwLock<Rule>>>,
 
-    pub applied_rules: HashSet<usize>,
-    pub blocked_rules: HashSet<usize>,
+    pub applied_rules: HashSet<u64>,
+    pub blocked_rules: HashSet<u64>,
     pub weight:        usize,
     pub replaced:      bool,
     pub simplified:    bool,
@@ -75,7 +75,7 @@ impl MarkedStatement {
         self
     }
 
-    pub fn rule(&mut self, id: usize, level: u64) -> Option<Arc<RwLock<Rule>>> {
+    pub fn rule(&mut self, id: u64, level: u64) -> Option<Arc<RwLock<Rule>>> {
         if self.not_rule {
             return None;
         }

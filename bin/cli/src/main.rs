@@ -91,6 +91,10 @@ fn main() {
     }
     let db_problems_iter = db_ext(&db);
 
+    let mut solved = 0;
+    let mut not_solved = 0;
+    let mut answer_changed = 0;
+
     for record in problems
         .into_iter()
         .map(|p| ProblemRecord::from(&p))
@@ -122,12 +126,14 @@ fn main() {
 
         match solution.solve() {
             Ok(_) => {
+                solved += 1;
                 println!("{} {}", "Solution:".italic().blue(), Console(&solution));
                 if let Some(prev) = record.runs.last() {
                     if let (Ok(prev_answer), Ok(answer)) =
                         (&prev.status, &solution.perf_stats.status)
                     {
                         if answer != prev_answer {
+                            answer_changed += 1;
                             println!(
                                 "{}\nOld:{}\nNew:{}",
                                 "Answer changed: ".bold().blink().red(),
@@ -139,6 +145,7 @@ fn main() {
                 }
             }
             Err(e) => {
+                not_solved += 1;
                 println!(
                     "{} {} {}",
                     "Solution:".italic().blue(),
@@ -155,4 +162,9 @@ fn main() {
             );
         }
     }
+
+    println!(
+        "Stats: solved: {} not solved: {} answer_changed: {}",
+        solved, not_solved, answer_changed
+    );
 }

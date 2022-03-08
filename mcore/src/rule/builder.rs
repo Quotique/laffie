@@ -1,5 +1,7 @@
 use std::{collections::HashMap, convert::From, fmt};
 
+use multimap::MultiMap;
+
 use crate::{
     predefine::symbol_by_name,
     statement::{NodeMapping, NodePosition, Statement},
@@ -16,7 +18,7 @@ pub enum RuleBuilderError {
 }
 
 pub struct RuleBuilder {
-    rule_id:      usize,
+    rule_id:      u64,
     statement:    Option<Statement>,
     requirements: Vec<Statement>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
@@ -58,7 +60,7 @@ impl Default for RuleBuilder {
 }
 
 impl RuleBuilder {
-    pub fn with_id(mut self, id: usize) -> Self {
+    pub fn with_id(mut self, id: u64) -> Self {
         self.rule_id = id;
         self
     }
@@ -114,7 +116,7 @@ impl RuleBuilder {
             return Err(RuleBuilderError::WrongArgsCount);
         }
 
-        let mut attrs: HashMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
+        let mut attrs: MultiMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
         attrs.insert(RuleAttr::Subtree, RuleAttrValue::None);
 
         let level = if let Some(RuleAttrValue::UInt(level)) = attrs.get(&RuleAttr::Level) {
@@ -160,6 +162,7 @@ impl RuleBuilder {
                 level: *level as usize,
                 symbol_id: self.symbol_id,
                 attrs: attrs.clone(),
+                block: Default::default(),
                 pattern_symbols: statement.root().front().unwrap().symbols(),
                 statement,
                 pattern: NodePosition::default().child(0),

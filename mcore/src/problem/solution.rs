@@ -9,7 +9,7 @@ use bincode::{Decode, Encode};
 use crate::{
     rule::{RulesEngine, SharedRule},
     statement::Statement,
-    utils::{Dumper, DumperSink},
+    utils::{Dumper, DumperSink, VecDisplay},
 };
 
 use super::{frame::Frame, problem::Problem, target::Target};
@@ -75,10 +75,17 @@ impl Solution {
                 rules.clone(),
                 dumper.clone(),
                 problem.conditions.iter().cloned(),
+                problem.subproblem_level,
             ),
 
             local_rules: vec![],
-            target: Target::try_from((*problem.target.statement).clone(), rules, dumper).unwrap(),
+            target: Target::try_from(
+                (*problem.target.statement).clone(),
+                rules,
+                dumper,
+                problem.subproblem_level,
+            )
+            .unwrap(),
 
             answer: None,
 
@@ -94,7 +101,7 @@ impl Solution {
 
     pub fn solve(&mut self) -> Result<(), SolutionError> {
         self.stack.dumper().subproblem_start(&self.problem);
-        trace!(target: "subproblems", "Subproblem: {}, {:?}", self.target, self.problem.conditions);
+        trace!(target: "subproblem", "Subproblem: {}, {}", self.target, VecDisplay(&self.problem.conditions));
         if self.problem.subproblem_level > MAX_SUBPROBLEM_LEVEL {
             return Err(SolutionError::MaxSubproblemLevelExceed);
         }
@@ -115,7 +122,12 @@ impl Solution {
 
             let index = self.stack.pick_condition()?;
             let level = self.stack[index].weight;
-            trace!(target: "subproblem", "Subproblem level: {}", level);
+            trace!(
+                target: "subproblem",
+                "[{}] Level: {} -> {}",
+                self.problem.subproblem_level,
+                level, self.stack[index]
+            );
             if level > MAX_LEVEL {
                 return Err(SolutionError::NoSolutionsFound);
             }
@@ -146,12 +158,16 @@ impl Solution {
                         let _ = self.stack.add_condition(suppose.resolution.clone());
                         self.answer = Some(self.stack.find(&suppose.resolution.statement).unwrap());
                     }
-                    trace!("Solved. Answer: {}", self.answer().unwrap());
+                    trace!(
+                        "Solved {}. Answer: {}",
+                        self.problem.subproblem_level,
+                        self.answer().unwrap()
+                    );
                     return Ok(());
                 }
             }
             if let Some(r) = self.stack[index].rule(
-                (self.local_rules.len() + 1) | 0x80_00_00_00_00_00_00_00,
+                (self.local_rules.len() as u64 + 1) | 0x80_00_00_00_00_00_00_00,
                 (level + 1) as u64,
             ) {
                 self.local_rules.push(r);

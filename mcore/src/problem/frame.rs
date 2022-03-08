@@ -9,8 +9,13 @@ use std::{
 use trees::tr;
 
 use crate::{
+    predefine::{normalize, symbol_by_name},
     rule::{Rule, RulesEngine, SharedRule, Suppose},
-    statement::{term::Term, tree_utils::NodeMapping, MarkedStatement, Statement},
+    statement::{
+        term::{StatementNode, Term},
+        tree_utils::{swap_node, NodeMapping},
+        MarkedStatement, Statement,
+    },
     utils::{Dumper, DumperSink, VecDisplay},
 };
 
@@ -27,6 +32,8 @@ pub struct Frame {
 
     rules_engine: Arc<RulesEngine>,
     dumper:       Dumper,
+
+    subproblem_level: usize,
 }
 
 impl fmt::Debug for Frame {
@@ -41,13 +48,34 @@ impl fmt::Display for Frame {
     }
 }
 
+fn is_replace(root: &mut StatementNode) {
+    if !root.data().is_symbol_name("is") || root.degree() != 2 {
+        return;
+    }
+
+    match root.back().unwrap().data().symbol().map(|x| x.name) {
+        Some(name) if name == "true" => {
+            let mut child = root.pop_front().unwrap();
+            swap_node(root, &mut child.root_mut());
+        }
+        Some(name) if name == "false" => {
+            let child = root.pop_front().unwrap();
+            let mut neg = tr(Term::Symbol(symbol_by_name("!").unwrap().id)) / child;
+            swap_node(root, &mut neg.root_mut());
+        }
+        _ => {}
+    }
+}
+
 impl Frame {
-    pub fn new(rules: Arc<RulesEngine>, dump: Dumper) -> Self {
+    pub fn new(rules: Arc<RulesEngine>, dump: Dumper, level: usize) -> Self {
         Frame {
             stack:        Vec::new(),
             index:        HashMap::new(),
             rules_engine: rules,
             dumper:       dump,
+
+            subproblem_level: level,
         }
     }
 
@@ -55,8 +83,9 @@ impl Frame {
         rules: Arc<RulesEngine>,
         dumper: Dumper,
         statements: impl IntoIterator<Item = MarkedStatement>,
+        level: usize,
     ) -> Self {
-        let mut result = Self::new(rules, dumper);
+        let mut result = Self::new(rules, dumper, level);
         for i in statements {
             // TODO: error processing
             let _ = result.add_condition(i);
@@ -129,12 +158,17 @@ impl Frame {
             return true;
         }
 
+        let mut clone = statement.root().deep_clone();
+        is_replace(&mut clone.root_mut());
+        normalize(&mut clone.root_mut());
+
         let subproblem = ProblemBuilder::default()
             .with_target(MarkedStatement::from(Arc::new(Statement::from(
-                tr(Term::with_symbol_name("proof").unwrap()) / statement.root().deep_clone(),
+                tr(Term::with_symbol_name("proof").unwrap()) / clone,
             ))))
             .expect("Can't build subproblem")
             .with_conditions(self.stack.iter().cloned())
+            .with_level(self.subproblem_level + 1)
             .build()
             .expect("Can't build subproblem");
         let mut solution =
@@ -160,6 +194,7 @@ impl Frame {
             ))))
             .expect("Can't build subproblem")
             .with_conditions(self.stack.iter().cloned())
+            .with_level(self.subproblem_level + 1)
             .build()
             .expect("Can't build subproblem");
         let mut solution =
@@ -247,11 +282,17 @@ impl Frame {
         rules.append(&mut local_rules);
         for rule in rules {
             let rule = rule.read();
+            trace!(target: "rule_selection", "Rule: {}", rule);
+
             if !filter(&rule) {
+                trace!(target: "rule_selection", "Rule: {} rejected by filter", rule);
                 continue;
             }
 
-            if let Ok(result) = rule.apply(&mut self.stack[index], target) {
+            if let Ok(result) = rule
+                .apply(&mut self.stack[index], target)
+                .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
+            {
                 let mut res = vec![];
                 for sup in result {
                     let mut proofed = true;
@@ -259,14 +300,17 @@ impl Frame {
                         continue;
                     }
 
+                    trace!(target: "rule_selection", "Suppose: {}", sup);
                     for req in sup.requirements {
                         if !self.proof(req.as_ref()) {
+                            trace!(target: "rule_selection", "Can't proof: {} suppose rejected", req);
                             proofed = false;
                             break;
                         }
                     }
 
                     if proofed {
+                        trace!(target: "rule_selection", "Suppose: proofed, resolution applied");
                         res.push(sup.resolution);
                     }
                 }

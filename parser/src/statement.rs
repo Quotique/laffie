@@ -55,7 +55,9 @@ impl<'a> StatementParser<'a> {
                 &mut 0,
             )?
         };
-        Ok(Statement::new(tree, positions_map))
+        let mut state = Statement::new(tree, positions_map);
+        state.inpl_normalize();
+        Ok(state)
     }
 
     fn try_parse_impl(

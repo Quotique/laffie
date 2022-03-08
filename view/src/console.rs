@@ -14,7 +14,9 @@ impl<'a> fmt::Display for Console<'a> {
             fn visitor(stack: &Frame, id: usize, trace: &mut Vec<(usize, Vec<usize>)>) {
                 trace.push((id, stack[id].parents.clone()));
                 for i in stack[id].parents.iter() {
-                    visitor(stack, *i, trace);
+                    if *i != id {
+                        visitor(stack, *i, trace);
+                    }
                 }
             }
 

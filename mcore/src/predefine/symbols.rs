@@ -2,7 +2,7 @@ use multi_map::MultiMap;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 
-use crate::statement::symbols::Symbol;
+use crate::statement::symbols::{Symbol, SymbolAttr, SymbolAttrValue};
 
 use super::operations::{
     divide, equal, inequal, is, less, less_or_equal, minus, more, more_or_equal, mul, op_not,
@@ -32,8 +32,22 @@ fn all_symbols() -> &'static RwLock<MultiMap<u64, String, Symbol>> {
         add_with_name(&mut result, "in"); // 14
         add_with_name(&mut result, "find");
         add_with_name(&mut result, "AnySymbol");
-        add_with_name(&mut result, "=>");
-        add_with_name(&mut result, "<=>");
+        add_symbol_impl(
+            &mut result,
+            Symbol::builder()
+                .name("=>")
+                .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(900))
+                .build()
+                .unwrap(),
+        );
+        add_symbol_impl(
+            &mut result,
+            Symbol::builder()
+                .name("<=>")
+                .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(900))
+                .build()
+                .unwrap(),
+        );
         add_with_name(&mut result, "&&");
         add_with_name(&mut result, "||");
 

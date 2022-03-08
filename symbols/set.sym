@@ -20,7 +20,16 @@ rule {
 };
 
 rule {
-    attr level(3),problem_target(transform(x)),subtree,replace;
+    attr level(0),problem_target(find(x)),subtree,replace;
+
+    x in set(a, b) => answer(x in set(a, b));
+
+    a is known,
+    b is known;
+};
+
+rule {
+    attr level(3),problem_target(transform(x)),subtree,replace,block(move_left);
 
     a in set(b, c) <=> a == b || a == c;
 };

@@ -1,15 +1,13 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashSet, fmt, str::FromStr, sync::Arc};
 
 use eyre::{bail, Result};
+use multimap::MultiMap;
 
 use crate::{
     predefine::symbol_by_id,
-    statement::{MarkedStatement, NodePosition, ParamsMapping, Statement, StatementNode},
+    statement::{
+        CompactString, MarkedStatement, NodePosition, ParamsMapping, Statement, StatementNode,
+    },
     utils::VecDisplay,
 };
 
@@ -22,12 +20,15 @@ pub enum RuleAttr {
     Level,
     Zero,
     One,
+    Block,
+    Id,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuleAttrValue {
     None,
     UInt(u64),
+    Str(CompactString),
     Target(Statement),
 }
 
@@ -48,11 +49,12 @@ pub struct Suppose {
 
 #[derive(Debug)]
 pub struct Rule {
-    pub id:        usize,
+    pub id:        u64,
     pub level:     usize,
     pub symbol_id: u64,
 
-    pub attrs: HashMap<RuleAttr, RuleAttrValue>,
+    pub attrs: MultiMap<RuleAttr, RuleAttrValue>,
+    pub block: Vec<u64>,
 
     pub statement: Statement,
     pub pattern:   NodePosition,
@@ -76,6 +78,8 @@ impl FromStr for RuleAttr {
             "problem_target" => Ok(RuleAttr::Target),
             "zero" => Ok(RuleAttr::Zero),
             "one" => Ok(RuleAttr::One),
+            "id" => Ok(RuleAttr::Id),
+            "block" => Ok(RuleAttr::Block),
             _ => bail!(""),
         }
     }
@@ -96,15 +100,22 @@ impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} id: {}, level: {}, reqs: {:?}",
-            self.statement, self.id, self.level, self.requirements
+            "{} id: {}, level: {}, reqs: {}",
+            self.statement,
+            self.id,
+            self.level,
+            VecDisplay(&self.requirements)
         )
     }
 }
 
 impl Rule {
-    pub fn attribute(&self, attr: &RuleAttr) -> Option<&RuleAttrValue> {
-        self.attrs.get(attr)
+    pub fn attribute(&self, attr: &RuleAttr) -> impl Iterator<Item = &RuleAttrValue> {
+        self.attrs.iter_key(attr)
+    }
+
+    pub fn contains_attribute(&self, attr: &RuleAttr) -> bool {
+        self.attrs.iter_key(attr).next().is_some()
     }
 
     pub fn is_tautology(&self) -> bool {
@@ -136,7 +147,8 @@ impl Rule {
     }
 
     pub fn is_target_suitable(&self, target: &MarkedStatement) -> Result<(), RuleDeclineReason> {
-        if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Target) {
+        // TODO: multiple targets
+        if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Target).next() {
             if pattern.map(&target.statement).is_err() {
                 trace!(target: "rule_selection", "no match target: {}, required: {}", target, pattern);
                 return Err(RuleDeclineReason::TargetMissmatch);
@@ -169,7 +181,7 @@ impl Rule {
             return Err(RuleDeclineReason::Blocked);
         }
 
-        if self.attribute(&RuleAttr::Subtree).is_some() {
+        if self.contains_attribute(&RuleAttr::Subtree) {
             self.apply_subtree(arg)
         } else {
             self.apply_root(arg)
@@ -224,6 +236,8 @@ impl Rule {
                 let mut src = (*arg.statement).clone();
                 replace.swap_node(&mut src[pos]);
                 src.inpl_normalize();
+                let mut resolution = MarkedStatement::from(Arc::new(src)).with_parent(arg.id);
+                resolution.blocked_rules.extend(self.block.iter());
 
                 let suppose = Suppose {
                     requirements: self
@@ -231,7 +245,7 @@ impl Rule {
                         .iter()
                         .map(|r| Arc::new(r.apply_map(&self.binds).apply_map(i)))
                         .collect(),
-                    resolution:   MarkedStatement::from(Arc::new(src)).with_parent(arg.id),
+                    resolution,
                 };
                 trace!(target: "rule_selection", "New suppose: {}", suppose);
                 result.push(suppose);

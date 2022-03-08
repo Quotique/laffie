@@ -1,6 +1,9 @@
 use std::str::FromStr;
 
-use mcore::rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder};
+use mcore::{
+    rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
+    statement::CompactString,
+};
 
 use crate::ParserError;
 
@@ -110,6 +113,34 @@ impl<'a> RuleParser<'a> {
                     RuleAttrValue::Target(target),
                 ))
             }
+            "id" => {
+                if attr.degree() != 1 {
+                    return Err(ParserError {
+                        loc: attr.data().location.clone(),
+                        msg: "must have one argument".to_owned(),
+                    });
+                }
+                let data = attr.front().unwrap().data();
+
+                Ok((
+                    RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
+                    RuleAttrValue::Str(CompactString::from(data.symbol.as_str())),
+                ))
+            }
+            "block" => {
+                if attr.degree() != 1 {
+                    return Err(ParserError {
+                        loc: attr.data().location.clone(),
+                        msg: "must have one argument".to_owned(),
+                    });
+                }
+                let data = attr.front().unwrap().data();
+
+                Ok((
+                    RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
+                    RuleAttrValue::Str(CompactString::from(data.symbol.as_str())),
+                ))
+            }
             _ => Err(ParserError {
                 loc: attr.data().location.clone(),
                 msg: "unknown attribute".to_owned(),
@@ -174,10 +205,10 @@ mod tests {
 
         assert_eq!(rule.attrs.len(), 3);
 
-        assert!(rule.attribute(&RuleAttr::Replace).is_some());
+        assert!(rule.contains_attribute(&RuleAttr::Replace));
         assert_eq!(
-            rule.attribute(&RuleAttr::Level),
-            Some(&RuleAttrValue::UInt(1))
+            rule.attribute(&RuleAttr::Level).collect::<Vec<_>>(),
+            vec![&RuleAttrValue::UInt(1)]
         );
     }
 
@@ -229,11 +260,11 @@ mod tests {
 
         assert_eq!(rule.attrs.len(), 4);
 
-        assert!(rule.attribute(&RuleAttr::Subtree).is_some());
-        assert!(rule.attribute(&RuleAttr::Equivalence).is_some());
+        assert!(rule.contains_attribute(&RuleAttr::Subtree));
+        assert!(rule.contains_attribute(&RuleAttr::Equivalence));
         assert_eq!(
-            rule.attribute(&RuleAttr::Level),
-            Some(&RuleAttrValue::UInt(0))
+            rule.attribute(&RuleAttr::Level).collect::<Vec<_>>(),
+            vec![&RuleAttrValue::UInt(0)]
         );
     }
 
@@ -251,5 +282,35 @@ mod tests {
 
         let rules = result.unwrap();
         assert_eq!(rules.len(), 3);
+    }
+
+    #[test]
+    fn attr_parse_test() {
+        let test = r#"rule {
+            attr replace,level(1),id(move_left),block(hello),block(world);
+            a == b => a - b == 0;
+            b != 0;
+        }"#;
+
+        let states = lang::lang_rule(test)
+            .map_err(|e| println!("{}", e))
+            .unwrap();
+        let result = RuleParser::with(&states).parse();
+        assert!(result.is_ok());
+
+        let mut rules = result.unwrap();
+        assert_eq!(rules.len(), 1);
+        let rule = rules.pop().unwrap();
+        assert_eq!(
+            rule.attribute(&RuleAttr::Id).collect::<Vec<_>>(),
+            vec![&RuleAttrValue::Str("move_left".into())]
+        );
+        assert_eq!(
+            rule.attribute(&RuleAttr::Block).collect::<Vec<_>>(),
+            vec![
+                &RuleAttrValue::Str("hello".into()),
+                &RuleAttrValue::Str("world".into())
+            ]
+        );
     }
 }
