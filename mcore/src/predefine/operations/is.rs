@@ -1,7 +1,7 @@
 use crate::{
     predefine::symbol_by_name,
     statement::{
-        symbols::{Symbol, TruthResult},
+        symbols::{Symbol, SymbolAttr, SymbolAttrValue, TruthResult},
         term::{StatementNode, Term},
     },
 };
@@ -9,6 +9,11 @@ use crate::{
 pub fn symbol() -> Symbol {
     Symbol::builder()
         .name("is")
+        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(800))
+        .with_attr(
+            SymbolAttr::Display,
+            SymbolAttrValue::UStr(" is ".to_owned()),
+        )
         .with_truth_checker(Box::new(is))
         .build()
         .unwrap()

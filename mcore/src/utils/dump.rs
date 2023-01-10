@@ -83,7 +83,7 @@ impl FileDumper {
     }
 
     fn prefix(&self) -> String {
-        String::from(" ").repeat(self.subproblem_level * 2)
+        String::from("┆ ").repeat(self.subproblem_level)
     }
 }
 
@@ -114,7 +114,7 @@ impl DumperSink for FileDumper {
 
     fn add_statement(&mut self, statement: &MarkedStatement) {
         self.file
-            .write_all(format!("{} {}\n", self.prefix(), statement.statement).as_bytes())
+            .write_all(format!("{}{}\n", self.prefix(), statement.statement).as_bytes())
             .expect("Unable write into dump file");
     }
 }

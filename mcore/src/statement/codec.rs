@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use bincode::{Decode, Encode};
+use bincode::{BorrowDecode, Decode, Encode};
 use trees::tr;
 
 use super::{
@@ -66,6 +66,70 @@ impl Decode for Term {
             _ => unreachable!(),
         };
         Ok(term)
+    }
+}
+
+impl<'de> BorrowDecode<'de> for Term {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> core::result::Result<Self, bincode::error::DecodeError> {
+        let index: i8 = BorrowDecode::borrow_decode(decoder)?;
+        let term = match index {
+            1 => Term::Symbol(BorrowDecode::borrow_decode(decoder)?),
+            2 => {
+                let s: String = BorrowDecode::borrow_decode(decoder)?;
+                Term::Param(CompactString::from(s).into())
+            }
+            3 => {
+                let s: String = BorrowDecode::borrow_decode(decoder)?;
+                Term::Variable(CompactString::from(s).into())
+            }
+            4 => {
+                let s: String = BorrowDecode::borrow_decode(decoder)?;
+                // TODO: remove unwrap
+                Term::Number(Decimal::from_str(&s).unwrap())
+            }
+            5 => {
+                let p: u64 = BorrowDecode::borrow_decode(decoder)?;
+                Term::Placeholder(p.into())
+            }
+            _ => unreachable!(),
+        };
+        Ok(term)
+    }
+}
+
+impl<'de> BorrowDecode<'de> for Statement {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
+        decoder: &mut D,
+    ) -> core::result::Result<Self, bincode::error::DecodeError> {
+        let mut tree_vec: Vec<(isize, StatementTree)> = vec![];
+        loop {
+            let parent_no: isize = BorrowDecode::borrow_decode(decoder)?;
+            if parent_no == -2 {
+                break;
+            }
+
+            let data: Term = BorrowDecode::borrow_decode(decoder)?;
+            tree_vec.push((parent_no, tr(data)));
+        }
+
+        let mut statement_node = None;
+        while let Some((parent_no, node)) = tree_vec.pop() {
+            if parent_no == -1 {
+                assert!(tree_vec.is_empty(), "root element is not last");
+                statement_node = Some(node);
+            } else {
+                tree_vec[parent_no as usize].1.push_front(node);
+            }
+        }
+        let tree = statement_node.take().unwrap();
+
+        Ok(Statement {
+            tree,
+            // TODO: encode/decode for binds
+            binds: Default::default(),
+        })
     }
 }
 

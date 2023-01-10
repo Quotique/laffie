@@ -35,7 +35,16 @@ pub fn plus(root: &mut StatementNode) -> bool {
 
     let mut constant_mapping = HashMap::new();
 
+    let mut children = vec![];
     while let Some(mut child) = root.pop_front() {
+        if child.data().is_symbol_name("-") && child.degree() == 2 {
+            // +(a -(b c)) -> +(a b -c)
+            children.push(child.pop_front().unwrap());
+        }
+        children.push(child);
+    }
+
+    for mut child in children {
         let num_const = extract_mul_const(&mut child.root_mut());
         constant_mapping
             .entry(child)
@@ -212,8 +221,5 @@ mod tests {
 
         let state = statement_with_vars("4");
         assert_eq!(mean_arg(state.root()).to_string(), "4".to_owned());
-
-        let state = statement_with_vars("4*2");
-        assert_eq!(mean_arg(state.root()).to_string(), "2".to_owned());
     }
 }

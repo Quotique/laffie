@@ -1,6 +1,6 @@
 ---
-source: src/statement/tree_utils.rs
+source: mcore/src/statement/mapping.rs
+assertion_line: 311
 expression: test
-
 ---
-x-1+1
+2*^(x, 2)+1

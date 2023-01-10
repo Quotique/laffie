@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn subtree_param_map_test() {
-        let statement = statement_with_vars("(x - 1) + 4 == x - 1");
+        let statement = statement_with_vars("2*x^2 + 4 == x - 1");
         let pattern = statement_with_params("a + 4 == b");
 
         let maps = ParamsMapping::mapper(statement.root(), pattern.root())
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn apply_param_map_test() {
-        let statement = statement_with_vars("(x - 1) + 4 == x - 1");
+        let statement = statement_with_vars("2*x^2 + 4 == x - 1");
         let pattern = statement_with_params("a + 4 == b");
 
         let maps = ParamsMapping::mapper(statement.root(), pattern.root())

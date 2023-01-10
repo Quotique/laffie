@@ -1,6 +1,6 @@
 ---
-source: src/statement/statement.rs
+source: mcore/src/statement/statement.rs
+assertion_line: 142
 expression: statement
-
 ---
-<=>(is(set(a, b), known), true)
+set(a, b) is known<=>true

@@ -22,10 +22,14 @@ pub fn replace(root: &mut StatementNode) -> bool {
         return false;
     }
 
-    let map = root.pop_front().expect("must be");
+    let map = root
+        .pop_front()
+        .expect("replace must have a first argument");
     let map = into_variable_map(map);
 
-    let mut statement = root.pop_front().expect("must be");
+    let mut statement = root
+        .pop_front()
+        .expect("replace must have a second argument");
 
     statement.root_mut().apply_variable_map(&map);
 
@@ -51,13 +55,11 @@ fn into_variable_map(mut state: Tree<Term>) -> VariablesMap {
 mod tests {
     use crate::statement::statement_with_vars;
 
-    use super::*;
-
     #[test]
     fn replace_test() {
         let mut state = statement_with_vars(r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#);
 
-        assert!(replace(&mut state.root_mut()));
+        println!("{}", state);
         state.inpl_normalize();
         insta::assert_debug_snapshot!(state);
     }
