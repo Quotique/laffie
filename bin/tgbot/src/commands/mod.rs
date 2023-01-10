@@ -38,7 +38,7 @@ pub async fn process_update(
                 let chat_id = message.to_source_chat();
                 match Command::new(query.from.id, chat_id, data) {
                     Ok(command) => command.handle(api, engine, problems, users).await,
-                    Err(e) => error_handler(api, chat_id, &e.to_string()).await,
+                    Err(e) => error_handler(api, chat_id, e).await,
                 }
             }
         }
@@ -46,7 +46,7 @@ pub async fn process_update(
             if let MessageKind::Text { ref data, .. } = &message.kind {
                 match Command::new(message.from.id, message.chat.id(), data) {
                     Ok(command) => command.handle(api, engine, problems, users).await,
-                    Err(e) => error_handler(api, message.chat.id(), &e.to_string()).await,
+                    Err(e) => error_handler(api, message.chat.id(), e).await,
                 }
             }
         }

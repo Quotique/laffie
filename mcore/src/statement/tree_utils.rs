@@ -76,8 +76,7 @@ impl NodeMapping for StatementNode {
         if let Some(mut v) = self
             .data()
             .variable()
-            .map(|x| variables.get(x))
-            .flatten()
+            .and_then(|x| variables.get(x))
             .cloned()
         {
             swap_node(self, &mut v.root_mut());
@@ -89,13 +88,7 @@ impl NodeMapping for StatementNode {
     }
 
     fn apply_param_map(&mut self, params: &ParamsMap) {
-        if let Some(mut v) = self
-            .data()
-            .param()
-            .map(|x| params.get(x))
-            .flatten()
-            .cloned()
-        {
+        if let Some(mut v) = self.data().param().and_then(|x| params.get(x)).cloned() {
             swap_node(self, &mut v.root_mut());
         } else {
             for mut i in self.iter_mut() {

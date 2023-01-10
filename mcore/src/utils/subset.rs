@@ -7,7 +7,7 @@ pub struct Subsets {
 
 impl Subsets {
     pub fn as_vec(&self) -> &Vec<usize> {
-        &*self.positions
+        &self.positions
     }
 }
 

@@ -6,6 +6,8 @@ use macros::FuncAttr;
 
 use super::term::StatementNode;
 
+type BoxedComparator = Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TruthResult {
     True,
@@ -14,7 +16,7 @@ pub enum TruthResult {
 }
 
 #[derive(FuncAttr)]
-pub struct Ordering(Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>);
+pub struct Ordering(BoxedComparator);
 #[derive(FuncAttr)]
 pub struct Calculator(Box<dyn Fn(&mut StatementNode) -> bool>);
 #[derive(FuncAttr)]
@@ -93,10 +95,7 @@ impl SymbolBuilder {
         self
     }
 
-    pub fn with_ordering(
-        &mut self,
-        ordering: Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>,
-    ) -> &mut Self {
+    pub fn with_ordering(&mut self, ordering: BoxedComparator) -> &mut Self {
         self.arg_order = Some(Arc::new(Some(Ordering(ordering))));
         self
     }

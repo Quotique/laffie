@@ -171,8 +171,8 @@ impl Rule {
         arg: &mut MarkedStatement,
         target: &MarkedStatement,
     ) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        let _ = self.is_statement_suitable(arg)?;
-        let _ = self.is_target_suitable(target)?;
+        self.is_statement_suitable(arg)?;
+        self.is_target_suitable(target)?;
 
         if !arg.applied_rules.insert(self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);

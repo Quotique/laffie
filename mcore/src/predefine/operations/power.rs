@@ -32,7 +32,7 @@ pub fn power(root: &mut StatementNode) -> bool {
         if let Some(e) = d2.to_i8() {
             result = true;
             let (m, exp) = d1.as_bigint_and_exponent();
-            let result = Decimal::new(m.pow(e.abs() as u32), exp * (e.abs() as i64));
+            let result = Decimal::new(m.pow(e.unsigned_abs()), exp * (e.abs() as i64));
             while root.pop_front().is_some() {}
             if e >= 0 {
                 *root.data_mut() = Term::Number(result);

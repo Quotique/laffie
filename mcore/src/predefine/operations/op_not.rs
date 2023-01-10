@@ -26,17 +26,15 @@ fn not_replace(root: &mut StatementNode) -> bool {
             let mut child = root.pop_front().unwrap();
             swap_node(root, &mut child.root_mut());
             *root.data_mut() = Term::Symbol(symbol_by_name("!=").unwrap().id);
-            return true;
+            true
         }
         Some(name) if name == "!=" => {
             let mut child = root.pop_front().unwrap();
             swap_node(root, &mut child.root_mut());
             *root.data_mut() = Term::Symbol(symbol_by_name("==").unwrap().id);
-            return true;
+            true
         }
-        _ => {
-            return false;
-        }
+        _ => false,
     }
 }
 

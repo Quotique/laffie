@@ -85,7 +85,7 @@ async fn main() {
                 println!("Symbols dir is not specified");
                 std::process::exit(-1);
             }),
-        "".to_owned(),
+        "".to_string(),
     );
 
     let rules_engine = Arc::new(parser.load_rules().unwrap());
