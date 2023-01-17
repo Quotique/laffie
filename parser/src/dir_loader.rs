@@ -91,8 +91,11 @@ impl DirectoryParser {
             let path = entry.path();
             if path.is_dir() {
                 Self::load_dir(&path, extensions, cb)?;
-            } else if path.extension().is_some() &&
-                extensions.contains(&path.extension().unwrap().to_str().unwrap())
+            } else if path
+                .extension()
+                .and_then(|x| x.to_str())
+                .map(|x| extensions.contains(&x))
+                .unwrap_or(false)
             {
                 Self::load_file(&path, cb)?;
             }

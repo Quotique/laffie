@@ -32,4 +32,11 @@ problem {
     target proof(!symbolic_eq(1, 0));
 
     x == 1;
+};
+
+problem {
+    target proof(x == 6/5);
+
+    x in set(6/5, 12/5);
+    answer(x in set(6/5, 12/5));
 }

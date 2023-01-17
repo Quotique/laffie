@@ -75,6 +75,11 @@ impl MarkedStatement {
         self
     }
 
+    pub fn without_parents(mut self) -> Self {
+        self.parents.clear();
+        self
+    }
+
     pub fn rule(&mut self, id: u64, level: u64) -> Option<Arc<RwLock<Rule>>> {
         if self.not_rule {
             return None;

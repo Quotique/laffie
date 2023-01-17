@@ -112,7 +112,14 @@ impl Frame {
         if self.contains(&statement.statement) {
             return Ok(());
         }
-        self.dumper.add_statement(&statement);
+        self.dumper.add_statement(
+            &statement,
+            &statement
+                .parents
+                .first()
+                .map(|id| self.stack[*id].clone())
+                .unwrap_or_else(|| MarkedStatement::from(Arc::new(Statement::zero()))),
+        );
 
         statement.id = self.stack.len();
         if self.stack.len() + 1 > STACK_SIZE {
@@ -167,7 +174,12 @@ impl Frame {
                 tr(Term::with_symbol_name("proof").unwrap()) / clone,
             ))))
             .expect("Can't build subproblem")
-            .with_conditions(self.stack.iter().cloned())
+            .with_conditions(
+                self.stack
+                    .iter()
+                    .filter(|x| !x.statement.root().data().is_symbol_name("answer"))
+                    .cloned(),
+            )
             .with_level(self.subproblem_level + 1)
             .build()
             .expect("Can't build subproblem");
@@ -187,26 +199,48 @@ impl Frame {
         }
         self[index].simplified = true;
 
+        let (answer_wrap, to_transform) =
+            if self[index].statement.root().data().is_symbol_name("answer") {
+                (
+                    true,
+                    self[index].statement.root().front().unwrap().deep_clone(),
+                )
+            } else {
+                (false, self[index].statement.root().deep_clone())
+            };
+
         let subproblem = ProblemBuilder::default()
             .with_target(MarkedStatement::from(Arc::new(Statement::from(
-                tr(Term::with_symbol_name("transform").unwrap()) /
-                    self[index].statement.root().deep_clone(),
+                tr(Term::with_symbol_name("transform").unwrap()) / to_transform,
             ))))
             .expect("Can't build subproblem")
-            .with_conditions(self.stack.iter().cloned())
+            .with_conditions(
+                self.stack
+                    .iter()
+                    .filter(|x| !x.statement.root().data().is_symbol_name("answer"))
+                    .cloned(),
+            )
             .with_level(self.subproblem_level + 1)
             .build()
             .expect("Can't build subproblem");
         let mut solution =
             Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
 
-        if solution.solve().is_err() || self[index].statement == solution.answer().unwrap() {
+        solution.solve().ok()?;
+        let mut answer = solution.answer().unwrap().as_ref().clone();
+        if answer_wrap {
+            let mut tmp = tr(Term::with_symbol_name("answer").unwrap());
+            swap_node(&mut answer.root_mut(), &mut tmp.root_mut());
+            answer.root_mut().push_back(tmp);
+        }
+
+        if solution.solve().is_err() || *self[index].statement == answer {
             return None;
         }
-        let mut result = MarkedStatement::from(solution.answer().unwrap());
+        let mut result = MarkedStatement::from(Arc::new(answer));
         result.blocked_rules = self[index].blocked_rules.clone();
         result.simplified = true;
-        result.parents.push(self[index].id);
+        result.parents = vec![self[index].id];
 
         Some(result)
     }
@@ -229,8 +263,8 @@ impl Frame {
     ) -> Vec<MarkedStatement> {
         let mut rules = self.rules_engine.suggest_rules(statement, target);
         rules.append(&mut local_rules);
-        for rule in rules {
-            let rule = rule.read();
+        for shared_rule in rules {
+            let rule = shared_rule.read();
             trace!(target: "rule_selection", "Rule: {}", rule);
 
             if !filter(&rule) {
@@ -243,8 +277,9 @@ impl Frame {
                 .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
             {
                 let mut res = vec![];
-                for sup in result {
+                for mut sup in result {
                     let mut proofed = true;
+                    sup.resolution.rule = Some(shared_rule.clone());
                     if self.contains(&sup.resolution.statement) {
                         continue;
                     }
@@ -280,8 +315,8 @@ impl Frame {
     ) -> Vec<MarkedStatement> {
         let mut rules = self.rules_engine.suggest_rules(&self.stack[index], target);
         rules.append(&mut local_rules);
-        for rule in rules {
-            let rule = rule.read();
+        for shared_rule in rules {
+            let rule = shared_rule.read();
             trace!(target: "rule_selection", "Rule: {}", rule);
 
             if !filter(&rule) {
@@ -294,8 +329,9 @@ impl Frame {
                 .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
             {
                 let mut res = vec![];
-                for sup in result {
+                for mut sup in result {
                     let mut proofed = true;
+                    sup.resolution.rule = Some(shared_rule.clone());
                     if self.contains(&sup.resolution.statement) {
                         continue;
                     }

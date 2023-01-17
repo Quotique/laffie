@@ -148,7 +148,7 @@ impl Target {
                     if x[index].weight > MAX_LEVEL {
                         return Some(Suppose {
                             requirements: vec![],
-                            resolution:   x.last().unwrap().clone(),
+                            resolution:   x.last().unwrap().clone().without_parents(),
                         });
                     }
                 }

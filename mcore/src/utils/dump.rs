@@ -22,7 +22,7 @@ pub trait DumperSink {
 
     fn subproblem_end(&mut self);
 
-    fn add_statement(&mut self, statement: &MarkedStatement);
+    fn add_statement(&mut self, statement: &MarkedStatement, parent: &MarkedStatement);
 }
 
 pub struct FileDumper {
@@ -61,8 +61,8 @@ impl DumperSink for Dumper {
         self.sink.lock().unwrap().subproblem_end();
     }
 
-    fn add_statement(&mut self, statement: &MarkedStatement) {
-        self.sink.lock().unwrap().add_statement(statement);
+    fn add_statement(&mut self, statement: &MarkedStatement, parent: &MarkedStatement) {
+        self.sink.lock().unwrap().add_statement(statement, parent);
     }
 }
 
@@ -71,7 +71,7 @@ impl DumperSink for NoneDumper {
 
     fn subproblem_end(&mut self) {}
 
-    fn add_statement(&mut self, _: &MarkedStatement) {}
+    fn add_statement(&mut self, _: &MarkedStatement, _: &MarkedStatement) {}
 }
 
 impl FileDumper {
@@ -112,9 +112,22 @@ impl DumperSink for FileDumper {
         self.subproblem_level -= 1;
     }
 
-    fn add_statement(&mut self, statement: &MarkedStatement) {
+    fn add_statement(&mut self, statement: &MarkedStatement, parent: &MarkedStatement) {
         self.file
-            .write_all(format!("{}{}\n", self.prefix(), statement.statement).as_bytes())
+            .write_all(
+                format!(
+                    "{}{} [{}, {}]\n",
+                    self.prefix(),
+                    statement.statement,
+                    parent.statement,
+                    statement
+                        .rule
+                        .as_ref()
+                        .map(|x| x.read().to_string())
+                        .unwrap_or_default()
+                )
+                .as_bytes(),
+            )
             .expect("Unable write into dump file");
     }
 }
