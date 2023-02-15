@@ -3,8 +3,8 @@ Description=Laffie bot service
 
 [Service]
 Type=simple
-WorkingDirectory=/home/minerva
-ExecStart=/home/minerva/bin/tgbot -c config/tgbot.json
+WorkingDirectory=/home/laffie
+ExecStart=/home/laffie/bin/tgbot -c config/tgbot.json
 
 [Install]
 WantedBy=default.target
