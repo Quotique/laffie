@@ -141,7 +141,7 @@ impl Symbol {
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(SymbolAttrValue::UStr(s)) = self.attrs.get(&SymbolAttr::Display) {
-            return write!(f, "{}", s);
+            return write!(f, "{s}");
         }
         write!(f, "{}", self.name)
     }

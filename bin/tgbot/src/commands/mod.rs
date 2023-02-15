@@ -51,7 +51,7 @@ pub async fn process_update(
             }
         }
         _ => {
-            println!("{:?}", update);
+            println!("{update:?}");
         }
     }
 }

@@ -43,7 +43,7 @@ fn main() {
 
     let settings = Settings::new(matches.value_of("config").unwrap())
         .map_err(|e| {
-            println!("Config error: {:?}", e);
+            println!("Config error: {e:?}");
             e
         })
         .unwrap_or_else(|_| {
@@ -54,14 +54,14 @@ fn main() {
     let problems_db = ProblemDb::open(&settings.problems_db).unwrap();
     problems_db.backup(&settings.problems_backup).unwrap();
     if let Err(e) = update_problems(problems_db) {
-        println!("error: {}", e);
+        println!("error: {e}");
         ProblemDb::restore(&settings.problems_db, &settings.problems_backup).unwrap();
     }
 
     let users_db = UserDb::open(&settings.users_db).unwrap();
     users_db.backup(&settings.users_backup).unwrap();
     if let Err(e) = update_users(users_db) {
-        println!("error: {}", e);
+        println!("error: {e}");
         UserDb::restore(&settings.users_db, &settings.problems_db).unwrap();
     }
 }

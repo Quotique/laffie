@@ -59,7 +59,7 @@ mod tests {
     fn replace_test() {
         let mut state = statement_with_vars(r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#);
 
-        println!("{}", state);
+        println!("{state}");
         state.inpl_normalize();
         insta::assert_debug_snapshot!(state);
     }

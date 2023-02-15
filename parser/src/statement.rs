@@ -76,7 +76,7 @@ impl<'a> StatementParser<'a> {
             {
                 return Err(ParserError {
                     loc: node.data().location.clone(),
-                    msg: format!("Multiple definition of param {}", param),
+                    msg: format!("Multiple definition of param {param}"),
                 });
             }
 

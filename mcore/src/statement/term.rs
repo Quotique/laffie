@@ -99,15 +99,15 @@ impl fmt::Display for Term {
                 let s = symbol_by_id(*id).unwrap();
                 write!(f, "{}", s.name)
             }
-            Term::Param(id) => write!(f, "{}", id),
+            Term::Param(id) => write!(f, "{id}"),
             Term::Number(value) => {
                 if value.is_negative() {
-                    write!(f, "({})", value)
+                    write!(f, "({value})")
                 } else {
-                    write!(f, "{}", value)
+                    write!(f, "{value}")
                 }
             }
-            Term::Variable(id) => write!(f, "{}", id),
+            Term::Variable(id) => write!(f, "{id}"),
             Term::Placeholder(_) => write!(f, ".."),
         }
     }

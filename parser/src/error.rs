@@ -52,7 +52,7 @@ impl ParserError {
             .lines()
             .map(|x| x.to_owned())
             .enumerate()
-            .map(|(n, s)| format!("{:>count_len$}: {}", n, s))
+            .map(|(n, s)| format!("{n:>count_len$}: {s}"))
             .collect();
         let len = std::cmp::min(self.loc.len, lines[self.loc.row - 1].len() - self.loc.col);
 

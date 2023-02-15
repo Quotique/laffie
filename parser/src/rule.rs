@@ -292,9 +292,7 @@ mod tests {
             b != 0;
         }"#;
 
-        let states = lang::lang_rule(test)
-            .map_err(|e| println!("{}", e))
-            .unwrap();
+        let states = lang::lang_rule(test).map_err(|e| println!("{e}")).unwrap();
         let result = RuleParser::with(&states).parse();
         assert!(result.is_ok());
 

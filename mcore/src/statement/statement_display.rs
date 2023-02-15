@@ -64,7 +64,7 @@ fn prefix_symbol_display(symbol: Symbol, node: &StatementNode) -> String {
                 .join(", ")
         )
     } else {
-        format!("{}", symbol,)
+        format!("{symbol}")
     }
 }
 

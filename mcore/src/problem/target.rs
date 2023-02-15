@@ -26,9 +26,9 @@ pub enum Target {
 impl fmt::Debug for Target {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Target::Find(s) => write!(f, "Find: {:?}", s),
-            Target::Proof(s) => write!(f, "Proof: {:?}", s),
-            Target::Transform(s) => write!(f, "Transform {:?}", s),
+            Target::Find(s) => write!(f, "Find: {s:?}"),
+            Target::Proof(s) => write!(f, "Proof: {s:?}"),
+            Target::Transform(s) => write!(f, "Transform {s:?}"),
         }
     }
 }
@@ -36,9 +36,9 @@ impl fmt::Debug for Target {
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Target::Find(s) => write!(f, "Find: {:?}", s),
-            Target::Proof(s) => write!(f, "Proof: {:?}", s),
-            Target::Transform(s) => write!(f, "Transform {:?}", s),
+            Target::Find(s) => write!(f, "Find: {s:?}"),
+            Target::Proof(s) => write!(f, "Proof: {s:?}"),
+            Target::Transform(s) => write!(f, "Transform {s:?}"),
         }
     }
 }

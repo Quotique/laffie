@@ -53,7 +53,7 @@ fn main() {
 
     let settings = Settings::new(args.config)
         .map_err(|e| {
-            println!("Config error: {:?}", e);
+            println!("Config error: {e:?}");
             e
         })
         .unwrap_or_else(|_| {
@@ -120,7 +120,7 @@ fn main() {
                 } else {
                     "none".into()
                 },
-                filename: format!("dumps/{:x}.dump", p_id),
+                filename: format!("dumps/{p_id:x}.dump"),
             }),
         );
 
@@ -163,8 +163,5 @@ fn main() {
         }
     }
 
-    println!(
-        "Stats: solved: {} not solved: {} answer_changed: {}",
-        solved, not_solved, answer_changed
-    );
+    println!("Stats: solved: {solved} not solved: {not_solved} answer_changed: {answer_changed}",);
 }

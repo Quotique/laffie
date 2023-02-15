@@ -16,7 +16,7 @@ fn problems_list(
     let mut result = vec![];
 
     for id in user.problems_iter() {
-        if let Some(p) = problems.get(id).map_err(|e| format!("Db error {}", e))? {
+        if let Some(p) = problems.get(id).map_err(|e| format!("Db error {e}"))? {
             result.push(p);
         }
     }

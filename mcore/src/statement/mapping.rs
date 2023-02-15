@@ -240,7 +240,7 @@ impl fmt::Display for ParamsMapping {
             "{{ {} }}",
             self.params
                 .iter()
-                .map(|(x, y)| format!("{}: {}", x, y))
+                .map(|(x, y)| format!("{x}: {y}"))
                 .chain(
                     self.placeholders
                         .iter()
@@ -266,7 +266,7 @@ mod tests {
 
         let maps = ParamsMapping::mapper(statement.root(), pattern.root())
             .try_map()
-            .map_err(|e| println!("Error: {}", e))
+            .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_display_snapshot!(VecDisplay(&maps));
     }
@@ -278,7 +278,7 @@ mod tests {
 
         let maps = ParamsMapping::mapper(statement.root(), pattern.root())
             .try_map()
-            .map_err(|e| println!("Error: {}", e))
+            .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_display_snapshot!(VecDisplay(&maps));
     }
@@ -290,7 +290,7 @@ mod tests {
 
         let maps = ParamsMapping::mapper(statement.root(), pattern.root())
             .try_map()
-            .map_err(|e| println!("Error: {}", e))
+            .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_display_snapshot!(VecDisplay(&maps));
     }
@@ -302,7 +302,7 @@ mod tests {
 
         let maps = ParamsMapping::mapper(statement.root(), pattern.root())
             .try_map()
-            .map_err(|e| println!("Error: {}", e))
+            .map_err(|e| println!("Error: {e}"))
             .unwrap();
         assert_eq!(maps.len(), 1);
 
@@ -318,7 +318,7 @@ mod tests {
 
         let maps = ParamsMapping::mapper(statement.root(), pattern.root())
             .try_map()
-            .map_err(|e| println!("Error: {}", e))
+            .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_display_snapshot!(VecDisplay(&maps));
     }

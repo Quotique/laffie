@@ -68,7 +68,7 @@ async fn main() {
 
     let settings = Settings::new(matches.value_of("config").unwrap())
         .map_err(|e| {
-            println!("Config error: {:?}", e);
+            println!("Config error: {e:?}");
             e
         })
         .unwrap_or_else(|_| {
