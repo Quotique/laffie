@@ -2,8 +2,6 @@
 
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate serde_derive;
 
 pub mod predefine;
 pub mod problem;
@@ -11,8 +9,39 @@ pub mod rule;
 pub mod statement;
 pub mod utils;
 
-use std::env;
+use bincode::{Decode, Encode};
+use derive_more::{Display, From};
+
+pub use smartstring::alias::String as CompactString;
+
+#[derive(Clone, Copy, Debug, Default, Display)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(From)]
+#[derive(Decode, Encode)]
+pub struct RuleId(u64);
+
+#[derive(Clone, Copy, Debug, Default, Display)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(From)]
+#[derive(Decode, Encode)]
+pub struct SymbolId(u64);
+
+impl RuleId {
+    pub fn new(mask: u64, id: u64) -> Self {
+        Self(mask | id)
+    }
+
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
+}
+
+impl SymbolId {
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
+}
 
 pub fn version_str() -> String {
-    env!("CARGO_PKG_VERSION").to_owned()
+    std::env!("CARGO_PKG_VERSION").to_owned()
 }

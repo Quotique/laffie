@@ -9,6 +9,7 @@ use crate::{
         CompactString, MarkedStatement, NodePosition, ParamsMapping, Statement, StatementNode,
     },
     utils::VecDisplay,
+    RuleId, SymbolId,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -47,14 +48,14 @@ pub struct Suppose {
     pub resolution:   MarkedStatement,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Rule {
-    pub id:        u64,
+    pub id:        RuleId,
     pub level:     usize,
-    pub symbol_id: u64,
+    pub symbol_id: SymbolId,
 
     pub attrs: MultiMap<RuleAttr, RuleAttrValue>,
-    pub block: Vec<u64>,
+    pub block: Vec<RuleId>,
 
     pub statement: Statement,
     pub pattern:   NodePosition,
@@ -63,7 +64,7 @@ pub struct Rule {
 
     pub requirements: Vec<Statement>,
 
-    pub pattern_symbols: HashSet<u64>,
+    pub pattern_symbols: HashSet<SymbolId>,
 }
 
 impl FromStr for RuleAttr {
@@ -237,7 +238,7 @@ impl Rule {
                 replace.swap_node(&mut src[pos]);
                 src.inpl_normalize();
                 let mut resolution = MarkedStatement::from(Arc::new(src)).with_parent(arg.id);
-                resolution.blocked_rules.extend(self.block.iter());
+                resolution.blocked_rules.extend(self.block.iter().cloned());
 
                 let suppose = Suppose {
                     requirements: self

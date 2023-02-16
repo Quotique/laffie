@@ -4,6 +4,8 @@ use derive_builder::Builder;
 
 use macros::FuncAttr;
 
+use crate::SymbolId;
+
 use super::term::StatementNode;
 
 type BoxedComparator = Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>;
@@ -39,8 +41,8 @@ pub enum SymbolAttrValue {
 
 #[derive(Builder, Clone, Debug, PartialEq, Eq)]
 pub struct Symbol {
-    #[builder(default = "0")]
-    pub id:            u64,
+    #[builder(default)]
+    pub id:            SymbolId,
     #[builder(setter(into))]
     pub name:          String,
     #[builder(default)]
@@ -155,11 +157,11 @@ mod tests {
 
     #[test]
     fn by_id_test() {
-        let sym = symbol_by_id(1).unwrap();
+        let sym = symbol_by_id(1.into()).unwrap();
         assert_eq!(
             sym,
             Symbol::builder()
-                .id(1)
+                .id(1.into())
                 .name("==")
                 .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(500))
                 .with_truth_checker(Box::new(|_| TruthResult::Unknown))
@@ -174,7 +176,7 @@ mod tests {
         assert_eq!(
             sym,
             Symbol::builder()
-                .id(1)
+                .id(1.into())
                 .name("==")
                 .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(500))
                 .with_truth_checker(Box::new(|_| TruthResult::Unknown))

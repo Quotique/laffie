@@ -127,11 +127,11 @@ mod operations_tests {
     #[test]
     fn associative_nesting_remove_test() {
         // (1+2)+(1+2) -> 1+2+1+2
-        let mut test_tree = tr(Term::Symbol(2)) /
-            (tr(Term::Symbol(2)) /
+        let mut test_tree = tr(Term::Symbol(2.into())) /
+            (tr(Term::Symbol(2.into())) /
                 tr(Term::Number(Decimal::from(1))) /
                 tr(Term::Number(Decimal::from(2)))) /
-            (tr(Term::Symbol(2)) /
+            (tr(Term::Symbol(2.into())) /
                 tr(Term::Number(Decimal::from(1))) /
                 tr(Term::Number(Decimal::from(2))));
         assert!(associative_nesting_remove(&mut test_tree.root_mut()));
@@ -141,7 +141,7 @@ mod operations_tests {
     #[test]
     fn evaluate_plus_test() {
         // 1+2+5 -> 8
-        let mut test_tree1 = tr(Term::Symbol(2)) /
+        let mut test_tree1 = tr(Term::Symbol(2.into())) /
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
@@ -149,7 +149,7 @@ mod operations_tests {
         assert_eq!(test_tree1, tr(Term::Number(Decimal::from(8))));
 
         // x+1+2+5 -> x+8
-        let mut test_tree1 = tr(Term::Symbol(2)) /
+        let mut test_tree1 = tr(Term::Symbol(2.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
@@ -158,7 +158,7 @@ mod operations_tests {
         commutative_reorder(&mut test_tree1.root_mut());
         assert_eq!(
             test_tree1,
-            tr(Term::Symbol(2)) /
+            tr(Term::Symbol(2.into())) /
                 tr(Term::Variable("x".parse().unwrap())) /
                 tr(Term::Number(Decimal::from(8)))
         );
@@ -167,7 +167,7 @@ mod operations_tests {
     #[test]
     fn evaluate_multiply_test() {
         // 1*2*5 -> 10
-        let mut test_tree = tr(Term::Symbol(7)) /
+        let mut test_tree = tr(Term::Symbol(7.into())) /
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
@@ -175,7 +175,7 @@ mod operations_tests {
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(10))));
 
         // x*1*2*5 -> 10*x
-        let mut test_tree = tr(Term::Symbol(7)) /
+        let mut test_tree = tr(Term::Symbol(7.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
@@ -184,13 +184,13 @@ mod operations_tests {
         commutative_reorder(&mut test_tree.root_mut());
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(7)) /
+            tr(Term::Symbol(7.into())) /
                 tr(Term::Number(Decimal::from(10))) /
                 tr(Term::Variable("x".parse().unwrap()))
         );
 
         // x*1 -> x
-        let mut test_tree = tr(Term::Symbol(7)) /
+        let mut test_tree = tr(Term::Symbol(7.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(1)));
         assert!(test_tree.root_mut().evaluate());
@@ -200,20 +200,20 @@ mod operations_tests {
     #[test]
     fn evaluate_minus_test() {
         // 10 - 2 -> 8
-        let mut test_tree = tr(Term::Symbol(3)) /
+        let mut test_tree = tr(Term::Symbol(3.into())) /
             tr(Term::Number(Decimal::from(10))) /
             tr(Term::Number(Decimal::from(2)));
         assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(8))));
 
         // x - 2 -> x - 2
-        let mut test_tree = tr(Term::Symbol(3)) /
+        let mut test_tree = tr(Term::Symbol(3.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(2)));
         assert!(!test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(3)) /
+            tr(Term::Symbol(3.into())) /
                 tr(Term::Variable("x".parse().unwrap())) /
                 tr(Term::Number(Decimal::from(2)))
         );
@@ -222,26 +222,26 @@ mod operations_tests {
     #[test]
     fn evaluate_divide_test() {
         // 10 / 2 -> 5
-        let mut test_tree = tr(Term::Symbol(8)) /
+        let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(10))) /
             tr(Term::Number(Decimal::from(2)));
         assert!(test_tree.root_mut().evaluate());
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(5))));
 
         // x / 2 -> x / 2
-        let mut test_tree = tr(Term::Symbol(8)) /
+        let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(2)));
         assert!(!test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(8)) /
+            tr(Term::Symbol(8.into())) /
                 tr(Term::Variable("x".parse().unwrap())) /
                 tr(Term::Number(Decimal::from(2)))
         );
 
         // 2 / 5 -> 0.4
-        let mut test_tree = tr(Term::Symbol(8)) /
+        let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
         assert!(test_tree.root_mut().evaluate());
@@ -251,25 +251,25 @@ mod operations_tests {
         );
 
         // 30 / 45 -> 2/3
-        let mut test_tree = tr(Term::Symbol(8)) /
+        let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(30))) /
             tr(Term::Number(Decimal::from(45)));
         assert!(test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(8)) /
+            tr(Term::Symbol(8.into())) /
                 tr(Term::Number(Decimal::from(2))) /
                 tr(Term::Number(Decimal::from(3)))
         );
 
         // 30 / 4.5 -> 2/3
-        let mut test_tree = tr(Term::Symbol(8)) /
+        let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(30))) /
             tr(Term::Number(Decimal::from((45.into(), 1))));
         assert!(test_tree.root_mut().evaluate());
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(8)) /
+            tr(Term::Symbol(8.into())) /
                 tr(Term::Number(Decimal::from(20))) /
                 tr(Term::Number(Decimal::from(3)))
         );
@@ -317,26 +317,26 @@ mod operations_tests {
     #[test]
     fn commutative_reorder_test() {
         // 1+2+5+(2*x)+x+(2+3) -> (2+3)+(2*x)+x+1+2+5
-        let mut test_tree = tr(Term::Symbol(2)) /
+        let mut test_tree = tr(Term::Symbol(2.into())) /
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5))) /
-            (tr(Term::Symbol(7)) /
+            (tr(Term::Symbol(7.into())) /
                 tr(Term::Number(Decimal::from(2))) /
                 tr(Term::Variable("x".parse().unwrap()))) /
             tr(Term::Variable("x".parse().unwrap())) /
-            (tr(Term::Symbol(2)) /
+            (tr(Term::Symbol(2.into())) /
                 tr(Term::Number(Decimal::from(2))) /
                 tr(Term::Number(Decimal::from(3))));
 
         assert!(commutative_reorder(test_tree.root_mut().get_mut()));
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(2)) /
-                (tr(Term::Symbol(2)) /
+            tr(Term::Symbol(2.into())) /
+                (tr(Term::Symbol(2.into())) /
                     tr(Term::Number(Decimal::from(2))) /
                     tr(Term::Number(Decimal::from(3)))) /
-                (tr(Term::Symbol(7)) /
+                (tr(Term::Symbol(7.into())) /
                     tr(Term::Number(Decimal::from(2))) /
                     tr(Term::Variable("x".parse().unwrap()))) /
                 tr(Term::Variable("x".parse().unwrap())) /

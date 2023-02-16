@@ -154,6 +154,7 @@ impl Frame {
     pub fn suppose_proof(&self, suppose: &Suppose) -> bool {
         for req in suppose.requirements.iter() {
             if !self.proof(req) {
+                trace!(target: "rule_selection", "Can't proof: {}", req);
                 return false;
             }
         }
@@ -247,112 +248,63 @@ impl Frame {
 
     pub fn next_statement(
         &mut self,
-        local_rules: Vec<SharedRule>,
+        local_rules: &[SharedRule],
         index: usize,
         target: &MarkedStatement,
     ) -> Vec<MarkedStatement> {
         self.next_statement_with_filter(local_rules, index, target, |_| true)
     }
 
-    pub fn next_statement_with_statement(
-        &self,
-        mut local_rules: Vec<SharedRule>,
-        statement: &mut MarkedStatement,
-        target: &MarkedStatement,
-        filter: impl Fn(&Rule) -> bool,
-    ) -> Vec<MarkedStatement> {
-        let mut rules = self.rules_engine.suggest_rules(statement, target);
-        rules.append(&mut local_rules);
-        for shared_rule in rules {
-            let rule = shared_rule.read();
-            trace!(target: "rule_selection", "Rule: {}", rule);
-
-            if !filter(&rule) {
-                trace!(target: "rule_selection", "Rule: {} rejected by filter", rule);
-                continue;
-            }
-
-            if let Ok(result) = rule
-                .apply(statement, target)
-                .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
-            {
-                let mut res = vec![];
-                for mut sup in result {
-                    let mut proofed = true;
-                    sup.resolution.rule = Some(shared_rule.clone());
-                    if self.contains(&sup.resolution.statement) {
-                        continue;
-                    }
-
-                    trace!(target: "rule_selection", "Suppose: {}", sup);
-                    for req in sup.requirements {
-                        if !self.proof(req.as_ref()) {
-                            trace!(target: "rule_selection", "Can't proof: {} suppose rejected", req);
-                            proofed = false;
-                            break;
-                        }
-                    }
-
-                    if proofed {
-                        trace!(target: "rule_selection", "Suppose: proofed, resolution applied");
-                        res.push(sup.resolution);
-                    }
-                }
-                if !res.is_empty() {
-                    return res;
-                }
-            }
-        }
-        vec![]
-    }
-
     pub fn next_statement_with_filter(
         &mut self,
-        mut local_rules: Vec<SharedRule>,
+        local_rules: &[SharedRule],
         index: usize,
         target: &MarkedStatement,
         filter: impl Fn(&Rule) -> bool,
     ) -> Vec<MarkedStatement> {
-        let mut rules = self.rules_engine.suggest_rules(&self.stack[index], target);
-        rules.append(&mut local_rules);
-        for shared_rule in rules {
-            let rule = shared_rule.read();
-            trace!(target: "rule_selection", "Rule: {}", rule);
+        // Need to split &mut self into (&self, &mut MarkedStatement).
+        // Only list of applied rules will be chahged in MarkedStatement, so it's safe.
+        let statement: *mut MarkedStatement = &mut self.stack[index];
+        let statement: &mut MarkedStatement = unsafe { &mut *statement };
+        self.next_statement_with_statement(local_rules, statement, target, filter)
+    }
 
-            if !filter(&rule) {
-                trace!(target: "rule_selection", "Rule: {} rejected by filter", rule);
-                continue;
-            }
-
-            if let Ok(result) = rule
-                .apply(&mut self.stack[index], target)
-                .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
-            {
-                let mut res = vec![];
-                for mut sup in result {
-                    let mut proofed = true;
-                    sup.resolution.rule = Some(shared_rule.clone());
-                    if self.contains(&sup.resolution.statement) {
-                        continue;
-                    }
-
-                    trace!(target: "rule_selection", "Suppose: {}", sup);
-                    for req in sup.requirements {
-                        if !self.proof(req.as_ref()) {
-                            trace!(target: "rule_selection", "Can't proof: {} suppose rejected", req);
-                            proofed = false;
-                            break;
-                        }
-                    }
-
-                    if proofed {
-                        trace!(target: "rule_selection", "Suppose: proofed, resolution applied");
-                        res.push(sup.resolution);
-                    }
-                }
-                if !res.is_empty() {
-                    return res;
-                }
+    pub fn next_statement_with_statement(
+        &self,
+        local_rules: &[SharedRule],
+        statement: &mut MarkedStatement,
+        target: &MarkedStatement,
+        filter: impl Fn(&Rule) -> bool,
+    ) -> Vec<MarkedStatement> {
+        for (rule, supposes) in self
+            .rules_engine
+            .suggest_rules(statement, target)
+            .iter()
+            .chain(local_rules.iter())
+            .inspect(|rule| trace!(target: "rule_selection", "Rule: {}", rule))
+            .filter(|rule| filter(rule))
+            .filter_map(|rule| {
+                rule.apply(statement, target)
+                    .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
+                    .ok()
+                    .map(|supposes| (rule, supposes))
+            })
+        {
+            let res: Vec<_> = supposes
+                .into_iter()
+                .filter(|suppose| !self.contains(&suppose.resolution.statement))
+                .inspect(|suppose| trace!(target: "rule_selection", "Suppose: {}", suppose))
+                .filter(|suppose| self.suppose_proof(&suppose))
+                .inspect(
+                    |_| trace!(target: "rule_selection", "Suppose: proofed, resolution applied"),
+                )
+                .map(|mut suppose| {
+                    suppose.resolution.rule = Some(rule.clone());
+                    suppose.resolution
+                })
+                .collect();
+            if !res.is_empty() {
+                return res;
             }
         }
         vec![]

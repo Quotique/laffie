@@ -8,6 +8,8 @@ use std::{
 use eyre::Result;
 use trees::{tr, Node};
 
+use crate::SymbolId;
+
 use super::{
     index::NodePosition,
     mapping::ParamsMapping,
@@ -51,13 +53,13 @@ impl Statement {
         crate::predefine::normalize(&mut self.tree.root_mut());
     }
 
-    pub fn symbols(&self) -> HashSet<u64> {
+    pub fn symbols(&self) -> HashSet<SymbolId> {
         self.tree
             .root()
             .bfs()
             .iter
             .filter_map(|x| x.data.symbol_id())
-            .collect::<HashSet<u64>>()
+            .collect()
     }
 
     pub fn root(&self) -> &trees::Node<Term> {

@@ -3,6 +3,7 @@ use std::str::FromStr;
 use mcore::{
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
     statement::CompactString,
+    SymbolId,
 };
 
 use crate::ParserError;
@@ -11,18 +12,18 @@ use super::{statement::StatementParser, Node, Tree};
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
-    symbol_id:   u64,
+    symbol_id:   SymbolId,
 }
 
 impl<'a> RuleParser<'a> {
     pub fn with(syntax_tree: &'a Tree) -> Self {
         Self {
             syntax_tree,
-            symbol_id: 0,
+            symbol_id: Default::default(),
         }
     }
 
-    pub fn with_symbol_id(mut self, symbol_id: u64) -> Self {
+    pub fn with_symbol_id(mut self, symbol_id: SymbolId) -> Self {
         self.symbol_id = symbol_id;
         self
     }

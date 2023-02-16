@@ -6,7 +6,10 @@ pub use smartstring::alias::String as CompactString;
 use trees::{Node, Tree};
 
 use super::symbols::Symbol;
-use crate::predefine::{symbol_by_id, symbol_by_name};
+use crate::{
+    predefine::{symbol_by_id, symbol_by_name},
+    SymbolId,
+};
 
 pub type StatementTree = Tree<Term>;
 pub type StatementNode = Node<Term>;
@@ -23,7 +26,7 @@ pub struct Placeholder(u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Term {
-    Symbol(u64),
+    Symbol(SymbolId),
     Param(Param),
     Variable(Variable),
     Number(Decimal),
@@ -42,7 +45,7 @@ impl Term {
         None
     }
 
-    pub fn symbol_id(&self) -> Option<u64> {
+    pub fn symbol_id(&self) -> Option<SymbolId> {
         if let Term::Symbol(id) = self {
             return Some(*id);
         }

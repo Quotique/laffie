@@ -5,6 +5,7 @@ use multimap::MultiMap;
 use crate::{
     predefine::symbol_by_name,
     statement::{NodeMapping, NodePosition, Statement},
+    RuleId, SymbolId,
 };
 
 use super::rule::{Rule, RuleAttr, RuleAttrValue};
@@ -18,11 +19,11 @@ pub enum RuleBuilderError {
 }
 
 pub struct RuleBuilder {
-    rule_id:      u64,
+    rule_id:      RuleId,
     statement:    Option<Statement>,
     requirements: Vec<Statement>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
-    symbol_id:    u64,
+    symbol_id:    SymbolId,
 
     replaces: Vec<(RuleAttr, Statement)>,
 }
@@ -47,7 +48,7 @@ impl fmt::Display for RuleBuilderError {
 impl Default for RuleBuilder {
     fn default() -> Self {
         RuleBuilder {
-            rule_id:      0,
+            rule_id:      RuleId::default(),
             statement:    None,
             requirements: Default::default(),
             attributes:   Default::default(),
@@ -60,12 +61,12 @@ impl Default for RuleBuilder {
 }
 
 impl RuleBuilder {
-    pub fn with_id(mut self, id: u64) -> Self {
+    pub fn with_id(mut self, id: RuleId) -> Self {
         self.rule_id = id;
         self
     }
 
-    pub fn with_symbol_id(mut self, symbol_id: u64) -> Self {
+    pub fn with_symbol_id(mut self, symbol_id: SymbolId) -> Self {
         self.symbol_id = symbol_id;
         self
     }

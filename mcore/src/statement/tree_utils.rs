@@ -6,7 +6,7 @@ use std::{
 
 use trees::{tr, Node, Tree};
 
-use crate::utils::SubsetIterator;
+use crate::{utils::SubsetIterator, SymbolId};
 
 use super::{
     symbols::TruthResult,
@@ -61,15 +61,12 @@ pub trait NodeMapping {
 
     fn check_truth(&self) -> TruthResult;
 
-    fn symbols(&self) -> HashSet<u64>;
+    fn symbols(&self) -> HashSet<SymbolId>;
 }
 
 impl NodeMapping for StatementNode {
-    fn symbols(&self) -> HashSet<u64> {
-        self.bfs()
-            .iter
-            .filter_map(|x| x.data.symbol_id())
-            .collect::<HashSet<u64>>()
+    fn symbols(&self) -> HashSet<SymbolId> {
+        self.bfs().iter.filter_map(|x| x.data.symbol_id()).collect()
     }
 
     fn apply_variable_map(&mut self, variables: &VariablesMap) {

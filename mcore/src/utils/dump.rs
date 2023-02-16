@@ -4,6 +4,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use serde_derive::Deserialize;
+
 use crate::{problem::Problem, statement::MarkedStatement};
 
 #[derive(Debug, Deserialize)]
@@ -123,7 +125,7 @@ impl DumperSink for FileDumper {
                     statement
                         .rule
                         .as_ref()
-                        .map(|x| x.read().to_string())
+                        .map(|x| x.to_string())
                         .unwrap_or_default()
                 )
                 .as_bytes(),

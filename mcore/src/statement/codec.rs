@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn term_codec_test() {
         for t in &[
-            Term::Symbol(2),
+            Term::Symbol(2.into()),
             Term::Param(CompactString::from("a").into()),
             Term::Variable(CompactString::from("x").into()),
             Term::Number(Decimal::from(100)),

@@ -1,5 +1,3 @@
-use super::statement::Statement;
-use crate::rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder};
 use std::{
     collections::HashSet,
     convert::From,
@@ -8,20 +6,24 @@ use std::{
     sync::Arc,
 };
 
-use parking_lot::RwLock;
+use super::statement::Statement;
+use crate::{
+    rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
+    RuleId, SymbolId,
+};
 
 #[derive(Debug, Clone)]
 pub struct MarkedStatement {
     pub id:      usize,
     pub parents: Vec<usize>,
-    pub rule:    Option<Arc<RwLock<Rule>>>,
+    pub rule:    Option<Arc<Rule>>,
 
     pub statement: Arc<Statement>,
-    pub symbols:   HashSet<u64>,
-    as_rule:       Option<Arc<RwLock<Rule>>>,
+    pub symbols:   HashSet<SymbolId>,
+    as_rule:       Option<Arc<Rule>>,
 
-    pub applied_rules: HashSet<u64>,
-    pub blocked_rules: HashSet<u64>,
+    pub applied_rules: HashSet<RuleId>,
+    pub blocked_rules: HashSet<RuleId>,
     pub weight:        usize,
     pub replaced:      bool,
     pub simplified:    bool,
@@ -80,7 +82,7 @@ impl MarkedStatement {
         self
     }
 
-    pub fn rule(&mut self, id: u64, level: u64) -> Option<Arc<RwLock<Rule>>> {
+    pub fn rule(&mut self, id: RuleId, level: u64) -> Option<Arc<Rule>> {
         if self.not_rule {
             return None;
         }
@@ -101,7 +103,7 @@ impl MarkedStatement {
                 if let Some(rule) = rule.pop() {
                     if rule.pattern_node().data().variable().is_some() {
                         trace!("New rule: {}", rule);
-                        let rule = Arc::new(RwLock::new(rule));
+                        let rule = Arc::new(rule);
                         self.as_rule = Some(rule.clone());
                         self.blocked_rules.insert(id);
                         return Some(rule);

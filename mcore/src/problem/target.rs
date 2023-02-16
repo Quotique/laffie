@@ -172,7 +172,7 @@ impl Target {
                         return;
                     }
                     let new_states = main_frame.next_statement_with_statement(
-                        local_rules.clone(),
+                        &local_rules,
                         &mut x[index],
                         target,
                         |rule| rule.contains_attribute(&RuleAttr::Equivalence),
@@ -191,7 +191,7 @@ impl Target {
                         return;
                     }
                     let new_states = main_frame.next_statement_with_statement(
-                        local_rules.clone(),
+                        &local_rules,
                         &mut x[index],
                         target,
                         |_| true,

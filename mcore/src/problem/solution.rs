@@ -10,6 +10,7 @@ use crate::{
     rule::{RulesEngine, SharedRule},
     statement::Statement,
     utils::{Dumper, DumperSink, VecDisplay},
+    RuleId,
 };
 
 use super::{frame::Frame, problem::Problem, target::Target};
@@ -167,18 +168,16 @@ impl Solution {
                 }
             }
             if let Some(r) = self.stack[index].rule(
-                (self.local_rules.len() as u64 + 1) | 0x80_00_00_00_00_00_00_00,
+                RuleId::new(0x80_00_00_00_00_00_00_00, self.local_rules.len() as u64 + 1),
                 (level + 1) as u64,
             ) {
                 self.local_rules.push(r);
             }
 
             if !self.target.is_transform() {
-                let statements = self.stack.next_statement(
-                    self.local_rules.clone(),
-                    index,
-                    &self.problem.target,
-                );
+                let statements =
+                    self.stack
+                        .next_statement(&self.local_rules, index, &self.problem.target);
                 if statements.is_empty() {
                     self.stack[index].weight += 1;
                 }
