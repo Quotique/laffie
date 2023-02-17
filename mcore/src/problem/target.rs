@@ -8,7 +8,7 @@ use crate::{
     utils::Dumper,
 };
 
-use super::{frame::Frame, solution::MAX_LEVEL};
+use super::{cache::ProblemsCache, frame::Frame, solution::MAX_LEVEL};
 
 // TODO: remove
 #[derive(Clone, Debug)]
@@ -163,6 +163,7 @@ impl Target {
         local_rules: Vec<SharedRule>,
         main_frame: &Frame,
         target: &MarkedStatement,
+        cache: Arc<ProblemsCache>,
     ) {
         match self {
             Self::Find(_) => {}
@@ -176,6 +177,7 @@ impl Target {
                         &mut x[index],
                         target,
                         |rule| rule.contains_attribute(&RuleAttr::Equivalence),
+                        cache.clone(),
                     );
                     if new_states.is_empty() {
                         x[index].weight += 1;
@@ -195,6 +197,7 @@ impl Target {
                         &mut x[index],
                         target,
                         |_| true,
+                        cache.clone(),
                     );
 
                     if new_states.is_empty() {

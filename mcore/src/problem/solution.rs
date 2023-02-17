@@ -13,7 +13,7 @@ use crate::{
     RuleId,
 };
 
-use super::{frame::Frame, problem::Problem, target::Target};
+use super::{cache::ProblemsCache, frame::Frame, problem::Problem, target::Target};
 
 pub const MAX_SUBPROBLEM_LEVEL: usize = 10;
 pub const MAX_LEVEL: usize = 20;
@@ -31,6 +31,7 @@ pub struct Solution {
     pub problem: Problem,
 
     pub stack: Frame,
+    cache:     Arc<ProblemsCache>,
 
     local_rules: Vec<SharedRule>,
     target:      Target,
@@ -78,6 +79,7 @@ impl Solution {
                 problem.conditions.iter().cloned(),
                 problem.subproblem_level,
             ),
+            cache: Default::default(),
 
             local_rules: vec![],
             target: Target::try_from(
@@ -94,6 +96,11 @@ impl Solution {
 
             problem,
         }
+    }
+
+    pub fn with_cache(mut self, cache: Arc<ProblemsCache>) -> Self {
+        self.cache = cache;
+        self
     }
 
     pub fn answer(&self) -> Option<Arc<Statement>> {
@@ -137,10 +144,11 @@ impl Solution {
                 self.local_rules.clone(),
                 &self.stack,
                 &self.problem.target,
+                self.cache.clone(),
             );
 
             if !self.target.is_transform() {
-                if let Some(simplified) = self.stack.transform(index) {
+                if let Some(simplified) = self.stack.transform(index, self.cache.clone()) {
                     self.stack[index].replaced = true;
                     self.stack.add_condition(simplified).unwrap();
                     continue;
@@ -150,7 +158,7 @@ impl Solution {
             }
 
             if let Some(suppose) = self.target.is_answer(&self.stack[index]) {
-                if self.stack.suppose_proof(&suppose) {
+                if self.stack.suppose_proof(&suppose, self.cache.clone()) {
                     trace!("Resolution: {}", suppose.resolution);
                     if self.stack[index] == suppose.resolution {
                         trace!("Equivalence");
@@ -175,9 +183,12 @@ impl Solution {
             }
 
             if !self.target.is_transform() {
-                let statements =
-                    self.stack
-                        .next_statement(&self.local_rules, index, &self.problem.target);
+                let statements = self.stack.next_statement(
+                    &self.local_rules,
+                    index,
+                    &self.problem.target,
+                    self.cache.clone(),
+                );
                 if statements.is_empty() {
                     self.stack[index].weight += 1;
                 }

@@ -1,3 +1,4 @@
+mod cache;
 mod frame;
 mod problem;
 mod solution;
