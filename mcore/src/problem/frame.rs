@@ -20,6 +20,7 @@ use crate::{
 };
 
 use super::{
+    cache::{ProblemStatus, ProblemsCache},
     problem::ProblemBuilder,
     solution::{Solution, SolutionError},
 };
@@ -151,9 +152,9 @@ impl Frame {
             .ok_or(SolutionError::NoConditions)
     }
 
-    pub fn suppose_proof(&self, suppose: &Suppose) -> bool {
+    pub fn suppose_proof(&self, suppose: &Suppose, cache: Arc<ProblemsCache>) -> bool {
         for req in suppose.requirements.iter() {
-            if !self.proof(req) {
+            if !self.proof(req, cache.clone()) {
                 trace!(target: "rule_selection", "Can't proof: {}", req);
                 return false;
             }
@@ -161,7 +162,7 @@ impl Frame {
         true
     }
 
-    pub fn proof(&self, statement: &Statement) -> bool {
+    pub fn proof(&self, statement: &Statement, cache: Arc<ProblemsCache>) -> bool {
         if statement.root().check_truth().is_true() {
             return true;
         }
@@ -170,10 +171,21 @@ impl Frame {
         is_replace(&mut clone.root_mut());
         normalize(&mut clone.root_mut());
 
+        let proof_target = Arc::new(Statement::from(
+            tr(Term::with_symbol_name("proof").unwrap()) / clone,
+        ));
+
+        if let Some(status) = cache.status(&proof_target) {
+            match status {
+                ProblemStatus::Solved(_) => return true,
+                _ => return false,
+            }
+        }
+
+        cache.add(Statement::from(proof_target.root().deep_clone()));
+
         let subproblem = ProblemBuilder::default()
-            .with_target(MarkedStatement::from(Arc::new(Statement::from(
-                tr(Term::with_symbol_name("proof").unwrap()) / clone,
-            ))))
+            .with_target(MarkedStatement::from(proof_target.clone()))
             .expect("Can't build subproblem")
             .with_conditions(
                 self.stack
@@ -185,16 +197,23 @@ impl Frame {
             .build()
             .expect("Can't build subproblem");
         let mut solution =
-            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
+            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone())
+                .with_cache(cache.clone());
 
         if let Err(e) = solution.solve() {
             trace!("Can't proof {}: {}", statement, e);
+            cache.update_status(&proof_target, ProblemStatus::NotSolved);
             return false;
         }
+        cache.update_status(&proof_target, ProblemStatus::Solved(Arc::new(solution)));
         true
     }
 
-    pub fn transform(&mut self, index: usize) -> Option<MarkedStatement> {
+    pub fn transform(
+        &mut self,
+        index: usize,
+        cache: Arc<ProblemsCache>,
+    ) -> Option<MarkedStatement> {
         if self[index].simplified {
             return None;
         }
@@ -225,7 +244,8 @@ impl Frame {
             .build()
             .expect("Can't build subproblem");
         let mut solution =
-            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
+            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone())
+                .with_cache(cache);
 
         solution.solve().ok()?;
         let mut answer = solution.answer().unwrap().as_ref().clone();
@@ -251,8 +271,9 @@ impl Frame {
         local_rules: &[SharedRule],
         index: usize,
         target: &MarkedStatement,
+        cache: Arc<ProblemsCache>,
     ) -> Vec<MarkedStatement> {
-        self.next_statement_with_filter(local_rules, index, target, |_| true)
+        self.next_statement_with_filter(local_rules, index, target, |_| true, cache)
     }
 
     pub fn next_statement_with_filter(
@@ -261,12 +282,13 @@ impl Frame {
         index: usize,
         target: &MarkedStatement,
         filter: impl Fn(&Rule) -> bool,
+        cache: Arc<ProblemsCache>,
     ) -> Vec<MarkedStatement> {
         // Need to split &mut self into (&self, &mut MarkedStatement).
         // Only list of applied rules will be chahged in MarkedStatement, so it's safe.
         let statement: *mut MarkedStatement = &mut self.stack[index];
         let statement: &mut MarkedStatement = unsafe { &mut *statement };
-        self.next_statement_with_statement(local_rules, statement, target, filter)
+        self.next_statement_with_statement(local_rules, statement, target, filter, cache)
     }
 
     pub fn next_statement_with_statement(
@@ -275,6 +297,7 @@ impl Frame {
         statement: &mut MarkedStatement,
         target: &MarkedStatement,
         filter: impl Fn(&Rule) -> bool,
+        cache: Arc<ProblemsCache>,
     ) -> Vec<MarkedStatement> {
         for (rule, supposes) in self
             .rules_engine
@@ -294,7 +317,7 @@ impl Frame {
                 .into_iter()
                 .filter(|suppose| !self.contains(&suppose.resolution.statement))
                 .inspect(|suppose| trace!(target: "rule_selection", "Suppose: {}", suppose))
-                .filter(|suppose| self.suppose_proof(suppose))
+                .filter(|suppose| self.suppose_proof(suppose, cache.clone()))
                 .inspect(
                     |_| trace!(target: "rule_selection", "Suppose: proofed, resolution applied"),
                 )
