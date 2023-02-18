@@ -31,7 +31,7 @@ pub struct Solution {
     pub problem: Problem,
 
     pub stack: Frame,
-    cache:     Arc<ProblemsCache>,
+    cache:     Option<Arc<ProblemsCache>>,
 
     local_rules: Vec<SharedRule>,
     target:      Target,
@@ -79,7 +79,7 @@ impl Solution {
                 problem.conditions.iter().cloned(),
                 problem.subproblem_level,
             ),
-            cache: Default::default(),
+            cache: None,
 
             local_rules: vec![],
             target: Target::try_from(
@@ -98,16 +98,16 @@ impl Solution {
         }
     }
 
-    pub fn with_cache(mut self, cache: Arc<ProblemsCache>) -> Self {
-        self.cache = cache;
-        self
-    }
-
     pub fn answer(&self) -> Option<Arc<Statement>> {
         self.answer.map(|i| self.stack[i].statement.clone())
     }
 
     pub fn solve(&mut self) -> Result<(), SolutionError> {
+        self.cache = Some(Default::default());
+        self.solve_subproblem(self.cache.as_ref().unwrap().clone())
+    }
+
+    pub fn solve_subproblem(&mut self, cache: Arc<ProblemsCache>) -> Result<(), SolutionError> {
         self.stack.dumper().subproblem_start(&self.problem);
         trace!(target: "subproblem", "Subproblem: {}, {}", self.target, VecDisplay(&self.problem.conditions));
         if self.problem.subproblem_level > MAX_SUBPROBLEM_LEVEL {
@@ -115,7 +115,7 @@ impl Solution {
         }
 
         let start = Instant::now();
-        let result = self.solution_loop();
+        let result = self.solution_loop(cache);
 
         self.perf_stats.status =
             result.map(|_| (*self.stack[self.answer.unwrap()].statement).clone());
@@ -124,7 +124,7 @@ impl Solution {
         result
     }
 
-    fn solution_loop(&mut self) -> Result<(), SolutionError> {
+    fn solution_loop(&mut self, cache: Arc<ProblemsCache>) -> Result<(), SolutionError> {
         loop {
             self.perf_stats.cycles_count += 1;
 
@@ -144,11 +144,11 @@ impl Solution {
                 self.local_rules.clone(),
                 &self.stack,
                 &self.problem.target,
-                self.cache.clone(),
+                cache.clone(),
             );
 
             if !self.target.is_transform() {
-                if let Some(simplified) = self.stack.transform(index, self.cache.clone()) {
+                if let Some(simplified) = self.stack.transform(index, cache.clone()) {
                     self.stack[index].replaced = true;
                     self.stack.add_condition(simplified).unwrap();
                     continue;
@@ -158,7 +158,7 @@ impl Solution {
             }
 
             if let Some(suppose) = self.target.is_answer(&self.stack[index]) {
-                if self.stack.suppose_proof(&suppose, self.cache.clone()) {
+                if self.stack.suppose_proof(&suppose, cache.clone()).is_some() {
                     trace!("Resolution: {}", suppose.resolution);
                     if self.stack[index] == suppose.resolution {
                         trace!("Equivalence");
@@ -187,7 +187,7 @@ impl Solution {
                     &self.local_rules,
                     index,
                     &self.problem.target,
-                    self.cache.clone(),
+                    cache.clone(),
                 );
                 if statements.is_empty() {
                     self.stack[index].weight += 1;

@@ -116,9 +116,8 @@ impl Frame {
         self.dumper.add_statement(
             &statement,
             &statement
-                .parents
-                .first()
-                .map(|id| self.stack[*id].clone())
+                .parent
+                .map(|id| self.stack[id].clone())
                 .unwrap_or_else(|| MarkedStatement::from(Arc::new(Statement::zero()))),
         );
 
@@ -152,21 +151,29 @@ impl Frame {
             .ok_or(SolutionError::NoConditions)
     }
 
-    pub fn suppose_proof(&self, suppose: &Suppose, cache: Arc<ProblemsCache>) -> bool {
+    pub fn suppose_proof(
+        &self,
+        suppose: &Suppose,
+        cache: Arc<ProblemsCache>,
+    ) -> Option<Vec<Arc<Statement>>> {
+        let mut result = vec![];
         for req in suppose.requirements.iter() {
-            if !self.proof(req, cache.clone()) {
+            if let Some(proofed) = self.proof(req, cache.clone()) {
+                result.push(proofed);
+            } else {
                 trace!(target: "rule_selection", "Can't proof: {}", req);
-                return false;
+                return None;
             }
         }
-        true
+        Some(result)
     }
 
-    pub fn proof(&self, statement: &Statement, cache: Arc<ProblemsCache>) -> bool {
-        if statement.root().check_truth().is_true() {
-            return true;
-        }
-
+    // Returns proof target (is a key for problems cache)
+    pub fn proof(
+        &self,
+        statement: &Statement,
+        cache: Arc<ProblemsCache>,
+    ) -> Option<Arc<Statement>> {
         let mut clone = statement.root().deep_clone();
         is_replace(&mut clone.root_mut());
         normalize(&mut clone.root_mut());
@@ -175,10 +182,14 @@ impl Frame {
             tr(Term::with_symbol_name("proof").unwrap()) / clone,
         ));
 
+        if statement.root().check_truth().is_true() {
+            return Some(proof_target);
+        }
+
         if let Some(status) = cache.status(&proof_target) {
             match status {
-                ProblemStatus::Solved(_) => return true,
-                _ => return false,
+                ProblemStatus::Solved(_) => return Some(proof_target),
+                _ => return None,
             }
         }
 
@@ -197,16 +208,15 @@ impl Frame {
             .build()
             .expect("Can't build subproblem");
         let mut solution =
-            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone())
-                .with_cache(cache.clone());
+            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
 
-        if let Err(e) = solution.solve() {
+        if let Err(e) = solution.solve_subproblem(cache.clone()) {
             trace!("Can't proof {}: {}", statement, e);
             cache.update_status(&proof_target, ProblemStatus::NotSolved);
-            return false;
+            return None;
         }
         cache.update_status(&proof_target, ProblemStatus::Solved(Arc::new(solution)));
-        true
+        Some(proof_target)
     }
 
     pub fn transform(
@@ -244,10 +254,9 @@ impl Frame {
             .build()
             .expect("Can't build subproblem");
         let mut solution =
-            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone())
-                .with_cache(cache);
+            Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
 
-        solution.solve().ok()?;
+        solution.solve_subproblem(cache.clone()).ok()?;
         let mut answer = solution.answer().unwrap().as_ref().clone();
         if answer_wrap {
             let mut tmp = tr(Term::with_symbol_name("answer").unwrap());
@@ -255,13 +264,14 @@ impl Frame {
             answer.root_mut().push_back(tmp);
         }
 
-        if solution.solve().is_err() || *self[index].statement == answer {
+        // TODO: remove second call of solver!
+        if solution.solve_subproblem(cache).is_err() || *self[index].statement == answer {
             return None;
         }
         let mut result = MarkedStatement::from(Arc::new(answer));
         result.blocked_rules = self[index].blocked_rules.clone();
         result.simplified = true;
-        result.parents = vec![self[index].id];
+        result.parent = Some(self[index].id);
 
         Some(result)
     }
@@ -317,7 +327,14 @@ impl Frame {
                 .into_iter()
                 .filter(|suppose| !self.contains(&suppose.resolution.statement))
                 .inspect(|suppose| trace!(target: "rule_selection", "Suppose: {}", suppose))
-                .filter(|suppose| self.suppose_proof(suppose, cache.clone()))
+                .filter_map(|mut suppose| {
+                    if let Some(proofed) = self.suppose_proof(&suppose, cache.clone()) {
+                        suppose.resolution.requirements = proofed;
+                        Some(suppose)
+                    } else {
+                        None
+                    }
+                })
                 .inspect(
                     |_| trace!(target: "rule_selection", "Suppose: proofed, resolution applied"),
                 )

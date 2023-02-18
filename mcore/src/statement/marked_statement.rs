@@ -14,9 +14,10 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct MarkedStatement {
-    pub id:      usize,
-    pub parents: Vec<usize>,
-    pub rule:    Option<Arc<Rule>>,
+    pub id:           usize,
+    pub parent:       Option<usize>,
+    pub rule:         Option<Arc<Rule>>,
+    pub requirements: Vec<Arc<Statement>>,
 
     pub statement: Arc<Statement>,
     pub symbols:   HashSet<SymbolId>,
@@ -33,9 +34,10 @@ pub struct MarkedStatement {
 impl From<Arc<Statement>> for MarkedStatement {
     fn from(value: Arc<Statement>) -> Self {
         Self {
-            id:      0,
-            parents: vec![],
-            rule:    None,
+            id:           0,
+            parent:       None,
+            rule:         None,
+            requirements: Default::default(),
 
             symbols:   value.symbols(),
             statement: value,
@@ -73,12 +75,14 @@ impl Eq for MarkedStatement {}
 
 impl MarkedStatement {
     pub fn with_parent(mut self, id: usize) -> Self {
-        self.parents.push(id);
+        if self.parent.replace(id).is_some() {
+            warn!("parent replacement");
+        }
         self
     }
 
     pub fn without_parents(mut self) -> Self {
-        self.parents.clear();
+        self.parent.take();
         self
     }
 
