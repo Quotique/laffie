@@ -6,6 +6,16 @@ use database::ProblemRecord;
 
 pub struct Text;
 
+#[cfg(target_os = "linux")]
+fn get_cpu_freq() -> f32 {
+    cpu_freq::get()[0].max.unwrap()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn get_cpu_freq() -> f32 {
+    f32::NAN
+}
+
 impl Text {
     pub fn system() -> String {
         format!(
@@ -13,7 +23,7 @@ impl Text {
             sys_info::os_type().unwrap(),
             sys_info::os_release().unwrap(),
             env::consts::ARCH,
-            cpu_freq::get()[0].max.unwrap(),
+            get_cpu_freq()
         )
     }
 

@@ -25,7 +25,7 @@ peg::parser! {
 
         rule line_comment() = "//" (!"\n" [_])* ("\n" / ![_])
 
-        rule whitespace_char() = ['\t' | ' ']
+        rule whitespace_char() = ['\t' | '\r' | ' ']
 
         rule _() = quiet!{ (whitespace_char() / "\n" / line_comment())* }
 

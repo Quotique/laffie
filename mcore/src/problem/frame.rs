@@ -294,7 +294,7 @@ impl Frame {
                 .into_iter()
                 .filter(|suppose| !self.contains(&suppose.resolution.statement))
                 .inspect(|suppose| trace!(target: "rule_selection", "Suppose: {}", suppose))
-                .filter(|suppose| self.suppose_proof(&suppose))
+                .filter(|suppose| self.suppose_proof(suppose))
                 .inspect(
                     |_| trace!(target: "rule_selection", "Suppose: proofed, resolution applied"),
                 )
