@@ -9,26 +9,33 @@ pub struct Console<'a>(pub &'a Solution);
 impl<'a> fmt::Display for Console<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(a) = self.0.answer {
+            // for (i, s) in self.0.stack.iter().enumerate() {
+            //     println!(
+            //         "{} {} {:?} {}",
+            //         i,
+            //         s.statement,
+            //         s.parent,
+            //         if i == a { "*" } else { "" }
+            //     );
+            // }
             let mut trace: Vec<usize> = vec![a];
 
             while let Some(parent) = self.0.stack[*trace.last().unwrap()].parent {
                 trace.push(parent);
             }
 
-            let mut parent = trace.pop().unwrap();
+            let mut parent = None;
             while let Some(id) = trace.pop() {
                 writeln!(
                     f,
                     "\n{} [requirements: {}]\n=> {}",
-                    self.0.stack[parent]
-                        .statement
-                        .to_string()
-                        .underline()
-                        .bold(),
+                    parent
+                        .map(|x| self.0.stack[x].statement.to_string().underline().bold())
+                        .unwrap_or("".into()),
                     VecDisplay(&self.0.stack[id].requirements),
                     self.0.stack[id].statement.to_string().bold().yellow()
                 )?;
-                parent = id;
+                parent = Some(id);
             }
             writeln!(
                 f,
