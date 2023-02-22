@@ -15,15 +15,19 @@ impl<'a> fmt::Display for Html<'a> {
                 trace.push(parent);
             }
 
-            let mut parent = trace.pop().unwrap();
+            let mut parent = None;
             while let Some(id) = trace.pop() {
                 writeln!(
                     f,
                     "\n<u>{}</u>\n<b>{}</b>",
-                    encode_text(&self.0.stack[parent].statement.to_string()),
+                    encode_text(
+                        &parent
+                            .map(|x| self.0.stack[x].statement.to_string())
+                            .unwrap_or(String::default())
+                    ),
                     encode_text(&self.0.stack[id].statement.to_string())
                 )?;
-                parent = id;
+                parent = Some(id);
             }
             writeln!(
                 f,

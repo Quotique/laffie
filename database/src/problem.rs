@@ -81,6 +81,7 @@ impl From<&Problem> for ProblemRecord {
     }
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<Problem> for ProblemRecord {
     fn into(self) -> Problem {
         Problem {

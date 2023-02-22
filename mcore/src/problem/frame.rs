@@ -239,10 +239,11 @@ impl Frame {
                 (false, self[index].statement.root().deep_clone())
             };
 
+        let problem = Arc::new(Statement::from(
+            tr(Term::with_symbol_name("transform").unwrap()) / to_transform,
+        ));
         let subproblem = ProblemBuilder::default()
-            .with_target(MarkedStatement::from(Arc::new(Statement::from(
-                tr(Term::with_symbol_name("transform").unwrap()) / to_transform,
-            ))))
+            .with_target(MarkedStatement::from(problem.clone()))
             .expect("Can't build subproblem")
             .with_conditions(
                 self.stack
@@ -256,7 +257,7 @@ impl Frame {
         let mut solution =
             Solution::new(subproblem, self.rules_engine.clone(), self.dumper.clone());
 
-        solution.solve_subproblem(cache.clone()).ok()?;
+        solution.solve_subproblem(cache).ok()?;
         let mut answer = solution.answer().unwrap().as_ref().clone();
         if answer_wrap {
             let mut tmp = tr(Term::with_symbol_name("answer").unwrap());
@@ -264,14 +265,14 @@ impl Frame {
             answer.root_mut().push_back(tmp);
         }
 
-        // TODO: remove second call of solver!
-        if solution.solve_subproblem(cache).is_err() || *self[index].statement == answer {
+        if *self[index].statement == answer {
             return None;
         }
         let mut result = MarkedStatement::from(Arc::new(answer));
         result.blocked_rules = self[index].blocked_rules.clone();
         result.simplified = true;
         result.parent = Some(self[index].id);
+        result.requirements.push(problem);
 
         Some(result)
     }
