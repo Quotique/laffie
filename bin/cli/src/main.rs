@@ -128,7 +128,7 @@ fn main() {
             Ok(_) => {
                 solved += 1;
                 println!(
-                    "{} {}",
+                    "{}\n{}",
                     "Solution:".italic().blue(),
                     View::try_from(&solution).unwrap()
                 );
@@ -151,7 +151,7 @@ fn main() {
             Err(e) => {
                 not_solved += 1;
                 println!(
-                    "{} {} {}",
+                    "{} {}\n{}",
                     "Solution:".italic().blue(),
                     e.to_string().red(),
                     View::try_from(&solution).unwrap()
