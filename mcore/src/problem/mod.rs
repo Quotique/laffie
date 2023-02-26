@@ -5,9 +5,11 @@ mod solution;
 mod target;
 
 pub use self::{
+    cache::ProblemsCache,
     frame::Frame,
     problem::{Problem, ProblemBuilder},
     solution::{Solution, SolveStatus},
+    target::Target,
 };
 
 #[cfg(test)]

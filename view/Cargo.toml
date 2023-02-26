@@ -9,4 +9,5 @@ edition = "2021"
 mcore = { path = "../mcore/" }
 
 colored = "1.9"
+eyre = "0.6"
 html-escape = "0.2.9"

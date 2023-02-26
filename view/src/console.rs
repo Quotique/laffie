@@ -2,54 +2,70 @@ use std::fmt;
 
 use colored::*;
 
-use mcore::{problem::Solution, utils::VecDisplay};
+use mcore::{
+    problem::{Frame, SolveStatus, Target},
+    statement::{MarkedStatement, Statement},
+    utils::VecDisplay,
+};
 
-pub struct Console<'a>(pub &'a Solution);
+use crate::Renderer;
 
-impl<'a> fmt::Display for Console<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(a) = self.0.answer {
-            // for (i, s) in self.0.stack.iter().enumerate() {
-            //     println!(
-            //         "{} {} {:?} {}",
-            //         i,
-            //         s.statement,
-            //         s.parent,
-            //         if i == a { "*" } else { "" }
-            //     );
-            // }
-            let mut trace: Vec<usize> = vec![a];
+pub struct Console<'a, 'b> {
+    pub output: &'a mut fmt::Formatter<'b>,
+}
 
-            while let Some(parent) = self.0.stack[*trace.last().unwrap()].parent {
-                trace.push(parent);
-            }
+impl<'a, 'b> Renderer for Console<'a, 'b> {
+    fn display_target(&mut self, subproblem_level: usize, target: &Target) -> fmt::Result {
+        writeln!(self.output, "{}{target}", "  ".repeat(subproblem_level))
+    }
 
-            let mut parent = None;
-            while let Some(id) = trace.pop() {
-                writeln!(
-                    f,
-                    "\n{} [requirements: {}]\n=> {}",
-                    parent
-                        .map(|x| self.0.stack[x].statement.to_string().underline().bold())
-                        .unwrap_or("".into()),
-                    VecDisplay(&self.0.stack[id].requirements),
-                    self.0.stack[id].statement.to_string().bold().yellow()
-                )?;
-                parent = Some(id);
-            }
+    fn display_statement(
+        &mut self,
+        subproblem_level: usize,
+        statement: &MarkedStatement,
+    ) -> fmt::Result {
+        writeln!(
+            self.output,
+            "{}=> {} from: {}",
+            "  ".repeat(subproblem_level),
+            statement.statement.to_string().bold().yellow(),
+            VecDisplay(&statement.requirements),
+        )
+    }
+
+    fn display_answer(
+        &mut self,
+        target: &Target,
+        answer: Option<&Statement>,
+        status: &SolveStatus,
+    ) -> fmt::Result {
+        if let Some(answer) = answer.as_ref() {
             writeln!(
-                f,
+                self.output,
                 "{} {}",
-                "SOLVED!".green(),
+                match target {
+                    Target::Find(_) | Target::Transform(_) => {
+                        format!("{} {answer}", "Answer:".green()).bold()
+                    }
+                    Target::Proof(_) => {
+                        "PROOFED!".bold().green()
+                    }
+                },
                 format!(
                     "[{} cycles, {}ms]",
-                    self.0.perf_stats.cycles_count, self.0.perf_stats.absolute_time
+                    status.cycles_count, status.absolute_time
                 )
                 .yellow()
             )
         } else {
-            writeln!(f)?;
-            writeln!(f, "{}", "NOT SOLVED!".bold().blink().red())
+            writeln!(self.output, "{}", "NOT SOLVED!".bold().blink().red())
         }
+    }
+
+    fn dump_frame(&mut self, frame: &Frame) -> fmt::Result {
+        for (i, s) in frame.iter().enumerate() {
+            writeln!(self.output, "{i} {} {:?}", s.statement, s.parent)?;
+        }
+        Ok(())
     }
 }

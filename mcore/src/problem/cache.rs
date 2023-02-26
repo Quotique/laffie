@@ -18,6 +18,15 @@ pub struct ProblemsCache {
     problems: RwLock<HashMap<Statement, ProblemStatus>>,
 }
 
+impl ProblemStatus {
+    pub fn solution(&self) -> Option<Arc<Solution>> {
+        match self {
+            ProblemStatus::Solved(solution) => Some(solution.clone()),
+            _ => None,
+        }
+    }
+}
+
 impl ProblemsCache {
     pub fn contains(&self, target: &Statement) -> bool {
         self.problems.read().contains_key(target)
