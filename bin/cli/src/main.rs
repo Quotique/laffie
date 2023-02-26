@@ -3,7 +3,7 @@
 
 mod settings;
 
-use std::{path::PathBuf, sync::Arc};
+use std::{convert::TryFrom, path::PathBuf, sync::Arc};
 
 use clap::Parser;
 use colored::*;
@@ -14,7 +14,7 @@ use mcore::{
     utils::{log_init, Dumper, DumperConfig, VecDisplay},
 };
 use parser::DirectoryParser;
-use view::Console;
+use view::View;
 
 use crate::settings::Settings;
 
@@ -127,7 +127,11 @@ fn main() {
         match solution.solve() {
             Ok(_) => {
                 solved += 1;
-                println!("{} {}", "Solution:".italic().blue(), Console(&solution));
+                println!(
+                    "{} {}",
+                    "Solution:".italic().blue(),
+                    View::try_from(&solution).unwrap()
+                );
                 if let Some(prev) = record.runs.last() {
                     if let (Ok(prev_answer), Ok(answer)) =
                         (&prev.status, &solution.perf_stats.status)
@@ -150,7 +154,7 @@ fn main() {
                     "{} {} {}",
                     "Solution:".italic().blue(),
                     e.to_string().red(),
-                    Console(&solution)
+                    View::try_from(&solution).unwrap()
                 );
             }
         };

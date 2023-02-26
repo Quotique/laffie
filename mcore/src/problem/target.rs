@@ -28,7 +28,7 @@ impl fmt::Debug for Target {
         match self {
             Target::Find(s) => write!(f, "Find: {s:?}"),
             Target::Proof(s) => write!(f, "Proof: {s:?}"),
-            Target::Transform(s) => write!(f, "Transform {s:?}"),
+            Target::Transform(s) => write!(f, "Transform: {s:?}"),
         }
     }
 }
@@ -36,9 +36,9 @@ impl fmt::Debug for Target {
 impl fmt::Display for Target {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Target::Find(s) => write!(f, "Find: {s:?}"),
-            Target::Proof(s) => write!(f, "Proof: {s:?}"),
-            Target::Transform(s) => write!(f, "Transform {s:?}"),
+            Target::Find(s) => write!(f, "Find: {s}"),
+            Target::Proof(s) => write!(f, "Proof: {}", s[0]),
+            Target::Transform(s) => write!(f, "Transform: {}", s[0]),
         }
     }
 }
@@ -93,15 +93,19 @@ impl Target {
             statement_root.data().is_symbol_name("answer") &&
             statement_root.degree() == 1
         {
+            let mut resolution = MarkedStatement::from(Arc::from(Statement::from(
+                (*statement.statement)
+                    .clone()
+                    .root_mut()
+                    .pop_front()
+                    .unwrap(),
+            )));
+            if let Some(parent) = statement.parent.clone() {
+                resolution = resolution.with_parent(parent);
+            }
             return Some(Suppose {
                 requirements: vec![],
-                resolution:   MarkedStatement::from(Arc::from(Statement::from(
-                    (*statement.statement)
-                        .clone()
-                        .root_mut()
-                        .pop_front()
-                        .unwrap(),
-                ))),
+                resolution,
             });
         }
 
@@ -137,7 +141,7 @@ impl Target {
                     if i.statement.root().check_truth().is_true() {
                         return Some(Suppose {
                             requirements: vec![],
-                            resolution:   statement.clone(),
+                            resolution:   i.clone().without_parents(),
                         });
                     }
                 }

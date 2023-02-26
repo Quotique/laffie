@@ -31,10 +31,10 @@ pub struct Solution {
     pub problem: Problem,
 
     pub stack: Frame,
-    cache:     Option<Arc<ProblemsCache>>,
+    pub cache: Option<Arc<ProblemsCache>>,
 
     local_rules: Vec<SharedRule>,
-    target:      Target,
+    pub target:  Target,
     pub answer:  Option<usize>,
 
     pub perf_stats: SolveStatus,
@@ -157,14 +157,13 @@ impl Solution {
                 }
             }
 
-            if let Some(mut suppose) = self.target.is_answer(&self.stack[index]) {
+            if let Some(suppose) = self.target.is_answer(&self.stack[index]) {
                 if self.stack.suppose_proof(&suppose, cache.clone()).is_some() {
                     trace!("Resolution: {}", suppose.resolution);
                     if self.stack[index] == suppose.resolution {
                         trace!("Equivalence");
                         self.answer = Some(index);
                     } else {
-                        suppose.resolution.parent = Some(index);
                         let _ = self.stack.add_condition(suppose.resolution.clone());
                         self.answer = Some(self.stack.find(&suppose.resolution.statement).unwrap());
                     }
