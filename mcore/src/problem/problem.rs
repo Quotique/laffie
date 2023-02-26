@@ -80,15 +80,14 @@ impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{{id: {:x}, contitions: [{}], target: {}, subproblem_level: {} }}",
+            "{:x} {}\n  {}",
             self.id,
+            self.target,
             self.conditions
                 .iter()
                 .map(|x| x.statement.to_string())
                 .collect::<Vec<String>>()
-                .join(";"),
-            self.target,
-            self.subproblem_level,
+                .join("\n  "),
         )
     }
 }
