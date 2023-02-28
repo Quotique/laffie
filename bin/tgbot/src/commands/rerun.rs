@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::{convert::TryFrom, fmt::Write, str::FromStr, sync::Arc};
 
 use rust_i18n::t;
 use telegram_bot::*;
@@ -10,16 +10,17 @@ use mcore::{
     statement::term::CompactString,
     utils::{Dumper, DumperConfig},
 };
-use view::Html;
+use view::{Html, View};
 
 use super::Command;
+use crate::pagination::Paginator;
 
 fn rerun(
     problem_id: CompactString,
     engine: Arc<RulesEngine>,
     problems: Arc<ProblemDb>,
     _user: &mut UserRecord,
-) -> Result<String, String> {
+) -> Result<Paginator, String> {
     let problem_id: u128 = u128::from_str(&problem_id).map_err(|e| e.to_string())?;
 
     let mut record = problems
@@ -35,14 +36,25 @@ fn rerun(
         }),
     );
 
-    let result = match solution.solve() {
-        Ok(_) => format!("{} {}", "Solution:", Html(&solution)),
-        Err(e) => format!("{} {} {}", "Solution:", e, Html(&solution)),
-    };
+    let mut output = Paginator::new(4096);
+    output
+        .write_str(&match solution.solve() {
+            Ok(_) => format!("{} ", "Solution:"),
+            Err(e) => format!("{} {} ", "Solution:", e,),
+        })
+        .map_err(|e| format!("error {e}"))?;
+
+    View::try_from(&solution)
+        .unwrap()
+        .display_impl(&mut Html {
+            output: &mut output,
+        })
+        .unwrap();
+
     record.runs.push(solution.perf_stats.clone());
     problems.put(&record)?;
 
-    Ok(result)
+    Ok(output)
 }
 
 pub async fn handler(
@@ -59,10 +71,18 @@ pub async fn handler(
         .unwrap_or_else(|| UserRecord::new(user_id));
 
     match rerun(command.args, engine.clone(), problems.clone(), &mut user) {
-        Ok(s) | Err(s) => api
-            .send(command.chat_id.text(s).parse_mode(ParseMode::Html))
-            .await
-            .unwrap(),
+        Ok(s) => {
+            for i in s.iter() {
+                api.send(command.chat_id.text(i).parse_mode(ParseMode::Html))
+                    .await
+                    .unwrap();
+            }
+        }
+        Err(s) => {
+            api.send(command.chat_id.text(s).parse_mode(ParseMode::Html))
+                .await
+                .unwrap();
+        }
     };
 
     users.put(&user).unwrap();

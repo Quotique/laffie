@@ -111,7 +111,7 @@ impl<'a> View<'a> {
         Ok(())
     }
 
-    fn display_impl(&self, renderer: &mut dyn Renderer) -> fmt::Result {
+    pub fn display_impl(&self, renderer: &mut dyn Renderer) -> fmt::Result {
         if let Some(a) = self.solution.answer {
             self.display_target(
                 &self.solution.target,
