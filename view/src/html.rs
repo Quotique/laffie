@@ -2,41 +2,71 @@ use std::fmt;
 
 use html_escape::encode_text;
 
-use mcore::problem::Solution;
+use mcore::{
+    problem::{Frame, SolveStatus, Target},
+    statement::{MarkedStatement, Statement},
+    utils::VecDisplay,
+};
 
-pub struct Html<'a>(pub &'a Solution);
+use crate::Renderer;
 
-impl<'a> fmt::Display for Html<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(a) = self.0.answer {
-            let mut trace: Vec<usize> = vec![a];
+pub struct Html<'a> {
+    pub output: &'a mut dyn fmt::Write,
+}
 
-            while let Some(parent) = self.0.stack[*trace.last().unwrap()].parent {
-                trace.push(parent);
-            }
+impl<'a> Renderer for Html<'a> {
+    fn display_target(&mut self, subproblem_level: usize, target: &Target) -> fmt::Result {
+        self.output.write_str(&format!(
+            "{}{}\n",
+            "  ".repeat(subproblem_level),
+            encode_text(&target.to_string())
+        ))
+    }
 
-            let mut parent = None;
-            while let Some(id) = trace.pop() {
-                writeln!(
-                    f,
-                    "\n<u>{}</u>\n<b>{}</b>",
-                    encode_text(
-                        &parent
-                            .map(|x| self.0.stack[x].statement.to_string())
-                            .unwrap_or(String::default())
-                    ),
-                    encode_text(&self.0.stack[id].statement.to_string())
-                )?;
-                parent = Some(id);
-            }
-            writeln!(
-                f,
-                "<b>SOLVED!</b> [{} cycles, {}ms]",
-                self.0.perf_stats.cycles_count, self.0.perf_stats.absolute_time
-            )
+    fn display_statement(
+        &mut self,
+        subproblem_level: usize,
+        statement: &MarkedStatement,
+    ) -> fmt::Result {
+        self.output.write_str(&format!(
+            "{}=> <b>{}</b>\n",
+            "  ".repeat(subproblem_level),
+            encode_text(&statement.statement.to_string()),
+        ))
+    }
+
+    fn display_answer(
+        &mut self,
+        target: &Target,
+        answer: Option<&Statement>,
+        status: &SolveStatus,
+    ) -> fmt::Result {
+        if let Some(answer) = answer.as_ref() {
+            self.output.write_str(&format!(
+                "{} {}\n",
+                match target {
+                    Target::Find(_) | Target::Transform(_) => {
+                        format!("<b>Answer:</b> {}", encode_text(&answer.to_string()))
+                    }
+                    Target::Proof(_) => {
+                        "<b>PROOFED!</b>".to_owned()
+                    }
+                },
+                format!(
+                    "[{} cycles, {}ms]",
+                    status.cycles_count, status.absolute_time
+                )
+            ))
         } else {
-            writeln!(f)?;
-            writeln!(f, "<b>NOT SOLVED!</b>")
+            self.output.write_str("<b>NOT SOLVED!</b>\n")
         }
+    }
+
+    fn dump_frame(&mut self, frame: &Frame) -> fmt::Result {
+        for (i, s) in frame.iter().enumerate() {
+            self.output
+                .write_str(&format!("{i} {} {:?}\n", s.statement, s.parent))?;
+        }
+        Ok(())
     }
 }

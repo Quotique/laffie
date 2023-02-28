@@ -1,4 +1,5 @@
 mod commands;
+mod pagination;
 mod settings;
 mod text;
 
