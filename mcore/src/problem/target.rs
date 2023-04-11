@@ -100,7 +100,7 @@ impl Target {
                     .pop_front()
                     .unwrap(),
             )));
-            if let Some(parent) = statement.parent.clone() {
+            if let Some(parent) = statement.parent {
                 resolution = resolution.with_parent(parent);
             }
             return Some(Suppose {

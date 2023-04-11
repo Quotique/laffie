@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 mcore = { path = "../mcore/" }
 
-colored = "1.9"
+colored = "2"
 eyre = "0.6"
 html-escape = "0.2"

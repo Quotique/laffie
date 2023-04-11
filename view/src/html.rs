@@ -5,7 +5,6 @@ use html_escape::encode_text;
 use mcore::{
     problem::{Frame, SolveStatus, Target},
     statement::{MarkedStatement, Statement},
-    utils::VecDisplay,
 };
 
 use crate::Renderer;
@@ -52,7 +51,7 @@ impl<'a> Renderer for Html<'a> {
                         "<b>PROOFED!</b>".to_owned()
                     }
                 },
-                format!(
+                format_args!(
                     "[{} cycles, {}ms]",
                     status.cycles_count, status.absolute_time
                 )

@@ -24,7 +24,7 @@ parking_lot = "0.11"
 regex = "1"
 serde_derive = "1.0"
 serde = "1.0"
-smartstring = "0.2"
+smartstring = "1"
 trees = "0.4"
 
 [dev-dependencies]

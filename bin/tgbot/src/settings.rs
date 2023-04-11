@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use config::{Config, ConfigError, File};
+use config::{Config, ConfigError, File, FileFormat};
 use serde_derive::Deserialize;
 
 use mcore::utils::LogConfig;
@@ -16,10 +16,9 @@ pub struct Settings {
 
 impl Settings {
     pub fn new(file_name: &str) -> Result<Self, ConfigError> {
-        let mut s = Config::new();
-
-        s.merge(File::with_name(file_name)).unwrap();
-
-        s.try_into()
+        Config::builder()
+            .add_source(File::new(file_name, FileFormat::Json))
+            .build()?
+            .try_deserialize()
     }
 }
