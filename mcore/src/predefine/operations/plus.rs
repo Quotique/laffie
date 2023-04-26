@@ -148,9 +148,10 @@ fn attach_constant(root: &mut StatementNode, constant: Decimal) {
 fn merge_mul_const(mut root: Tree<Term>, d: Decimal) -> Tree<Term> {
     if d == Decimal::from(1) {
         return root;
-    }
-    if d == Decimal::from(0) {
+    } else if d == Decimal::from(0) {
         return tr(Term::Number(Decimal::from(0)));
+    } else if d == Decimal::from(-1) {
+        return tr(Term::with_symbol_name("-").unwrap()) / root;
     }
     if d == Decimal::from(-1) {
         return tr(Term::with_symbol_name("-").unwrap()) / root;
