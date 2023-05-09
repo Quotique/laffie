@@ -6,7 +6,7 @@ use std::{
 
 use trees::{tr, Node, Tree};
 
-use crate::{utils::SubsetIterator, SymbolId};
+use crate::{utils::SubsetIterator, NormalizationLevel, SymbolId};
 
 use super::{
     symbols::TruthResult,
@@ -57,7 +57,7 @@ pub trait NodeMapping {
 
     fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = StatementTree> + '_>;
 
-    fn evaluate(&mut self) -> bool;
+    fn evaluate(&mut self, level: NormalizationLevel) -> bool;
 
     fn check_truth(&self) -> TruthResult;
 
@@ -116,9 +116,9 @@ impl NodeMapping for StatementNode {
         }))
     }
 
-    fn evaluate(&mut self) -> bool {
+    fn evaluate(&mut self, level: NormalizationLevel) -> bool {
         if let Some(symbol) = &self.data().symbol() {
-            return symbol.evaluate(self);
+            return symbol.evaluate(self, level);
         }
         false
     }

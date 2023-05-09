@@ -9,7 +9,7 @@ use crate::{
         CompactString, MarkedStatement, NodePosition, ParamsMapping, Statement, StatementNode,
     },
     utils::VecDisplay,
-    RuleId, SymbolId,
+    NormalizationLevel, RuleId, SymbolId,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -23,6 +23,7 @@ pub enum RuleAttr {
     One,
     Block,
     Id,
+    Normalize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -81,6 +82,7 @@ impl FromStr for RuleAttr {
             "one" => Ok(RuleAttr::One),
             "id" => Ok(RuleAttr::Id),
             "block" => Ok(RuleAttr::Block),
+            "normalize" => Ok(RuleAttr::Normalize),
             _ => bail!(""),
         }
     }
@@ -213,9 +215,10 @@ impl Rule {
                     .map(|r| Arc::new(r.apply_map(x)))
                     .collect(),
                 resolution:   MarkedStatement::from(Arc::new(
+                    // TODO: normalization level
                     Statement::from(self.replace_node().deep_clone())
                         .apply_map(x)
-                        .normalize(),
+                        .normalize(NormalizationLevel::max()),
                 ))
                 .with_parent(arg.id),
             })
@@ -236,7 +239,8 @@ impl Rule {
                 let mut replace = replace.apply_map(&self.binds).apply_map(i);
                 let mut src = (*arg.statement).clone();
                 replace.swap_node(&mut src[pos]);
-                src.inpl_normalize();
+                // TODO: normalization level
+                src = src.normalize(NormalizationLevel::max());
                 let mut resolution = MarkedStatement::from(Arc::new(src)).with_parent(arg.id);
                 resolution.blocked_rules.extend(self.block.iter().cloned());
 
@@ -264,6 +268,7 @@ pub mod tests {
     use crate::{
         rule::{parse_rule, Rule, RuleDeclineReason},
         statement::{statement_with_vars, MarkedStatement},
+        NormalizationLevel,
     };
 
     fn base_rule() -> Rule {
@@ -339,7 +344,7 @@ pub mod tests {
         assert_eq!(*suppose[0].requirements[0], statement_with_vars("2 != 0"));
         assert_eq!(
             *suppose[0].resolution.statement,
-            statement_with_vars("x == -2").normalize()
+            statement_with_vars("x == -2").normalize(NormalizationLevel::max())
         );
         assert_eq!(suppose[1].requirements.len(), 1);
         assert_eq!(*suppose[1].requirements[0], statement_with_vars("x != 0"));

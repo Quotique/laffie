@@ -1,9 +1,12 @@
 use bigdecimal::BigDecimal as Decimal;
 use num::Integer;
 
-use crate::statement::{
-    symbols::Symbol,
-    term::{StatementNode, Term},
+use crate::{
+    statement::{
+        symbols::Symbol,
+        term::{StatementNode, Term},
+    },
+    NormalizationLevel,
 };
 
 pub fn symbol() -> Symbol {
@@ -14,7 +17,7 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn sqrt(root: &mut StatementNode) -> bool {
+pub fn sqrt(root: &mut StatementNode, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("sqrt") {
         return false;
     }

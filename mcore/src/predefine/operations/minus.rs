@@ -1,6 +1,9 @@
-use crate::statement::{
-    symbols::{Symbol, SymbolAttr, SymbolAttrValue},
-    term::{StatementNode, Term},
+use crate::{
+    statement::{
+        symbols::{Symbol, SymbolAttr, SymbolAttrValue},
+        term::{StatementNode, Term},
+    },
+    NormalizationLevel,
 };
 
 pub fn symbol() -> Symbol {
@@ -12,7 +15,7 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn minus(root: &mut StatementNode) -> bool {
+pub fn minus(root: &mut StatementNode, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("-") {
         return false;
     }

@@ -10,6 +10,7 @@ use crate::{
         term::{StatementNode, Term},
         tree_utils::swap_node,
     },
+    NormalizationLevel,
 };
 
 use super::power::power_argument;
@@ -26,7 +27,7 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn plus(root: &mut StatementNode) -> bool {
+pub fn plus(root: &mut StatementNode, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("+") || root.degree() < 2 {
         return false;
     }

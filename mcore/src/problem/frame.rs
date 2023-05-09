@@ -17,6 +17,7 @@ use crate::{
         MarkedStatement, Statement,
     },
     utils::{Dumper, DumperSink, VecDisplay},
+    NormalizationLevel,
 };
 
 use super::{
@@ -176,7 +177,8 @@ impl Frame {
     ) -> Option<Arc<Statement>> {
         let mut clone = statement.root().deep_clone();
         is_replace(&mut clone.root_mut());
-        normalize(&mut clone.root_mut());
+        // TODO: normalization level
+        normalize(&mut clone.root_mut(), NormalizationLevel::max());
 
         let proof_target = Arc::new(Statement::from(
             tr(Term::with_symbol_name("proof").unwrap()) / clone,

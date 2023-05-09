@@ -10,6 +10,7 @@ use crate::{
         term::{StatementNode, Term},
         tree_utils::swap_node,
     },
+    NormalizationLevel,
 };
 
 use super::{plus::plus, power::power_argument};
@@ -26,7 +27,7 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn multiply(root: &mut StatementNode) -> bool {
+pub fn multiply(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("*") {
         return false;
     }
@@ -59,7 +60,7 @@ pub fn multiply(root: &mut StatementNode) -> bool {
     }
 
     for (elem, mut pow) in powers_mapping.into_iter() {
-        plus(&mut pow.root_mut());
+        plus(&mut pow.root_mut(), level);
         let arg = merge_power(elem, pow);
         if !arg.data().is_number_value(&Decimal::from(1)) {
             root.push_back(arg);

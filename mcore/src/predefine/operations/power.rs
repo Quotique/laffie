@@ -9,6 +9,7 @@ use crate::{
         term::{StatementNode, Term},
         tree_utils::NodeMapping,
     },
+    NormalizationLevel,
 };
 
 pub fn symbol() -> Symbol {
@@ -19,7 +20,7 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn power(root: &mut StatementNode) -> bool {
+pub fn power(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("^") {
         return false;
     }
@@ -40,7 +41,7 @@ pub fn power(root: &mut StatementNode) -> bool {
                 *root.data_mut() = Term::Symbol(symbol_by_name("/").unwrap().id);
                 root.push_back(tr(Term::Number(Decimal::one())));
                 root.push_back(tr(Term::Number(result)));
-                root.evaluate();
+                root.evaluate(level);
             }
         }
     }

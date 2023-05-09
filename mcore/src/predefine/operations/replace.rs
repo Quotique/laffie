@@ -1,9 +1,12 @@
 use trees::Tree;
 
-use crate::statement::{
-    symbols::Symbol,
-    term::{StatementNode, Term},
-    tree_utils::{swap_node, NodeMapping, VariablesMap},
+use crate::{
+    statement::{
+        symbols::Symbol,
+        term::{StatementNode, Term},
+        tree_utils::{swap_node, NodeMapping, VariablesMap},
+    },
+    NormalizationLevel,
 };
 
 pub fn symbol() -> Symbol {
@@ -14,7 +17,7 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn replace(root: &mut StatementNode) -> bool {
+pub fn replace(root: &mut StatementNode, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }
@@ -53,14 +56,13 @@ fn into_variable_map(mut state: Tree<Term>) -> VariablesMap {
 
 #[cfg(test)]
 mod tests {
-    use crate::statement::statement_with_vars;
+    use crate::{statement::statement_with_vars, NormalizationLevel};
 
     #[test]
     fn replace_test() {
-        let mut state = statement_with_vars(r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#);
-
-        println!("{state}");
-        state.inpl_normalize();
-        insta::assert_debug_snapshot!(state);
+        insta::assert_debug_snapshot!(statement_with_vars(
+            r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#
+        )
+        .normalize(NormalizationLevel::max()));
     }
 }

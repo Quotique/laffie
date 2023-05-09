@@ -2,10 +2,13 @@ use std::{cmp::Ordering, rc::Rc};
 
 use trees::Node;
 
-use crate::statement::{
-    symbols::SymbolAttr,
-    term::{StatementNode, Term},
-    tree_utils::NodeMapping,
+use crate::{
+    statement::{
+        symbols::SymbolAttr,
+        term::{StatementNode, Term},
+        tree_utils::NodeMapping,
+    },
+    NormalizationLevel,
 };
 
 pub mod divide;
@@ -101,15 +104,15 @@ fn commutative_reorder(root: &mut Node<Term>) -> bool {
     result
 }
 
-pub fn normalize(root: &mut StatementNode) -> bool {
+pub fn normalize(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     let mut result = false;
     for mut i in root.iter_mut() {
-        result |= normalize(&mut i);
+        result |= normalize(&mut i, level);
     }
 
     result |= associative_nesting_remove(root);
     result |= commutative_reorder(root);
-    result |= root.evaluate();
+    result |= root.evaluate(level);
     result |= commutative_reorder(root); // TODO: reorder once
 
     result
@@ -145,7 +148,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(test_tree1.root_mut().evaluate());
+        assert!(test_tree1.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree1, tr(Term::Number(Decimal::from(8))));
 
         // x+1+2+5 -> x+8
@@ -154,7 +157,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(test_tree1.root_mut().evaluate());
+        assert!(test_tree1.root_mut().evaluate(NormalizationLevel::max()));
         commutative_reorder(&mut test_tree1.root_mut());
         assert_eq!(
             test_tree1,
@@ -171,7 +174,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(10))));
 
         // x*1*2*5 -> 10*x
@@ -180,7 +183,7 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(1))) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         commutative_reorder(&mut test_tree.root_mut());
         assert_eq!(
             test_tree,
@@ -193,7 +196,7 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(7.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(1)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Variable("x".parse().unwrap())));
     }
 
@@ -203,14 +206,14 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(3.into())) /
             tr(Term::Number(Decimal::from(10))) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(8))));
 
         // x - 2 -> x - 2
         let mut test_tree = tr(Term::Symbol(3.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(!test_tree.root_mut().evaluate());
+        assert!(!test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             tr(Term::Symbol(3.into())) /
@@ -225,14 +228,14 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(10))) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(5))));
 
         // x / 2 -> x / 2
         let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(!test_tree.root_mut().evaluate());
+        assert!(!test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             tr(Term::Symbol(8.into())) /
@@ -244,7 +247,7 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(5)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             tr(Term::Number(Decimal::from_str_radix("0.4", 10).unwrap()))
@@ -254,7 +257,7 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(30))) /
             tr(Term::Number(Decimal::from(45)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             tr(Term::Symbol(8.into())) /
@@ -266,7 +269,7 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(30))) /
             tr(Term::Number(Decimal::from((45.into(), 1))));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             tr(Term::Symbol(8.into())) /
@@ -284,28 +287,28 @@ mod operations_tests {
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(2)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(4))));
 
         // 2 ^ (-2) -> 0.25
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(-2)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from((25.into(), 2)))));
 
         // 0.5 ^ (-2) -> 4
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
             tr(Term::Number(Decimal::from((5.into(), 1)))) /
             tr(Term::Number(Decimal::from(-2)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(4))));
 
         // 3 ^ (-2) -> 1/9
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
             tr(Term::Number(Decimal::from(3))) /
             tr(Term::Number(Decimal::from(-2)));
-        assert!(test_tree.root_mut().evaluate());
+        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             tr(Term::Symbol(div_sym.id)) /

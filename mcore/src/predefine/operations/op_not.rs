@@ -5,6 +5,7 @@ use crate::{
         term::{StatementNode, Term},
         tree_utils::{swap_node, NodeMapping},
     },
+    NormalizationLevel,
 };
 
 pub fn symbol() -> Symbol {
@@ -16,7 +17,7 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-fn not_replace(root: &mut StatementNode) -> bool {
+fn not_replace(root: &mut StatementNode, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("!") || root.degree() != 1 {
         return false;
     }

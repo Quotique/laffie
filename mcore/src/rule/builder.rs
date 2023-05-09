@@ -5,7 +5,7 @@ use multimap::MultiMap;
 use crate::{
     predefine::symbol_by_name,
     statement::{NodeMapping, NodePosition, Statement},
-    RuleId, SymbolId,
+    NormalizationLevel, RuleId, SymbolId,
 };
 
 use super::rule::{Rule, RuleAttr, RuleAttrValue};
@@ -156,7 +156,8 @@ impl RuleBuilder {
                 .map(|(param, pos)| (param.clone(), statement[pos].deep_clone()))
                 .collect();
 
-            statement.inpl_normalize();
+            // TODO: normalization level
+            statement = statement.normalize(NormalizationLevel::max());
 
             result.push(Rule {
                 id: self.rule_id,

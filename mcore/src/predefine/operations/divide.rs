@@ -5,10 +5,13 @@ use num::integer::gcd;
 use num_bigint::{BigInt, ToBigInt};
 use trees::tr;
 
-use crate::statement::{
-    symbols::{Symbol, SymbolAttr, SymbolAttrValue},
-    term::{StatementNode, Term},
-    tree_utils::swap_node,
+use crate::{
+    statement::{
+        symbols::{Symbol, SymbolAttr, SymbolAttrValue},
+        term::{StatementNode, Term},
+        tree_utils::swap_node,
+    },
+    NormalizationLevel,
 };
 
 use super::{MAX_DEC_CONVERSION_EXP, MAX_DEC_CONVERSION_VALUE};
@@ -22,7 +25,7 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn divide(root: &mut StatementNode) -> bool {
+pub fn divide(root: &mut StatementNode, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("/") {
         return false;
     }

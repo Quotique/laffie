@@ -8,7 +8,7 @@ use std::{
 use eyre::Result;
 use trees::{tr, Node};
 
-use crate::SymbolId;
+use crate::{NormalizationLevel, SymbolId};
 
 use super::{
     index::NodePosition,
@@ -43,14 +43,9 @@ impl Statement {
         }
     }
 
-    pub fn normalize(&self) -> Self {
-        let mut copy = self.clone();
-        copy.inpl_normalize();
-        copy
-    }
-
-    pub fn inpl_normalize(&mut self) {
-        crate::predefine::normalize(&mut self.tree.root_mut());
+    pub fn normalize(mut self, level: NormalizationLevel) -> Self {
+        crate::predefine::normalize(&mut self.tree.root_mut(), level);
+        self
     }
 
     pub fn symbols(&self) -> HashSet<SymbolId> {

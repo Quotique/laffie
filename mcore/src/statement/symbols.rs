@@ -4,11 +4,12 @@ use derive_builder::Builder;
 
 use macros::FuncAttr;
 
-use crate::SymbolId;
+use crate::{NormalizationLevel, SymbolId};
 
 use super::term::StatementNode;
 
 type BoxedComparator = Box<dyn Fn(&StatementNode, &StatementNode) -> std::cmp::Ordering>;
+type CalculatorSignature = dyn Fn(&mut StatementNode, NormalizationLevel) -> bool;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TruthResult {
@@ -20,7 +21,7 @@ pub enum TruthResult {
 #[derive(FuncAttr)]
 pub struct Ordering(BoxedComparator);
 #[derive(FuncAttr)]
-pub struct Calculator(Box<dyn Fn(&mut StatementNode) -> bool>);
+pub struct Calculator(Box<CalculatorSignature>);
 #[derive(FuncAttr)]
 pub struct TruthChecker(Box<dyn Fn(&StatementNode) -> TruthResult>);
 
@@ -81,10 +82,7 @@ impl SymbolBuilder {
         self
     }
 
-    pub fn with_calculator(
-        &mut self,
-        calculator: Box<dyn Fn(&mut StatementNode) -> bool>,
-    ) -> &mut Self {
+    pub fn with_calculator(&mut self, calculator: Box<CalculatorSignature>) -> &mut Self {
         self.calculator = Some(Arc::new(Some(Calculator(calculator))));
         self
     }
@@ -123,9 +121,9 @@ impl Symbol {
         }
     }
 
-    pub fn evaluate(&self, node: &mut StatementNode) -> bool {
+    pub fn evaluate(&self, node: &mut StatementNode, level: NormalizationLevel) -> bool {
         if let Some(c) = self.calculator.as_ref() {
-            c.0(node)
+            c.0(node, level)
         } else {
             false
         }

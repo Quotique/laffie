@@ -142,6 +142,23 @@ impl<'a> RuleParser<'a> {
                     RuleAttrValue::Str(CompactString::from(data.symbol.as_str())),
                 ))
             }
+            "normalize" => {
+                if attr.degree() != 1 {
+                    return Err(ParserError {
+                        loc: attr.data().location.clone(),
+                        msg: "must have one argument".to_owned(),
+                    });
+                }
+                let data = attr.front().unwrap().data();
+
+                Ok((
+                    RuleAttr::Normalize,
+                    RuleAttrValue::UInt(data.symbol.parse::<u64>().map_err(|_| ParserError {
+                        loc: data.location.clone(),
+                        msg: "must be u64".to_owned(),
+                    })?),
+                ))
+            }
             _ => Err(ParserError {
                 loc: attr.data().location.clone(),
                 msg: "unknown attribute".to_owned(),
@@ -288,7 +305,7 @@ mod tests {
     #[test]
     fn attr_parse_test() {
         let test = r#"rule {
-            attr replace,level(1),id(move_left),block(hello),block(world);
+            attr replace,level(1),id(move_left),block(hello),block(world),normalize(4);
             a == b => a - b == 0;
             b != 0;
         }"#;
@@ -310,6 +327,10 @@ mod tests {
                 &RuleAttrValue::Str("hello".into()),
                 &RuleAttrValue::Str("world".into())
             ]
+        );
+        assert_eq!(
+            rule.attribute(&RuleAttr::Normalize).collect::<Vec<_>>(),
+            vec![&RuleAttrValue::UInt(4)]
         );
     }
 }
