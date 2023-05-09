@@ -1,12 +1,10 @@
 use std::{collections::BTreeSet, iter::Iterator, path::Path};
 
 use bincode::{config, config::Configuration, Decode, Encode};
-use rocksdb::{
-    backup::{BackupEngine, BackupEngineOptions},
-    Error, IteratorMode, DB,
-};
+use sled::{Db, Error};
 
-const BACKUPS_COUNT: usize = 3;
+use super::err_handle;
+
 const VERSION: u64 = 2;
 
 pub mod old {
@@ -34,7 +32,7 @@ pub struct UserRecord {
 }
 
 pub struct UserDb {
-    db:     DB,
+    db:     Db,
     config: Configuration,
 }
 
@@ -71,26 +69,31 @@ impl UserRecord {
 impl UserDb {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         Ok(Self {
-            db:     DB::open_default(path)?,
+            db:     sled::open(path)?,
             config: config::standard(),
         })
     }
 
     pub fn backup<P: AsRef<Path>>(&self, path: P) -> Result<(), Error> {
-        let backup_opts = BackupEngineOptions::default();
-        let mut backup_engine = BackupEngine::open(&backup_opts, &path)?;
-        backup_engine.create_new_backup_flush(&self.db, true)?;
+        let backup = sled::open(path)?;
 
-        backup_engine.verify_backup(1)?;
-        backup_engine.purge_old_backups(BACKUPS_COUNT)
+        for (k, v) in self.db.iter().flat_map(err_handle) {
+            backup.insert(k, v)?;
+        }
+
+        Ok(())
     }
 
     pub fn restore<P: AsRef<Path>>(backup_path: P, db_path: P) -> Result<(), Error> {
-        let backup_opts = BackupEngineOptions::default();
-        let mut backup_engine = BackupEngine::open(&backup_opts, &backup_path).unwrap();
-        let restore_option = rocksdb::backup::RestoreOptions::default();
+        let db = sled::open(db_path)?;
+        db.clear()?;
 
-        backup_engine.restore_from_latest_backup(&db_path, &db_path, &restore_option)
+        let backup = sled::open(backup_path)?;
+
+        for (k, v) in backup.iter().flat_map(err_handle) {
+            db.insert(k, v)?;
+        }
+        Ok(())
     }
 
     pub fn get(&self, id: u64) -> Result<Option<UserRecord>, Error> {
@@ -107,11 +110,11 @@ impl UserDb {
 
         let encoded: Vec<u8> = bincode::encode_to_vec(user, self.config).unwrap();
 
-        self.db.put(key, encoded)
+        self.db.insert(key, encoded).map(|_| ())
     }
 
     pub fn iter_old(&self) -> impl Iterator<Item = old::UserRecord> + '_ {
-        self.db.iterator(IteratorMode::Start).map(|(_, v)| {
+        self.db.iter().flat_map(err_handle).map(|(_, v)| {
             let (decoded, _): (old::UserRecord, usize) =
                 bincode::decode_from_slice(&v[..], self.config).unwrap();
             assert_eq!(decoded.version, old::VERSION);

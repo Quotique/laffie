@@ -27,7 +27,7 @@ fn problem(
         .map_err(|e| e.to_string())?;
 
     let record = ProblemRecord::from(&problem);
-    let mut record = problems.get_or_insert(record)?;
+    let mut record = problems.get_or_insert(record).map_err(|e| e.to_string())?;
 
     let mut solution = Solution::new(
         problem,
@@ -56,7 +56,7 @@ fn problem(
         .unwrap();
 
     record.runs.push(solution.perf_stats.clone());
-    problems.put(&record)?;
+    problems.put(&record).map_err(|e| e.to_string())?;
 
     Ok(output)
 }

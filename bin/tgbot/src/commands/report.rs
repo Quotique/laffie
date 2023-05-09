@@ -16,14 +16,15 @@ fn report(
     let problem_id: u128 = u128::from_str(&problem_id).map_err(|e| e.to_string())?;
 
     let mut record = problems
-        .get(problem_id)?
+        .get(problem_id)
+        .map_err(|e| e.to_string())?
         .ok_or_else(|| t!("errors.problem_not_found"))?;
 
     if !record.reports.iter().any(|x| x == &user.id) {
         record.reports.push(user.id);
     }
 
-    problems.put(&record)?;
+    problems.put(&record).map_err(|e| e.to_string())?;
 
     Ok(t!("content.reported"))
 }
