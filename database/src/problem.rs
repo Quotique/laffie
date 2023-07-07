@@ -181,6 +181,11 @@ impl ProblemDb {
         self.db.insert(key, encoded).map(|_| ())
     }
 
+    pub fn remove(&self, id: i128) -> Result<(), Error> {
+        let key = id.to_le_bytes();
+        self.db.remove(key).map(|_| ())
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = ProblemRecord> + '_ {
         self.db.iter().flat_map(err_handle).map(|(_, v)| {
             let (decoded, _): (ProblemRecord, usize) =

@@ -30,6 +30,10 @@ struct Args {
     #[clap(short, long, default_value = "")]
     only: String,
 
+    /// Remove problem from db
+    #[clap(short, long, default_value = "")]
+    remove: String,
+
     /// Specify symbols path
     #[clap(short, long)]
     symbols: Option<PathBuf>,
@@ -39,8 +43,8 @@ struct Args {
     problems: Option<PathBuf>,
 
     /// Specify problems DB path
-    #[clap(short = 'd', long)]
-    problems_db: Option<PathBuf>,
+    #[clap(short = 'd', long, default_value = "./db/problems")]
+    problems_db: PathBuf,
 
     /// Dump solution trace into a file
     #[clap(short, long)]
@@ -80,33 +84,32 @@ fn main() {
 
     let rules_engine = Arc::new(parser.load_rules().unwrap());
     let problems = parser.load_problems().unwrap();
-    let db = args.problems_db.map(|x| ProblemDb::open(x).unwrap());
+    let db = ProblemDb::open(args.problems_db).unwrap();
 
-    fn db_ext<'a>(db: &'a Option<ProblemDb>) -> Box<dyn Iterator<Item = ProblemRecord> + 'a> {
-        if let Some(db) = db {
-            Box::new(db.iter())
-        } else {
-            Box::new(std::iter::empty())
+    if !args.remove.is_empty() {
+        let id = i128::from_str_radix(&args.remove, 16).expect("bad problem id");
+        if let Err(e) = db.remove(id) {
+            println!("problem remove error: {}", e);
+        }
+        return;
+    }
+
+    for record in problems.into_iter().map(|p| ProblemRecord::from(&p)) {
+        if let Err(e) = db.get_or_insert(record) {
+            println!("problem write error: {}", e);
         }
     }
-    let db_problems_iter = db_ext(&db);
 
     let mut solved = 0;
     let mut not_solved = 0;
     let mut answer_changed = 0;
 
-    for record in problems
-        .into_iter()
-        .map(|p| ProblemRecord::from(&p))
-        .chain(db_problems_iter)
-        .filter(move |x| {
-            if !only.is_empty() {
-                let id = format!("{:x}", x.id);
-                return id.starts_with(&only) || id.ends_with(&only);
-            }
-            true
-        })
-    {
+    let db_problems_iter = Box::new(db.iter());
+
+    for mut record in db_problems_iter.filter(move |x| {
+        let id = format!("{:x}", x.id);
+        id.starts_with(&only) || id.ends_with(&only)
+    }) {
         let p: Problem = record.clone().into();
 
         println!("{} {}", "Problem".bold().green(), p);
@@ -147,6 +150,11 @@ fn main() {
                         }
                     }
                 }
+                record.runs.push(solution.perf_stats);
+
+                if let Err(e) = db.put(&record) {
+                    println!("Cant put record {}", e);
+                }
             }
             Err(e) => {
                 not_solved += 1;
@@ -167,5 +175,10 @@ fn main() {
         }
     }
 
-    println!("Stats: solved: {solved} not solved: {not_solved} answer_changed: {answer_changed}",);
+    println!(
+        "Stats:\n {}: {solved}\n {}: {not_solved}\n {}: {answer_changed}",
+        "solved".bold().green(),
+        "not solved".bold().yellow(),
+        "answer changed".bold().red()
+    );
 }
