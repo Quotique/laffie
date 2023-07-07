@@ -1,6 +1,6 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::cmp::Ordering;
 
-use bigdecimal::BigDecimal as Decimal;
+use bigdecimal::{BigDecimal as Decimal, Zero};
 use trees::{tr, Tree};
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
     NormalizationLevel,
 };
 
-use super::power::power_argument;
+use super::{power::power_argument, to_const};
 
 pub fn symbol() -> Symbol {
     Symbol::builder()
@@ -27,14 +27,57 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn plus(root: &mut StatementNode, _: NormalizationLevel) -> bool {
+pub fn plus(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("+") || root.degree() < 2 {
         return false;
     }
 
+    match level {
+        NormalizationLevel(0) => return false,
+        NormalizationLevel(1) => {
+            let result = root.iter_mut().fold(false, |acc, mut x| {
+                if x.data().is_number_value(&0.into()) ||
+                    (x.data().is_symbol_name("-") &&
+                        x.front().unwrap().data().is_number_value(&0.into()))
+                {
+                    x.detach();
+                    true
+                } else {
+                    acc
+                }
+            });
+            return remove_unused_plus(root) || result;
+        }
+        NormalizationLevel(2) => {
+            let degree = root.degree();
+            let (constant, result) = root.iter_mut().enumerate().fold(
+                (Decimal::from(0), false),
+                |mut acc, (num, mut x)| {
+                    if let Some(d) = x.data().number().cloned() {
+                        x.detach();
+                        acc.1 |= d.is_zero();
+                        acc.1 |= degree != num - 1;
+                        acc.0 += d;
+                    } else if x.data().is_symbol_name("-") {
+                        if let Some(d) = x.front().unwrap().data().number().cloned() {
+                            x.detach();
+                            acc.1 |= d.is_zero();
+                            acc.1 |= degree != num - 1;
+                            acc.0 -= d;
+                        }
+                    }
+                    acc
+                },
+            );
+            attach_constant(root, constant);
+            return remove_unused_plus(root) || result;
+        }
+        _ => {}
+    };
+
     let mut result = false;
 
-    let mut constant_mapping = HashMap::new();
+    let mut constant_mapping = indexmap::IndexMap::new();
 
     let mut children = vec![];
     while let Some(mut child) = root.pop_front() {
@@ -60,19 +103,46 @@ pub fn plus(root: &mut StatementNode, _: NormalizationLevel) -> bool {
         let arg = merge_mul_const(mul, dec);
         if !arg.data().is_number_value(&Decimal::from(0)) {
             root.push_back(arg);
+        } else {
+            result = true;
         }
     }
 
     if root.degree() == 0 {
         *root.data_mut() = Term::Number(Decimal::from(0));
+        result = true;
     } else if root.degree() == 1 {
         let mut child = root.pop_front().unwrap();
         swap_node(root, &mut child.root_mut());
+        result = true;
     }
 
-    // TODO: ordering
+    result |= super::commutative_reorder(root);
 
     result
+}
+
+fn remove_unused_plus(root: &mut StatementNode) -> bool {
+    if root.degree() == 0 {
+        *root.data_mut() = Term::Number(Decimal::from(0));
+        true
+    } else if root.degree() == 1 {
+        let mut child = root.pop_front().unwrap();
+        swap_node(root, &mut child.root_mut());
+        true
+    } else {
+        false
+    }
+}
+
+fn attach_constant(root: &mut StatementNode, constant: Decimal) {
+    match constant.cmp(&Decimal::zero()) {
+        Ordering::Less => {
+            root.push_back(tr(Term::with_symbol_name("-").unwrap()) / tr(Term::Number(-constant)))
+        }
+        Ordering::Greater => root.push_back(tr(Term::Number(constant))),
+        Ordering::Equal => {}
+    }
 }
 
 fn merge_mul_const(mut root: Tree<Term>, d: Decimal) -> Tree<Term> {
@@ -82,36 +152,39 @@ fn merge_mul_const(mut root: Tree<Term>, d: Decimal) -> Tree<Term> {
     if d == Decimal::from(0) {
         return tr(Term::Number(Decimal::from(0)));
     }
+    if d == Decimal::from(-1) {
+        return tr(Term::with_symbol_name("-").unwrap()) / root;
+    }
+    let constant = if d < Decimal::zero() {
+        tr(Term::with_symbol_name("-").unwrap()) / tr(Term::Number(-d))
+    } else {
+        tr(Term::Number(d))
+    };
 
     if root.data().is_number_value(&Decimal::from(1)) {
-        return tr(Term::Number(d));
+        return constant;
     }
 
     if root.data().is_symbol_name("*") {
-        root.push_front(tr(Term::Number(d)));
+        root.push_front(constant);
         root
     } else {
-        tr(Term::with_symbol_name("*").unwrap()) / tr(Term::Number(d)) / root
+        tr(Term::with_symbol_name("*").unwrap()) / constant / root
     }
 }
 
 fn extract_mul_const(root: &mut StatementNode) -> Decimal {
-    if let Term::Number(d) = root.data() {
+    if let Some(d) = to_const(&root) {
         let result = d.clone();
-        *root.data_mut() = Term::Number(Decimal::from(1));
+        swap_node(root, &mut tr(Term::Number(1.into())).root_mut());
         return result;
     }
-
-    if root.data().is_symbol_name("-") {
-        let mut child = root.pop_front().unwrap();
-        swap_node(root, &mut child.root_mut());
-        return -extract_mul_const(root);
-    } else if !root.data().is_symbol_name("*") {
+    if !root.data().is_symbol_name("*") {
         return Decimal::from(1);
     }
 
     let constant = root.iter_mut().fold(Decimal::from(1), |prev, mut x| {
-        if let Term::Number(d) = x.data() {
+        if let Some(d) = to_const(&x) {
             let res = prev * d;
             x.detach();
             res
@@ -141,6 +214,9 @@ fn cummulative_power(root: &StatementNode) -> Decimal {
         for i in root.iter() {
             match i.data() {
                 Term::Number(_) | Term::Placeholder(_) => {}
+                Term::Symbol(_)
+                    if i.data().is_symbol_name("-") &&
+                        i.front().unwrap().data().number().is_some() => {}
                 Term::Symbol(_) if i.data().is_symbol_name("^") => {
                     result += if let Some(v) = i.back().unwrap().data().number() {
                         v.clone()
@@ -160,20 +236,37 @@ fn cummulative_power(root: &StatementNode) -> Decimal {
 }
 
 fn mean_arg(root: &StatementNode) -> &StatementNode {
-    if root.data().is_symbol_name("*") {
+    let pa = if root.data().is_symbol_name("*") {
         // find first non-number argument and omit power
         // last number argument in non-number not found
         // 4 * x^2 * y -> x
         // 2 * 4 -> 4
         // y * z^4 -> y
-        return power_argument(
+        power_argument(
             root.iter()
-                .find(|x| power_argument(x).data().number().is_none())
+                .find(|x| {
+                    let pa = power_argument(x);
+                    if pa.data().number().is_some() {
+                        return false;
+                    }
+                    if pa.data().is_symbol_name("-") &&
+                        pa.front().unwrap().data().number().is_some()
+                    {
+                        return false;
+                    }
+                    true
+                })
                 .unwrap_or_else(|| root.back().unwrap()),
-        );
-    }
+        )
+    } else {
+        power_argument(root)
+    };
 
-    power_argument(root)
+    if pa.data().is_symbol_name("-") {
+        pa.front().unwrap()
+    } else {
+        pa
+    }
 }
 
 fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
@@ -211,7 +304,7 @@ fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
 
 #[cfg(test)]
 mod tests {
-    use crate::statement::statement_with_vars;
+    use crate::{predefine::operations::calculator_check, statement::statement_with_vars};
 
     use super::*;
 
@@ -222,5 +315,35 @@ mod tests {
 
         let state = statement_with_vars("4");
         assert_eq!(mean_arg(state.root()).to_string(), "4".to_owned());
+
+        let state = statement_with_vars("(-1)*y");
+        assert_eq!(mean_arg(state.root()).to_string(), "y".to_owned());
+
+        let state = statement_with_vars("-y");
+        assert_eq!(mean_arg(state.root()).to_string(), "y".to_owned());
+    }
+
+    #[test]
+    fn plus_test() {
+        for (source, level_one, level_two, level_all) in [
+            ("x+y", "x+y", "x+y", "x+y"),
+            ("0+x", "x", "x", "x"),
+            ("1+x", "1+x", "x+1", "x+1"),
+            ("0+0", "0", "0", "0"),
+            ("1+x+3", "1+x+3", "x+4", "x+4"),
+            ("-1+x+3", "-1+x+3", "x+2", "x+2"),
+            ("x-y", "x-y", "x-y", "x-y"),
+            ("0-x", "-x", "-x", "-x"),
+            ("x-0", "x", "x", "x"),
+            ("0-0", "0", "0", "0"),
+            ("2*x*y+(-1)*x*y", "2*x*y+(-1)*x*y", "2*x*y+(-1)*x*y", "x*y"),
+            ("1+2+3", "1+2+3", "6", "6"),
+            ("1+2-3", "1+2-3", "0", "0"),
+        ] {
+            calculator_check(source, source, plus, NormalizationLevel(0));
+            calculator_check(source, level_one, plus, NormalizationLevel(1));
+            calculator_check(source, level_two, plus, NormalizationLevel(2));
+            calculator_check(source, level_all, plus, NormalizationLevel::max());
+        }
     }
 }

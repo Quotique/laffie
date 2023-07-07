@@ -1,11 +1,14 @@
 use std::{cmp::Ordering, rc::Rc};
 
-use trees::Node;
+use bigdecimal::{BigDecimal as Decimal, Zero};
+use trees::{tr, Node};
 
+#[cfg(test)]
+use crate::statement::statement_with_params;
 use crate::{
     statement::{
         symbols::SymbolAttr,
-        term::{StatementNode, Term},
+        term::{StatementNode, StatementTree, Term},
         tree_utils::NodeMapping,
     },
     NormalizationLevel,
@@ -29,7 +32,6 @@ pub mod replace;
 pub mod sqrt;
 pub mod symbolic_eq;
 
-pub const MAX_DEC_CONVERSION_VALUE: i64 = 1_000_000;
 pub const MAX_DEC_CONVERSION_EXP: i64 = 6;
 
 fn associative_nesting_remove(root: &mut Node<Term>) -> bool {
@@ -83,21 +85,36 @@ fn commutative_reorder(root: &mut Node<Term>) -> bool {
     let mut result = false;
     if let Some(symbol) = &root.data().symbol() {
         if symbol.attrs.contains_key(&SymbolAttr::Commutative) {
-            result = true;
-            let mut to_sort = vec![];
-
-            while let Some(t) = root.pop_front() {
-                to_sort.push(Rc::new(t));
-            }
-
-            to_sort.sort_by(|x, y| {
-                symbol
-                    .arg_order(x.root(), y.root())
-                    .unwrap_or_else(|| default_ordering(x.root(), y.root()))
+            // TODO: replace with is_sorted_by when it's stable
+            // https://doc.rust-lang.org/std/vec/struct.Vec.html#method.is_sorted_by
+            let mut sorted = true;
+            root.iter().reduce(|prev, x| {
+                if symbol
+                    .arg_order(prev, x)
+                    .unwrap_or_else(|| default_ordering(prev, x)) ==
+                    Ordering::Greater
+                {
+                    sorted = false;
+                }
+                x
             });
+            if !sorted {
+                result = true;
+                let mut to_sort = vec![];
 
-            while let Some(t) = to_sort.pop() {
-                root.push_front(Rc::try_unwrap(t).unwrap());
+                while let Some(t) = root.pop_front() {
+                    to_sort.push(Rc::new(t));
+                }
+
+                to_sort.sort_by(|x, y| {
+                    symbol
+                        .arg_order(x.root(), y.root())
+                        .unwrap_or_else(|| default_ordering(x.root(), y.root()))
+                });
+
+                while let Some(t) = to_sort.pop() {
+                    root.push_front(Rc::try_unwrap(t).unwrap());
+                }
             }
         }
     }
@@ -111,11 +128,57 @@ pub fn normalize(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     }
 
     result |= associative_nesting_remove(root);
-    result |= commutative_reorder(root);
+    // result |= commutative_reorder(root);
     result |= root.evaluate(level);
-    result |= commutative_reorder(root); // TODO: reorder once
-
+    if level > NormalizationLevel(0) {
+        result |= commutative_reorder(root); // TODO: reorder once
+    }
     result
+}
+
+fn from_const(d: Decimal) -> StatementTree {
+    if d < Decimal::zero() {
+        tr(Term::with_symbol_name("-").unwrap()) / tr(Term::Number(-d))
+    } else {
+        tr(Term::Number(d))
+    }
+}
+
+fn to_const(node: &StatementNode) -> Option<Decimal> {
+    if let Some(d) = node.data().number() {
+        Some(d.clone())
+    } else if node.data().is_symbol_name("-") {
+        if let Some(d) = node.front().unwrap().data().number() {
+            Some(-d.clone())
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+fn compare_numbers(left: &StatementNode, right: &StatementNode) -> Option<Ordering> {
+    let left_num = to_const(left)?;
+    let right_num = to_const(right)?;
+
+    Some(left_num.cmp(&right_num))
+}
+
+#[cfg(test)]
+pub fn calculator_check(
+    src: &'static str,
+    res: &'static str,
+    f: impl Fn(&mut StatementNode, NormalizationLevel) -> bool,
+    level: NormalizationLevel,
+) {
+    let mut s = statement_with_params(src);
+    assert_eq!(
+        f(&mut s.root_mut(), level),
+        src != res,
+        "{src} {res} l:{level}"
+    );
+    assert_eq!(s, statement_with_params(res), "{src} {res} l:{level}");
 }
 
 #[cfg(test)]
@@ -209,16 +272,16 @@ mod operations_tests {
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(8))));
 
-        // x - 2 -> x - 2
+        // x - 2 -> x + (- 2)
         let mut test_tree = tr(Term::Symbol(3.into())) /
             tr(Term::Variable("x".parse().unwrap())) /
             tr(Term::Number(Decimal::from(2)));
         assert!(!test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            tr(Term::Symbol(3.into())) /
+            tr(Term::Symbol(2.into())) /
                 tr(Term::Variable("x".parse().unwrap())) /
-                tr(Term::Number(Decimal::from(2)))
+                (tr(Term::Symbol(3.into())) / tr(Term::Number(Decimal::from(2))))
         );
     }
 

@@ -1,7 +1,9 @@
 use crate::statement::{
     symbols::{Symbol, TruthResult},
-    term::{StatementNode, Term},
+    term::StatementNode,
 };
+
+use super::compare_numbers;
 
 pub fn symbol() -> Symbol {
     Symbol::builder()
@@ -16,15 +18,9 @@ pub fn less(root: &StatementNode) -> TruthResult {
         return TruthResult::Unknown;
     }
 
-    if let (Term::Number(d1), Term::Number(d2)) =
-        (&root.front().unwrap().data(), &root.back().unwrap().data())
-    {
-        if d1 < d2 {
-            return TruthResult::True;
-        } else {
-            return TruthResult::False;
-        }
+    match compare_numbers(root.front().unwrap(), root.back().unwrap()) {
+        Some(std::cmp::Ordering::Less) => TruthResult::True,
+        Some(_) => TruthResult::False,
+        _ => TruthResult::Unknown,
     }
-
-    TruthResult::Unknown
 }

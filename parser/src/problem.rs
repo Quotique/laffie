@@ -7,6 +7,7 @@ use std::{
 use mcore::{
     problem::{Problem, ProblemBuilder},
     statement::MarkedStatement,
+    NormalizationLevel,
 };
 
 use crate::ParserError;
@@ -56,7 +57,10 @@ impl<'a> ProblemParser<'a> {
                     })?;
             } else {
                 builder = builder.with_condition(MarkedStatement::from(Arc::new(
-                    StatementParser::new(child).with_variables().parse()?,
+                    StatementParser::new(child)
+                        .with_variables()
+                        .parse()?
+                        .normalize(NormalizationLevel::max()),
                 )));
             }
         }

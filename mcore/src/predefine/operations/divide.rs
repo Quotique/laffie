@@ -2,8 +2,7 @@ use std::cmp::max;
 
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use num::integer::gcd;
-use num_bigint::{BigInt, ToBigInt};
-use trees::tr;
+use num_bigint::ToBigInt;
 
 use crate::{
     statement::{
@@ -14,7 +13,7 @@ use crate::{
     NormalizationLevel,
 };
 
-use super::{MAX_DEC_CONVERSION_EXP, MAX_DEC_CONVERSION_VALUE};
+use super::{from_const, to_const, MAX_DEC_CONVERSION_EXP};
 
 pub fn symbol() -> Symbol {
     Symbol::builder()
@@ -25,60 +24,137 @@ pub fn symbol() -> Symbol {
         .unwrap()
 }
 
-pub fn divide(root: &mut StatementNode, _: NormalizationLevel) -> bool {
+pub fn divide(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("/") {
         return false;
     }
 
-    let mut result = false;
+    match level {
+        NormalizationLevel(0) => false,
+        NormalizationLevel(1) => {
+            if let Term::Number(d) = &root.back().unwrap().data() {
+                if d.is_one() {
+                    let mut child = root.pop_front().unwrap();
+                    swap_node(root, &mut child.root_mut());
+                    return true;
+                }
+            }
+            false
+        }
+        _ => {
+            match (
+                to_const(root.front().unwrap()),
+                to_const(root.back().unwrap()),
+            ) {
+                (Some(d1), Some(d2)) => {
+                    let (num, den) = simplify(d1.clone(), d2.clone());
+                    if let Some(t) = impl_devide(&num, &den) {
+                        swap_node(root, &mut from_const(t).root_mut());
+                        true
+                    } else if d1 != num || d2 != den {
+                        let sign = if (&num * &den) < Decimal::zero() {
+                            Decimal::from(-1)
+                        } else {
+                            Decimal::one()
+                        };
 
-    match (&root.front().unwrap().data(), &root.back().unwrap().data()) {
-        (Term::Number(d1), Term::Number(d2)) => {
-            let (num_m, num_e) = d1.clone().into_bigint_and_exponent();
-            let (den_m, den_e) = d2.clone().into_bigint_and_exponent();
-
-            let (num_e, den_e) = (num_e - max(num_e, den_e), den_e - max(num_e, den_e));
-            let (num_m, den_m) = (
-                num_m *
-                    Decimal::new(10.into(), num_e)
-                        .to_bigint()
-                        .expect("Unable to get bigint"),
-                den_m *
-                    Decimal::new(10.into(), den_e)
-                        .to_bigint()
-                        .expect("Unable to get bigint"),
-            );
-
-            let g = gcd(num_m.clone(), den_m.clone());
-            let (num_m, den_m) = (num_m / g.clone(), den_m / g);
-
-            result = true;
-            root.pop_back();
-            root.pop_back();
-
-            if den_m.is_one() {
-                *root.data_mut() = Term::Number(Decimal::from(num_m));
-            } else if (BigInt::from(MAX_DEC_CONVERSION_VALUE) % den_m.clone()).is_zero() {
-                *root.data_mut() = Term::Number(
-                    Decimal::new(
-                        num_m * (BigInt::from(MAX_DEC_CONVERSION_VALUE) / den_m),
-                        MAX_DEC_CONVERSION_EXP,
-                    )
-                    .normalized(),
-                );
-            } else {
-                root.push_back(tr(Term::Number(Decimal::from(num_m))));
-                root.push_back(tr(Term::Number(Decimal::from(den_m))));
+                        swap_node(
+                            &mut root.front_mut().unwrap(),
+                            &mut from_const(sign * num.abs()).root_mut(),
+                        );
+                        *root.back_mut().unwrap().data_mut() = Term::Number(den.abs());
+                        true
+                    } else {
+                        false
+                    }
+                }
+                (_, Some(d)) => {
+                    if d.is_one() {
+                        let mut child = root.pop_front().unwrap();
+                        swap_node(root, &mut child.root_mut());
+                        true
+                    } else {
+                        false
+                    }
+                }
+                (_, _) => false,
             }
         }
-        (_, Term::Number(d)) => {
-            if d.is_one() {
-                let mut child = root.pop_front().unwrap();
-                swap_node(root, &mut child.root_mut());
-            }
+    }
+}
+
+fn simplify(num: Decimal, den: Decimal) -> (Decimal, Decimal) {
+    let (num_m, num_e) = num.into_bigint_and_exponent();
+    let (den_m, den_e) = den.into_bigint_and_exponent();
+
+    let (num_e, den_e) = (num_e - max(num_e, den_e), den_e - max(num_e, den_e));
+    let (num_m, den_m) = (
+        num_m *
+            Decimal::new(10.into(), num_e)
+                .to_bigint()
+                .expect("Unable to get bigint"),
+        den_m *
+            Decimal::new(10.into(), den_e)
+                .to_bigint()
+                .expect("Unable to get bigint"),
+    );
+
+    let g = gcd(num_m.clone(), den_m.clone());
+    (Decimal::from(num_m / g.clone()), Decimal::from(den_m / g))
+}
+
+fn impl_devide(num: &Decimal, den: &Decimal) -> Option<Decimal> {
+    if den.is_one() {
+        Some(num.clone())
+    } else {
+        let res = (num / den).normalized();
+        let (_, exp) = res.clone().into_bigint_and_exponent();
+        if exp <= MAX_DEC_CONVERSION_EXP {
+            Some(res)
+        } else {
+            None
         }
-        (_, _) => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::predefine::operations::calculator_check;
+
+    #[test]
+    fn derive_test() {
+        assert_eq!(impl_devide(&5.into(), &1.into()), Some(5.into()));
+        assert_eq!(
+            impl_devide(&5.into(), &2.into()),
+            Some(Decimal::new(25.into(), 1))
+        );
+        assert_eq!(impl_devide(&1.into(), &3.into()), None);
     }
 
-    result
+    #[test]
+    fn simplify_test() {
+        assert_eq!(simplify(100.into(), 20.into()), (5.into(), 1.into()));
+
+        assert_eq!(
+            simplify(Decimal::new(35.into(), 1), Decimal::new(14.into(), 1)),
+            (5.into(), 2.into())
+        );
+    }
+
+    #[test]
+    fn calculator_test() {
+        for (source, level_one, level_all) in [
+            ("2/3", "2/3", "2/3"),
+            ("2/1", "2", "2"),
+            ("a/1", "a", "a"),
+            ("25/35", "25/35", "5 / 7"),
+            ("2.5/3.5", "2.5/3.5", "5 / 7"),
+            ("(-10)/6", "(-10)/6", "(-5)/3"),
+        ] {
+            calculator_check(source, source, divide, NormalizationLevel(0));
+            calculator_check(source, level_one, divide, NormalizationLevel(1));
+            calculator_check(source, level_all, divide, NormalizationLevel::max());
+        }
+    }
 }

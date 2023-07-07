@@ -141,7 +141,7 @@ peg::parser! {
             x:(@) _ p:position!() "as" _ y:ident() { Data::new("as", p)/x/y }
             --
             x:(@) _ p:position!() "+" _ y:@ { Data::new("+", p)/x/y }
-            x:(@) _ p:position!() "-" _ y:@ { Data::new("-", p)/x/y }
+            x:(@) _ p:position!() "-" _ y:@ { Data::new("+", p)/x/(Data::new("-", p)/y) }
             --
             p:position!() "-" _ x:@ { Data::new("-", p)/x }
             p:position!() "+" _ x:@ { Data::new("+", p)/x }
@@ -156,6 +156,7 @@ peg::parser! {
             e:eval() { e }
             p:placeholder() { p }
             n:number() p:position!() i:char_first_ident() { Data::new("*", p)/n/i }
+            n:number() { n }
             i:ident() { i }
             "(" _  a:arithmetic() _ ")" {a}
         }
@@ -360,6 +361,25 @@ mod tests {
         assert_eq!(
             states[0],
             Data::new("*", 1) / Data::new("6", 0) / (Data::new("sin", 1) / Data::new("x", 5))
+        );
+    }
+
+    #[test]
+    fn decimal_fraction_test() {
+        let test = r#"2.1sin(x)"#;
+        let states = ra::statements(test).unwrap();
+        assert_eq!(states.len(), 1);
+        assert_eq!(
+            states[0],
+            Data::new("*", 3) / Data::new("2.1", 0) / (Data::new("sin", 3) / Data::new("x", 7))
+        );
+
+        let test = r#"2.1/3.5"#;
+        let states = ra::statements(test).unwrap();
+        assert_eq!(states.len(), 1);
+        assert_eq!(
+            states[0],
+            Data::new("/", 3) / Data::new("2.1", 0) / Data::new("3.5", 4)
         );
     }
 }

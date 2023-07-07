@@ -8,7 +8,6 @@ use mcore::{
         term::{Decimal, Param, Placeholder, Term, Variable},
         NodePosition, Statement, StatementTree,
     },
-    NormalizationLevel,
 };
 
 use crate::{Node, ParserError};
@@ -56,8 +55,7 @@ impl<'a> StatementParser<'a> {
                 &mut 0,
             )?
         };
-        // TODO: normalization level
-        Ok(Statement::new(tree, positions_map).normalize(NormalizationLevel::max()))
+        Ok(Statement::new(tree, positions_map).normalize(0.into()))
     }
 
     fn try_parse_impl(

@@ -1,6 +1,5 @@
 ---
 source: mcore/src/statement/mapping.rs
-assertion_line: 311
 expression: test
 ---
-2*^(x, 2)+1
+2*x^2+1

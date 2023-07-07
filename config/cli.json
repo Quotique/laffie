@@ -3,7 +3,8 @@
     "filename": "cli.log",
     "level": "Trace",
     "target_levels": {
-      "pattern_match": "Info"
+      "pattern_match": "Info",
+      "sled": "Warn"
     }
   },
   "symbols_dir": "symbols",

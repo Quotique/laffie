@@ -8,6 +8,7 @@ pub fn display_string(node: &StatementNode) -> String {
         Some(symbol) => symbol_display(symbol, node),
         _ => node.data().to_string(),
     }
+    .replace("+-", "-")
 }
 
 fn symbol_display(symbol: Symbol, node: &StatementNode) -> String {
@@ -79,10 +80,11 @@ mod tests {
             ("a*(b+c)", "a*(b+c)"),
             ("a*b + c", "a*b+c"),
             ("a*b/2 + c", "(a*b)/2+c"),
-            ("a + b - c", "(a+b)-c"),
-            //("x == -3", "x==-3"),
-            //("-(-x + 2)", "-(-x+2)"),
-            ////("-(-1)", "-(-1)"),
+            ("a + b - c", "a+b-c"),
+            ("x == -3", "x==-3"),
+            ("-(-x + 2)", "-(-x+2)"),
+            ("-(-1)", "-(-1)"),
+            ("118*x^2 + 1389x - 1507 == 0", "118*x^2+1389*x-1507==0"),
         ] {
             let statement = statement_with_params(statement);
 
