@@ -1,10 +1,10 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, VecDeque},
     iter::once,
     sync::Arc,
 };
 
-use multimap::MultiMap;
+use itertools::Itertools;
 
 use crate::{
     predefine::symbol_by_name, statement::MarkedStatement, utils::VecDisplay, CompactString,
@@ -21,59 +21,24 @@ type LevelRules = HashMap<SymbolId, Vec<SharedRule>>;
 
 #[derive(Default)]
 pub struct RulesEngine {
-    all_rules:   HashMap<Level, LevelRules>,
-    id_requires: MultiMap<CompactString, SharedRule>,
-    id_map:      HashMap<CompactString, RuleId>,
-    last_id:     RuleId,
+    all_rules:  HashMap<Level, LevelRules>,
+    rule_queue: VecDeque<Rule>,
+    id_map:     HashMap<CompactString, RuleId>,
+    last_id:    RuleId,
 }
 
 unsafe impl Send for RulesEngine {}
 unsafe impl Sync for RulesEngine {}
 
 impl RulesEngine {
-    fn update_rule_blocklist(&mut self, mut s_rule: SharedRule) {
-        let mut blocklist: HashSet<RuleId> = Default::default();
-
-        // TODO: iter?
-        for i in s_rule.attribute(&RuleAttr::Block) {
-            if let RuleAttrValue::Str(s) = i {
-                if let Some(id) = self.id_map.get(s) {
-                    blocklist.insert(*id);
-                } else {
-                    self.id_requires.insert(s.clone(), s_rule.clone());
-                }
-            }
-        }
-        let rule = Arc::make_mut(&mut s_rule);
-        rule.block = blocklist.into_iter().collect();
-    }
-
-    fn register_id(&mut self, rule: SharedRule) {
+    pub fn register_rule(&mut self, mut rule: Rule) {
+        self.last_id.increment();
+        rule.id = self.last_id;
         if let Some(RuleAttrValue::Str(s)) = rule.attribute(&RuleAttr::Id).next() {
             self.id_map.insert(s.clone(), rule.id);
-            if let Some(reqs) = self.id_requires.remove(s) {
-                for r in reqs.into_iter() {
-                    self.update_rule_blocklist(r);
-                }
-            }
-        };
-    }
-
-    pub fn register_raw_rule(&mut self, rule: Rule) {
-        self.register_rule(Arc::new(rule))
-    }
-
-    pub fn register_rule(&mut self, mut rule: SharedRule) {
-        self.last_id.increment();
-        Arc::make_mut(&mut rule).id = self.last_id;
-        self.update_rule_blocklist(rule.clone());
-        self.register_id(rule.clone());
-        self.all_rules
-            .entry(rule.level)
-            .or_insert_with(LevelRules::new)
-            .entry(rule.symbol_id)
-            .or_insert_with(Vec::new)
-            .push(rule);
+        }
+        self.add_rule(rule);
+        self.process_queue();
     }
 
     pub fn suggest_rules(
@@ -81,6 +46,8 @@ impl RulesEngine {
         statement: &MarkedStatement,
         target: &MarkedStatement,
     ) -> Vec<SharedRule> {
+        assert!(self.rule_queue.is_empty());
+
         let empty_level = LevelRules::new();
         let level = self
             .all_rules
@@ -107,5 +74,40 @@ impl RulesEngine {
             );
         }
         result
+    }
+
+    fn process_queue(&mut self) {
+        let mut queue_len = self.rule_queue.len();
+
+        while let Some(rule) = self.rule_queue.pop_front() {
+            self.add_rule(rule);
+            queue_len -= 1;
+            if queue_len == 0 {
+                break;
+            }
+        }
+    }
+
+    fn add_rule(&mut self, mut rule: Rule) {
+        if !rule
+            .attribute(&RuleAttr::Block)
+            .filter_map(RuleAttrValue::str)
+            .all(|x| self.id_map.contains_key(x))
+        {
+            self.rule_queue.push_back(rule);
+        } else {
+            rule.block = rule
+                .attribute(&RuleAttr::Block)
+                .filter_map(RuleAttrValue::str)
+                .map(|x| *self.id_map.get(x).unwrap())
+                .unique()
+                .collect();
+            self.all_rules
+                .entry(rule.level)
+                .or_insert_with(LevelRules::new)
+                .entry(rule.symbol_id)
+                .or_insert_with(Vec::new)
+                .push(Arc::new(rule));
+        }
     }
 }

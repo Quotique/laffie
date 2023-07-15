@@ -112,6 +112,16 @@ impl fmt::Display for Rule {
     }
 }
 
+impl RuleAttrValue {
+    pub fn str(&self) -> Option<&str> {
+        if let RuleAttrValue::Str(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+}
+
 impl Rule {
     pub fn attribute(&self, attr: &RuleAttr) -> impl Iterator<Item = &RuleAttrValue> {
         self.attrs.iter_key(attr)
@@ -184,11 +194,7 @@ impl Rule {
             return Err(RuleDeclineReason::Blocked);
         }
 
-        if self.contains_attribute(&RuleAttr::Subtree) {
-            self.apply_subtree(arg)
-        } else {
-            self.apply_root(arg)
-        }
+        self.apply_subtree(arg)
     }
 
     #[inline]
@@ -199,30 +205,6 @@ impl Rule {
     #[inline]
     pub fn replace_node(&self) -> &StatementNode {
         &self.statement[&self.replace]
-    }
-
-    fn apply_root(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        let maps = ParamsMapping::mapper(arg.statement.root(), self.pattern_node())
-            .try_map()
-            .map_err(|e| RuleDeclineReason::ParamsMappingErr(e.to_string()))?;
-
-        Ok(maps
-            .iter()
-            .map(|x| Suppose {
-                requirements: self
-                    .requirements
-                    .iter()
-                    .map(|r| Arc::new(r.apply_map(x)))
-                    .collect(),
-                resolution:   MarkedStatement::from(Arc::new(
-                    // TODO: normalization level
-                    Statement::from(self.replace_node().deep_clone())
-                        .apply_map(x)
-                        .normalize(NormalizationLevel::max()),
-                ))
-                .with_parent(arg.id),
-            })
-            .collect())
     }
 
     fn apply_subtree(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {

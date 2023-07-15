@@ -15,6 +15,7 @@ derive_more = "0.99"
 eyre = "0.6"
 fern = "0.5"
 indexmap = "2.0"
+itertools = "0.11"
 log = "0.4"
 multi-map = "1.2"
 multimap = { git = "https://github.com/Quotique/multimap.git" }

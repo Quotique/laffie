@@ -46,7 +46,7 @@ impl DirectoryParser {
                 {
                     for rule in rules {
                         trace!("New rule: {}", rule);
-                        result.register_raw_rule(rule);
+                        result.register_rule(rule);
                     }
                 }
             },
