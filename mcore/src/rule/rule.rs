@@ -120,6 +120,14 @@ impl RuleAttrValue {
             None
         }
     }
+
+    pub fn uint(&self) -> Option<u64> {
+        if let RuleAttrValue::UInt(u) = self {
+            Some(*u)
+        } else {
+            None
+        }
+    }
 }
 
 impl Rule {
@@ -129,6 +137,14 @@ impl Rule {
 
     pub fn contains_attribute(&self, attr: &RuleAttr) -> bool {
         self.attrs.iter_key(attr).next().is_some()
+    }
+
+    pub fn norm_level(&self) -> NormalizationLevel {
+        self.attrs
+            .iter_key(&RuleAttr::Normalize)
+            .filter_map(RuleAttrValue::uint)
+            .max()
+            .map_or(NormalizationLevel::max(), NormalizationLevel)
     }
 
     pub fn is_tautology(&self) -> bool {
@@ -221,8 +237,8 @@ impl Rule {
                 let mut replace = replace.apply_map(&self.binds).apply_map(i);
                 let mut src = (*arg.statement).clone();
                 replace.swap_node(&mut src[pos]);
-                // TODO: normalization level
-                src = src.normalize(NormalizationLevel::max());
+                // src = src.normalize(NormalizationLevel::max());
+                src = src.normalize(self.norm_level());
                 let mut resolution = MarkedStatement::from(Arc::new(src)).with_parent(arg.id);
                 resolution.blocked_rules.extend(self.block.iter().cloned());
 

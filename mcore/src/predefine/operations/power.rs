@@ -33,8 +33,8 @@ pub fn power(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     }
 
     match (
-        to_const(&root.front().unwrap()),
-        to_const(&root.back().unwrap()),
+        to_const(root.front().unwrap()),
+        to_const(root.back().unwrap()),
     ) {
         (Some(d1), Some(d2)) if level > 1.into() => {
             if let Some(e) = d2.to_i8() {
@@ -62,7 +62,7 @@ pub fn power(root: &mut StatementNode, level: NormalizationLevel) -> bool {
         }
         (_, Some(pow)) if pow.is_zero() => {
             swap_node(root, &mut tr(Term::Number(1.into())).root_mut());
-            return true;
+            true
         }
         (_, Some(pow)) if pow.is_one() => {
             let mut arg = root.pop_front().unwrap();

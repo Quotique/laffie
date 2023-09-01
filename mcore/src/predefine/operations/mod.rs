@@ -148,11 +148,7 @@ fn to_const(node: &StatementNode) -> Option<Decimal> {
     if let Some(d) = node.data().number() {
         Some(d.clone())
     } else if node.data().is_symbol_name("-") {
-        if let Some(d) = node.front().unwrap().data().number() {
-            Some(-d.clone())
-        } else {
-            None
-        }
+        node.front().unwrap().data().number().map(|d| -d.clone())
     } else {
         None
     }

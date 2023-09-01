@@ -174,7 +174,7 @@ fn merge_mul_const(mut root: Tree<Term>, d: Decimal) -> Tree<Term> {
 }
 
 fn extract_mul_const(root: &mut StatementNode) -> Decimal {
-    if let Some(d) = to_const(&root) {
+    if let Some(d) = to_const(root) {
         let result = d.clone();
         swap_node(root, &mut tr(Term::Number(1.into())).root_mut());
         return result;
