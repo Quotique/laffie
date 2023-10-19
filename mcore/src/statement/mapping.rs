@@ -29,7 +29,7 @@ pub struct Mapper<'a> {
 impl From<HashMap<Param, StatementTree>> for ParamsMapping {
     fn from(params: HashMap<Param, StatementTree>) -> Self {
         Self {
-            params:       BTreeMap::from_iter(params.into_iter()),
+            params:       BTreeMap::from_iter(params),
             placeholders: Default::default(),
         }
     }
@@ -171,6 +171,8 @@ fn params_map_impl(
             if sym.attrs.contains_key(&SymbolAttr::Associative) &&
                 sym.attrs.contains_key(&SymbolAttr::Commutative)
             {
+                // TODO: priority mapping
+                // not even trying to map subsets twice
                 for parts in target.subsets(pattern.degree()) {
                     let mut loc_result = vec![params.clone()];
                     params_map_arguments(&parts, pattern, &mut loc_result).expect("must match");

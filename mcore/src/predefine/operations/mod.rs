@@ -327,7 +327,7 @@ mod operations_tests {
         // 30 / 4.5 -> 2/3
         let mut test_tree = tr(Term::Symbol(8.into())) /
             tr(Term::Number(Decimal::from(30))) /
-            tr(Term::Number(Decimal::from((45.into(), 1))));
+            tr(Term::Number(Decimal::from((45, 1))));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
@@ -354,11 +354,11 @@ mod operations_tests {
             tr(Term::Number(Decimal::from(2))) /
             tr(Term::Number(Decimal::from(-2)));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree, tr(Term::Number(Decimal::from((25.into(), 2)))));
+        assert_eq!(test_tree, tr(Term::Number(Decimal::from((25, 2)))));
 
         // 0.5 ^ (-2) -> 4
         let mut test_tree = tr(Term::Symbol(power_sym.id)) /
-            tr(Term::Number(Decimal::from((5.into(), 1)))) /
+            tr(Term::Number(Decimal::from((5, 1)))) /
             tr(Term::Number(Decimal::from(-2)));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Term::Number(Decimal::from(4))));

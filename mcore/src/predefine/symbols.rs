@@ -94,7 +94,7 @@ pub fn add_with_name(symbols: &mut MultiMap<SymbolId, String, Symbol>, name: &st
 
 fn add_symbol_impl(symbols: &mut MultiMap<SymbolId, String, Symbol>, mut symbol: Symbol) -> Symbol {
     if let Some(s) = symbols.get_mut_alt(&symbol.name) {
-        s.attrs.extend(symbol.attrs.into_iter());
+        s.attrs.extend(symbol.attrs);
         return s.clone();
     }
 

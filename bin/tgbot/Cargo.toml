@@ -15,10 +15,10 @@ config = "0.13"
 cpu-freq = "0.0.2"
 futures = "0.3"
 lazy_static = "1.4"
-rust-i18n = "0.5"
+rust-i18n = "2.2"
 serde = "1.0"
 serde_derive = "1.0"
-strip-ansi-escapes = "0.1"
+strip-ansi-escapes = "0.2"
 sys-info = "0.9"
 telegram-bot = { git ="https://github.com/Quotique/telegram-bot", default-features = false, features = ["rustls"]}
 tokio = { version = "1.17", features = ["macros", "time", "fs", "rt-multi-thread"] }

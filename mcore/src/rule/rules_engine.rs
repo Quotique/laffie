@@ -104,9 +104,9 @@ impl RulesEngine {
                 .collect();
             self.all_rules
                 .entry(rule.level)
-                .or_insert_with(LevelRules::new)
+                .or_default()
                 .entry(rule.symbol_id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(Arc::new(rule));
         }
     }

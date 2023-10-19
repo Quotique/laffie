@@ -8,6 +8,6 @@ mcore = { path = "../mcore" }
 
 eyre = "0.6"
 log = "0.4"
-peg = "0.6"
+peg = "0.8"
 trees = "0.4"
 smartstring = "1"
