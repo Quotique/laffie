@@ -1,43 +1,43 @@
 symbol ! {
     attr display("!")
-};
+}
 
 
 rule {
     attr level(0),subtree,replace;
 
     !(a == b) <=> a != b;
-};
+}
 
 rule {
     attr level(0),subtree,replace;
 
     !(a != b) <=> a == b;
-};
+}
 
 rule {
     attr level(0),subtree,replace;
 
     !(a < b) <=> a >= b;
-};
+}
 
 rule {
     attr level(0),subtree,replace;
 
     !(a <= b) <=> a > b;
-};
+}
 
 rule {
     attr level(0),subtree,replace;
 
     !(a >= b) <=> a < b;
-};
+}
 
 rule {
     attr level(0),subtree,replace;
 
     !(a > b) <=> a <= b;
-};
+}
 
 rule {
     attr level(0),subtree,replace;

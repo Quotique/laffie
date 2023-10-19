@@ -1,6 +1,6 @@
 symbol set {
     attr commutative
-};
+}
 
 rule {
     attr level(0),problem_target(proof(set(a) is known));
@@ -8,7 +8,7 @@ rule {
     set(a) is known <=> true;
 
     a is known;
-};
+}
 
 rule {
     attr level(0),problem_target(proof(set(a, ..) is known));
@@ -17,7 +17,7 @@ rule {
 
     a is known,
     set(S) is known;
-};
+}
 
 rule {
     attr level(0),problem_target(find(x)),subtree,replace;
@@ -26,20 +26,20 @@ rule {
 
     a is known,
     b is known;
-};
+}
 
 rule {
     attr level(3),problem_target(transform(x)),subtree,replace,block(move_left);
 
     a in set(b, c) <=> a == b || a == c;
-};
+}
 
 symbol empty_set {
     attr display("∅ ")
-};
+}
 
 rule {
     attr level(0),problem_target(proof(empty_set is known));
 
     empty_set is known <=> true;
-};
+}

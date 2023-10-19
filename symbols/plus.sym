@@ -1,6 +1,6 @@
 symbol + {
     attr infix(300),associative,commutative
-};
+}
 
 rule {
     attr level(0),problem_target(proof(a+b is known));
@@ -9,4 +9,4 @@ rule {
 
     a is known,
     b is known;
-};
+}

@@ -1,24 +1,24 @@
 symbol * {
     attr infix(200),display("·"),associative,commutative
-};
+}
 
 rule {
     attr replace,level(2),problem_target(transform(x));
 
     (a + b)*c <=> a*c + b*c;
-};
+}
 
 rule {
     attr replace,level(4),problem_target(transform(x));
 
     a*c + b*c + d <=> (a+b)*c + d;
-};
+}
 
 rule {
     attr replace,level(1),problem_target(transform(x)),one(c);
 
     a*a*c <=> (a^2)*c;
-};
+}
 
 rule {
     attr level(0),problem_target(proof(a*b is known));
@@ -27,5 +27,5 @@ rule {
 
     a is known,
     b is known;
-};
+}
 

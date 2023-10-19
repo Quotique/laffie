@@ -1,6 +1,6 @@
 symbol && {
     attr infix(500),display("&"),associative,commutative
-};
+}
 
 rule {
     attr level(2),problem_target(transform(x)),subtree,replace;
@@ -8,7 +8,7 @@ rule {
     a && b <=> b;
 
     a is true;
-};
+}
 
 rule {
     attr level(2),problem_target(transform(x)),subtree,replace;
@@ -16,7 +16,7 @@ rule {
     a && b <=> a;
 
     a is false;
-};
+}
 
 rule {
     attr level(1),problem_target(transform(x)),subtree,replace;
@@ -24,10 +24,10 @@ rule {
     a == b && c =>  a == b && replace(a == b, c);
 
     a is variable;
-};
+}
 
 rule {
     attr level(3),problem_target(transform(x)),subtree,replace;
 
     a && (b || c) => (a && b) || (a && c);
-};
+}

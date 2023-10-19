@@ -1,6 +1,6 @@
 symbol sqrt {
     attr display("√")
-};
+}
 
 rule {
     attr level(0),problem_target(proof(sqrt(a) is known));
@@ -8,4 +8,4 @@ rule {
     sqrt(a) is known <=> true;
 
     a is known;
-};
+}

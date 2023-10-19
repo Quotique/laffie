@@ -1,24 +1,24 @@
 symbol - {
     attr infix(300)
-};
+}
 
 rule {
     attr level(0),problem_target(transform(x)),subtree,replace;
 
     --a <=> a;
-};
+}
 
 rule {
     attr level(0),problem_target(transform(x)),subtree,replace;
 
     a-b => a+(-b);
-};
+}
 
 rule {
     attr level(0),problem_target(transform(x)),subtree,replace;
 
     -a/b => (-a)/b;
-};
+}
 
 rule {
     attr level(0),problem_target(proof(-a is known));
@@ -26,10 +26,10 @@ rule {
     -a is known <=> true;
 
     a is known;
-};
+}
 
 rule {
     attr level(1),problem_target(transform(x)),subtree,replace;
 
     -(a+b) <=> -a+(-b);
-};
+}

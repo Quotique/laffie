@@ -1,15 +1,15 @@
 symbol is {
     attr infix(100),display(" is ")
-};
+}
 
 rule {
     attr replace,level(0),problem_target(proof(a is true));
 
     a is true <=> a;
-};
+}
 
 rule {
     attr replace,level(0);
 
     a is false <=> !(a);
-};
+}

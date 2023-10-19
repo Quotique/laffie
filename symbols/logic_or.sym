@@ -1,6 +1,6 @@
 symbol || {
     attr infix(600),display("|"),associative,commutative
-};
+}
 
 rule {
     attr level(2),problem_target(transform(x)),subtree,replace;
@@ -8,7 +8,7 @@ rule {
     a || b <=> a;
 
     a is true;
-};
+}
 
 rule {
     attr level(2),problem_target(transform(x)),subtree,replace;
@@ -16,7 +16,7 @@ rule {
     a || b <=> b;
 
     a is false;
-};
+}
 
 rule {
     attr level(0),problem_target(find(x)),subtree,replace;
@@ -25,7 +25,7 @@ rule {
 
     a is known,
     b is known;
-};
+}
 
 rule {
     attr level(0),problem_target(find(x)),subtree,replace;
@@ -35,4 +35,4 @@ rule {
     a is known,
     b is known,
     c is known;
-};
+}

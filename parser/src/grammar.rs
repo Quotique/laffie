@@ -55,7 +55,7 @@ peg::parser! {
         rule attrs() -> Vec<Tree<Data>> = _ keyword("attr") _ a:commasep(<arithmetic()>) { a }
 
         pub rule any() -> Vec<Tree<Data>> =
-            _ s:semicolonsep(<problem()/lang_rule()/symbol()>) _ { s }
+            _ s:( (problem()/lang_rule()/symbol())* ) _ { s }
 
         pub rule statements() -> Vec<Tree<Data>> = _ c:semicolonsep(<arithmetic()>) _ { c }
 
@@ -75,23 +75,16 @@ peg::parser! {
             _ ps:position!() keyword("symbol")
                 _ pn:position!() s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '*' | '/' |
                         '^' | '=' | '<' | '>' | '!' | '|' | '&' | '_' ]+)
-                _ pa:position!() a:("{" _ a:attrs() _ "}" { a } )?
+                _ pa:position!() a:( "{" _ a:attrs() _ "}" { a } / ";" { vec![] } )
                 {
-                    match a {
-                        Some(a) => {
-                            let mut t = Data::new("Attrs", pa);
-                            for i in a.iter().cloned() {
-                                t.push_back(i);
-                            }
-                            Data::new("Declare", ps) /
-                                (Data::new("Symbol", ps) / Data::new(s, pn)) /
-                                t
+                    if !a.is_empty() {
+                        let mut t = Data::new("Attrs", pa);
+                        for i in a.into_iter() {
+                            t.push_back(i);
                         }
-                        None => {
-                            Data::new("Declare", ps) /
-                                (Data::new("Symbol", ps) /
-                                 Data::new(s, pn))
-                        }
+                        Data::new("Declare", ps) / (Data::new("Symbol", ps) / Data::new(s, pn)) / t
+                    } else {
+                        Data::new("Declare", ps) / (Data::new("Symbol", ps) / Data::new(s, pn))
                     }
                 }
 

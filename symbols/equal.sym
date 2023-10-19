@@ -1,6 +1,6 @@
 symbol == {
     attr infix(500),display("=")
-};
+}
 
 rule {
     attr replace,level(0),problem_target(find(x)),id(move_left);
@@ -8,7 +8,7 @@ rule {
     a == b <=> a - b == 0;
 
     !symbolic_eq(b, 0);
-};
+}
 
 rule {
     attr replace,level(5),problem_target(find(x));
@@ -16,7 +16,7 @@ rule {
     a + b == c <=> a + b - c == 0;
 
     !symbolic_eq(c, 0);
-};
+}
 
 rule {
     attr level(1),problem_target(find(x)),one(a),zero(b),block(move_left);
@@ -25,5 +25,5 @@ rule {
 
     a != 0,
     b is known;
-};
+}
 

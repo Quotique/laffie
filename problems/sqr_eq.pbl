@@ -2,37 +2,37 @@ problem {
     target find(x);
 
     x^2+x-6 == 0;
-};
+}
 
 problem {
     target find(x);
 
     3*x^2+2*x-5 == 0;
-};
+}
 
 problem {
     target find(x);
 
     3*x^3 + 2*x^2 -5*x == 0;
-};
+}
 
 problem {
     target find(x);
 
     x^2 + 2103*x + 2102 == 0;
-};
+}
 
 problem {
     target find(x);
 
     118*x^2 + 1389x - 1507 == 0;
-};
+}
 
 problem {
     target find(x);
 
     2*x^2 + 2x + 5 == 0;
-};
+}
 
 problem {
     target find(x);
