@@ -1,9 +1,7 @@
-/target
-*/target
-*/*/target
-dumps*
-**/*.rs.bk
-*.log
-Cargo.lock
-src/parser/lang.rs
 /db
+dumps*
+*.log
+/logs
+**/*.rs.bk
+/target
+target/

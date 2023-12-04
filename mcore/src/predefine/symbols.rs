@@ -40,6 +40,7 @@ fn all_symbols() -> &'static RwLock<MultiMap<SymbolId, String, Symbol>> {
             Symbol::builder()
                 .name("=>")
                 .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(900))
+                .with_attr(SymbolAttr::Display, SymbolAttrValue::UStr(" ⟹  ".into()))
                 .build()
                 .unwrap(),
         );
@@ -48,6 +49,7 @@ fn all_symbols() -> &'static RwLock<MultiMap<SymbolId, String, Symbol>> {
             Symbol::builder()
                 .name("<=>")
                 .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(900))
+                .with_attr(SymbolAttr::Display, SymbolAttrValue::UStr(" ⟺  ".into()))
                 .build()
                 .unwrap(),
         );

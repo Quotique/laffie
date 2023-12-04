@@ -63,7 +63,7 @@ fn main() {
         .unwrap_or_else(|_| {
             std::process::exit(-1);
         });
-    log_init(&settings.logger);
+    let _log_guard = log_init(&settings.logger);
 
     let parser = DirectoryParser::new(
         args.symbols

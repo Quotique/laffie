@@ -1,8 +1,7 @@
 [package]
 name = "mcore"
 version = "0.4.2"
-edition = "2018"
-authors = ["Alexander <just.std@gmail.com>"]
+edition = "2021"
 
 [dependencies]
 macros = { path = "../macros" }
@@ -13,7 +12,7 @@ chrono = "0.4"
 derive_builder = "0.12"
 derive_more = "0.99"
 eyre = "0.6"
-fern = "0.6"
+file-rotate = "0.7.5"
 indexmap = "2.0"
 itertools = "0.11"
 log = "0.4"
@@ -23,9 +22,15 @@ num = "0.4"
 num-bigint = "0.4"
 once_cell = "1.9"
 parking_lot = "0.12"
+patricia_tree = { version = "0.6.2" }
 regex = "1"
 serde = "1.0"
 serde_derive = "1.0"
+slog-async = { version = "2.7" }
+slog-scope = { version = "4.4" }
+slog-stdlog = { version = "4.1" }
+slog-term = { version = "2.9" }
+slog = { version = "2.7", features = ["max_level_trace", "release_max_level_trace"] }
 smartstring = "1"
 trees = "0.4"
 

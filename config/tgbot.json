@@ -2,6 +2,8 @@
   "logger": {
     "filename": "tgbot.log",
     "level": "Trace",
+    "num_files": 3,
+    "file_rotate_bytes": 100000000,
     "target_levels": {
       "hyper": "Info",
       "tokio_threadpool": "Info",

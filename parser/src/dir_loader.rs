@@ -7,6 +7,7 @@ use trees::Tree;
 
 use mcore::{
     predefine::add_symbol, problem::Problem, rule::RulesEngine, statement::symbols::Symbol,
+    utils::VecDisplay,
 };
 
 use crate::{lang, NodeData, ProblemParser, RuleParser, SymbolParser};
@@ -45,7 +46,6 @@ impl DirectoryParser {
                     .map_err(|e| error!("Rule not parsed: {}", e.error_string(src)))
                 {
                     for rule in rules {
-                        trace!("New rule: {}", rule);
                         result.register_rule(rule);
                     }
                 }
@@ -57,10 +57,17 @@ impl DirectoryParser {
     pub fn load_problems(&self) -> io::Result<Vec<Problem>> {
         let mut result = vec![];
         Self::load_dir(self.problems_path.as_ref(), &["pbl"], &mut |src, s| {
-            trace!("New problem cb: {}", s);
             if s.root().data().symbol == "Problem" {
                 match ProblemParser::with(s).parse() {
-                    Ok(p) => result.push(p),
+                    Ok(p) => {
+                        trace!(
+                            "New problem: [{:x}] {} {}",
+                            p.id,
+                            p.target,
+                            VecDisplay(&p.conditions)
+                        );
+                        result.push(p)
+                    }
                     Err(e) => error!("Problem not parsed: {}", e.error_string(src)),
                 }
             }

@@ -103,11 +103,11 @@ impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{} id: {}, level: {}, reqs: {}",
-            self.statement,
+            "[{}](L:{}) {} => {}",
             self.id,
             self.level,
-            VecDisplay(&self.requirements)
+            VecDisplay(&self.requirements),
+            self.statement
         )
     }
 }

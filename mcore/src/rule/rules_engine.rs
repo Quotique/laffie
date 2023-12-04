@@ -34,6 +34,7 @@ impl RulesEngine {
     pub fn register_rule(&mut self, mut rule: Rule) {
         self.last_id.increment();
         rule.id = self.last_id;
+        debug!("New rule: {}", rule);
         if let Some(RuleAttrValue::Str(s)) = rule.attribute(&RuleAttr::Id).next() {
             self.id_map.insert(s.clone(), rule.id);
         }
@@ -69,8 +70,9 @@ impl RulesEngine {
             .collect();
         if !result.is_empty() {
             trace!(
-                target: "rule_selection", "[{}] Suggested rules: [{}]",
-                statement.weight, VecDisplay(&result)
+                "[{}] Suggested rules: [{}]",
+                statement.weight,
+                VecDisplay(&result)
             );
         }
         result

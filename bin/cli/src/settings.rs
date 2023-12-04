@@ -15,7 +15,7 @@ pub struct Settings {
 impl Settings {
     pub fn new<P: AsRef<Path>>(file: P) -> Result<Self, ConfigError> {
         Config::builder()
-            .add_source(File::new(file.as_ref().to_str().unwrap(), FileFormat::Json))
+            .add_source(File::new(file.as_ref().to_str().unwrap(), FileFormat::Yaml))
             .build()?
             .try_deserialize()
     }
