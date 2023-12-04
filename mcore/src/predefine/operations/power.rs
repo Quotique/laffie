@@ -60,6 +60,10 @@ pub fn power(root: &mut StatementNode, level: NormalizationLevel) -> bool {
                 false
             }
         }
+        (Some(arg), _) if arg.is_one() => {
+            swap_node(root, &mut tr(Term::Number(1.into())).root_mut());
+            true
+        }
         (_, Some(pow)) if pow.is_zero() => {
             swap_node(root, &mut tr(Term::Number(1.into())).root_mut());
             true

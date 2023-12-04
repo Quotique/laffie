@@ -9,3 +9,12 @@ rule {
 
     a is known;
 }
+
+rule {
+    attr level(0),problem_target(proof(x != 0));
+
+    a*sqrt(b) + c != 0 <=> c*a > 0 || b != (c/a)^2;
+
+    b >= 0,
+    a != 0;
+}

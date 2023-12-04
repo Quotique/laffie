@@ -1,0 +1,5 @@
+problem {
+	target proof(4*sqrt(5) + 9 != 0);
+
+	x == 2;
+}

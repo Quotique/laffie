@@ -176,6 +176,15 @@ impl Target {
                     if x[index].weight > level {
                         return;
                     }
+
+                    if let Some(simplified) = x.transform(index, cache.clone()) {
+                        x[index].replaced = true;
+                        x.add_condition(simplified).unwrap();
+                        continue;
+                    } else {
+                        x[index].simplified = true;
+                    }
+
                     let new_states = main_frame.next_statement_with_statement(
                         &local_rules,
                         &mut x[index],

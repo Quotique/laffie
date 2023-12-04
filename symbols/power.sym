@@ -27,8 +27,20 @@ rule {
     (a/b)^n <=> (a^n)/(b^n);
 }
 
+// TODO: n is natural
 rule {
-    attr replace,level(1),problem_target(transform(x)),one(c);
+    attr replace,level(4),problem_target(transform(x)),normalize(2);
 
-    (a^n)*a*c <=> (a^(n+1))*c;
+    (a+b)^n <=> (a+b)^(n - 1)*(a + b);
+
+    a is known,
+    b is known;
+}
+
+rule {
+    attr replace,level(1),problem_target(transform(x));
+
+    (sqrt(a))^2 <=> a;
+
+    a >= 0;
 }

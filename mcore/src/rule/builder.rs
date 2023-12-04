@@ -157,7 +157,7 @@ impl RuleBuilder {
                 .collect();
 
             // TODO: normalization level
-            statement = statement.normalize(NormalizationLevel::max());
+            statement = statement.normalize(NormalizationLevel::from(1));
 
             result.push(Rule {
                 id: self.rule_id,

@@ -15,12 +15,6 @@ rule {
 }
 
 rule {
-    attr replace,level(1),problem_target(transform(x)),one(c);
-
-    a*a*c <=> (a^2)*c;
-}
-
-rule {
     attr level(0),problem_target(proof(a*b is known));
 
     a*b is known <=> true;

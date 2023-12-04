@@ -38,6 +38,14 @@ rule {
 }
 
 rule {
+    attr level(3),problem_target(proof(a/b != c));
+
+    a/b != c <=> a != c*b;
+
+    a is known;
+}
+
+rule {
     attr level(2),problem_target(find(x));
 
     a/b == 0 => a == 0 && b != 0;
