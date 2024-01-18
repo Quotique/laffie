@@ -120,7 +120,7 @@ impl Solution {
         self.perf_stats.status =
             result.map(|_| (*self.stack[self.answer.unwrap()].statement).clone());
         self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
-        self.stack.dumper().subproblem_end();
+        self.stack.dumper().subproblem_end(&self.perf_stats);
         result
     }
 
