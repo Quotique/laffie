@@ -1,12 +1,16 @@
 use std::{
     fs::File,
     io::prelude::*,
+    path::Path,
     sync::{Arc, Mutex},
 };
 
 use serde_derive::Deserialize;
 
-use crate::{problem::Problem, statement::MarkedStatement};
+use crate::{
+    problem::{Problem, SolveStatus},
+    statement::MarkedStatement,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -22,7 +26,7 @@ pub struct Dumper {
 pub trait DumperSink {
     fn subproblem_start(&mut self, problem: &Problem);
 
-    fn subproblem_end(&mut self);
+    fn subproblem_end(&mut self, status: &SolveStatus);
 
     fn add_statement(&mut self, statement: &MarkedStatement, parent: &MarkedStatement);
 }
@@ -59,8 +63,8 @@ impl DumperSink for Dumper {
         self.sink.lock().unwrap().subproblem_start(problem);
     }
 
-    fn subproblem_end(&mut self) {
-        self.sink.lock().unwrap().subproblem_end();
+    fn subproblem_end(&mut self, status: &SolveStatus) {
+        self.sink.lock().unwrap().subproblem_end(status);
     }
 
     fn add_statement(&mut self, statement: &MarkedStatement, parent: &MarkedStatement) {
@@ -71,16 +75,20 @@ impl DumperSink for Dumper {
 impl DumperSink for NoneDumper {
     fn subproblem_start(&mut self, _: &Problem) {}
 
-    fn subproblem_end(&mut self) {}
+    fn subproblem_end(&mut self, _: &SolveStatus) {}
 
     fn add_statement(&mut self, _: &MarkedStatement, _: &MarkedStatement) {}
 }
 
 impl FileDumper {
     pub fn new(file_name: &str) -> FileDumper {
+        let path: &Path = file_name.as_ref();
+        if let Some(p) = path.parent() {
+            std::fs::create_dir_all(p).expect("unable to create directory");
+        }
         FileDumper {
             subproblem_level: 0,
-            file:             File::create(file_name).expect("Unable to create dump file"),
+            file:             File::create(path).expect("Unable to create dump file"),
         }
     }
 
@@ -110,7 +118,18 @@ impl DumperSink for FileDumper {
         self.subproblem_level += 1;
     }
 
-    fn subproblem_end(&mut self) {
+    fn subproblem_end(&mut self, status: &SolveStatus) {
+        self.file
+            .write_all(
+                format!(
+                    "{}[{} cycles, {} ms]\n",
+                    self.prefix(),
+                    status.cycles_count,
+                    status.absolute_time
+                )
+                .as_bytes(),
+            )
+            .expect("Unable write into dump file");
         self.subproblem_level -= 1;
     }
 

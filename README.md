@@ -4,7 +4,7 @@
 
 После установки собрать и запустить систему можно командой
 
-cargo run --release --bin cli -- -c config/cli.json
+cargo run --release --bin cli -- -c config/cli.yaml
 
 Рекомендуется использовать имено релизную сборку (флаг --release), так как время работы отличается в разы
 
