@@ -3,8 +3,8 @@ use std::fmt;
 use colored::*;
 
 use mcore::{
-    problem::{Frame, SolveStatus, Target},
-    statement::{MarkedStatement, Statement},
+    task::{Frame, Purpose, SolveStatus},
+    term::{Term, TermProps},
     utils::VecDisplay,
 };
 
@@ -15,39 +15,35 @@ pub struct Console<'a, 'b> {
 }
 
 impl<'a, 'b> Renderer for Console<'a, 'b> {
-    fn display_target(&mut self, subproblem_level: usize, target: &Target) -> fmt::Result {
-        writeln!(self.output, "{}{target}", "  ".repeat(subproblem_level))
+    fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result {
+        writeln!(self.output, "{}{purpose}", "  ".repeat(subtask_level))
     }
 
-    fn display_statement(
-        &mut self,
-        subproblem_level: usize,
-        statement: &MarkedStatement,
-    ) -> fmt::Result {
+    fn display_term(&mut self, subtask_level: usize, term: &TermProps) -> fmt::Result {
         writeln!(
             self.output,
             "{}=> {} from: {}",
-            "  ".repeat(subproblem_level),
-            statement.statement.to_string().bold().yellow(),
-            VecDisplay(&statement.requirements),
+            "  ".repeat(subtask_level),
+            term.term.to_string().bold().yellow(),
+            VecDisplay(&term.requirements),
         )
     }
 
     fn display_answer(
         &mut self,
-        target: &Target,
-        answer: Option<&Statement>,
+        purpose: &Purpose,
+        answer: Option<&Term>,
         status: &SolveStatus,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {
             writeln!(
                 self.output,
                 "{} {}",
-                match target {
-                    Target::Find(_) | Target::Transform(_) => {
+                match purpose {
+                    Purpose::Find(_) | Purpose::Transform(_) => {
                         format!("{} {answer}", "Answer:".green()).bold()
                     }
-                    Target::Proof(_) => {
+                    Purpose::Proof(_) => {
                         "PROOFED!".bold().green()
                     }
                 },
@@ -64,7 +60,7 @@ impl<'a, 'b> Renderer for Console<'a, 'b> {
 
     fn dump_frame(&mut self, frame: &Frame) -> fmt::Result {
         for (i, s) in frame.iter().enumerate() {
-            writeln!(self.output, "{i} {} {:?}", s.statement, s.parent)?;
+            writeln!(self.output, "{i} {} {:?}", s.term, s.parent)?;
         }
         Ok(())
     }

@@ -7,11 +7,11 @@ use mcore::utils::LogConfig;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub logger:          LogConfig,
-    pub problems_db:     PathBuf,
-    pub users_db:        PathBuf,
-    pub problems_backup: PathBuf,
-    pub users_backup:    PathBuf,
+    pub logger:       LogConfig,
+    pub tasks_db:     PathBuf,
+    pub users_db:     PathBuf,
+    pub tasks_backup: PathBuf,
+    pub users_backup: PathBuf,
 }
 
 impl Settings {

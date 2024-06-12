@@ -1,0 +1,67 @@
+task {
+    purpose find(x);
+
+    x == 1;
+}
+
+task {
+    purpose find(x);
+
+    x in set(1);
+}
+
+task {
+    purpose find(x);
+
+    x in set(1, (sqrt(2) + 5)/2 );
+}
+
+task {
+    purpose find(x);
+
+    --x == 1;
+}
+
+task {
+    purpose find(x);
+
+    x+3 == 0;
+}
+
+task {
+    purpose find(x);
+
+    2*x+5 == 0;
+}
+
+task {
+    purpose find(x);
+
+    2*x-5 == 0;
+}
+
+task {
+    purpose find(x);
+
+    2*(x+4) + 3*(x-5) == 0;
+}
+
+task {
+    purpose find(x);
+
+    2*x-5+t == 0;
+    t is known;
+}
+
+task {
+    purpose find(x);
+
+    2*x-t == 0;
+    t is known;
+}
+
+task {
+    purpose find(x);
+
+    3*x+5 == 1-x;
+}

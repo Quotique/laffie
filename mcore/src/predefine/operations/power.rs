@@ -4,26 +4,26 @@ use trees::tr;
 
 use crate::{
     predefine::symbol_by_name,
-    statement::{
-        symbols::{Symbol, SymbolAttr, SymbolAttrValue},
-        term::{StatementNode, Term},
+    term::{
+        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue},
+        symbol::Symbol,
         tree_utils::{swap_node, NodeMapping},
+        TermNode,
     },
     NormalizationLevel,
 };
 
 use super::to_const;
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name("^")
         .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(100))
         .with_calculator(Box::new(power))
         .build()
-        .unwrap()
 }
 
-pub fn power(root: &mut StatementNode, level: NormalizationLevel) -> bool {
+pub fn power(root: &mut TermNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("^") {
         return false;
     }
@@ -41,17 +41,17 @@ pub fn power(root: &mut StatementNode, level: NormalizationLevel) -> bool {
                 let (m, exp) = d1.as_bigint_and_exponent();
                 let result = Decimal::new(m.pow(e.unsigned_abs()), exp * (e.abs() as i64));
                 let mut result = if result > Decimal::zero() {
-                    tr(Term::Number(result))
+                    tr(Symbol::Number(result))
                 } else {
-                    tr(Term::with_symbol_name("-").unwrap()) / tr(Term::Number(-result))
+                    tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-result))
                 };
                 // TODO: negative result
                 while root.pop_front().is_some() {}
                 if e >= 0 {
                     swap_node(root, &mut result.root_mut());
                 } else {
-                    *root.data_mut() = Term::Symbol(symbol_by_name("/").unwrap().id);
-                    root.push_back(tr(Term::Number(Decimal::one())));
+                    *root.data_mut() = Symbol::FuncSymbol(symbol_by_name("/").unwrap());
+                    root.push_back(tr(Symbol::Number(Decimal::one())));
                     root.push_back(result);
                     root.evaluate(level);
                 }
@@ -61,11 +61,11 @@ pub fn power(root: &mut StatementNode, level: NormalizationLevel) -> bool {
             }
         }
         (Some(arg), _) if arg.is_one() => {
-            swap_node(root, &mut tr(Term::Number(1.into())).root_mut());
+            swap_node(root, &mut tr(Symbol::Number(1.into())).root_mut());
             true
         }
         (_, Some(pow)) if pow.is_zero() => {
-            swap_node(root, &mut tr(Term::Number(1.into())).root_mut());
+            swap_node(root, &mut tr(Symbol::Number(1.into())).root_mut());
             true
         }
         (_, Some(pow)) if pow.is_one() => {
@@ -77,7 +77,7 @@ pub fn power(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     }
 }
 
-pub fn power_argument(root: &StatementNode) -> &StatementNode {
+pub fn power_argument(root: &TermNode) -> &TermNode {
     if root.data().is_symbol_name("^") {
         root.front().unwrap()
     } else {

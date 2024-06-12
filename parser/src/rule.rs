@@ -1,30 +1,30 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use mcore::{
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
-    statement::CompactString,
-    SymbolId,
+    term::FuncSymbol,
+    CompactString,
 };
 
 use crate::ParserError;
 
-use super::{statement::StatementParser, Node, Tree};
+use super::{term::TermParser, Node, Tree};
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
-    symbol_id:   SymbolId,
+    func_symbol: Arc<FuncSymbol>,
 }
 
 impl<'a> RuleParser<'a> {
     pub fn with(syntax_tree: &'a Tree) -> Self {
         Self {
             syntax_tree,
-            symbol_id: Default::default(),
+            func_symbol: Default::default(),
         }
     }
 
-    pub fn with_symbol_id(mut self, symbol_id: SymbolId) -> Self {
-        self.symbol_id = symbol_id;
+    pub fn with_func_symbol(mut self, func_symbol: Arc<FuncSymbol>) -> Self {
+        self.func_symbol = func_symbol;
         self
     }
 
@@ -41,7 +41,7 @@ impl<'a> RuleParser<'a> {
             match child.data().symbol.as_str() {
                 "=>" | "<=>" => {
                     builder = builder
-                        .with_statement(StatementParser::new(child).parse()?)
+                        .with_term(TermParser::new(child).parse()?)
                         .map_err(|e| ParserError {
                             loc: child.data().location.clone(),
                             msg: e.to_string(),
@@ -49,7 +49,7 @@ impl<'a> RuleParser<'a> {
                 }
                 "Predicates" => {
                     for req in child.iter() {
-                        builder = builder.with_require(StatementParser::new(req).parse()?)
+                        builder = builder.with_require(TermParser::new(req).parse()?)
                     }
                 }
                 "Attributes" => {
@@ -69,7 +69,7 @@ impl<'a> RuleParser<'a> {
         }
 
         builder
-            .with_symbol_id(self.symbol_id)
+            .with_func_symbol(self.func_symbol)
             .build()
             .map_err(|e| ParserError {
                 loc: self.syntax_tree.data().location.clone(),
@@ -100,7 +100,7 @@ impl<'a> RuleParser<'a> {
                     })?),
                 ))
             }
-            "problem_target" | "zero" | "one" => {
+            "purpose" | "zero" | "one" => {
                 if attr.degree() != 1 {
                     return Err(ParserError {
                         loc: attr.data().location.clone(),
@@ -108,10 +108,10 @@ impl<'a> RuleParser<'a> {
                     });
                 }
 
-                let target = StatementParser::new(attr.front().unwrap()).parse()?;
+                let purpose = TermParser::new(attr.front().unwrap()).parse()?;
                 Ok((
                     RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
-                    RuleAttrValue::Target(target),
+                    RuleAttrValue::Target(purpose),
                 ))
             }
             "id" => {
@@ -173,7 +173,7 @@ mod tests {
 
     use mcore::{
         rule::{RuleAttr, RuleAttrValue},
-        statement::term::Term,
+        term::symbol::Symbol,
     };
 
     use crate::lang;
@@ -198,30 +198,29 @@ mod tests {
 
         assert_eq!(
             rule.pattern_node().deep_clone(),
-            (tr(Term::with_symbol_name("==").unwrap()) /
-                (tr(Term::with_symbol_name("+").unwrap()) /
-                    tr(Term::Param("a".parse().unwrap())) /
-                    tr(Term::Param("x".parse().unwrap()))) /
-                tr(Term::Number(0.into())))
+            (tr(Symbol::with_func_symbol("==")) /
+                (tr(Symbol::with_func_symbol("+")) /
+                    tr(Symbol::Param("a".parse().unwrap())) /
+                    tr(Symbol::Param("x".parse().unwrap()))) /
+                tr(Symbol::Number(0.into())))
         );
 
         assert_eq!(
             rule.replace_node().deep_clone(),
-            (tr(Term::with_symbol_name("==").unwrap()) /
-                tr(Term::Param("x".parse().unwrap())) /
-                (tr(Term::with_symbol_name("-").unwrap()) /
-                    tr(Term::Param("a".parse().unwrap()))))
+            (tr(Symbol::with_func_symbol("==")) /
+                tr(Symbol::Param("x".parse().unwrap())) /
+                (tr(Symbol::with_func_symbol("-")) / tr(Symbol::Param("a".parse().unwrap()))))
         );
         assert_eq!(rule.requirements.len(), 1);
         assert_eq!(
             rule.requirements[0],
-            (tr(Term::with_symbol_name("!=").unwrap()) /
-                tr(Term::Param("a".parse().unwrap())) /
-                tr(Term::Number(0.into())))
+            (tr(Symbol::with_func_symbol("!=")) /
+                tr(Symbol::Param("a".parse().unwrap())) /
+                tr(Symbol::Number(0.into())))
             .into()
         );
 
-        assert_eq!(rule.attrs.len(), 3);
+        assert_eq!(rule.attrs.len(), 2);
 
         assert!(rule.contains_attribute(&RuleAttr::Replace));
         assert_eq!(
@@ -233,7 +232,7 @@ mod tests {
     #[test]
     fn rule_parse_2_test() {
         let test = r#"rule {
-                    attr level(0),problem_target(proof(a/b is known));
+                    attr level(0),purpose(proof(a/b is known));
                     a/b is known <=> true;
                     a is known,
                     b is known
@@ -249,36 +248,35 @@ mod tests {
 
         assert_eq!(
             rule.pattern_node().deep_clone(),
-            (tr(Term::with_symbol_name("is").unwrap()) /
-                (tr(Term::with_symbol_name("/").unwrap()) /
-                    tr(Term::Param("a".parse().unwrap())) /
-                    tr(Term::Param("b".parse().unwrap()))) /
-                tr(Term::with_symbol_name("known").unwrap()))
+            (tr(Symbol::with_func_symbol("is")) /
+                (tr(Symbol::with_func_symbol("/")) /
+                    tr(Symbol::Param("a".parse().unwrap())) /
+                    tr(Symbol::Param("b".parse().unwrap()))) /
+                tr(Symbol::with_func_symbol("known")))
         );
 
         assert_eq!(
             rule.replace_node().deep_clone(),
-            (tr(Term::with_symbol_name("true").unwrap()))
+            (tr(Symbol::with_func_symbol("true")))
         );
         assert_eq!(rule.requirements.len(), 2);
         assert_eq!(
             rule.requirements[0],
-            (tr(Term::with_symbol_name("is").unwrap()) /
-                tr(Term::Param("a".parse().unwrap())) /
-                tr(Term::with_symbol_name("known").unwrap()))
+            (tr(Symbol::with_func_symbol("is")) /
+                tr(Symbol::Param("a".parse().unwrap())) /
+                tr(Symbol::with_func_symbol("known")))
             .into()
         );
         assert_eq!(
             rule.requirements[1],
-            (tr(Term::with_symbol_name("is").unwrap()) /
-                tr(Term::Param("b".parse().unwrap())) /
-                tr(Term::with_symbol_name("known").unwrap()))
+            (tr(Symbol::with_func_symbol("is")) /
+                tr(Symbol::Param("b".parse().unwrap())) /
+                tr(Symbol::with_func_symbol("known")))
             .into()
         );
 
-        assert_eq!(rule.attrs.len(), 4);
+        assert_eq!(rule.attrs.len(), 3);
 
-        assert!(rule.contains_attribute(&RuleAttr::Subtree));
         assert!(rule.contains_attribute(&RuleAttr::Equivalence));
         assert_eq!(
             rule.attribute(&RuleAttr::Level).collect::<Vec<_>>(),

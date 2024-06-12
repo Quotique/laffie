@@ -7,9 +7,9 @@ use mcore::utils::LogConfig;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub logger:       LogConfig,
-    pub symbols_dir:  Option<PathBuf>,
-    pub problems_dir: Option<PathBuf>,
+    pub logger:      LogConfig,
+    pub symbols_dir: Option<PathBuf>,
+    pub tasks_dir:   Option<PathBuf>,
 }
 
 impl Settings {

@@ -12,8 +12,8 @@ pub fn symbol(text: &str) -> Result<Tree, ParserError> {
     })))
 }
 
-pub fn statements(text: &str) -> Result<Vec<Tree>, ParserError> {
-    let state = ra::statements(text).map_err(ParserError::from)?;
+pub fn terms(text: &str) -> Result<Vec<Tree>, ParserError> {
+    let state = ra::terms(text).map_err(ParserError::from)?;
     let poses = Location::new_line_poses(text);
 
     Ok(state
@@ -37,8 +37,8 @@ pub fn lang_rule(text: &str) -> Result<Tree, ParserError> {
     })))
 }
 
-pub fn problem(text: &str) -> Result<Tree, ParserError> {
-    let state = ra::problem(text).map_err(ParserError::from)?;
+pub fn task(text: &str) -> Result<Tree, ParserError> {
+    let state = ra::task(text).map_err(ParserError::from)?;
     let poses = Location::new_line_poses(text);
 
     Ok(Tree::from(state.into_bfs().map(|x| NodeData {

@@ -1,20 +1,19 @@
-use crate::statement::{
-    symbols::{Symbol, SymbolAttr, SymbolAttrValue, TruthResult},
-    term::StatementNode,
+use crate::term::{
+    func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue, TruthResult},
+    TermNode,
 };
 
 use super::compare_numbers;
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name("==")
         .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(500))
         .with_truth_checker(Box::new(equal))
         .build()
-        .unwrap()
 }
 
-pub fn equal(root: &StatementNode) -> TruthResult {
+pub fn equal(root: &TermNode) -> TruthResult {
     if !root.data().is_symbol_name("==") {
         return TruthResult::Unknown;
     }

@@ -3,7 +3,7 @@ symbol sqrt {
 }
 
 rule {
-    attr level(0),problem_target(proof(sqrt(a) is known));
+    attr level(0),purpose(proof(sqrt(a) is known));
 
     sqrt(a) is known <=> true;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(0),problem_target(proof(x != 0));
+    attr level(0),purpose(proof(x != 0));
 
     a*sqrt(b) + c != 0 <=> c*a > 0 || b != (c/a)^2;
 

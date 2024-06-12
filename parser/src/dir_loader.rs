@@ -1,27 +1,28 @@
 use std::{
     fs, io,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use trees::Tree;
 
 use mcore::{
-    predefine::add_symbol, problem::Problem, rule::RulesEngine, statement::symbols::Symbol,
+    predefine::add_symbol, rule::RulesEngine, task::Task, term::func_symbol::FuncSymbol,
     utils::VecDisplay,
 };
 
-use crate::{lang, NodeData, ProblemParser, RuleParser, SymbolParser};
+use crate::{lang, FuncSymbolParser, NodeData, RuleParser, TaskParser};
 
 pub struct DirectoryParser {
-    symbols_path:  PathBuf,
-    problems_path: PathBuf,
+    symbols_path: PathBuf,
+    tasks_path:   PathBuf,
 }
 
 impl DirectoryParser {
-    pub fn new<P: AsRef<Path>>(symbols_path: P, problems_path: P) -> Self {
+    pub fn new<P: AsRef<Path>>(symbols_path: P, tasks_path: P) -> Self {
         Self {
-            symbols_path:  PathBuf::from(symbols_path.as_ref()),
-            problems_path: PathBuf::from(problems_path.as_ref()),
+            symbols_path: PathBuf::from(symbols_path.as_ref()),
+            tasks_path:   PathBuf::from(tasks_path.as_ref()),
         }
     }
 
@@ -31,17 +32,17 @@ impl DirectoryParser {
         self.load_symbols()?;
 
         let mut result = RulesEngine::default();
-        let mut last_sym: Option<Symbol> = None;
+        let mut last_sym: Option<Arc<FuncSymbol>> = None;
 
         Self::load_dir(
             &self.symbols_path,
             &["sym"],
             &mut |src, s: &Tree<NodeData>| {
-                if let Ok(sym) = SymbolParser::new(s).parse() {
+                if let Ok(sym) = FuncSymbolParser::new(s).parse() {
                     let sym = add_symbol(sym);
                     last_sym.replace(sym);
                 } else if let Ok(rules) = RuleParser::with(s)
-                    .with_symbol_id(last_sym.as_ref().unwrap().id)
+                    .with_func_symbol(last_sym.as_ref().unwrap().clone())
                     .parse()
                     .map_err(|e| error!("Rule not parsed: {}", e.error_string(src)))
                 {
@@ -54,21 +55,21 @@ impl DirectoryParser {
         Ok(result)
     }
 
-    pub fn load_problems(&self) -> io::Result<Vec<Problem>> {
+    pub fn load_tasks(&self) -> io::Result<Vec<Task>> {
         let mut result = vec![];
-        Self::load_dir(self.problems_path.as_ref(), &["pbl"], &mut |src, s| {
-            if s.root().data().symbol == "Problem" {
-                match ProblemParser::with(s).parse() {
+        Self::load_dir(self.tasks_path.as_ref(), &["pbl"], &mut |src, s| {
+            if s.root().data().symbol == "Task" {
+                match TaskParser::with(s).parse() {
                     Ok(p) => {
                         trace!(
-                            "New problem: [{:x}] {} {}",
+                            "New task: [{:x}] {} {}",
                             p.id,
-                            p.target,
+                            p.purpose,
                             VecDisplay(&p.conditions)
                         );
                         result.push(p)
                     }
-                    Err(e) => error!("Problem not parsed: {}", e.error_string(src)),
+                    Err(e) => error!("Task not parsed: {}", e.error_string(src)),
                 }
             }
         })?;
@@ -80,7 +81,7 @@ impl DirectoryParser {
             &self.symbols_path,
             &["sym"],
             &mut |_, s: &Tree<NodeData>| {
-                if let Ok(sym) = SymbolParser::new(s).parse() {
+                if let Ok(sym) = FuncSymbolParser::new(s).parse() {
                     add_symbol(sym);
                 }
             },

@@ -1,19 +1,18 @@
-use crate::statement::{
-    symbols::{Symbol, TruthResult},
-    term::StatementNode,
+use crate::term::{
+    func_symbol::{FuncSymbol, TruthResult},
+    TermNode,
 };
 
 use super::compare_numbers;
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name(">")
         .with_truth_checker(Box::new(more))
         .build()
-        .unwrap()
 }
 
-pub fn more(root: &StatementNode) -> TruthResult {
+pub fn more(root: &TermNode) -> TruthResult {
     if !root.data().is_symbol_name(">") {
         return TruthResult::Unknown;
     }

@@ -1,17 +1,16 @@
-use crate::statement::{
-    symbols::{Symbol, TruthResult},
-    term::StatementNode,
+use crate::term::{
+    func_symbol::{FuncSymbol, TruthResult},
+    TermNode,
 };
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name("true")
         .with_truth_checker(Box::new(is_true))
         .build()
-        .unwrap()
 }
 
-pub fn is_true(root: &StatementNode) -> TruthResult {
+pub fn is_true(root: &TermNode) -> TruthResult {
     if !root.data().is_symbol_name("true") {
         return TruthResult::Unknown;
     }

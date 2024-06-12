@@ -1,0 +1,5 @@
+---
+source: mcore/src/term/mod.rs
+expression: term
+---
+set(a, b) is known ⟺  true

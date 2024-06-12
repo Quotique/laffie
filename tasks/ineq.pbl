@@ -1,0 +1,29 @@
+task {
+	purpose proof(1 > 0);
+
+	x == 2;
+}
+
+task {
+	purpose proof(-9 < 0);
+
+	x == 2;
+}
+
+task {
+	purpose proof((1>0) is (true));
+
+	x == 2;
+}
+
+task {
+	purpose proof(x > 0);
+
+	x == 2;
+}
+
+task {
+	purpose proof(x > 0);
+
+	x == 2 + 2;
+}

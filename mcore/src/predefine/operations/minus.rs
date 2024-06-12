@@ -2,24 +2,24 @@ use bigdecimal::Zero;
 use trees::tr;
 
 use crate::{
-    statement::{
-        symbols::{Symbol, SymbolAttr, SymbolAttrValue},
-        term::{StatementNode, Term},
+    term::{
+        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue},
+        symbol::Symbol,
         tree_utils::{swap_node, NodeMapping},
+        TermNode,
     },
     NormalizationLevel,
 };
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name("-")
         .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(300))
         .with_calculator(Box::new(minus))
         .build()
-        .unwrap()
 }
 
-pub fn minus(root: &mut StatementNode, level: NormalizationLevel) -> bool {
+pub fn minus(root: &mut TermNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("-") {
         return false;
     }
@@ -30,14 +30,14 @@ pub fn minus(root: &mut StatementNode, level: NormalizationLevel) -> bool {
         _ => {
             if root.degree() == 2 {
                 let second = root.pop_back().unwrap();
-                *root.data_mut() = Term::with_symbol_name("+").unwrap();
-                root.push_back(tr(Term::with_symbol_name("-").unwrap()) / second);
+                *root.data_mut() = Symbol::with_func_symbol("+");
+                root.push_back(tr(Symbol::with_func_symbol("-")) / second);
                 root.evaluate(level)
             } else if root.front().unwrap().data().is_symbol_name("*") {
                 let mut child = root.pop_front().unwrap();
                 swap_node(root, &mut child.root_mut());
                 let first_arg = root.pop_front().unwrap();
-                root.push_front(tr(Term::with_symbol_name("-").unwrap()) / first_arg);
+                root.push_front(tr(Symbol::with_func_symbol("-")) / first_arg);
                 root.evaluate(level)
             } else {
                 remove_zeroes(root)
@@ -46,27 +46,27 @@ pub fn minus(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     }
 }
 
-fn remove_zeroes(root: &mut StatementNode) -> bool {
+fn remove_zeroes(root: &mut TermNode) -> bool {
     match root.degree() {
         1 => {
-            if let Term::Number(d) = root.back().unwrap().data() {
+            if let Symbol::Number(d) = root.back().unwrap().data() {
                 if d.is_zero() {
-                    swap_node(root, &mut tr(Term::Number(0.into())).root_mut());
+                    swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
                     return true;
                 }
             }
             false
         }
         2 => match (&root.front().unwrap().data(), &root.back().unwrap().data()) {
-            (Term::Number(d1), Term::Number(d2)) if d1.is_zero() && d2.is_zero() => {
-                swap_node(root, &mut tr(Term::Number(0.into())).root_mut());
+            (Symbol::Number(d1), Symbol::Number(d2)) if d1.is_zero() && d2.is_zero() => {
+                swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
                 true
             }
-            (Term::Number(d), _) if d.is_zero() => {
+            (Symbol::Number(d), _) if d.is_zero() => {
                 let _ = root.pop_front().unwrap();
                 true
             }
-            (_, Term::Number(d)) if d.is_zero() => {
+            (_, Symbol::Number(d)) if d.is_zero() => {
                 let mut first = root.pop_front().unwrap();
                 swap_node(root, &mut first.root_mut());
                 true

@@ -1,13 +1,13 @@
 ru:
   buttons:
     help: "Список команд"
-    problems: "Мои задачи"
+    tasks: "Мои задачи"
     guide: "Руководство"
     examples: "Примеры задач"
     rerun: "Повторить решение"
     report: "Сообщить об ошибке"
   content:
-    empty_problems_list: "Нет задач"
+    empty_tasks_list: "Нет задач"
     reported: "Сообщение отправлено"
     start: |
       Laffie - пользовательский интерфейс к ядру символьной арифметики Minerva.
@@ -21,8 +21,8 @@ ru:
     help: |
       Список доступных команд:
       /start - запуск бота, информация о текущей версии.
-      /problem { ... } - создать новую задачу.
-      /problems_list - список ранее введенных задач.
+      /task { ... } - создать новую задачу.
+      /tasks_list - список ранее введенных задач.
 
       /help - список доступных команд.
       /guide - руководство по вводу задач.
@@ -30,8 +30,8 @@ ru:
     instruction: |
       Как вводить задачи:
 
-      Новая задача вводится с помощью команды <i>/problem</i>, далее в фигурных скобках вводится данные задачи.
-      <i>target</i> обозначает целевую установку задачи.
+      Новая задача вводится с помощью команды <i>/task</i>, далее в фигурных скобках вводится данные задачи.
+      <i>purpose</i> обозначает целевую установку задачи.
       На данный момент существуют три возможные целевые установки:
       1. <i>find(x)</i> выражение значения переменной <i>x</i> через известные параметры.
       2. <i>proof(&lt;statement&gt)</i> доказать истинность утвержение (вывести его из условий задачи).
@@ -52,62 +52,62 @@ ru:
       Примеры задач.
 
       Простейшее линейное уравнение:
-      <code>/problem {
-          target find(x);
+      <code>/task {
+          purpose find(x);
 
           2*x-5 == 0;
       }</code>
 
-      <code>/problem {
-          target find(x);
+      <code>/task {
+          purpose find(x);
 
           2*(x+4) + 3*(x-5) == 0;
       }</code>
 
       Линейное уравнение с параметром:
-      <code>/problem {
-          target find(x);
+      <code>/task {
+          purpose find(x);
 
           2*x-5+t == 0;
           t is known;
       }</code>
 
       Преобразование логических выражений:
-      <code>/problem {
-          target find(x);
+      <code>/task {
+          purpose find(x);
 
           (x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 &lt 0 && x in empty_set) || (3600 &gt= 0 && x in set(1, 4)));
       }</code>
 
       Квадратное уравнение:
-      <code>/problem {
-          target find(x);
+      <code>/task {
+          purpose find(x);
 
           3*x^2+2*x-5 == 0;
       }</code>
 
       Дробно-рациональное уравнение:
-      <code>/problem {
-          target find(x);
+      <code>/task {
+          purpose find(x);
 
           1/(x-1) + 2/(x-2) + 3/(x-3) == 6/(x+6);
       }</code>
 
       Пример задачи на доказательство:
-      <code>/problem {
-          target proof(x &gt 0);
+      <code>/task {
+          purpose proof(x &gt 0);
 
           x == 2;
       }</code>
 
       Пример задачи с бессмысленным набором условий:
-      <code>/problem {
-          target proof(1 &gt 0);
+      <code>/task {
+          purpose proof(1 &gt 0);
 
           x == 2;
       }</code>
 
   errors:
     unknown_command: "Недопустимая команда"
-    problem_not_found: "Задача не найдена"
+    task_not_found: "Задача не найдена"
 

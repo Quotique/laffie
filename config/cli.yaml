@@ -5,10 +5,10 @@ logger:
   file_rotate_bytes: 100000000
   target_levels:
     mcore: "Info"
-    mcore::problem: "Trace"
+    mcore::task: "Trace"
     mcore::rule: "Trace"
     sled: "Warn"
 
 symbols_dir: "symbols"
-problems_dir: "problems"
+tasks_dir: "tasks"
 

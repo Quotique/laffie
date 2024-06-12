@@ -55,16 +55,16 @@ peg::parser! {
         rule attrs() -> Vec<Tree<Data>> = _ keyword("attr") _ a:commasep(<arithmetic()>) { a }
 
         pub rule any() -> Vec<Tree<Data>> =
-            _ s:( (problem()/lang_rule()/symbol())* ) _ { s }
+            _ s:( (task()/lang_rule()/symbol())* ) _ { s }
 
-        pub rule statements() -> Vec<Tree<Data>> = _ c:semicolonsep(<arithmetic()>) _ { c }
+        pub rule terms() -> Vec<Tree<Data>> = _ c:semicolonsep(<arithmetic()>) _ { c }
 
-        pub rule problem() -> Tree<Data> = _ pp:position!() keyword("problem") _ "{"
-            _ pt:position!() keyword("target") _ t:eval() ";"
+        pub rule task() -> Tree<Data> = _ pp:position!() keyword("task") _ "{"
+            _ pt:position!() keyword("purpose") _ t:eval() ";"
                 _ c:semicolonsep(<arithmetic()>)
             _ "}"
             {
-                let mut p = Data::new("Problem", pp) /(Data::new("Target", pt) / t);
+                let mut p = Data::new("Task", pp) /(Data::new("Purpose", pt) / t);
                 for i in c.iter().cloned() {
                     p.push_back(i);
                 }
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn bindings_test() {
         let test = "set(a, b) as S is Known";
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(states.len(), 1);
         assert_eq!(
             states[0],
@@ -206,7 +206,7 @@ mod tests {
     #[test]
     fn predicate_parse_test() {
         let test = "x in Real; x is Unknown;";
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
 
         assert_eq!(states.len(), 2);
         assert_eq!(
@@ -225,7 +225,7 @@ mod tests {
                       -sin(x) == 0 => x == Pi*n && n in Z;
                       a is true <=> a"#;
 
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(states.len(), 3);
         assert_eq!(
             states[0],
@@ -270,35 +270,35 @@ mod tests {
     }
 
     #[test]
-    fn problem_parse_test() {
-        let test = r#"problem {
-                        target find(x);
+    fn task_parse_test() {
+        let test = r#"task {
+                        purpose find(x);
                         2*x+5 == 0;
                     }"#;
-        let states = ra::problem(test).unwrap();
+        let states = ra::task(test).unwrap();
         assert_eq!(
             states,
-            Data::new("Problem", 0) /
-                (Data::new("Target", 34) / (Data::new("find", 41) / Data::new("x", 46))) /
-                (Data::new("==", 80) /
-                    (Data::new("+", 77) /
-                        (Data::new("*", 75) / Data::new("2", 74) / Data::new("x", 76)) /
-                        Data::new("5", 78)) /
-                    Data::new("0", 83))
+            Data::new("Task", 0) /
+                (Data::new("Purpose", 31) / (Data::new("find", 39) / Data::new("x", 44))) /
+                (Data::new("==", 78) /
+                    (Data::new("+", 75) /
+                        (Data::new("*", 73) / Data::new("2", 72) / Data::new("x", 74)) /
+                        Data::new("5", 76)) /
+                    Data::new("0", 81))
         )
     }
 
     #[test]
     fn priority_test() {
         let test = r#"-a/b"#;
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(
             states[0],
             Data::new("-", 0) / (Data::new("/", 2) / Data::new("a", 1) / Data::new("b", 3))
         );
 
         let test = r#"-a+b"#;
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(
             states[0],
             Data::new("+", 2) / (Data::new("-", 0) / Data::new("a", 1)) / Data::new("b", 3)
@@ -311,7 +311,7 @@ mod tests {
             -a/b // test comment near
             //test comment after
         "#;
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(
             states[0],
             Data::new("-", 35) / (Data::new("/", 37) / Data::new("a", 36) / Data::new("b", 38))
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn placeholder_test() {
         let test = "set(..) as S is Known";
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(states.len(), 1);
         assert_eq!(
             states[0],
@@ -336,7 +336,7 @@ mod tests {
     #[test]
     fn short_mul_ident_test() {
         let test = r#"6x"#;
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(states.len(), 1);
 
         assert_eq!(
@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn short_mul_expr_test() {
         let test = r#"6sin(x)"#;
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(states.len(), 1);
 
         assert_eq!(
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn decimal_fraction_test() {
         let test = r#"2.1sin(x)"#;
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(states.len(), 1);
         assert_eq!(
             states[0],
@@ -368,7 +368,7 @@ mod tests {
         );
 
         let test = r#"2.1/3.5"#;
-        let states = ra::statements(test).unwrap();
+        let states = ra::terms(test).unwrap();
         assert_eq!(states.len(), 1);
         assert_eq!(
             states[0],

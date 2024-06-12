@@ -2,7 +2,7 @@ use std::env;
 
 use chrono::{offset::Utc, DateTime};
 
-use database::ProblemRecord;
+use database::TaskRecord;
 
 pub struct Text;
 
@@ -35,8 +35,8 @@ impl Text {
         )
     }
 
-    pub fn problem_text(problem: &ProblemRecord) -> String {
-        let answer = problem
+    pub fn task_text(task: &TaskRecord) -> String {
+        let answer = task
             .runs
             .last()
             .map(|x| match &x.status {
@@ -51,10 +51,9 @@ impl Text {
             .unwrap_or_else(|| "".to_owned());
         format!(
             "<u><i>Задача</i></u> 0x{:x}\n<i>цель:</i> {}\n<i>условия:</i>\n  {}\n{}",
-            problem.id,
-            problem.target,
-            problem
-                .conditions
+            task.id,
+            task.purpose,
+            task.conditions
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>()

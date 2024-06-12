@@ -1,15 +1,15 @@
-mod problem;
-mod problems_list;
 mod report;
 mod rerun;
+mod task;
+mod tasks_list;
 
 use std::sync::Arc;
 
 use rust_i18n::t;
 use telegram_bot::*;
 
-use database::{ProblemDb, UserDb};
-use mcore::{rule::RulesEngine, statement::term::CompactString};
+use database::{TaskDb, UserDb};
+use mcore::{rule::RulesEngine, CompactString};
 
 use crate::text::Text;
 
@@ -27,7 +27,7 @@ pub async fn process_update(
     update: types::Update,
     api: &Api,
     engine: Arc<RulesEngine>,
-    problems: Arc<ProblemDb>,
+    tasks: Arc<TaskDb>,
     users: Arc<UserDb>,
 ) {
     rust_i18n::set_locale("ru");
@@ -37,7 +37,7 @@ pub async fn process_update(
             if let (Some(data), Some(message)) = (&query.data, &query.message) {
                 let chat_id = message.to_source_chat();
                 match Command::new(query.from.id, chat_id, data) {
-                    Ok(command) => command.handle(api, engine, problems, users).await,
+                    Ok(command) => command.handle(api, engine, tasks, users).await,
                     Err(e) => error_handler(api, chat_id, e).await,
                 }
             }
@@ -45,7 +45,7 @@ pub async fn process_update(
         UpdateKind::Message(message) => {
             if let MessageKind::Text { ref data, .. } = &message.kind {
                 match Command::new(message.from.id, message.chat.id(), data) {
-                    Ok(command) => command.handle(api, engine, problems, users).await,
+                    Ok(command) => command.handle(api, engine, tasks, users).await,
                     Err(e) => error_handler(api, message.chat.id(), e).await,
                 }
             }
@@ -60,7 +60,7 @@ async fn start_handler(api: &Api, command: Command) {
     let mut markup = types::InlineKeyboardMarkup::new();
     markup.add_row(vec![
         types::InlineKeyboardButton::callback(t!("buttons.help"), "/help"),
-        types::InlineKeyboardButton::callback(t!("buttons.problems"), "/problems_list"),
+        types::InlineKeyboardButton::callback(t!("buttons.tasks"), "/tasks_list"),
     ]);
     markup.add_row(vec![
         types::InlineKeyboardButton::callback(t!("buttons.guide"), "/guide"),
@@ -112,15 +112,15 @@ impl Command {
         self,
         api: &Api,
         engine: Arc<RulesEngine>,
-        problems: Arc<ProblemDb>,
+        tasks: Arc<TaskDb>,
         users: Arc<UserDb>,
     ) {
         match self.command.as_str() {
             "start" => start_handler(api, self).await,
-            "problem" => problem::handler(api, self, engine, problems, users).await,
-            "problems_list" => problems_list::handler(api, self, problems, users).await,
-            "rerun" => rerun::handler(api, self, engine, problems, users).await,
-            "report" => report::handler(api, self, problems, users).await,
+            "task" => task::handler(api, self, engine, tasks, users).await,
+            "tasks_list" => tasks_list::handler(api, self, tasks, users).await,
+            "rerun" => rerun::handler(api, self, engine, tasks, users).await,
+            "report" => report::handler(api, self, tasks, users).await,
             "help" => {
                 api.send(
                     self.chat_id
@@ -172,20 +172,20 @@ mod tests {
                 },
             ),
             (
-                "/problem asdf",
+                "/task asdf",
                 Command {
                     user_id,
                     chat_id,
-                    command: "problem".into(),
+                    command: "task".into(),
                     args: "asdf".into(),
                 },
             ),
             (
-                "prefix /problem asdf qwer",
+                "prefix /task asdf qwer",
                 Command {
                     user_id,
                     chat_id,
-                    command: "problem".into(),
+                    command: "task".into(),
                     args: "asdf qwer".into(),
                 },
             ),

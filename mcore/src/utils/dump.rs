@@ -8,8 +8,8 @@ use std::{
 use serde_derive::Deserialize;
 
 use crate::{
-    problem::{Problem, SolveStatus},
-    statement::MarkedStatement,
+    task::{SolveStatus, Task},
+    term::TermProps,
 };
 
 #[derive(Debug, Deserialize)]
@@ -23,17 +23,17 @@ pub struct Dumper {
     sink: Arc<Mutex<Box<dyn DumperSink>>>,
 }
 
-pub trait DumperSink {
-    fn subproblem_start(&mut self, problem: &Problem);
+pub trait DumperSink: Send + Sync {
+    fn subtask_start(&mut self, task: &Task);
 
-    fn subproblem_end(&mut self, status: &SolveStatus);
+    fn subtask_end(&mut self, status: &SolveStatus);
 
-    fn add_statement(&mut self, statement: &MarkedStatement, parent: &MarkedStatement);
+    fn add_term(&mut self, term: &TermProps, parent: &TermProps);
 }
 
 pub struct FileDumper {
-    subproblem_level: usize,
-    file:             File,
+    subtask_level: usize,
+    file:          File,
 }
 
 pub struct NoneDumper {}
@@ -59,25 +59,25 @@ impl Default for Dumper {
 }
 
 impl DumperSink for Dumper {
-    fn subproblem_start(&mut self, problem: &Problem) {
-        self.sink.lock().unwrap().subproblem_start(problem);
+    fn subtask_start(&mut self, task: &Task) {
+        self.sink.lock().unwrap().subtask_start(task);
     }
 
-    fn subproblem_end(&mut self, status: &SolveStatus) {
-        self.sink.lock().unwrap().subproblem_end(status);
+    fn subtask_end(&mut self, status: &SolveStatus) {
+        self.sink.lock().unwrap().subtask_end(status);
     }
 
-    fn add_statement(&mut self, statement: &MarkedStatement, parent: &MarkedStatement) {
-        self.sink.lock().unwrap().add_statement(statement, parent);
+    fn add_term(&mut self, term: &TermProps, parent: &TermProps) {
+        self.sink.lock().unwrap().add_term(term, parent);
     }
 }
 
 impl DumperSink for NoneDumper {
-    fn subproblem_start(&mut self, _: &Problem) {}
+    fn subtask_start(&mut self, _: &Task) {}
 
-    fn subproblem_end(&mut self, _: &SolveStatus) {}
+    fn subtask_end(&mut self, _: &SolveStatus) {}
 
-    fn add_statement(&mut self, _: &MarkedStatement, _: &MarkedStatement) {}
+    fn add_term(&mut self, _: &TermProps, _: &TermProps) {}
 }
 
 impl FileDumper {
@@ -87,38 +87,37 @@ impl FileDumper {
             std::fs::create_dir_all(p).expect("unable to create directory");
         }
         FileDumper {
-            subproblem_level: 0,
-            file:             File::create(path).expect("Unable to create dump file"),
+            subtask_level: 0,
+            file:          File::create(path).expect("Unable to create dump file"),
         }
     }
 
     fn prefix(&self) -> String {
-        String::from("┆ ").repeat(self.subproblem_level)
+        String::from("┆ ").repeat(self.subtask_level)
     }
 }
 
 impl DumperSink for FileDumper {
-    fn subproblem_start(&mut self, problem: &Problem) {
+    fn subtask_start(&mut self, task: &Task) {
         self.file
             .write_all(
                 format!(
                     "{} {} [{}]\n",
                     self.prefix(),
-                    problem.target,
-                    problem
-                        .conditions
+                    task.purpose,
+                    task.conditions
                         .iter()
-                        .map(|x| x.statement.to_string())
+                        .map(|x| x.term.to_string())
                         .collect::<Vec<String>>()
                         .join(";"),
                 )
                 .as_bytes(),
             )
             .expect("Unable write into dump file");
-        self.subproblem_level += 1;
+        self.subtask_level += 1;
     }
 
-    fn subproblem_end(&mut self, status: &SolveStatus) {
+    fn subtask_end(&mut self, status: &SolveStatus) {
         self.file
             .write_all(
                 format!(
@@ -130,19 +129,18 @@ impl DumperSink for FileDumper {
                 .as_bytes(),
             )
             .expect("Unable write into dump file");
-        self.subproblem_level -= 1;
+        self.subtask_level -= 1;
     }
 
-    fn add_statement(&mut self, statement: &MarkedStatement, parent: &MarkedStatement) {
+    fn add_term(&mut self, term: &TermProps, parent: &TermProps) {
         self.file
             .write_all(
                 format!(
                     "{}{} [{}, {}]\n",
                     self.prefix(),
-                    statement.statement,
-                    parent.statement,
-                    statement
-                        .rule
+                    term.term,
+                    parent.term,
+                    term.rule
                         .as_ref()
                         .map(|x| x.to_string())
                         .unwrap_or_default()

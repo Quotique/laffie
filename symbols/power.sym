@@ -3,7 +3,7 @@ symbol ^ {
 }
 
 rule {
-    attr level(4),problem_target(find(x)),one(a),one(b),zero(c),block(move_left);
+    attr level(4),purpose(find(x)),one(a),one(b),zero(c),block(move_left);
 
     a * x^2 + b * x + c == 0 => 
         (((b^2 - 4*a*c) as D) < 0 && x in empty_set) || 
@@ -14,7 +14,7 @@ rule {
 }
 
 rule {
-    attr level(4),problem_target(find(x)),one(a),one(b),zero(c);
+    attr level(4),purpose(find(x)),one(a),one(b),zero(c);
 
     a * x^3 + b * x^2 + c * x == 0 => (x == 0) || (a * x^2 + b * x + c == 0);
 
@@ -22,14 +22,14 @@ rule {
 }
 
 rule {
-    attr replace,level(1),problem_target(transform(x));
+    attr replace,level(1),purpose(transform(x));
 
     (a/b)^n <=> (a^n)/(b^n);
 }
 
 // TODO: n is natural
 rule {
-    attr replace,level(4),problem_target(transform(x)),normalize(2);
+    attr replace,level(4),purpose(transform(x)),normalize(2);
 
     (a+b)^n <=> (a+b)^(n - 1)*(a + b);
 
@@ -38,7 +38,7 @@ rule {
 }
 
 rule {
-    attr replace,level(1),problem_target(transform(x));
+    attr replace,level(1),purpose(transform(x));
 
     (sqrt(a))^2 <=> a;
 

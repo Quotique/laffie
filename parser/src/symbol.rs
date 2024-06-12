@@ -1,19 +1,19 @@
 use std::str::FromStr;
 
-use mcore::statement::{Symbol, SymbolAttr, SymbolAttrValue};
+use mcore::term::{FuncSymbol, SymbolAttr, SymbolAttrValue};
 
 use super::{Node, ParserError};
 
-pub struct SymbolParser<'a> {
+pub struct FuncSymbolParser<'a> {
     ast: &'a Node,
 }
 
-impl<'a> SymbolParser<'a> {
+impl<'a> FuncSymbolParser<'a> {
     pub fn new(syntax_tree: &'a Node) -> Self {
         Self { ast: syntax_tree }
     }
 
-    pub fn parse(self) -> Result<Symbol, ParserError> {
+    pub fn parse(self) -> Result<FuncSymbol, ParserError> {
         if self.ast.data().symbol != "Declare" {
             return Err(ParserError {
                 loc: self.ast.data().location.clone(),
@@ -21,22 +21,19 @@ impl<'a> SymbolParser<'a> {
             });
         }
 
-        let mut builder = Symbol::builder();
+        let mut builder = FuncSymbol::builder();
 
         for sym_child in self.ast.iter() {
             if sym_child.data().symbol == "Symbol" {
-                builder.name(sym_child.front().unwrap().data().symbol.clone());
+                builder = builder.name(sym_child.front().unwrap().data().symbol.clone());
             } else if sym_child.data().symbol == "Attrs" {
                 for attr in sym_child.iter() {
                     let a = Self::parse_attr(attr)?;
-                    builder.with_attr(a.0, a.1);
+                    builder = builder.with_attr(a.0, a.1);
                 }
             }
         }
-        builder.build().map_err(|e| ParserError {
-            loc: self.ast.data().location.clone(),
-            msg: e.to_string(),
-        })
+        Ok(builder.build())
     }
 
     fn parse_attr(data: &Node) -> Result<(SymbolAttr, SymbolAttrValue), ParserError> {
@@ -86,14 +83,13 @@ pub mod tests {
         let test_str = "symbol + { attr infix(10) }";
         let states = lang::symbol(test_str).unwrap();
 
-        let sym = SymbolParser::new(&states).parse().unwrap();
+        let sym = FuncSymbolParser::new(&states).parse().unwrap();
         assert_eq!(
             sym,
-            Symbol::builder()
+            FuncSymbol::builder()
                 .name("+")
                 .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(10))
                 .build()
-                .unwrap()
         );
     }
 }

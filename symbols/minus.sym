@@ -3,25 +3,25 @@ symbol - {
 }
 
 rule {
-    attr level(0),problem_target(transform(x)),subtree,replace;
+    attr level(0),purpose(transform(x)),replace;
 
     --a <=> a;
 }
 
 rule {
-    attr level(0),problem_target(transform(x)),subtree,replace;
+    attr level(0),purpose(transform(x)),replace;
 
     a-b => a+(-b);
 }
 
 rule {
-    attr level(0),problem_target(transform(x)),subtree,replace;
+    attr level(0),purpose(transform(x)),replace;
 
     -a/b => (-a)/b;
 }
 
 rule {
-    attr level(0),problem_target(proof(-a is known));
+    attr level(0),purpose(proof(-a is known));
 
     -a is known <=> true;
 
@@ -29,7 +29,7 @@ rule {
 }
 
 rule {
-    attr level(1),problem_target(transform(x)),subtree,replace;
+    attr level(1),purpose(transform(x)),replace;
 
     -(a+b) <=> -a+(-b);
 }

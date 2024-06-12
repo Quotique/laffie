@@ -3,12 +3,12 @@ use std::{convert::TryFrom, fmt::Write, str::FromStr, sync::Arc};
 use rust_i18n::t;
 use telegram_bot::*;
 
-use database::{ProblemDb, UserDb, UserRecord};
+use database::{TaskDb, UserDb, UserRecord};
 use mcore::{
-    problem::Solution,
     rule::RulesEngine,
-    statement::term::CompactString,
+    task::Solution,
     utils::{Dumper, DumperConfig},
+    CompactString,
 };
 use view::{Html, View};
 
@@ -16,17 +16,17 @@ use super::Command;
 use crate::pagination::Paginator;
 
 fn rerun(
-    problem_id: CompactString,
+    task_id: CompactString,
     engine: Arc<RulesEngine>,
-    problems: Arc<ProblemDb>,
+    tasks: Arc<TaskDb>,
     _user: &mut UserRecord,
 ) -> Result<Paginator, String> {
-    let problem_id: u128 = u128::from_str(&problem_id).map_err(|e| e.to_string())?;
+    let task_id: u128 = u128::from_str(&task_id).map_err(|e| e.to_string())?;
 
-    let mut record = problems
-        .get(problem_id)
+    let mut record = tasks
+        .get(task_id)
         .map_err(|e| e.to_string())?
-        .ok_or_else(|| t!("errors.problem_not_found"))?;
+        .ok_or_else(|| t!("errors.task_not_found"))?;
 
     let mut solution = Solution::new(
         record.clone().into(),
@@ -53,7 +53,7 @@ fn rerun(
         .unwrap();
 
     record.runs.push(solution.perf_stats.clone());
-    problems.put(&record).map_err(|e| e.to_string())?;
+    tasks.put(&record).map_err(|e| e.to_string())?;
 
     Ok(output)
 }
@@ -62,7 +62,7 @@ pub async fn handler(
     api: &Api,
     command: Command,
     engine: Arc<RulesEngine>,
-    problems: Arc<ProblemDb>,
+    tasks: Arc<TaskDb>,
     users: Arc<UserDb>,
 ) {
     let user_id = i64::from(command.user_id) as u64;
@@ -71,7 +71,7 @@ pub async fn handler(
         .unwrap_or_default()
         .unwrap_or_else(|| UserRecord::new(user_id));
 
-    match rerun(command.args, engine.clone(), problems.clone(), &mut user) {
+    match rerun(command.args, engine.clone(), tasks.clone(), &mut user) {
         Ok(s) => {
             for i in s.iter() {
                 api.send(command.chat_id.text(i).parse_mode(ParseMode::Html))

@@ -3,7 +3,7 @@ symbol == {
 }
 
 rule {
-    attr replace,level(0),problem_target(find(x)),id(move_left);
+    attr replace,level(0),purpose(find(x)),id(move_left);
 
     a == b <=> a - b == 0;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr replace,level(5),problem_target(find(x));
+    attr replace,level(5),purpose(find(x));
 
     a + b == c <=> a + b - c == 0;
 
@@ -19,7 +19,7 @@ rule {
 }
 
 rule {
-    attr level(1),problem_target(find(x)),one(a),zero(b),block(move_left);
+    attr level(1),purpose(find(x)),one(a),zero(b),block(move_left);
 
     x*a + b == 0 => x == - b/a;
 

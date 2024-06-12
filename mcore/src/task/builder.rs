@@ -1,0 +1,71 @@
+use crate::term::TermProps;
+use std::{fmt, iter::Iterator};
+
+use super::Task;
+
+#[derive(Clone, Debug)]
+pub enum TaskBuilderError {
+    OnlyOnePurposeAllowed,
+    NoPurposeFound,
+}
+
+#[derive(Default)]
+pub struct TaskBuilder {
+    id:         u64,
+    conditions: Vec<TermProps>,
+    purpose:    Option<TermProps>,
+
+    subtask_level: usize,
+}
+
+impl TaskBuilder {
+    pub fn with_id(mut self, id: u64) -> Self {
+        self.id = id;
+        self
+    }
+
+    pub fn with_purpose(mut self, purpose: TermProps) -> Result<Self, TaskBuilderError> {
+        if let Some(_x) = self.purpose.replace(purpose) {
+            Err(TaskBuilderError::OnlyOnePurposeAllowed)
+        } else {
+            Ok(self)
+        }
+    }
+
+    pub fn with_condition(mut self, mut condition: TermProps) -> Self {
+        condition.weight = 0;
+        self.conditions.push(condition);
+        self
+    }
+
+    pub fn with_conditions(mut self, reqs: impl Iterator<Item = TermProps>) -> Self {
+        self.conditions.extend(reqs.map(|mut x| {
+            x.weight = 0;
+            x
+        }));
+        self
+    }
+
+    pub fn with_level(mut self, level: usize) -> Self {
+        self.subtask_level = level;
+        self
+    }
+
+    pub fn build(self) -> Result<Task, TaskBuilderError> {
+        Ok(Task {
+            id:            self.id,
+            conditions:    self.conditions,
+            purpose:       self.purpose.ok_or(TaskBuilderError::NoPurposeFound)?,
+            subtask_level: self.subtask_level,
+        })
+    }
+}
+
+impl fmt::Display for TaskBuilderError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::OnlyOnePurposeAllowed => write!(f, "Duplicate purpose"),
+            Self::NoPurposeFound => write!(f, "No purpose found"),
+        }
+    }
+}

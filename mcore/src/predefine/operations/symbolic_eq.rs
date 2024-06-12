@@ -1,17 +1,16 @@
-use crate::statement::{
-    symbols::{Symbol, TruthResult},
-    term::StatementNode,
+use crate::term::{
+    func_symbol::{FuncSymbol, TruthResult},
+    TermNode,
 };
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name("symbolic_eq")
         .with_truth_checker(Box::new(symbolic_eq))
         .build()
-        .unwrap()
 }
 
-pub fn symbolic_eq(root: &StatementNode) -> TruthResult {
+pub fn symbolic_eq(root: &TermNode) -> TruthResult {
     if !root.data().is_symbol_name("symbolic_eq") {
         return TruthResult::Unknown;
     }

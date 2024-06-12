@@ -1,14 +1,17 @@
 use std::{
     collections::{HashMap, VecDeque},
     iter::once,
+    rc::Rc,
     sync::Arc,
 };
 
 use itertools::Itertools;
 
 use crate::{
-    predefine::symbol_by_name, statement::MarkedStatement, utils::VecDisplay, CompactString,
-    RuleId, SymbolId,
+    predefine::symbol_by_name,
+    term::{FuncSymbol, TermProps},
+    utils::VecDisplay,
+    CompactString, RuleId,
 };
 
 use super::rule::{Rule, RuleAttr, RuleAttrValue};
@@ -16,8 +19,9 @@ use super::rule::{Rule, RuleAttr, RuleAttrValue};
 // TODO: move to correct place
 type Level = usize;
 
-pub type SharedRule = Arc<Rule>;
-type LevelRules = HashMap<SymbolId, Vec<SharedRule>>;
+pub type SharedRule = Rc<Rule>;
+#[allow(clippy::mutable_key_type)]
+type LevelRules = HashMap<Arc<FuncSymbol>, Vec<SharedRule>>;
 
 #[derive(Default)]
 pub struct RulesEngine {
@@ -42,28 +46,23 @@ impl RulesEngine {
         self.process_queue();
     }
 
-    pub fn suggest_rules(
-        &self,
-        statement: &MarkedStatement,
-        target: &MarkedStatement,
-    ) -> Vec<SharedRule> {
+    pub fn suggest_rules(&self, term: &TermProps, purpose: &TermProps) -> Vec<SharedRule> {
         assert!(self.rule_queue.is_empty());
 
+        #[allow(clippy::mutable_key_type)]
         let empty_level = LevelRules::new();
-        let level = self
-            .all_rules
-            .get(&statement.weight)
-            .unwrap_or(&empty_level);
-        let result: Vec<_> = once(&symbol_by_name("AnySymbol").unwrap().id)
-            .chain(statement.symbols.iter())
-            .flat_map(|symbol_id| level.get(symbol_id).into_iter())
+        #[allow(clippy::mutable_key_type)]
+        let level = self.all_rules.get(&term.weight).unwrap_or(&empty_level);
+        let result: Vec<_> = once(&symbol_by_name("AnySymbol").unwrap())
+            .chain(term.func_symbols.iter())
+            .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())
             .filter(|rule| {
-                rule.is_statement_suitable(statement).map_err(|e| {
-                    trace!(target: "rule_selection", "Rule {} rejected for statement {} by reason {:?}", rule, statement, e);
+                rule.is_term_suitable(term).map_err(|e| {
+                    trace!(target: "rule_selection", "Rule {} rejected for term {} by reason {:?}", rule, term, e);
                 }).is_ok() &&
-                    rule.is_target_suitable(target).map_err(|e| {
-                    trace!(target: "rule_selection", "Rule {} rejected for statement {} by reason {:?}", rule, statement, e);
+                    rule.is_purpose_suitable(purpose).map_err(|e| {
+                    trace!(target: "rule_selection", "Rule {} rejected for term {} by reason {:?}", rule, term, e);
                 }).is_ok()
             })
             .cloned()
@@ -71,7 +70,7 @@ impl RulesEngine {
         if !result.is_empty() {
             trace!(
                 "[{}] Suggested rules: [{}]",
-                statement.weight,
+                term.weight,
                 VecDisplay(&result)
             );
         }
@@ -107,9 +106,9 @@ impl RulesEngine {
             self.all_rules
                 .entry(rule.level)
                 .or_default()
-                .entry(rule.symbol_id)
+                .entry(rule.func_symbol.clone())
                 .or_default()
-                .push(Arc::new(rule));
+                .push(Rc::new(rule));
         }
     }
 }

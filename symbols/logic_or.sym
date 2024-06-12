@@ -3,7 +3,7 @@ symbol || {
 }
 
 rule {
-    attr level(2),problem_target(transform(x)),subtree,replace;
+    attr level(2),purpose(transform(x)),replace;
 
     a || b <=> a;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(2),problem_target(transform(x)),subtree,replace;
+    attr level(2),purpose(transform(x)),replace;
 
     a || b <=> b;
 
@@ -19,7 +19,7 @@ rule {
 }
 
 rule {
-    attr level(0),problem_target(find(x)),subtree,replace;
+    attr level(0),purpose(find(x)),replace;
 
     x == a || x == b => answer(x in set(a, b));
 
@@ -28,7 +28,7 @@ rule {
 }
 
 rule {
-    attr level(0),problem_target(find(x)),subtree,replace;
+    attr level(0),purpose(find(x)),replace;
 
     x == a || x == b || x == c => answer(x in set(a, b, c));
 

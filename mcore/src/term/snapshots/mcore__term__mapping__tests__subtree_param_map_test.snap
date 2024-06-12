@@ -1,0 +1,5 @@
+---
+source: mcore/src/term/mapping.rs
+expression: VecDisplay(&maps)
+---
+[{ a: *( 2 ^( x 2 ) ), b: +( x -( 1 ) ) }]

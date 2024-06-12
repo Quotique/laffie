@@ -3,19 +3,19 @@ symbol * {
 }
 
 rule {
-    attr replace,level(2),problem_target(transform(x));
+    attr replace,level(2),purpose(transform(x));
 
     (a + b)*c <=> a*c + b*c;
 }
 
 rule {
-    attr replace,level(4),problem_target(transform(x));
+    attr replace,level(4),purpose(transform(x));
 
     a*c + b*c + d <=> (a+b)*c + d;
 }
 
 rule {
-    attr level(0),problem_target(proof(a*b is known));
+    attr level(0),purpose(proof(a*b is known));
 
     a*b is known <=> true;
 

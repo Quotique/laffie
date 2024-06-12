@@ -1,23 +1,19 @@
-use std::{collections::HashSet, fmt, str::FromStr, sync::Arc};
+use std::{collections::HashSet, fmt, rc::Rc, str::FromStr, sync::Arc};
 
 use eyre::{bail, Result};
 use multimap::MultiMap;
 
 use crate::{
-    predefine::symbol_by_id,
-    statement::{
-        CompactString, MarkedStatement, NodePosition, ParamsMapping, Statement, StatementNode,
-    },
+    term::{FuncSymbol, NodePosition, ParamsMapping, Term, TermNode, TermProps},
     utils::VecDisplay,
-    NormalizationLevel, RuleId, SymbolId,
+    CompactString, NormalizationLevel, RuleId,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RuleAttr {
-    Subtree,
     Equivalence,
     Replace,
-    Target,
+    Purpose,
     Level,
     Zero,
     One,
@@ -31,13 +27,13 @@ pub enum RuleAttrValue {
     None,
     UInt(u64),
     Str(CompactString),
-    Target(Statement),
+    Target(Term),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuleDeclineReason {
     LevelMissmatch,
-    TargetMissmatch,
+    PurposeMissmatch,
     AlreadyApplied,
     Blocked,
     ParamsMappingErr(String),
@@ -45,27 +41,27 @@ pub enum RuleDeclineReason {
 
 #[derive(Debug)]
 pub struct Suppose {
-    pub requirements: Vec<Arc<Statement>>,
-    pub resolution:   MarkedStatement,
+    pub requirements: Vec<Rc<Term>>,
+    pub resolution:   TermProps,
 }
 
 #[derive(Clone, Debug)]
 pub struct Rule {
-    pub id:        RuleId,
-    pub level:     usize,
-    pub symbol_id: SymbolId,
+    pub id:          RuleId,
+    pub level:       usize,
+    pub func_symbol: Arc<FuncSymbol>,
 
     pub attrs: MultiMap<RuleAttr, RuleAttrValue>,
     pub block: Vec<RuleId>,
 
-    pub statement: Statement,
-    pub pattern:   NodePosition,
-    pub replace:   NodePosition,
-    pub binds:     ParamsMapping,
+    pub term:    Term,
+    pub pattern: NodePosition,
+    pub replace: NodePosition,
+    pub binds:   ParamsMapping,
 
-    pub requirements: Vec<Statement>,
+    pub requirements: Vec<Term>,
 
-    pub pattern_symbols: HashSet<SymbolId>,
+    pub pattern_symbols: HashSet<Arc<FuncSymbol>>,
 }
 
 impl FromStr for RuleAttr {
@@ -73,11 +69,10 @@ impl FromStr for RuleAttr {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "subtree" => Ok(RuleAttr::Subtree),
             "equivalence" => Ok(RuleAttr::Equivalence),
             "replace" => Ok(RuleAttr::Replace),
             "level" => Ok(RuleAttr::Level),
-            "problem_target" => Ok(RuleAttr::Target),
+            "purpose" => Ok(RuleAttr::Purpose),
             "zero" => Ok(RuleAttr::Zero),
             "one" => Ok(RuleAttr::One),
             "id" => Ok(RuleAttr::Id),
@@ -107,7 +102,7 @@ impl fmt::Display for Rule {
             self.id,
             self.level,
             VecDisplay(&self.requirements),
-            self.statement
+            self.term
         )
     }
 }
@@ -151,23 +146,20 @@ impl Rule {
         self.pattern_node() == self.replace_node()
     }
 
-    pub fn is_statement_suitable(
-        &self,
-        statement: &MarkedStatement,
-    ) -> Result<(), RuleDeclineReason> {
-        if self.level != statement.weight {
+    pub fn is_term_suitable(&self, term: &TermProps) -> Result<(), RuleDeclineReason> {
+        if self.level != term.weight {
             return Err(RuleDeclineReason::LevelMissmatch);
-        } else if statement.applied_rules.contains(&self.id) {
+        } else if term.applied_rules.contains(&self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
-        } else if statement.blocked_rules.contains(&self.id) {
+        } else if term.blocked_rules.contains(&self.id) {
             return Err(RuleDeclineReason::Blocked);
         }
 
         for s in self.pattern_symbols.iter() {
-            if !statement.symbols.contains(s) {
+            if !term.func_symbols.contains(s) {
                 return Err(RuleDeclineReason::ParamsMappingErr(format!(
                     "symbol: {} not found",
-                    symbol_by_id(*s).unwrap().name
+                    s.name
                 )));
             }
         }
@@ -175,33 +167,29 @@ impl Rule {
         Ok(())
     }
 
-    pub fn is_target_suitable(&self, target: &MarkedStatement) -> Result<(), RuleDeclineReason> {
-        // TODO: multiple targets
-        if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Target).next() {
-            if pattern.map(&target.statement).is_err() {
-                trace!(target: "rule_selection", "no match target: {}, required: {}", target, pattern);
-                return Err(RuleDeclineReason::TargetMissmatch);
+    pub fn is_purpose_suitable(&self, purpose: &TermProps) -> Result<(), RuleDeclineReason> {
+        // TODO: multiple purposes
+        if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Purpose).next() {
+            if pattern.map(&purpose.term).is_err() {
+                trace!(target: "rule_selection", "no match purpose: {}, required: {}", purpose, pattern);
+                return Err(RuleDeclineReason::PurposeMissmatch);
             }
             return Ok(());
         }
-        if (*target.statement)
-            .root()
-            .data()
-            .is_symbol_name("transform")
-        {
+        if (*purpose.term).root().data().is_symbol_name("transform") {
             // Only transform rules for transform
-            return Err(RuleDeclineReason::TargetMissmatch);
+            return Err(RuleDeclineReason::PurposeMissmatch);
         }
         Ok(())
     }
 
     pub fn apply(
         &self,
-        arg: &mut MarkedStatement,
-        target: &MarkedStatement,
+        arg: &mut TermProps,
+        purpose: &TermProps,
     ) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        self.is_statement_suitable(arg)?;
-        self.is_target_suitable(target)?;
+        self.is_term_suitable(arg)?;
+        self.is_purpose_suitable(purpose)?;
 
         if !arg.applied_rules.insert(self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
@@ -214,17 +202,17 @@ impl Rule {
     }
 
     #[inline]
-    pub fn pattern_node(&self) -> &StatementNode {
-        &self.statement[&self.pattern]
+    pub fn pattern_node(&self) -> &TermNode {
+        &self.term[&self.pattern]
     }
 
     #[inline]
-    pub fn replace_node(&self) -> &StatementNode {
-        &self.statement[&self.replace]
+    pub fn replace_node(&self) -> &TermNode {
+        &self.term[&self.replace]
     }
 
-    fn apply_subtree(&self, arg: &mut MarkedStatement) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        let maps = ParamsMapping::subtree_map(arg.statement.root(), self.pattern_node());
+    fn apply_subtree(&self, arg: &mut TermProps) -> Result<Vec<Suppose>, RuleDeclineReason> {
+        let maps = ParamsMapping::subtree_map(arg.term.root(), self.pattern_node());
         if maps.is_empty() {
             return Err(RuleDeclineReason::ParamsMappingErr("no match".into()));
         }
@@ -232,21 +220,21 @@ impl Rule {
         let mut result = vec![];
         for (maps, pos) in maps.iter() {
             for i in maps.iter() {
-                let replace = Statement::from(self.replace_node().deep_clone());
+                let replace = Term::from(self.replace_node().deep_clone());
 
                 let mut replace = replace.apply_map(&self.binds).apply_map(i);
-                let mut src = (*arg.statement).clone();
+                let mut src = (*arg.term).clone();
                 replace.swap_node(&mut src[pos]);
                 // src = src.normalize(NormalizationLevel::max());
                 src = src.normalize(self.norm_level());
-                let mut resolution = MarkedStatement::from(Arc::new(src)).with_parent(arg.id);
+                let mut resolution = TermProps::from(Rc::new(src)).with_parent(arg.id);
                 resolution.blocked_rules.extend(self.block.iter().cloned());
 
                 let suppose = Suppose {
                     requirements: self
                         .requirements
                         .iter()
-                        .map(|r| Arc::new(r.apply_map(&self.binds).apply_map(i)))
+                        .map(|r| Rc::new(r.apply_map(&self.binds).apply_map(i)))
                         .collect(),
                     resolution,
                 };
@@ -261,11 +249,11 @@ impl Rule {
 
 #[cfg(test)]
 pub mod tests {
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     use crate::{
         rule::{parse_rule, Rule, RuleDeclineReason},
-        statement::{statement_with_vars, MarkedStatement},
+        term::{term_with_vars, TermProps},
         NormalizationLevel,
     };
 
@@ -297,30 +285,30 @@ pub mod tests {
         )
     }
 
-    fn test_statement_fraction() -> MarkedStatement {
-        MarkedStatement::from(Arc::new(statement_with_vars(r#"2/(x + 1) == 0"#)))
+    fn test_term_fraction() -> TermProps {
+        TermProps::from(Rc::new(term_with_vars(r#"2/(x + 1) == 0"#)))
     }
 
-    fn test_statement() -> MarkedStatement {
-        MarkedStatement::from(Arc::new(statement_with_vars(r#"2 + x == 0"#)))
+    fn test_term() -> TermProps {
+        TermProps::from(Rc::new(term_with_vars(r#"2 + x == 0"#)))
     }
 
-    fn test_statement_subtree() -> MarkedStatement {
-        MarkedStatement::from(Arc::new(statement_with_vars(r#"x + (-(-2)) == 0"#)))
+    fn test_term_subtree() -> TermProps {
+        TermProps::from(Rc::new(term_with_vars(r#"x + (-(-2)) == 0"#)))
     }
 
-    fn test_target() -> MarkedStatement {
-        MarkedStatement::from(Arc::new(statement_with_vars(r#"find(x)"#)))
+    fn test_purpose() -> TermProps {
+        TermProps::from(Rc::new(term_with_vars(r#"find(x)"#)))
     }
 
     #[test]
     fn level_comparsion_test() {
         let rule = base_rule();
-        let mut statement = test_statement();
-        let target = test_target();
+        let mut term = test_term();
+        let purpose = test_purpose();
 
         assert_eq!(
-            rule.apply(&mut statement, &target).err(),
+            rule.apply(&mut term, &purpose).err(),
             Some(RuleDeclineReason::LevelMissmatch)
         );
     }
@@ -328,67 +316,61 @@ pub mod tests {
     #[test]
     fn apply_test() {
         let rule = base_rule();
-        let mut statement = test_statement();
-        let target = test_target();
+        let mut term = test_term();
+        let purpose = test_purpose();
 
-        statement.weight = 1;
-        let suppose = rule.apply(&mut statement, &target);
+        term.weight = 1;
+        let suppose = rule.apply(&mut term, &purpose);
         assert!(suppose.is_ok());
         let mut suppose = suppose.unwrap();
         suppose.sort_by_key(|x| x.requirements[0].to_string());
 
         assert_eq!(suppose.len(), 2);
         assert_eq!(suppose[0].requirements.len(), 1);
-        assert_eq!(*suppose[0].requirements[0], statement_with_vars("2 != 0"));
+        assert_eq!(*suppose[0].requirements[0], term_with_vars("2 != 0"));
         assert_eq!(
-            *suppose[0].resolution.statement,
-            statement_with_vars("x == -2").normalize(NormalizationLevel::max())
+            *suppose[0].resolution.term,
+            term_with_vars("x == -2").normalize(NormalizationLevel::max())
         );
         assert_eq!(suppose[1].requirements.len(), 1);
-        assert_eq!(*suppose[1].requirements[0], statement_with_vars("x != 0"));
-        assert_eq!(
-            *suppose[1].resolution.statement,
-            statement_with_vars("2 == -x")
-        );
+        assert_eq!(*suppose[1].requirements[0], term_with_vars("x != 0"));
+        assert_eq!(*suppose[1].resolution.term, term_with_vars("2 == -x"));
     }
 
     #[test]
     #[ignore] // TODO: fix double - autoremove
     fn subtree_apply_test() {
         let rule = subtree_rule();
-        let mut statement = test_statement_subtree();
-        let target = test_target();
+        let mut term = test_term_subtree();
+        let purpose = test_purpose();
 
-        statement.weight = 1;
-        let suppose = rule.apply(&mut statement, &target);
+        term.weight = 1;
+        let suppose = rule.apply(&mut term, &purpose);
         assert!(suppose.is_ok());
         let suppose = suppose.unwrap();
         assert_eq!(suppose.len(), 1);
         assert_eq!(suppose[0].requirements.len(), 0);
-        assert_eq!(
-            *suppose[0].resolution.statement,
-            statement_with_vars("x + 2 == 0")
-        );
+        assert_eq!(*suppose[0].resolution.term, term_with_vars("x + 2 == 0"));
     }
 
     #[test]
     fn subtree_apply_test_2() {
         let rule = parse_rule(
             r#"rule {
-                attr level(0),problem_target(transform(x)),subtree,replace;
+                attr level(0),purpose(transform(x)),replace;
                 a && b <=> b;
 
                 a is true;
             }"#,
         );
 
-        let test_statement = r#"(x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 < 0 && x in empty_set) || (3600 >= 0 && x in set(1, 2)))"#;
-        let mut statement = MarkedStatement::from(Arc::new(statement_with_vars(test_statement)));
+        let test_term = r#"(x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 < 0 && x in empty_set) || (3600 >= 0 && x in set(1, 2)))"#;
+        let mut term = TermProps::from(Rc::new(term_with_vars(test_term)));
 
-        let target = MarkedStatement::from(Arc::new(statement_with_vars(r#"transform(a)"#)));
-        statement.weight = 0;
+        let purpose = TermProps::from(Rc::new(term_with_vars(r#"transform(a)"#)));
+        term.weight = 0;
 
-        let suppose = rule.apply(&mut statement, &target);
+        let suppose = rule.apply(&mut term, &purpose);
         assert!(suppose.is_ok());
         let suppose = suppose.unwrap();
         assert_eq!(suppose.len(), 3);
@@ -398,13 +380,13 @@ pub mod tests {
     #[ignore] // TODO: fix double - autoremove
     fn twice_apply_test() {
         let rule = subtree_rule();
-        let mut statement = test_statement_subtree();
-        let target = test_target();
+        let mut term = test_term_subtree();
+        let purpose = test_purpose();
 
-        statement.weight = 1;
-        assert!(rule.apply(&mut statement, &target).is_ok());
+        term.weight = 1;
+        assert!(rule.apply(&mut term, &purpose).is_ok());
         assert_eq!(
-            rule.apply(&mut statement, &target).err(),
+            rule.apply(&mut term, &purpose).err(),
             Some(RuleDeclineReason::AlreadyApplied)
         );
     }
@@ -412,15 +394,15 @@ pub mod tests {
     #[test]
     fn bind_apply_test() {
         let rule = rule_with_binds();
-        let mut statement = test_statement_fraction();
-        let target = test_target();
+        let mut term = test_term_fraction();
+        let purpose = test_purpose();
 
-        statement.weight = 1;
-        let suppose = rule.apply(&mut statement, &target).unwrap();
+        term.weight = 1;
+        let suppose = rule.apply(&mut term, &purpose).unwrap();
         assert_eq!(suppose[0].requirements.len(), 0);
         assert_eq!(
-            *suppose[0].resolution.statement,
-            statement_with_vars("2 == 0 && x + 1 != 0")
+            *suppose[0].resolution.term,
+            term_with_vars("2 == 0 && x + 1 != 0")
         );
     }
 }

@@ -1,6 +1,0 @@
----
-source: mcore/src/statement/statement.rs
-assertion_line: 139
-expression: statement
----
-set(a, b) is known <=> true

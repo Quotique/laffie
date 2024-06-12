@@ -8,9 +8,9 @@ use std::{convert::TryFrom, path::PathBuf, sync::Arc};
 use clap::Parser;
 use colored::*;
 
-use database::{ProblemDb, ProblemRecord};
+use database::{TaskDb, TaskRecord};
 use mcore::{
-    problem::{Problem, Solution},
+    task::{Solution, Task},
     utils::{log_init, Dumper, DumperConfig, VecDisplay},
 };
 use parser::DirectoryParser;
@@ -26,11 +26,11 @@ struct Args {
     #[clap(short, long, default_value = "./config/local.json")]
     config: PathBuf,
 
-    /// Runs only spcified problem
+    /// Runs only spcified task
     #[clap(short, long, default_value = "")]
     only: String,
 
-    /// Remove problem from db
+    /// Remove task from db
     #[clap(short, long, default_value = "")]
     remove: String,
 
@@ -38,13 +38,13 @@ struct Args {
     #[clap(short, long)]
     symbols: Option<PathBuf>,
 
-    /// Specify problems path
+    /// Specify tasks path
     #[clap(short, long)]
-    problems: Option<PathBuf>,
+    tasks: Option<PathBuf>,
 
-    /// Specify problems DB path
-    #[clap(short = 'd', long, default_value = "./db/problems")]
-    problems_db: PathBuf,
+    /// Specify tasks DB path
+    #[clap(short = 'd', long, default_value = "./db/tasks")]
+    tasks_db: PathBuf,
 
     /// Dump solution trace into a file
     #[clap(short, long)]
@@ -73,30 +73,30 @@ fn main() {
                 println!("Symbols dir is not specified");
                 std::process::exit(-1);
             }),
-        args.problems
+        args.tasks
             .clone()
-            .or(settings.problems_dir)
+            .or(settings.tasks_dir)
             .unwrap_or_else(|| {
-                println!("Problems dir is not specified");
+                println!("Tasks dir is not specified");
                 std::process::exit(-1);
             }),
     );
 
     let rules_engine = Arc::new(parser.load_rules().unwrap());
-    let problems = parser.load_problems().unwrap();
-    let db = ProblemDb::open(args.problems_db).unwrap();
+    let tasks = parser.load_tasks().unwrap();
+    let db = TaskDb::open(args.tasks_db).unwrap();
 
     if !args.remove.is_empty() {
-        let id = i128::from_str_radix(&args.remove, 16).expect("bad problem id");
+        let id = i128::from_str_radix(&args.remove, 16).expect("bad task id");
         if let Err(e) = db.remove(id) {
-            println!("problem remove error: {}", e);
+            println!("task remove error: {}", e);
         }
         return;
     }
 
-    for record in problems.into_iter().map(|p| ProblemRecord::from(&p)) {
+    for record in tasks.into_iter().map(|p| TaskRecord::from(&p)) {
         if let Err(e) = db.get_or_insert(record) {
-            println!("problem write error: {}", e);
+            println!("task write error: {}", e);
         }
     }
 
@@ -104,15 +104,15 @@ fn main() {
     let mut not_solved = 0;
     let mut answer_changed = 0;
 
-    let db_problems_iter = Box::new(db.iter());
+    let db_tasks_iter = Box::new(db.iter());
 
-    for mut record in db_problems_iter.filter(move |x| {
+    for mut record in db_tasks_iter.filter(move |x| {
         let id = format!("{:x}", x.id);
         id.starts_with(&only) || id.ends_with(&only)
     }) {
-        let p: Problem = record.clone().into();
+        let p: Task = record.clone().into();
 
-        println!("{} {}", "Problem".bold().green(), p);
+        println!("{} {}", "Task".bold().green(), p);
         let p_id = p.id;
         let mut solution = Solution::new(
             p,

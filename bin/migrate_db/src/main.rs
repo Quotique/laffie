@@ -2,15 +2,15 @@ mod settings;
 
 use clap::{Arg, Command};
 
-use database::{ProblemDb, ProblemRecord, UserDb, UserRecord};
+use database::{TaskDb, TaskRecord, UserDb, UserRecord};
 use mcore::utils::log_init;
 
 use settings::Settings;
 
-fn update_problems(problems_db: ProblemDb) -> eyre::Result<()> {
-    for p in problems_db.iter_old() {
-        let problem = ProblemRecord::from(p);
-        problems_db.put(&problem)?;
+fn update_tasks(tasks_db: TaskDb) -> eyre::Result<()> {
+    for p in tasks_db.iter_old() {
+        let task = TaskRecord::from(p);
+        tasks_db.put(&task)?;
     }
 
     Ok(())
@@ -51,17 +51,17 @@ fn main() {
         });
     let _log_guard = log_init(&settings.logger);
 
-    let problems_db = ProblemDb::open(&settings.problems_db).unwrap();
-    problems_db.backup(&settings.problems_backup).unwrap();
-    if let Err(e) = update_problems(problems_db) {
+    let tasks_db = TaskDb::open(&settings.tasks_db).unwrap();
+    tasks_db.backup(&settings.tasks_backup).unwrap();
+    if let Err(e) = update_tasks(tasks_db) {
         println!("error: {e}");
-        ProblemDb::restore(&settings.problems_db, &settings.problems_backup).unwrap();
+        TaskDb::restore(&settings.tasks_db, &settings.tasks_backup).unwrap();
     }
 
     let users_db = UserDb::open(&settings.users_db).unwrap();
     users_db.backup(&settings.users_backup).unwrap();
     if let Err(e) = update_users(users_db) {
         println!("error: {e}");
-        UserDb::restore(&settings.users_db, &settings.problems_db).unwrap();
+        UserDb::restore(&settings.users_db, &settings.tasks_db).unwrap();
     }
 }

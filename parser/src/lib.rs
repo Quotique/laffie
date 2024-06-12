@@ -7,16 +7,16 @@ mod dir_loader;
 mod error;
 mod grammar;
 pub mod lang;
-mod problem;
 mod rule;
-mod statement;
 mod symbol;
+mod task;
+mod term;
 
 pub type CompactString = smartstring::alias::String;
 
 pub use self::{
-    dir_loader::DirectoryParser, error::ParserError, problem::ProblemParser, rule::RuleParser,
-    statement::StatementParser, symbol::SymbolParser,
+    dir_loader::DirectoryParser, error::ParserError, rule::RuleParser, symbol::FuncSymbolParser,
+    task::TaskParser, term::TermParser,
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

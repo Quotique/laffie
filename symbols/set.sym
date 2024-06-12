@@ -3,7 +3,7 @@ symbol set {
 }
 
 rule {
-    attr level(0),problem_target(proof(set(a) is known));
+    attr level(0),purpose(proof(set(a) is known));
 
     set(a) is known <=> true;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(0),problem_target(proof(set(a, ..) is known));
+    attr level(0),purpose(proof(set(a, ..) is known));
 
     set(a, .. as S) is known <=> true;
 
@@ -20,7 +20,7 @@ rule {
 }
 
 rule {
-    attr level(0),problem_target(find(x)),subtree,replace;
+    attr level(0),purpose(find(x)),replace;
 
     x in set(a, b) => answer(x in set(a, b));
 
@@ -29,7 +29,7 @@ rule {
 }
 
 rule {
-    attr level(3),problem_target(transform(x)),subtree,replace,block(move_left);
+    attr level(3),purpose(transform(x)),replace,block(move_left);
 
     a in set(b, c) <=> a == b || a == c;
 }
@@ -39,7 +39,7 @@ symbol empty_set {
 }
 
 rule {
-    attr level(0),problem_target(proof(empty_set is known));
+    attr level(0),purpose(proof(empty_set is known));
 
     empty_set is known <=> true;
 }

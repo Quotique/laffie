@@ -9,7 +9,7 @@ use clap::{Arg, Command};
 use futures::StreamExt;
 use telegram_bot::*;
 
-use database::{ProblemDb, UserDb};
+use database::{TaskDb, UserDb};
 use mcore::{rule::RulesEngine, utils::log_init};
 use parser::DirectoryParser;
 
@@ -21,7 +21,7 @@ rust_i18n::i18n!("locales");
 async fn run_bot(
     token: &str,
     engine: Arc<RulesEngine>,
-    problems_db: Arc<ProblemDb>,
+    tasks_db: Arc<TaskDb>,
     users_db: Arc<UserDb>,
 ) {
     let api = Api::new(token);
@@ -34,7 +34,7 @@ async fn run_bot(
                 update,
                 &api,
                 engine.clone(),
-                problems_db.clone(),
+                tasks_db.clone(),
                 users_db.clone(),
             )
             .await;
@@ -90,8 +90,8 @@ async fn main() {
     );
 
     let rules_engine = Arc::new(parser.load_rules().unwrap());
-    let problems_db = Arc::new(ProblemDb::open(settings.problems_db).unwrap());
+    let tasks_db = Arc::new(TaskDb::open(settings.tasks_db).unwrap());
     let users_db = Arc::new(UserDb::open(settings.users_db).unwrap());
 
-    run_bot(&settings.api_token, rules_engine, problems_db, users_db).await
+    run_bot(&settings.api_token, rules_engine, tasks_db, users_db).await
 }

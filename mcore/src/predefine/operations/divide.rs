@@ -5,26 +5,26 @@ use num::integer::gcd;
 use num_bigint::ToBigInt;
 
 use crate::{
-    statement::{
-        symbols::{Symbol, SymbolAttr, SymbolAttrValue},
-        term::{StatementNode, Term},
+    term::{
+        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue},
+        symbol::Symbol,
         tree_utils::swap_node,
+        TermNode,
     },
     NormalizationLevel,
 };
 
 use super::{from_const, to_const, MAX_DEC_CONVERSION_EXP};
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name("/")
         .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(200))
         .with_calculator(Box::new(divide))
         .build()
-        .unwrap()
 }
 
-pub fn divide(root: &mut StatementNode, level: NormalizationLevel) -> bool {
+pub fn divide(root: &mut TermNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("/") {
         return false;
     }
@@ -32,7 +32,7 @@ pub fn divide(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     match level {
         NormalizationLevel(0) => false,
         NormalizationLevel(1) => {
-            if let Term::Number(d) = &root.back().unwrap().data() {
+            if let Symbol::Number(d) = &root.back().unwrap().data() {
                 if d.is_one() {
                     let mut child = root.pop_front().unwrap();
                     swap_node(root, &mut child.root_mut());
@@ -62,7 +62,7 @@ pub fn divide(root: &mut StatementNode, level: NormalizationLevel) -> bool {
                             &mut root.front_mut().unwrap(),
                             &mut from_const(sign * num.abs()).root_mut(),
                         );
-                        *root.back_mut().unwrap().data_mut() = Term::Number(den.abs());
+                        *root.back_mut().unwrap().data_mut() = Symbol::Number(den.abs());
                         true
                     } else {
                         false

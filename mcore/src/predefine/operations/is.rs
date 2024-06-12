@@ -1,13 +1,14 @@
 use crate::{
     predefine::symbol_by_name,
-    statement::{
-        symbols::{Symbol, SymbolAttr, SymbolAttrValue, TruthResult},
-        term::{StatementNode, Term},
+    term::{
+        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue, TruthResult},
+        symbol::Symbol,
+        TermNode,
     },
 };
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name("is")
         .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(800))
         .with_attr(
@@ -16,27 +17,26 @@ pub fn symbol() -> Symbol {
         )
         .with_truth_checker(Box::new(is))
         .build()
-        .unwrap()
 }
 
-pub fn is(root: &StatementNode) -> TruthResult {
+pub fn is(root: &TermNode) -> TruthResult {
     if !root.data().is_symbol_name("is") {
         return TruthResult::Unknown;
     }
 
-    if let (Term::Number(_), Term::Symbol(known_id)) =
+    if let (Symbol::Number(_), Symbol::FuncSymbol(known_id)) =
         (&root.front().unwrap().data(), &root.back().unwrap().data())
     {
-        if *known_id == symbol_by_name("known").unwrap().id {
+        if *known_id == symbol_by_name("known").unwrap() {
             return TruthResult::True;
         } else {
             return TruthResult::Unknown;
         }
     }
-    if let (Term::Variable(_), Term::Symbol(sym_varible_id)) =
+    if let (Symbol::Variable(_), Symbol::FuncSymbol(sym_varible_id)) =
         (&root.front().unwrap().data(), &root.back().unwrap().data())
     {
-        if *sym_varible_id == symbol_by_name("variable").unwrap().id {
+        if *sym_varible_id == symbol_by_name("variable").unwrap() {
             return TruthResult::True;
         } else {
             return TruthResult::Unknown;

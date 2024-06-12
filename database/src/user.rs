@@ -16,9 +16,9 @@ pub mod old {
     pub struct UserRecord {
         pub version: u64,
 
-        pub id:       u64,
-        pub locale:   String,
-        pub problems: BTreeSet<u128>,
+        pub id:     u64,
+        pub locale: String,
+        pub tasks:  BTreeSet<u128>,
     }
 }
 
@@ -28,7 +28,7 @@ pub struct UserRecord {
 
     pub id:     u64,
     pub locale: String,
-    problems:   BTreeSet<u128>,
+    tasks:      BTreeSet<u128>,
 }
 
 pub struct UserDb {
@@ -39,10 +39,10 @@ pub struct UserDb {
 impl From<old::UserRecord> for UserRecord {
     fn from(value: old::UserRecord) -> Self {
         Self {
-            version:  VERSION,
-            id:       value.id,
-            locale:   "ru".to_owned(),
-            problems: value.problems,
+            version: VERSION,
+            id:      value.id,
+            locale:  "ru".to_owned(),
+            tasks:   value.tasks,
         }
     }
 }
@@ -53,16 +53,16 @@ impl UserRecord {
             version: VERSION,
             id,
             locale: "ru".to_owned(),
-            problems: Default::default(),
+            tasks: Default::default(),
         }
     }
 
-    pub fn add_problem_id(&mut self, id: u128) {
-        self.problems.insert(id);
+    pub fn add_task_id(&mut self, id: u128) {
+        self.tasks.insert(id);
     }
 
-    pub fn problems_iter(&self) -> impl Iterator<Item = u128> + '_ {
-        self.problems.iter().copied()
+    pub fn tasks_iter(&self) -> impl Iterator<Item = u128> + '_ {
+        self.tasks.iter().copied()
     }
 }
 

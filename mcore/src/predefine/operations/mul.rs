@@ -4,19 +4,19 @@ use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use trees::{tr, Tree};
 
 use crate::{
-    predefine::symbol_by_id,
-    statement::{
-        symbols::{Symbol, SymbolAttr, SymbolAttrValue},
-        term::{StatementNode, Term},
+    term::{
+        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue},
+        symbol::Symbol,
         tree_utils::swap_node,
+        TermNode,
     },
     NormalizationLevel,
 };
 
 use super::{plus::plus, power::power_argument, to_const};
 
-pub fn symbol() -> Symbol {
-    Symbol::builder()
+pub fn symbol() -> FuncSymbol {
+    FuncSymbol::builder()
         .name("*")
         .with_attr(SymbolAttr::Associative, SymbolAttrValue::None)
         .with_attr(SymbolAttr::Commutative, SymbolAttrValue::None)
@@ -24,10 +24,9 @@ pub fn symbol() -> Symbol {
         .with_calculator(Box::new(multiply))
         .with_ordering(Box::new(ordering))
         .build()
-        .unwrap()
 }
 
-pub fn multiply(root: &mut StatementNode, level: NormalizationLevel) -> bool {
+pub fn multiply(root: &mut TermNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("*") {
         return false;
     }
@@ -39,7 +38,7 @@ pub fn multiply(root: &mut StatementNode, level: NormalizationLevel) -> bool {
                 .iter()
                 .any(|x| x.data().is_number_value(&Decimal::zero()))
             {
-                swap_node(root, &mut tr(Term::Number(0.into())).root_mut());
+                swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
                 return true;
             }
             let result = root.iter_mut().fold(false, |acc, mut x| {
@@ -59,16 +58,15 @@ pub fn multiply(root: &mut StatementNode, level: NormalizationLevel) -> bool {
         _ => {
             let (constant, result) = fold_constant(root);
             let (powers, result) = root.iter_mut().fold(
-                (HashMap::<Tree<Term>, Tree<Term>>::new(), result),
+                (HashMap::<Tree<Symbol>, Tree<Symbol>>::new(), result),
                 |acc, mut x| {
                     let power = extract_power(&mut x);
                     let (mut powers, mut result) = acc;
                     powers
                         .entry(x.detach())
                         .and_modify(|p| {
-                            let mut new_pow = tr(Term::with_symbol_name("+").unwrap()) /
-                                p.clone() /
-                                power.clone();
+                            let mut new_pow =
+                                tr(Symbol::with_func_symbol("+")) / p.clone() / power.clone();
                             swap_node(&mut p.root_mut(), &mut new_pow.root_mut());
                             result = true;
                         })
@@ -94,22 +92,22 @@ pub fn multiply(root: &mut StatementNode, level: NormalizationLevel) -> bool {
     }
 }
 
-fn attach_constant(root: &mut StatementNode, constant: Decimal) -> bool {
+fn attach_constant(root: &mut TermNode, constant: Decimal) -> bool {
     if constant == Decimal::zero() {
-        swap_node(root, &mut tr(Term::Number(0.into())).root_mut());
+        swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
         true
     } else if constant < Decimal::zero() {
-        root.push_front(tr(Term::with_symbol_name("-").unwrap()) / tr(Term::Number(-constant)));
+        root.push_front(tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-constant)));
         false
     } else if constant != Decimal::one() {
-        root.push_front(tr(Term::Number(constant)));
+        root.push_front(tr(Symbol::Number(constant)));
         false
     } else {
         false
     }
 }
 
-fn fold_constant(root: &mut StatementNode) -> (Decimal, bool) {
+fn fold_constant(root: &mut TermNode) -> (Decimal, bool) {
     root.iter_mut()
         .enumerate()
         .fold((Decimal::from(1), false), |acc, (num, mut x)| {
@@ -128,10 +126,10 @@ fn fold_constant(root: &mut StatementNode) -> (Decimal, bool) {
         })
 }
 
-fn remove_unused_mul(root: &mut StatementNode) -> bool {
+fn remove_unused_mul(root: &mut TermNode) -> bool {
     match root.degree() {
         0 => {
-            *root.data_mut() = Term::Number(Decimal::from(1));
+            *root.data_mut() = Symbol::Number(Decimal::from(1));
             true
         }
         1 => {
@@ -143,19 +141,19 @@ fn remove_unused_mul(root: &mut StatementNode) -> bool {
     }
 }
 
-fn merge_power(root: Tree<Term>, pow: Tree<Term>) -> Tree<Term> {
-    if pow == tr(Term::Number(Decimal::from(1))) {
+fn merge_power(root: Tree<Symbol>, pow: Tree<Symbol>) -> Tree<Symbol> {
+    if pow == tr(Symbol::Number(Decimal::from(1))) {
         return root;
     }
 
-    if pow == tr(Term::Number(Decimal::from(0))) {
-        return tr(Term::Number(Decimal::from(1)));
+    if pow == tr(Symbol::Number(Decimal::from(0))) {
+        return tr(Symbol::Number(Decimal::from(1)));
     }
 
-    tr(Term::with_symbol_name("^").unwrap()) / root / pow
+    tr(Symbol::with_func_symbol("^")) / root / pow
 }
 
-fn extract_power(root: &mut StatementNode) -> Tree<Term> {
+fn extract_power(root: &mut TermNode) -> Tree<Symbol> {
     if root.data().is_symbol_name("^") {
         let power = root.pop_back().unwrap();
         let mut arg = root.pop_front().unwrap();
@@ -164,11 +162,11 @@ fn extract_power(root: &mut StatementNode) -> Tree<Term> {
         swap_node(root, &mut arg.root_mut());
         power
     } else {
-        tr(Term::Number(Decimal::from(1)))
+        tr(Symbol::Number(Decimal::from(1)))
     }
 }
 
-fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
+fn ordering(left: &TermNode, right: &TermNode) -> Ordering {
     // Number < Param < Variable < Symbol < Placeholder
     let pa_left = power_argument(left);
     let pa_right = power_argument(right);
@@ -181,27 +179,24 @@ fn ordering(left: &StatementNode, right: &StatementNode) -> Ordering {
     }
 
     match (pa_left.data(), pa_right.data()) {
-        (Term::Number(left), Term::Number(right)) => left.cmp(right),
-        (Term::Number(_), _) => Ordering::Less,
+        (Symbol::Number(left), Symbol::Number(right)) => left.cmp(right),
+        (Symbol::Number(_), _) => Ordering::Less,
 
-        (Term::Param(left), Term::Param(right)) => left.cmp(right),
-        (Term::Param(_), Term::Number(_)) => Ordering::Greater,
-        (Term::Param(_), _) => Ordering::Less,
+        (Symbol::Param(left), Symbol::Param(right)) => left.cmp(right),
+        (Symbol::Param(_), Symbol::Number(_)) => Ordering::Greater,
+        (Symbol::Param(_), _) => Ordering::Less,
 
-        (Term::Variable(left), Term::Variable(right)) => left.cmp(right),
-        (Term::Variable(_), Term::Symbol(_)) => Ordering::Less,
-        (Term::Variable(_), Term::Placeholder(_)) => Ordering::Less,
-        (Term::Variable(_), _) => Ordering::Greater,
+        (Symbol::Variable(left), Symbol::Variable(right)) => left.cmp(right),
+        (Symbol::Variable(_), Symbol::FuncSymbol(_)) => Ordering::Less,
+        (Symbol::Variable(_), Symbol::Placeholder(_)) => Ordering::Less,
+        (Symbol::Variable(_), _) => Ordering::Greater,
 
-        (Term::Symbol(left), Term::Symbol(right)) => symbol_by_id(*left)
-            .unwrap()
-            .name
-            .cmp(&symbol_by_id(*right).unwrap().name),
-        (Term::Symbol(_), Term::Placeholder(_)) => Ordering::Less,
-        (Term::Symbol(_), _) => Ordering::Greater,
+        (Symbol::FuncSymbol(left), Symbol::FuncSymbol(right)) => left.cmp(right),
+        (Symbol::FuncSymbol(_), Symbol::Placeholder(_)) => Ordering::Less,
+        (Symbol::FuncSymbol(_), _) => Ordering::Greater,
 
-        (Term::Placeholder(_), Term::Placeholder(_)) => Ordering::Equal,
-        (Term::Placeholder(_), _) => Ordering::Greater,
+        (Symbol::Placeholder(_), Symbol::Placeholder(_)) => Ordering::Equal,
+        (Symbol::Placeholder(_), _) => Ordering::Greater,
     }
 }
 

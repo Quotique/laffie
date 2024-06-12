@@ -3,7 +3,7 @@ symbol + {
 }
 
 rule {
-    attr level(0),problem_target(proof(a+b is known));
+    attr level(0),purpose(proof(a+b is known));
 
     a+b is known <=> true;
 

@@ -3,7 +3,7 @@ symbol is {
 }
 
 rule {
-    attr replace,level(0),problem_target(proof(a is true));
+    attr replace,level(0),purpose(proof(a is true));
 
     a is true <=> a;
 }

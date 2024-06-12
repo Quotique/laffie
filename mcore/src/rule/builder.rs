@@ -1,45 +1,45 @@
-use std::{collections::HashMap, convert::From, fmt};
+use std::{collections::HashMap, convert::From, fmt, sync::Arc};
 
 use multimap::MultiMap;
 
 use crate::{
     predefine::symbol_by_name,
-    statement::{NodeMapping, NodePosition, Statement},
-    NormalizationLevel, RuleId, SymbolId,
+    term::{FuncSymbol, NodeMapping, NodePosition, Term},
+    NormalizationLevel, RuleId,
 };
 
 use super::rule::{Rule, RuleAttr, RuleAttrValue};
 
 #[derive(Clone, Debug)]
 pub enum RuleBuilderError {
-    BadStatementRoot,
+    BadTermRoot,
     WrongArgsCount,
-    OnlyOneStatementIsAllowed,
+    OnlyOneTermIsAllowed,
     MissingLevelAttribute,
 }
 
 pub struct RuleBuilder {
     rule_id:      RuleId,
-    statement:    Option<Statement>,
-    requirements: Vec<Statement>,
+    term:         Option<Term>,
+    requirements: Vec<Term>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
-    symbol_id:    SymbolId,
+    func_symbol:  Arc<FuncSymbol>,
 
-    replaces: Vec<(RuleAttr, Statement)>,
+    replaces: Vec<(RuleAttr, Term)>,
 }
 
-impl From<Statement> for RuleBuilder {
-    fn from(source: Statement) -> Self {
-        Self::default().with_statement(source).unwrap()
+impl From<Term> for RuleBuilder {
+    fn from(source: Term) -> Self {
+        Self::default().with_term(source).unwrap()
     }
 }
 
 impl fmt::Display for RuleBuilderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::BadStatementRoot => write!(f, "Bad statement root"),
+            Self::BadTermRoot => write!(f, "Bad term root"),
             Self::WrongArgsCount => write!(f, "Wrong args count"),
-            Self::OnlyOneStatementIsAllowed => write!(f, "Only one statementis allowed"),
+            Self::OnlyOneTermIsAllowed => write!(f, "Only one termis allowed"),
             Self::MissingLevelAttribute => write!(f, "Missing level attribute"),
         }
     }
@@ -49,12 +49,11 @@ impl Default for RuleBuilder {
     fn default() -> Self {
         RuleBuilder {
             rule_id:      RuleId::default(),
-            statement:    None,
+            term:         None,
             requirements: Default::default(),
             attributes:   Default::default(),
-            symbol_id:    symbol_by_name("AnySymbol")
-                .expect("System symbol AnySymbol is not found")
-                .id,
+            func_symbol:  symbol_by_name("AnySymbol")
+                .expect("System symbol AnySymbol is not found"),
             replaces:     Default::default(),
         }
     }
@@ -66,19 +65,19 @@ impl RuleBuilder {
         self
     }
 
-    pub fn with_symbol_id(mut self, symbol_id: SymbolId) -> Self {
-        self.symbol_id = symbol_id;
+    pub fn with_func_symbol(mut self, func_symbol: Arc<FuncSymbol>) -> Self {
+        self.func_symbol = func_symbol;
         self
     }
 
-    pub fn with_statement(mut self, statement: Statement) -> Result<Self, RuleBuilderError> {
-        if self.statement.replace(statement).is_some() {
-            return Err(RuleBuilderError::OnlyOneStatementIsAllowed);
+    pub fn with_term(mut self, term: Term) -> Result<Self, RuleBuilderError> {
+        if self.term.replace(term).is_some() {
+            return Err(RuleBuilderError::OnlyOneTermIsAllowed);
         }
         Ok(self)
     }
 
-    pub fn with_require(mut self, requirement: Statement) -> Self {
+    pub fn with_require(mut self, requirement: Term) -> Self {
         self.requirements.push(requirement);
         self
     }
@@ -93,16 +92,13 @@ impl RuleBuilder {
     }
 
     pub fn build(mut self) -> Result<Vec<Rule>, RuleBuilderError> {
-        let statement = self
-            .statement
-            .take()
-            .ok_or(RuleBuilderError::BadStatementRoot)?;
+        let term = self.term.take().ok_or(RuleBuilderError::BadTermRoot)?;
 
-        let root_sym = statement
+        let root_sym = term
             .root()
             .data()
-            .symbol()
-            .ok_or(RuleBuilderError::BadStatementRoot)?;
+            .func_symbol()
+            .ok_or(RuleBuilderError::BadTermRoot)?;
 
         match root_sym.name.as_str() {
             "=>" => {}
@@ -110,15 +106,14 @@ impl RuleBuilder {
                 self.attributes
                     .push((RuleAttr::Equivalence, RuleAttrValue::None));
             }
-            _ => return Err(RuleBuilderError::BadStatementRoot),
+            _ => return Err(RuleBuilderError::BadTermRoot),
         }
 
-        if statement.root().degree() != 2 {
+        if term.root().degree() != 2 {
             return Err(RuleBuilderError::WrongArgsCount);
         }
 
-        let mut attrs: MultiMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
-        attrs.insert(RuleAttr::Subtree, RuleAttrValue::None);
+        let attrs: MultiMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
 
         let level = if let Some(RuleAttrValue::UInt(level)) = attrs.get(&RuleAttr::Level) {
             level
@@ -127,7 +122,7 @@ impl RuleBuilder {
         };
         let mut result = vec![];
         for set in 0..(2_u64).pow(self.replaces.len() as u32) {
-            let mut statement = statement.clone();
+            let mut term = term.clone();
             let mut reqs = self.requirements.clone();
 
             for i in 0..self.replaces.len() {
@@ -135,38 +130,38 @@ impl RuleBuilder {
                 if set & elem == elem {
                     match self.replaces.get(i) {
                         Some((RuleAttr::One, src)) => {
-                            statement.replace(src, &Statement::one());
+                            term.replace(src, &Term::one());
                             for i in reqs.iter_mut() {
-                                i.replace(src, &Statement::one());
+                                i.replace(src, &Term::one());
                             }
                         }
                         Some((RuleAttr::Zero, src)) => {
-                            statement.replace(src, &Statement::zero());
+                            term.replace(src, &Term::zero());
                             for i in reqs.iter_mut() {
-                                i.replace(src, &Statement::zero());
+                                i.replace(src, &Term::zero());
                             }
                         }
                         _ => {}
                     }
                 }
             }
-            let binds: HashMap<_, _> = statement
+            let binds: HashMap<_, _> = term
                 .binds
                 .iter()
-                .map(|(param, pos)| (param.clone(), statement[pos].deep_clone()))
+                .map(|(param, pos)| (param.clone(), term[pos].deep_clone()))
                 .collect();
 
             // TODO: normalization level
-            statement = statement.normalize(NormalizationLevel::from(1));
+            term = term.normalize(NormalizationLevel::from(1));
 
             result.push(Rule {
                 id: self.rule_id,
                 level: *level as usize,
-                symbol_id: self.symbol_id,
+                func_symbol: self.func_symbol.clone(),
                 attrs: attrs.clone(),
                 block: Default::default(),
-                pattern_symbols: statement.root().front().unwrap().symbols(),
-                statement,
+                pattern_symbols: term.root().front().unwrap().symbols(),
+                term,
                 pattern: NodePosition::default().child(0),
                 replace: NodePosition::default().child(1),
                 binds: binds.into(),

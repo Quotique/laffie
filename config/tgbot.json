@@ -16,7 +16,7 @@
     }
   },
   "symbols_dir": "symbols",
-  "problems_db": "./db/problems",
+  "problems_db": "./db/tasks",
   "users_db": "./db/users",
   "api_token": "5199256327:AAFZiEKFRUz7VanL5Bgd3lfhgArYdBACytM"
 }

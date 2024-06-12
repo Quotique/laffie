@@ -7,23 +7,19 @@ pub use console::Console;
 pub use html::Html;
 
 use mcore::{
-    problem::{Frame, ProblemsCache, Solution, SolveStatus, Target},
-    statement::{MarkedStatement, Statement},
+    task::{Frame, Purpose, Solution, SolveStatus, TasksCache},
+    term::{Term, TermProps},
 };
 
 pub trait Renderer {
-    fn display_target(&mut self, subproblem_level: usize, target: &Target) -> fmt::Result;
+    fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result;
 
-    fn display_statement(
-        &mut self,
-        subproblem_level: usize,
-        statement: &MarkedStatement,
-    ) -> fmt::Result;
+    fn display_term(&mut self, subtask_level: usize, term: &TermProps) -> fmt::Result;
 
     fn display_answer(
         &mut self,
-        target: &Target,
-        answer: Option<&Statement>,
+        purpose: &Purpose,
+        answer: Option<&Term>,
         status: &SolveStatus,
     ) -> fmt::Result;
 
@@ -33,9 +29,9 @@ pub trait Renderer {
 }
 
 pub struct View<'a> {
-    solution:    &'a Solution,
-    subproblems: Arc<ProblemsCache>,
-    rendered:    Arc<RefCell<HashSet<Statement>>>,
+    solution: &'a Solution,
+    subtasks: Arc<TasksCache>,
+    rendered: Arc<RefCell<HashSet<Term>>>,
 }
 
 impl<'a> TryFrom<&'a Solution> for View<'a> {
@@ -44,7 +40,7 @@ impl<'a> TryFrom<&'a Solution> for View<'a> {
     fn try_from(solution: &'a Solution) -> eyre::Result<Self> {
         Ok(Self {
             solution,
-            subproblems: solution
+            subtasks: solution
                 .cache
                 .clone()
                 .ok_or_else(|| eyre::eyre!("missing cache"))?,
@@ -54,24 +50,24 @@ impl<'a> TryFrom<&'a Solution> for View<'a> {
 }
 
 impl<'a> View<'a> {
-    fn display_target(
+    fn display_purpose(
         &self,
-        target: &Target,
-        answer: &Statement,
-        subproblem_level: usize,
+        purpose: &Purpose,
+        answer: &Term,
+        subtask_level: usize,
         renderer: &mut dyn Renderer,
     ) -> fmt::Result {
-        renderer.display_target(subproblem_level, target)?;
-        match target {
-            Target::Find(_) => {}
-            Target::Proof(s) | Target::Transform(s) => {
+        renderer.display_purpose(subtask_level, purpose)?;
+        match purpose {
+            Purpose::Find(_) => {}
+            Purpose::Proof(s) | Purpose::Transform(s) => {
                 let answer_idx = s
                     .iter()
                     .enumerate()
-                    .find(|(_, x)| x.statement.as_ref() == answer)
+                    .find(|(_, x)| x.term.as_ref() == answer)
                     .map(|(id, _)| id);
                 if let Some(idx) = answer_idx {
-                    self.display_frame(s, idx, subproblem_level, renderer)?;
+                    self.display_frame(s, idx, subtask_level, renderer)?;
                 }
             }
         }
@@ -82,7 +78,7 @@ impl<'a> View<'a> {
         &self,
         frame: &Frame,
         answer_idx: usize,
-        subproblem_level: usize,
+        subtask_level: usize,
         renderer: &mut dyn Renderer,
     ) -> fmt::Result {
         let mut trace: Vec<usize> = vec![answer_idx];
@@ -94,18 +90,18 @@ impl<'a> View<'a> {
         while let Some(id) = trace.pop() {
             for r in &frame[id].requirements {
                 if self.rendered.borrow_mut().insert(r.as_ref().clone()) {
-                    if let Some(solution) = self.subproblems.status(r).and_then(|x| x.solution()) {
+                    if let Some(solution) = self.subtasks.status(r).and_then(|x| x.solution()) {
                         View {
-                            solution:    &solution,
-                            subproblems: self.subproblems.clone(),
-                            rendered:    self.rendered.clone(),
+                            solution: &solution,
+                            subtasks: self.subtasks.clone(),
+                            rendered: self.rendered.clone(),
                         }
                         .display_impl(renderer)?;
                     }
                 }
             }
             if !trace.is_empty() {
-                renderer.display_statement(subproblem_level, &frame[id])?;
+                renderer.display_term(subtask_level, &frame[id])?;
             }
         }
         Ok(())
@@ -113,27 +109,27 @@ impl<'a> View<'a> {
 
     pub fn display_impl(&self, renderer: &mut dyn Renderer) -> fmt::Result {
         if let Some(a) = self.solution.answer {
-            self.display_target(
-                &self.solution.target,
-                &self.solution.stack[a].statement,
-                self.solution.problem.subproblem_level,
+            self.display_purpose(
+                &self.solution.purpose,
+                &self.solution.stack[a].term,
+                self.solution.task.subtask_level,
                 renderer,
             )?;
             self.display_frame(
                 &self.solution.stack,
                 a,
-                self.solution.problem.subproblem_level,
+                self.solution.task.subtask_level,
                 renderer,
             )?;
         } else {
             renderer.dump_frame(&self.solution.stack)?;
         }
-        if self.solution.problem.subproblem_level == 0 {
+        if self.solution.task.subtask_level == 0 {
             renderer.display_answer(
-                &self.solution.target,
+                &self.solution.purpose,
                 self.solution
                     .answer
-                    .map(|x| self.solution.stack[x].statement.as_ref()),
+                    .map(|x| self.solution.stack[x].term.as_ref()),
                 &self.solution.perf_stats,
             )?;
         }

@@ -8,8 +8,8 @@
       "pattern_match": "Info"
     }
   },
-  "problems_db": "./db/problems",
+  "tasks_db": "./db/tasks",
   "users_db": "./db/users",
-  "problems_backup": "./db/backup/problems",
+  "tasks_backup": "./db/backup/tasks",
   "users_backup": "./db/backup/users"
 }

@@ -3,8 +3,8 @@ use std::fmt;
 use html_escape::encode_text;
 
 use mcore::{
-    problem::{Frame, SolveStatus, Target},
-    statement::{MarkedStatement, Statement},
+    task::{Frame, Purpose, SolveStatus},
+    term::{Term, TermProps},
 };
 
 use crate::Renderer;
@@ -14,40 +14,36 @@ pub struct Html<'a> {
 }
 
 impl<'a> Renderer for Html<'a> {
-    fn display_target(&mut self, subproblem_level: usize, target: &Target) -> fmt::Result {
+    fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result {
         self.output.write_str(&format!(
             "{}{}\n",
-            "  ".repeat(subproblem_level),
-            encode_text(&target.to_string())
+            "  ".repeat(subtask_level),
+            encode_text(&purpose.to_string())
         ))
     }
 
-    fn display_statement(
-        &mut self,
-        subproblem_level: usize,
-        statement: &MarkedStatement,
-    ) -> fmt::Result {
+    fn display_term(&mut self, subtask_level: usize, term: &TermProps) -> fmt::Result {
         self.output.write_str(&format!(
             "{}=> <b>{}</b>\n",
-            "  ".repeat(subproblem_level),
-            encode_text(&statement.statement.to_string()),
+            "  ".repeat(subtask_level),
+            encode_text(&term.term.to_string()),
         ))
     }
 
     fn display_answer(
         &mut self,
-        target: &Target,
-        answer: Option<&Statement>,
+        purpose: &Purpose,
+        answer: Option<&Term>,
         status: &SolveStatus,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {
             self.output.write_str(&format!(
                 "{} {}\n",
-                match target {
-                    Target::Find(_) | Target::Transform(_) => {
+                match purpose {
+                    Purpose::Find(_) | Purpose::Transform(_) => {
                         format!("<b>Answer:</b> {}", encode_text(&answer.to_string()))
                     }
-                    Target::Proof(_) => {
+                    Purpose::Proof(_) => {
                         "<b>PROOFED!</b>".to_owned()
                     }
                 },
@@ -64,7 +60,7 @@ impl<'a> Renderer for Html<'a> {
     fn dump_frame(&mut self, frame: &Frame) -> fmt::Result {
         for (i, s) in frame.iter().enumerate() {
             self.output
-                .write_str(&format!("{i} {} {:?}\n", s.statement, s.parent))?;
+                .write_str(&format!("{i} {} {:?}\n", s.term, s.parent))?;
         }
         Ok(())
     }
