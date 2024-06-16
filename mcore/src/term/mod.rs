@@ -159,7 +159,12 @@ pub fn term_with_vars(text: &'static str) -> Term {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+        rc::Rc,
+        str::FromStr,
+    };
 
     use crate::term::{symbol::Placeholder, term_with_params};
 
@@ -196,5 +201,20 @@ mod tests {
                 .placeholder(),
             Some(&Placeholder::from(1))
         );
+    }
+
+    #[test]
+    fn hash_test() {
+        let term = term_with_params("a*x + c == 0");
+        let mut s = DefaultHasher::new();
+        term.hash(&mut s);
+        let hash_1 = s.finish();
+
+        let term = Rc::new(term);
+        let mut s = DefaultHasher::new();
+        term.hash(&mut s);
+        let hash_2 = s.finish();
+
+        assert_eq!(hash_1, hash_2);
     }
 }

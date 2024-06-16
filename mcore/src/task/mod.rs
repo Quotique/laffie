@@ -1,6 +1,5 @@
 mod builder;
 mod cache;
-mod frame;
 mod purpose;
 mod solution;
 
@@ -10,7 +9,6 @@ use std::{fmt, iter::Iterator};
 pub use self::{
     builder::TaskBuilder,
     cache::TasksCache,
-    frame::Frame,
     purpose::Purpose,
     solution::{Solution, SolveStatus},
 };

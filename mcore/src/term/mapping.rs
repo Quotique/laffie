@@ -270,7 +270,7 @@ mod tests {
             .try_map()
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_display_snapshot!(VecDisplay(&maps));
+        insta::assert_snapshot!(VecDisplay(&maps));
     }
 
     #[test]
@@ -282,7 +282,7 @@ mod tests {
             .try_map()
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_display_snapshot!(VecDisplay(&maps));
+        insta::assert_snapshot!(VecDisplay(&maps));
     }
 
     #[test]
@@ -294,7 +294,7 @@ mod tests {
             .try_map()
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_display_snapshot!(VecDisplay(&maps));
+        insta::assert_snapshot!(VecDisplay(&maps));
     }
 
     #[test]
@@ -322,7 +322,7 @@ mod tests {
             .try_map()
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_display_snapshot!(VecDisplay(&maps));
+        insta::assert_snapshot!(VecDisplay(&maps));
     }
 
     #[test]

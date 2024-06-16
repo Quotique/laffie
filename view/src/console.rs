@@ -3,7 +3,7 @@ use std::fmt;
 use colored::*;
 
 use mcore::{
-    task::{Frame, Purpose, SolveStatus},
+    task::{Purpose, SolveStatus},
     term::{Term, TermProps},
     utils::VecDisplay,
 };
@@ -58,7 +58,7 @@ impl<'a, 'b> Renderer for Console<'a, 'b> {
         }
     }
 
-    fn dump_frame(&mut self, frame: &Frame) -> fmt::Result {
+    fn dump_frame(&mut self, frame: &[TermProps]) -> fmt::Result {
         for (i, s) in frame.iter().enumerate() {
             writeln!(self.output, "{i} {} {:?}", s.term, s.parent)?;
         }

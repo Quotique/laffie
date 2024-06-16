@@ -3,9 +3,9 @@ mod pagination;
 mod settings;
 mod text;
 
-use std::{env, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
-use clap::{Arg, Command};
+use clap::Parser;
 use futures::StreamExt;
 use telegram_bot::*;
 
@@ -17,6 +17,19 @@ use commands::process_update;
 use settings::Settings;
 
 rust_i18n::i18n!("locales");
+
+/// Telegram interface
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// Sets a custom config file
+    #[clap(short, long, default_value = "./config/local.json")]
+    config: PathBuf,
+
+    /// Specify symbols path
+    #[clap(short, long)]
+    symbols: Option<PathBuf>,
+}
 
 async fn run_bot(
     token: &str,
@@ -44,30 +57,9 @@ async fn run_bot(
 
 #[tokio::main]
 async fn main() {
-    let matches = Command::new("LaffieBot")
-        .version(env!("CARGO_PKG_VERSION"))
-        .author("Quotique <just.std@gmail.com>")
-        .about("Telegram interface for Minerva Core")
-        .arg(
-            Arg::new("config")
-                .short('c')
-                .long("config")
-                .value_name("FILE")
-                .help("Sets a custom config file")
-                .default_value("./config/local.json")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("symbols")
-                .short('s')
-                .long("symbols")
-                .value_name("DIR")
-                .help("Specify symbols path")
-                .takes_value(true),
-        )
-        .get_matches();
+    let args = Args::parse();
 
-    let settings = Settings::new(matches.value_of("config").unwrap())
+    let settings = Settings::new(args.config)
         .map_err(|e| {
             println!("Config error: {e:?}");
             e
@@ -78,15 +70,14 @@ async fn main() {
     let _log_guard = log_init(&settings.logger);
 
     let parser = DirectoryParser::new(
-        matches
-            .value_of("symbols")
-            .map(|x| x.to_owned())
-            .or(settings.symbols_dir)
+        args.symbols
+            .clone()
+            .or(settings.symbols_dir.map(|x| x.into()))
             .unwrap_or_else(|| {
                 println!("Symbols dir is not specified");
                 std::process::exit(-1);
             }),
-        "".to_string(),
+        "".into(),
     );
 
     let rules_engine = Arc::new(parser.load_rules().unwrap());

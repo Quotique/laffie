@@ -7,7 +7,7 @@ pub use console::Console;
 pub use html::Html;
 
 use mcore::{
-    task::{Frame, Purpose, Solution, SolveStatus, TasksCache},
+    task::{Purpose, Solution, SolveStatus, TasksCache},
     term::{Term, TermProps},
 };
 
@@ -23,7 +23,7 @@ pub trait Renderer {
         status: &SolveStatus,
     ) -> fmt::Result;
 
-    fn dump_frame(&mut self, _frame: &Frame) -> fmt::Result {
+    fn dump_frame(&mut self, _frame: &[TermProps]) -> fmt::Result {
         Ok(())
     }
 }
@@ -40,10 +40,7 @@ impl<'a> TryFrom<&'a Solution> for View<'a> {
     fn try_from(solution: &'a Solution) -> eyre::Result<Self> {
         Ok(Self {
             solution,
-            subtasks: solution
-                .cache
-                .clone()
-                .ok_or_else(|| eyre::eyre!("missing cache"))?,
+            subtasks: solution.cache.clone(),
             rendered: Default::default(),
         })
     }
@@ -60,14 +57,17 @@ impl<'a> View<'a> {
         renderer.display_purpose(subtask_level, purpose)?;
         match purpose {
             Purpose::Find(_) => {}
-            Purpose::Proof(s) | Purpose::Transform(s) => {
-                let answer_idx = s
+            Purpose::Proof(_) | Purpose::Transform(_) => {
+                let answer_idx = self
+                    .solution
+                    .terms
                     .iter()
+                    .filter(|x| x.is_purpose)
                     .enumerate()
                     .find(|(_, x)| x.term.as_ref() == answer)
                     .map(|(id, _)| id);
                 if let Some(idx) = answer_idx {
-                    self.display_frame(s, idx, subtask_level, renderer)?;
+                    self.display_frame(&self.solution.terms, idx, subtask_level, renderer)?;
                 }
             }
         }
@@ -76,7 +76,7 @@ impl<'a> View<'a> {
 
     fn display_frame(
         &self,
-        frame: &Frame,
+        frame: &[TermProps],
         answer_idx: usize,
         subtask_level: usize,
         renderer: &mut dyn Renderer,
@@ -111,25 +111,25 @@ impl<'a> View<'a> {
         if let Some(a) = self.solution.answer {
             self.display_purpose(
                 &self.solution.purpose,
-                &self.solution.stack[a].term,
+                &self.solution.terms[a].term,
                 self.solution.task.subtask_level,
                 renderer,
             )?;
             self.display_frame(
-                &self.solution.stack,
+                &self.solution.terms,
                 a,
                 self.solution.task.subtask_level,
                 renderer,
             )?;
         } else {
-            renderer.dump_frame(&self.solution.stack)?;
+            renderer.dump_frame(&self.solution.terms)?;
         }
         if self.solution.task.subtask_level == 0 {
             renderer.display_answer(
                 &self.solution.purpose,
                 self.solution
                     .answer
-                    .map(|x| self.solution.stack[x].term.as_ref()),
+                    .map(|x| self.solution.terms[x].term.as_ref()),
                 &self.solution.perf_stats,
             )?;
         }

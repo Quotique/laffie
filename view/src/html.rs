@@ -3,7 +3,7 @@ use std::fmt;
 use html_escape::encode_text;
 
 use mcore::{
-    task::{Frame, Purpose, SolveStatus},
+    task::{Purpose, SolveStatus},
     term::{Term, TermProps},
 };
 
@@ -57,7 +57,7 @@ impl<'a> Renderer for Html<'a> {
         }
     }
 
-    fn dump_frame(&mut self, frame: &Frame) -> fmt::Result {
+    fn dump_frame(&mut self, frame: &[TermProps]) -> fmt::Result {
         for (i, s) in frame.iter().enumerate() {
             self.output
                 .write_str(&format!("{i} {} {:?}\n", s.term, s.parent))?;

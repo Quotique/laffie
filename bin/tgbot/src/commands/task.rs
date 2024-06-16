@@ -36,6 +36,7 @@ fn task(
             sink:     "none".into(),
             filename: "".to_owned(),
         }),
+        Default::default(),
     );
 
     user.add_task_id(record.id);

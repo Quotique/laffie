@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fmt,
     rc::Rc,
     sync::Arc,
@@ -6,18 +7,30 @@ use std::{
 };
 
 use bincode::{Decode, Encode};
+use trees::tr;
 
 use crate::{
-    rule::{RulesEngine, SharedRule},
-    term::Term,
+    predefine::{normalize, symbol_by_name},
+    rule::{Rule, RuleAttr, RulesEngine, SharedRule, Suppose},
+    term::{
+        symbol::Symbol,
+        tree_utils::{swap_node, NodeMapping},
+        Term, TermNode, TermProps,
+    },
     utils::{Dumper, DumperSink, VecDisplay},
-    RuleId,
+    NormalizationLevel, RuleId,
 };
 
-use super::{cache::TasksCache, frame::Frame, purpose::Purpose, Task};
+use super::{
+    builder::TaskBuilder,
+    cache::{TaskStatus, TasksCache},
+    purpose::Purpose,
+    Task,
+};
 
 pub const MAX_SUBTASK_LEVEL: usize = 10;
 pub const MAX_LEVEL: usize = 20;
+pub const STACK_SIZE: usize = 2048;
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct SolveStatus {
@@ -31,14 +44,23 @@ pub struct SolveStatus {
 pub struct Solution {
     pub task: Task,
 
-    pub stack: Frame,
-    pub cache: Option<Arc<TasksCache>>,
+    // pub stack: Frame,
+    pub terms:     Vec<TermProps>,
+    main_index:    HashMap<Rc<Term>, usize>,
+    purpose_index: HashMap<Rc<Term>, usize>,
+
+    pub cache: Arc<TasksCache>,
 
     local_rules: Vec<SharedRule>,
     pub purpose: Purpose,
-    pub answer:  Option<usize>,
+
+    // pub purpose_frame: Frame,
+    pub answer: Option<usize>,
 
     pub perf_stats: SolveStatus,
+
+    rules_engine: Arc<RulesEngine>,
+    dumper:       Dumper,
 }
 
 #[derive(Debug, Clone, Copy, Encode, Decode)]
@@ -72,100 +94,167 @@ impl Default for SolveStatus {
 }
 
 impl Solution {
-    pub fn new(task: Task, rules: Arc<RulesEngine>, dumper: Dumper) -> Solution {
-        Solution {
-            stack: Frame::with_terms(
-                rules.clone(),
-                dumper.clone(),
-                task.conditions.iter().cloned(),
-                task.subtask_level,
-            ),
-            cache: None,
+    pub fn new(
+        task: Task,
+        rules: Arc<RulesEngine>,
+        dumper: Dumper,
+        cache: Arc<TasksCache>,
+    ) -> Solution {
+        let purpose = Purpose::try_from((*task.purpose.term).clone()).unwrap();
+
+        let (root, mut childs) = (*task.purpose.term).clone().destruct();
+
+        let terms = if root.data().is_symbol_name("find") ||
+            root.data().is_symbol_name("proof") ||
+            root.data().is_symbol_name("transform")
+        {
+            if childs.degree() != 1 {
+                panic!("wrong arg count");
+            }
+            TermProps::from(Rc::new(Term::from(childs.pop_front().unwrap())))
+        } else {
+            panic!("unexpected word {}", root);
+        };
+
+        let conditions = task.conditions.clone();
+
+        let mut result = Solution {
+            // stack: Frame::with_terms(task.conditions.iter().cloned(), &mut dumper),
+
+            // TODO: init values
+            terms: Default::default(),
+            main_index: Default::default(),
+            purpose_index: Default::default(),
+
+            cache,
 
             local_rules: vec![],
-            purpose: Purpose::try_from(
-                (*task.purpose.term).clone(),
-                rules,
-                dumper,
-                task.subtask_level,
-            )
-            .unwrap(),
-
+            purpose,
+            // purpose_frame: Frame::with_terms(Some(terms.clone()).into_iter(), &mut dumper),
             answer: None,
 
             perf_stats: SolveStatus::default(),
 
             task,
+            rules_engine: rules.clone(),
+            dumper,
+        };
+        for i in conditions.into_iter() {
+            let _ = result.add_main(i);
         }
+        let _ = result.add_purpose(terms);
+        result
+    }
+
+    pub fn add_main(&mut self, term: TermProps) -> Result<(), SolutionError> {
+        if self.main_index.contains_key(&term.term) {
+            return Ok(());
+        }
+        let key = term.term.clone();
+        let id = self.add_term(term)?;
+        self.main_index.insert(key, id);
+        Ok(())
+    }
+
+    pub fn add_purpose(&mut self, mut term: TermProps) -> Result<(), SolutionError> {
+        term.is_purpose = true;
+        if self.purpose_index.contains_key(&term.term) {
+            return Ok(());
+        }
+        let key = term.term.clone();
+        let id = self.add_term(term)?;
+        self.purpose_index.insert(key, id);
+        Ok(())
+    }
+
+    fn add_term(&mut self, mut term: TermProps) -> Result<usize, SolutionError> {
+        self.dumper.add_term(
+            &term,
+            &term
+                .parent
+                .map(|id| self.terms[id].clone())
+                .unwrap_or_else(|| TermProps::from(Rc::new(Term::zero()))),
+        );
+
+        let id = self.terms.len();
+        term.id = id;
+        if self.terms.len() + 1 > STACK_SIZE {
+            return Err(SolutionError::StackOverflow);
+        }
+        self.terms.push(term);
+        Ok(id)
     }
 
     pub fn answer(&self) -> Option<Rc<Term>> {
-        self.answer.map(|i| self.stack[i].term.clone())
+        self.answer.map(|i| self.terms[i].term.clone())
     }
 
     pub fn solve(&mut self) -> Result<(), SolutionError> {
-        self.cache = Some(Default::default());
-        self.solve_subtask(self.cache.as_ref().unwrap().clone())
-    }
-
-    pub fn solve_subtask(&mut self, cache: Arc<TasksCache>) -> Result<(), SolutionError> {
-        self.stack.dumper().subtask_start(&self.task);
+        self.dumper.subtask_start(&self.task);
         trace!(target: "subtask", "Subtask: {}, {}", self.purpose, VecDisplay(&self.task.conditions));
         if self.task.subtask_level > MAX_SUBTASK_LEVEL {
             return Err(SolutionError::MaxSubtaskLevelExceed);
         }
 
         let start = Instant::now();
-        let result = self.solution_loop(cache);
+        let result = self.solution_loop();
 
-        self.perf_stats.status = result.map(|_| (*self.stack[self.answer.unwrap()].term).clone());
+        self.perf_stats.status = result.map(|_| (*self.terms[self.answer.unwrap()].term).clone());
         self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
-        self.stack.dumper().subtask_end(&self.perf_stats);
+        self.dumper.subtask_end(&self.perf_stats);
         result
     }
 
-    fn solution_loop(&mut self, cache: Arc<TasksCache>) -> Result<(), SolutionError> {
+    fn solution_loop(&mut self) -> Result<(), SolutionError> {
         loop {
             self.perf_stats.cycles_count += 1;
 
-            let index = self.stack.pick_condition()?;
-            let level = self.stack[index].weight;
+            let index = self
+                .terms
+                .iter()
+                .filter(|x| !(x.replaced || x.is_purpose))
+                .min_by_key(|x| x.weight)
+                .map(|x| x.id)
+                .ok_or(SolutionError::NoConditions)?;
+
+            let level = self.terms[index].weight;
             trace!(
                 target: "subtask",
                 "[{}] Level: {} -> {}",
                 self.task.subtask_level,
-                level, self.stack[index]
+                level, self.terms[index]
             );
             if level > MAX_LEVEL {
                 return Err(SolutionError::NoSolutionsFound);
             }
-            self.purpose.prepare_purpose(
-                level,
-                self.local_rules.clone(),
-                &self.stack,
-                &self.task.purpose,
-                cache.clone(),
-            );
+            self.prepare_purpose(level);
 
             if !self.purpose.is_transform() {
-                if let Some(simplified) = self.stack.transform(index, cache.clone()) {
-                    self.stack[index].replaced = true;
-                    self.stack.add_condition(simplified).unwrap();
+                if let Some(simplified) = self.transform(index) {
+                    self.terms[index].replaced = true;
+                    self.add_main(simplified).unwrap();
                     continue;
                 } else {
-                    self.stack[index].simplified = true;
+                    self.terms[index].simplified = true;
                 }
             }
 
-            if let Some(suppose) = self.purpose.is_answer(&self.stack[index]) {
-                if self.stack.suppose_proof(&suppose, cache.clone()).is_some() {
+            if let Some(suppose) = self.is_answer(&self.terms[index]) {
+                if self.suppose_proof(&suppose).is_some() {
                     trace!("Resolution: {}", suppose.resolution);
-                    if self.stack[index] == suppose.resolution {
+                    if self.terms[index] == suppose.resolution {
                         trace!("Equivalence");
                         self.answer = Some(index);
                     } else {
-                        let _ = self.stack.add_condition(suppose.resolution.clone());
-                        self.answer = Some(self.stack.find(&suppose.resolution.term).unwrap());
+                        // TODO: return index
+                        let _ = self.add_main(suppose.resolution.clone());
+                        self.answer = Some(
+                            self.terms
+                                .iter()
+                                .find(|x| x.term == suppose.resolution.term)
+                                .unwrap()
+                                .id,
+                        );
                     }
                     trace!(
                         "Solved {}. Answer: {}",
@@ -175,31 +264,400 @@ impl Solution {
                     return Ok(());
                 }
             }
-            if let Some(r) = self.stack[index].rule(
+            if let Some(r) = self.terms[index].rule(
                 RuleId::new(0x80_00_00_00_00_00_00_00, self.local_rules.len() as u64 + 1),
                 (level + 1) as u64,
             ) {
+                // TODO: check dups
                 self.local_rules.push(r);
             }
 
             if !self.purpose.is_transform() {
-                let terms = self.stack.next_term(
-                    &self.local_rules,
-                    index,
-                    &self.task.purpose,
-                    cache.clone(),
-                );
+                let terms = self.next_term(index);
                 if terms.is_empty() {
-                    self.stack[index].weight += 1;
+                    self.terms[index].weight += 1;
                 }
                 for s in terms {
-                    trace!("{} => {}", self.stack[index], s);
-                    self.stack.add_condition(s)?;
+                    trace!("{} => {}", self.terms[index], s);
+                    self.add_main(s)?;
                 }
             } else {
-                self.stack[index].weight += 1;
+                self.terms[index].weight += 1;
             }
         }
+    }
+
+    pub fn transform(&mut self, index: usize) -> Option<TermProps> {
+        if self.terms[index].simplified {
+            return None;
+        }
+        self.terms[index].simplified = true;
+
+        let (answer_wrap, to_transform) = if self.terms[index]
+            .term
+            .root()
+            .data()
+            .is_symbol_name("answer")
+        {
+            (
+                true,
+                self.terms[index].term.root().front().unwrap().deep_clone(),
+            )
+        } else {
+            (false, self.terms[index].term.root().deep_clone())
+        };
+
+        let task = Rc::new(Term::from(
+            tr(Symbol::with_func_symbol("transform")) / to_transform,
+        ));
+
+        self.cache.add(Term::from(task.root().deep_clone()));
+
+        let subtask = TaskBuilder::default()
+            .with_purpose(TermProps::from(task.clone()))
+            .expect("Can't build subtask")
+            .with_conditions(
+                self.terms
+                    .iter()
+                    .filter(|x| !(x.term.root().data().is_symbol_name("answer") || x.is_purpose))
+                    .cloned(),
+            )
+            .with_level(self.task.subtask_level + 1)
+            .build()
+            .expect("Can't build subtask");
+        let mut solution = Solution::new(
+            subtask,
+            self.rules_engine.clone(),
+            self.dumper.clone(),
+            self.cache.clone(),
+        );
+
+        solution.solve().ok()?;
+        let mut answer = solution.answer().unwrap().as_ref().clone();
+        if answer_wrap {
+            let mut tmp = tr(Symbol::with_func_symbol("answer"));
+            swap_node(&mut answer.root_mut(), &mut tmp.root_mut());
+            answer.root_mut().push_back(tmp);
+        }
+        self.cache
+            .update_status(&task, TaskStatus::Solved(Rc::new(solution)));
+
+        if *self.terms[index].term == answer {
+            return None;
+        }
+        let mut result = TermProps::from(Rc::new(answer));
+        result
+            .blocked_rules
+            .clone_from(&self.terms[index].blocked_rules);
+        result.simplified = true;
+        result.parent = Some(self.terms[index].id);
+        result.requirements.push(task);
+
+        Some(result)
+    }
+
+    pub fn next_term(&mut self, index: usize) -> Vec<TermProps> {
+        self.next_term_with_filter(index, |_| true)
+    }
+
+    pub fn next_term_with_filter(
+        &mut self,
+        index: usize,
+        filter: impl Fn(&Rule) -> bool,
+    ) -> Vec<TermProps> {
+        // Need to split &mut self into (&self, &mut TermProps).
+        // Only list of applied rules will be chahged in TermProps, so it's safe.
+        let term: *mut TermProps = &mut self.terms[index];
+        let term: &mut TermProps = unsafe { &mut *term };
+        self.next_term_with_term(term, filter)
+    }
+
+    pub fn next_term_with_term(
+        &self,
+        term: &mut TermProps,
+        filter: impl Fn(&Rule) -> bool,
+    ) -> Vec<TermProps> {
+        for (rule, supposes) in self
+            .rules_engine
+            .suggest_rules(term, &self.task.purpose)
+            .iter()
+            .chain(self.local_rules.iter())
+            .inspect(|rule| trace!(target: "rule_selection", "Rule: {}", rule))
+            .filter(|rule| filter(rule))
+            .filter_map(|rule| {
+                rule.apply(term, &self.task.purpose)
+                    .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
+                    .ok()
+                    .map(|supposes| (rule, supposes))
+            })
+        {
+            let res: Vec<_> = supposes
+                .into_iter()
+                // TODO: possible separate for purpose frame
+                .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
+                .inspect(|suppose| trace!(target: "rule_selection", "Suppose: {}", suppose))
+                .filter_map(|mut suppose| {
+                    if let Some(proofed) = self.suppose_proof(&suppose) {
+                        suppose.resolution.requirements = proofed;
+                        Some(suppose)
+                    } else {
+                        None
+                    }
+                })
+                .inspect(
+                    |_| trace!(target: "rule_selection", "Suppose: proofed, resolution applied"),
+                )
+                .map(|mut suppose| {
+                    suppose.resolution.rule = Some(rule.clone());
+                    suppose.resolution
+                })
+                .collect();
+            if !res.is_empty() {
+                return res;
+            }
+        }
+        vec![]
+    }
+
+    pub fn suppose_proof(&self, suppose: &Suppose) -> Option<Vec<Rc<Term>>> {
+        let mut result = vec![];
+        for req in suppose.requirements.iter() {
+            if let Some(proofed) = self.proof(req) {
+                result.push(proofed);
+            } else {
+                trace!(target: "rule_selection", "Can't proof: {}", req);
+                return None;
+            }
+        }
+        Some(result)
+    }
+
+    // Returns proof purpose (is a key for tasks cache)
+    pub fn proof(&self, term: &Term) -> Option<Rc<Term>> {
+        let mut clone = term.root().deep_clone();
+        is_replace(&mut clone.root_mut());
+        // TODO: normalization level
+        normalize(&mut clone.root_mut(), NormalizationLevel::max());
+
+        let proof_purpose = Rc::new(Term::from(tr(Symbol::with_func_symbol("proof")) / clone));
+
+        if term.root().check_truth().is_true() {
+            return Some(proof_purpose);
+        }
+
+        if let Some(status) = self.cache.status(&proof_purpose) {
+            match status {
+                TaskStatus::Solved(_) => return Some(proof_purpose),
+                _ => return None,
+            }
+        }
+
+        self.cache
+            .add(Term::from(proof_purpose.root().deep_clone()));
+
+        let subtask = TaskBuilder::default()
+            .with_purpose(TermProps::from(proof_purpose.clone()))
+            .expect("Can't build subtask")
+            .with_conditions(
+                self.terms
+                    .iter()
+                    .filter(|x| !(x.is_purpose || x.term.root().data().is_symbol_name("answer")))
+                    .cloned(),
+            )
+            .with_level(self.task.subtask_level + 1)
+            .build()
+            .expect("Can't build subtask");
+        let mut solution = Solution::new(
+            subtask,
+            self.rules_engine.clone(),
+            self.dumper.clone(),
+            self.cache.clone(),
+        );
+
+        if let Err(e) = solution.solve() {
+            trace!("Can't proof {}: {}", term, e);
+            self.cache
+                .update_status(&proof_purpose, TaskStatus::NotSolved);
+            return None;
+        }
+        self.cache
+            .update_status(&proof_purpose, TaskStatus::Solved(Rc::new(solution)));
+        Some(proof_purpose)
+    }
+
+    pub fn prepare_purpose(&mut self, level: usize) {
+        match &self.purpose {
+            Purpose::Find(_) => {}
+            Purpose::Proof(_) => {
+                while let Some(index) = self
+                    .terms
+                    .iter()
+                    .filter(|x| !x.replaced && x.is_purpose)
+                    .min_by_key(|x| x.weight)
+                    .map(|x| x.id)
+                {
+                    if self.terms[index].weight > level {
+                        return;
+                    }
+
+                    if let Some(simplified) = self.transform(index) {
+                        self.terms[index].replaced = true;
+                        // TODO remove unwrap
+                        self.add_purpose(simplified).unwrap();
+                        continue;
+                    } else {
+                        self.terms[index].simplified = true;
+                    }
+
+                    let new_states = self.next_term_with_filter(index, |rule| {
+                        rule.contains_attribute(&RuleAttr::Equivalence)
+                    });
+                    if new_states.is_empty() {
+                        self.terms[index].weight += 1;
+                    }
+                    for s in new_states {
+                        let _ = self.add_purpose(s);
+                    }
+                }
+            }
+            Purpose::Transform(_) => {
+                while let Some(index) = self
+                    .terms
+                    .iter()
+                    .filter(|x| !x.replaced && x.is_purpose)
+                    .min_by_key(|x| x.weight)
+                    .map(|x| x.id)
+                {
+                    if self.terms[index].weight > level {
+                        return;
+                    }
+                    let new_states = self.next_term(index);
+
+                    if new_states.is_empty() {
+                        self.terms[index].weight += 1;
+                    }
+                    for s in new_states {
+                        if self.purpose_index.contains_key(&s.term) {
+                            continue;
+                        }
+
+                        if self.add_purpose(s).is_ok() {
+                            self.terms[index].weight = MAX_LEVEL + 1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn is_answer(&self, term: &TermProps) -> Option<Suppose> {
+        let term_root = term.term.root();
+
+        if !self.purpose.is_transform() &&
+            term_root.data().is_symbol_name("answer") &&
+            term_root.degree() == 1
+        {
+            let mut resolution = TermProps::from(Rc::from(Term::from(
+                (*term.term).clone().root_mut().pop_front().unwrap(),
+            )));
+            if let Some(parent) = term.parent {
+                resolution = resolution.with_parent(parent);
+            }
+            return Some(Suppose {
+                requirements: vec![],
+                resolution,
+            });
+        }
+
+        match &self.purpose {
+            Purpose::Find(x) => {
+                if term_root.degree() != 2 ||
+                    (!term_root.data().is_symbol_name("==") &&
+                        !term_root.data().is_symbol_name("in"))
+                {
+                    return None;
+                }
+
+                if term_root.front().unwrap() == x.term.root() {
+                    let is_known = tr(Symbol::with_func_symbol("is")) /
+                        term_root.back().unwrap().deep_clone() /
+                        tr(Symbol::with_func_symbol("known"));
+
+                    return Some(Suppose {
+                        requirements: vec![Rc::new(Term::from(is_known))],
+                        resolution:   term.clone(),
+                    });
+                }
+                None
+            }
+            Purpose::Proof(_) => {
+                for i in self.purpose_index.values() {
+                    if term_root == self.terms[*i].term.root() {
+                        return Some(Suppose {
+                            requirements: vec![],
+                            resolution:   term.clone(),
+                        });
+                    }
+                    if self.terms[*i].term.root().check_truth().is_true() {
+                        return Some(Suppose {
+                            requirements: vec![],
+                            resolution:   self.terms[*i].clone().without_parents(),
+                        });
+                    }
+                }
+                None
+            }
+            Purpose::Transform(_) => {
+                if let Some(index) = self
+                    .terms
+                    .iter()
+                    .filter(|x| !x.replaced && x.is_purpose)
+                    .min_by_key(|x| x.weight)
+                    .map(|x| x.id)
+                {
+                    if self.terms[index].weight > MAX_LEVEL {
+                        return Some(Suppose {
+                            requirements: vec![],
+                            resolution:   self
+                                .terms
+                                .iter()
+                                .rev()
+                                .find(|x| x.is_purpose)
+                                .unwrap()
+                                .clone()
+                                .without_parents(),
+                        });
+                    }
+                }
+                None
+            }
+        }
+    }
+}
+
+fn is_replace(root: &mut TermNode) {
+    if !root.data().is_symbol_name("is") || root.degree() != 2 {
+        return;
+    }
+
+    match root
+        .back()
+        .unwrap()
+        .data()
+        .func_symbol()
+        .map(|x| x.name.clone())
+    {
+        Some(name) if name == "true" => {
+            let mut child = root.pop_front().unwrap();
+            swap_node(root, &mut child.root_mut());
+        }
+        Some(name) if name == "false" => {
+            let child = root.pop_front().unwrap();
+            let mut neg = tr(Symbol::FuncSymbol(symbol_by_name("!").unwrap())) / child;
+            swap_node(root, &mut neg.root_mut());
+        }
+        _ => {}
     }
 }
 
@@ -218,7 +676,7 @@ mod solution_tests {
     fn check_answer_find_test() {
         let task = parse_task("task {purpose find(x); x == 1;}");
         let rules = Arc::new(RulesEngine::default());
-        let mut solution = Solution::new(task, rules, Dumper::default());
+        let mut solution = Solution::new(task, rules, Dumper::default(), Default::default());
         assert!(solution.solve().is_ok());
         assert_eq!(*solution.answer().unwrap(), term_with_vars("x == 1"));
     }
@@ -227,7 +685,7 @@ mod solution_tests {
     fn check_answer_proof_test() {
         let task = parse_task("task { purpose proof(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
-        let mut solution = Solution::new(task, rules, Dumper::default());
+        let mut solution = Solution::new(task, rules, Dumper::default(), Default::default());
         assert!(solution.solve().is_ok());
         assert!(solution.answer().is_some());
     }

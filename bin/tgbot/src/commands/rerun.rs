@@ -35,6 +35,7 @@ fn rerun(
             sink:     "none".into(),
             filename: "".to_owned(),
         }),
+        Default::default(),
     );
 
     let mut output = Paginator::new(4096);

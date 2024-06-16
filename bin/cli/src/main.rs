@@ -18,7 +18,7 @@ use view::View;
 
 use crate::settings::Settings;
 
-/// Minerva core develop/debug enviroment
+/// Core develop/debug enviroment
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -125,6 +125,7 @@ fn main() {
                 },
                 filename: format!("dumps/{p_id:x}.dump"),
             }),
+            Default::default(),
         );
 
         match solution.solve() {

@@ -1,11 +1,22 @@
 mod settings;
 
-use clap::{Arg, Command};
+use std::path::PathBuf;
+
+use clap::Parser;
 
 use database::{TaskDb, TaskRecord, UserDb, UserRecord};
 use mcore::utils::log_init;
 
 use settings::Settings;
+
+/// MigrateDB
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// Sets a custom config file
+    #[clap(short, long, default_value = "./config/local.json")]
+    config: PathBuf,
+}
 
 fn update_tasks(tasks_db: TaskDb) -> eyre::Result<()> {
     for p in tasks_db.iter_old() {
@@ -26,22 +37,9 @@ fn update_users(users_db: UserDb) -> eyre::Result<()> {
 }
 
 fn main() {
-    let matches = Command::new("MigrateDB")
-        .version(env!("CARGO_PKG_VERSION"))
-        .author("Quotique <just.std@gmail.com>")
-        .about("DB migration tool")
-        .arg(
-            Arg::new("config")
-                .short('c')
-                .long("config")
-                .value_name("FILE")
-                .help("Sets a custom config file")
-                .default_value("./config/local.json")
-                .takes_value(true),
-        )
-        .get_matches();
+    let args = Args::parse();
 
-    let settings = Settings::new(matches.value_of("config").unwrap())
+    let settings = Settings::new(args.config)
         .map_err(|e| {
             println!("Config error: {e:?}");
             e

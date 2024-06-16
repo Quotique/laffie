@@ -9,8 +9,8 @@ edition = "2021"
 database = { path = "../../database" }
 mcore = { path = "../../mcore/" }
 
-clap = "3.1"
-config = "0.13"
+clap = "4.5"
+config = "0.14"
 eyre = "0.6"
 serde_derive = "1.0"
 serde = "1.0"

@@ -1,5 +1,5 @@
 use crate::term::TermProps;
-use std::{fmt, iter::Iterator};
+use std::{collections::HashMap, fmt, iter::Iterator};
 
 use super::Task;
 
@@ -11,9 +11,10 @@ pub enum TaskBuilderError {
 
 #[derive(Default)]
 pub struct TaskBuilder {
-    id:         u64,
-    conditions: Vec<TermProps>,
-    purpose:    Option<TermProps>,
+    id:          u64,
+    conditions:  Vec<TermProps>,
+    purpose:     Option<TermProps>,
+    term_id_map: HashMap<usize, usize>,
 
     subtask_level: usize,
 }
@@ -33,16 +34,21 @@ impl TaskBuilder {
     }
 
     pub fn with_condition(mut self, mut condition: TermProps) -> Self {
+        self.term_id_map.insert(condition.id, self.conditions.len());
         condition.weight = 0;
+        condition.id = self.conditions.len();
+
+        if let Some(parent) = condition.parent {
+            condition.parent = self.term_id_map.get(&parent).cloned();
+        }
         self.conditions.push(condition);
         self
     }
 
     pub fn with_conditions(mut self, reqs: impl Iterator<Item = TermProps>) -> Self {
-        self.conditions.extend(reqs.map(|mut x| {
-            x.weight = 0;
-            x
-        }));
+        for i in reqs {
+            self = self.with_condition(i);
+        }
         self
     }
 

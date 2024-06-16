@@ -30,6 +30,7 @@ pub struct TermProps {
     pub replaced:      bool,
     pub simplified:    bool,
     not_rule:          bool,
+    pub is_purpose:    bool,
 }
 
 impl From<Rc<Term>> for TermProps {
@@ -50,6 +51,7 @@ impl From<Rc<Term>> for TermProps {
             replaced:      false,
             simplified:    false,
             not_rule:      false,
+            is_purpose:    false,
         }
     }
 }

@@ -26,7 +26,7 @@ fn report(
 
     tasks.put(&record).map_err(|e| e.to_string())?;
 
-    Ok(t!("content.reported"))
+    Ok(t!("content.reported").to_string())
 }
 
 pub async fn handler(api: &Api, command: Command, tasks: Arc<TaskDb>, users: Arc<UserDb>) {
