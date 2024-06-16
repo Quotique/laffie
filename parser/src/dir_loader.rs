@@ -7,8 +7,7 @@ use std::{
 use trees::Tree;
 
 use mcore::{
-    predefine::add_symbol, rule::RulesEngine, task::Task, term::func_symbol::FuncSymbol,
-    utils::VecDisplay,
+    predefine::add_symbol, rule::RulesEngine, task::Task, term::FuncSymbol, utils::VecDisplay,
 };
 
 use crate::{lang, FuncSymbolParser, NodeData, RuleParser, TaskParser};

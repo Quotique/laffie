@@ -1,11 +1,11 @@
 mod codec;
-pub mod func_symbol;
+mod func_symbol;
 mod index;
 mod mapping;
-pub mod symbol;
+mod symbol;
 mod term_display;
 mod term_props;
-pub mod tree_utils;
+mod tree_utils;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -20,15 +20,14 @@ use trees::{tr, Node, Tree};
 
 use crate::NormalizationLevel;
 
-use symbol::{Param, Symbol};
 use term_display::display_string;
-use tree_utils::{replace, swap_node};
 
-pub use func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue};
+pub use func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue, TruthChecker, TruthResult};
 pub use index::NodePosition;
 pub use mapping::ParamsMapping;
+pub use symbol::{Param, Placeholder, Symbol, Variable};
 pub use term_props::TermProps;
-pub use tree_utils::NodeMapping;
+pub use tree_utils::{replace, swap_node, NodeMapping, VariablesMap};
 
 pub type TermTree = Tree<Symbol>;
 pub type TermNode = Node<Symbol>;

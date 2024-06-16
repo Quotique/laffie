@@ -4,12 +4,7 @@ use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use trees::{tr, Tree};
 
 use crate::{
-    term::{
-        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue},
-        symbol::Symbol,
-        tree_utils::swap_node,
-        TermNode,
-    },
+    term::{swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, TermNode},
     NormalizationLevel,
 };
 

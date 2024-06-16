@@ -1,11 +1,6 @@
 use crate::{
     predefine::symbol_by_name,
-    term::{
-        func_symbol::{FuncSymbol, TruthResult},
-        symbol::Symbol,
-        tree_utils::{swap_node, NodeMapping},
-        TermNode,
-    },
+    term::{swap_node, FuncSymbol, NodeMapping, Symbol, TermNode, TruthResult},
     NormalizationLevel,
 };
 

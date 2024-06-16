@@ -76,7 +76,7 @@ impl<'a> TaskParser<'a> {
 mod tests {
     use trees::tr;
 
-    use mcore::term::symbol::Symbol;
+    use mcore::term::Symbol;
 
     use crate::lang;
 

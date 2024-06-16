@@ -1,12 +1,7 @@
 use trees::Tree;
 
 use crate::{
-    term::{
-        func_symbol::FuncSymbol,
-        symbol::Symbol,
-        tree_utils::{swap_node, NodeMapping, VariablesMap},
-        TermNode,
-    },
+    term::{swap_node, FuncSymbol, NodeMapping, Symbol, TermNode, VariablesMap},
     NormalizationLevel,
 };
 

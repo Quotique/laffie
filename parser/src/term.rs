@@ -4,10 +4,7 @@ use trees::tr;
 
 use mcore::{
     predefine::symbol_by_name,
-    term::{
-        symbol::{Param, Placeholder, Symbol, Variable},
-        NodePosition, Term, TermTree,
-    },
+    term::{NodePosition, Param, Placeholder, Symbol, Term, TermTree, Variable},
     Decimal,
 };
 
@@ -132,7 +129,7 @@ impl<'a> TermParser<'a> {
 mod tests {
     use trees::tr;
 
-    use mcore::term::symbol::Symbol;
+    use mcore::term::Symbol;
 
     use crate::lang;
 

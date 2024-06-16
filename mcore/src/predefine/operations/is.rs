@@ -1,10 +1,6 @@
 use crate::{
     predefine::symbol_by_name,
-    term::{
-        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue, TruthResult},
-        symbol::Symbol,
-        TermNode,
-    },
+    term::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, TermNode, TruthResult},
 };
 
 pub fn symbol() -> FuncSymbol {

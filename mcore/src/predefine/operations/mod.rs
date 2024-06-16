@@ -6,7 +6,7 @@ use trees::{tr, Node};
 #[cfg(test)]
 use crate::term::term_with_params;
 use crate::{
-    term::{func_symbol::SymbolAttr, symbol::Symbol, tree_utils::NodeMapping, TermNode, TermTree},
+    term::{NodeMapping, Symbol, SymbolAttr, TermNode, TermTree},
     NormalizationLevel,
 };
 

@@ -5,12 +5,7 @@ use num::integer::gcd;
 use num_bigint::ToBigInt;
 
 use crate::{
-    term::{
-        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue},
-        symbol::Symbol,
-        tree_utils::swap_node,
-        TermNode,
-    },
+    term::{swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, TermNode},
     NormalizationLevel,
 };
 

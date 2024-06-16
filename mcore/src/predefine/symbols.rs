@@ -7,7 +7,7 @@ use std::{
 use parking_lot::RwLock;
 
 use crate::{
-    term::func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue},
+    term::{FuncSymbol, SymbolAttr, SymbolAttrValue},
     CompactString,
 };
 

@@ -4,12 +4,7 @@ use trees::tr;
 
 use crate::{
     predefine::symbol_by_name,
-    term::{
-        func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue},
-        symbol::Symbol,
-        tree_utils::{swap_node, NodeMapping},
-        TermNode,
-    },
+    term::{swap_node, FuncSymbol, NodeMapping, Symbol, SymbolAttr, SymbolAttrValue, TermNode},
     NormalizationLevel,
 };
 

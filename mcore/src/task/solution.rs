@@ -12,11 +12,7 @@ use trees::tr;
 use crate::{
     predefine::{normalize, symbol_by_name},
     rule::{Rule, RuleAttr, RulesEngine, SharedRule, Suppose},
-    term::{
-        symbol::Symbol,
-        tree_utils::{swap_node, NodeMapping},
-        Term, TermNode, TermProps,
-    },
+    term::{swap_node, NodeMapping, Symbol, Term, TermNode, TermProps},
     utils::{Dumper, DumperSink, VecDisplay},
     NormalizationLevel, RuleId,
 };
@@ -44,7 +40,6 @@ pub struct SolveStatus {
 pub struct Solution {
     pub task: Task,
 
-    // pub stack: Frame,
     pub terms:     Vec<TermProps>,
     main_index:    HashMap<Rc<Term>, usize>,
     purpose_index: HashMap<Rc<Term>, usize>,
@@ -54,7 +49,6 @@ pub struct Solution {
     local_rules: Vec<SharedRule>,
     pub purpose: Purpose,
 
-    // pub purpose_frame: Frame,
     pub answer: Option<usize>,
 
     pub perf_stats: SolveStatus,
@@ -119,8 +113,6 @@ impl Solution {
         let conditions = task.conditions.clone();
 
         let mut result = Solution {
-            // stack: Frame::with_terms(task.conditions.iter().cloned(), &mut dumper),
-
             // TODO: init values
             terms: Default::default(),
             main_index: Default::default(),
@@ -130,7 +122,6 @@ impl Solution {
 
             local_rules: vec![],
             purpose,
-            // purpose_frame: Frame::with_terms(Some(terms.clone()).into_iter(), &mut dumper),
             answer: None,
 
             perf_stats: SolveStatus::default(),
@@ -144,45 +135,6 @@ impl Solution {
         }
         let _ = result.add_purpose(terms);
         result
-    }
-
-    pub fn add_main(&mut self, term: TermProps) -> Result<(), SolutionError> {
-        if self.main_index.contains_key(&term.term) {
-            return Ok(());
-        }
-        let key = term.term.clone();
-        let id = self.add_term(term)?;
-        self.main_index.insert(key, id);
-        Ok(())
-    }
-
-    pub fn add_purpose(&mut self, mut term: TermProps) -> Result<(), SolutionError> {
-        term.is_purpose = true;
-        if self.purpose_index.contains_key(&term.term) {
-            return Ok(());
-        }
-        let key = term.term.clone();
-        let id = self.add_term(term)?;
-        self.purpose_index.insert(key, id);
-        Ok(())
-    }
-
-    fn add_term(&mut self, mut term: TermProps) -> Result<usize, SolutionError> {
-        self.dumper.add_term(
-            &term,
-            &term
-                .parent
-                .map(|id| self.terms[id].clone())
-                .unwrap_or_else(|| TermProps::from(Rc::new(Term::zero()))),
-        );
-
-        let id = self.terms.len();
-        term.id = id;
-        if self.terms.len() + 1 > STACK_SIZE {
-            return Err(SolutionError::StackOverflow);
-        }
-        self.terms.push(term);
-        Ok(id)
     }
 
     pub fn answer(&self) -> Option<Rc<Term>> {
@@ -287,113 +239,75 @@ impl Solution {
         }
     }
 
-    pub fn transform(&mut self, index: usize) -> Option<TermProps> {
-        if self.terms[index].simplified {
-            return None;
+    fn add_main(&mut self, term: TermProps) -> Result<(), SolutionError> {
+        if self.main_index.contains_key(&term.term) {
+            return Ok(());
         }
-        self.terms[index].simplified = true;
-
-        let (answer_wrap, to_transform) = if self.terms[index]
-            .term
-            .root()
-            .data()
-            .is_symbol_name("answer")
-        {
-            (
-                true,
-                self.terms[index].term.root().front().unwrap().deep_clone(),
-            )
-        } else {
-            (false, self.terms[index].term.root().deep_clone())
-        };
-
-        let task = Rc::new(Term::from(
-            tr(Symbol::with_func_symbol("transform")) / to_transform,
-        ));
-
-        self.cache.add(Term::from(task.root().deep_clone()));
-
-        let subtask = TaskBuilder::default()
-            .with_purpose(TermProps::from(task.clone()))
-            .expect("Can't build subtask")
-            .with_conditions(
-                self.terms
-                    .iter()
-                    .filter(|x| !(x.term.root().data().is_symbol_name("answer") || x.is_purpose))
-                    .cloned(),
-            )
-            .with_level(self.task.subtask_level + 1)
-            .build()
-            .expect("Can't build subtask");
-        let mut solution = Solution::new(
-            subtask,
-            self.rules_engine.clone(),
-            self.dumper.clone(),
-            self.cache.clone(),
-        );
-
-        solution.solve().ok()?;
-        let mut answer = solution.answer().unwrap().as_ref().clone();
-        if answer_wrap {
-            let mut tmp = tr(Symbol::with_func_symbol("answer"));
-            swap_node(&mut answer.root_mut(), &mut tmp.root_mut());
-            answer.root_mut().push_back(tmp);
-        }
-        self.cache
-            .update_status(&task, TaskStatus::Solved(Rc::new(solution)));
-
-        if *self.terms[index].term == answer {
-            return None;
-        }
-        let mut result = TermProps::from(Rc::new(answer));
-        result
-            .blocked_rules
-            .clone_from(&self.terms[index].blocked_rules);
-        result.simplified = true;
-        result.parent = Some(self.terms[index].id);
-        result.requirements.push(task);
-
-        Some(result)
+        let key = term.term.clone();
+        let id = self.add_term(term)?;
+        self.main_index.insert(key, id);
+        Ok(())
     }
 
-    pub fn next_term(&mut self, index: usize) -> Vec<TermProps> {
+    fn add_purpose(&mut self, mut term: TermProps) -> Result<(), SolutionError> {
+        term.is_purpose = true;
+        if self.purpose_index.contains_key(&term.term) {
+            return Ok(());
+        }
+        let key = term.term.clone();
+        let id = self.add_term(term)?;
+        self.purpose_index.insert(key, id);
+        Ok(())
+    }
+
+    fn add_term(&mut self, mut term: TermProps) -> Result<usize, SolutionError> {
+        self.dumper.add_term(
+            &term,
+            &term
+                .parent
+                .map(|id| self.terms[id].clone())
+                .unwrap_or_else(|| TermProps::from(Rc::new(Term::zero()))),
+        );
+
+        let id = self.terms.len();
+        term.id = id;
+        if self.terms.len() + 1 > STACK_SIZE {
+            return Err(SolutionError::StackOverflow);
+        }
+        self.terms.push(term);
+        Ok(id)
+    }
+
+    fn next_term(&mut self, index: usize) -> Vec<TermProps> {
         self.next_term_with_filter(index, |_| true)
     }
 
-    pub fn next_term_with_filter(
+    fn next_term_with_filter(
         &mut self,
         index: usize,
         filter: impl Fn(&Rule) -> bool,
     ) -> Vec<TermProps> {
-        // Need to split &mut self into (&self, &mut TermProps).
-        // Only list of applied rules will be chahged in TermProps, so it's safe.
-        let term: *mut TermProps = &mut self.terms[index];
-        let term: &mut TermProps = unsafe { &mut *term };
-        self.next_term_with_term(term, filter)
-    }
-
-    pub fn next_term_with_term(
-        &self,
-        term: &mut TermProps,
-        filter: impl Fn(&Rule) -> bool,
-    ) -> Vec<TermProps> {
-        for (rule, supposes) in self
+        let engine_rules = self
             .rules_engine
-            .suggest_rules(term, &self.task.purpose)
-            .iter()
-            .chain(self.local_rules.iter())
+            .suggest_rules(&self.terms[index], &self.task.purpose);
+        let suggested_rules: Vec<_> = engine_rules
+            .into_iter()
+            .chain(self.local_rules.iter().cloned())
             .inspect(|rule| trace!(target: "rule_selection", "Rule: {}", rule))
             .filter(|rule| filter(rule))
-            .filter_map(|rule| {
-                rule.apply(term, &self.task.purpose)
-                    .map_err(|e| trace!(target: "rule_selection", "Rule not applied: {:?}", e))
-                    .ok()
-                    .map(|supposes| (rule, supposes))
-            })
-        {
+            .collect();
+
+        for rule in suggested_rules {
+            let supposes = match rule.apply(&mut self.terms[index], &self.task.purpose) {
+                Ok(x) => x,
+                Err(e) => {
+                    trace!(target: "rule_selection", "Rule not applied: {:?}", e);
+                    continue;
+                }
+            };
+
             let res: Vec<_> = supposes
                 .into_iter()
-                // TODO: possible separate for purpose frame
                 .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
                 .inspect(|suppose| trace!(target: "rule_selection", "Suppose: {}", suppose))
                 .filter_map(|mut suppose| {
@@ -419,7 +333,7 @@ impl Solution {
         vec![]
     }
 
-    pub fn suppose_proof(&self, suppose: &Suppose) -> Option<Vec<Rc<Term>>> {
+    fn suppose_proof(&self, suppose: &Suppose) -> Option<Vec<Rc<Term>>> {
         let mut result = vec![];
         for req in suppose.requirements.iter() {
             if let Some(proofed) = self.proof(req) {
@@ -433,7 +347,7 @@ impl Solution {
     }
 
     // Returns proof purpose (is a key for tasks cache)
-    pub fn proof(&self, term: &Term) -> Option<Rc<Term>> {
+    fn proof(&self, term: &Term) -> Option<Rc<Term>> {
         let mut clone = term.root().deep_clone();
         is_replace(&mut clone.root_mut());
         // TODO: normalization level
@@ -444,19 +358,68 @@ impl Solution {
         if term.root().check_truth().is_true() {
             return Some(proof_purpose);
         }
+        self.solve_subtask(proof_purpose.clone())
+            .map(|_| proof_purpose)
+    }
 
-        if let Some(status) = self.cache.status(&proof_purpose) {
-            match status {
-                TaskStatus::Solved(_) => return Some(proof_purpose),
-                _ => return None,
-            }
+    fn transform(&mut self, index: usize) -> Option<TermProps> {
+        if self.terms[index].simplified {
+            return None;
+        }
+        self.terms[index].simplified = true;
+
+        let (answer_wrap, to_transform) = if self.terms[index]
+            .term
+            .root()
+            .data()
+            .is_symbol_name("answer")
+        {
+            (
+                true,
+                self.terms[index].term.root().front().unwrap().deep_clone(),
+            )
+        } else {
+            (false, self.terms[index].term.root().deep_clone())
+        };
+
+        let task = Rc::new(Term::from(
+            tr(Symbol::with_func_symbol("transform")) / to_transform,
+        ));
+
+        let solution = self.solve_subtask(task.clone())?;
+
+        let mut answer = solution.answer().unwrap().as_ref().clone();
+        if answer_wrap {
+            let mut tmp = tr(Symbol::with_func_symbol("answer"));
+            swap_node(&mut answer.root_mut(), &mut tmp.root_mut());
+            answer.root_mut().push_back(tmp);
         }
 
-        self.cache
-            .add(Term::from(proof_purpose.root().deep_clone()));
+        if *self.terms[index].term == answer {
+            return None;
+        }
+        let mut result = TermProps::from(Rc::new(answer));
+        result
+            .blocked_rules
+            .clone_from(&self.terms[index].blocked_rules);
+        result.simplified = true;
+        result.parent = Some(self.terms[index].id);
+        result.requirements.push(task);
+
+        Some(result)
+    }
+
+    fn solve_subtask(&self, task: Rc<Term>) -> Option<Rc<Solution>> {
+        match self.cache.status(&task) {
+            Some(TaskStatus::Solved(x)) => return Some(x),
+            Some(_) => return None,
+            None => {}
+        }
+
+        self.cache.add(Term::from(task.root().deep_clone()));
 
         let subtask = TaskBuilder::default()
-            .with_purpose(TermProps::from(proof_purpose.clone()))
+            .with_purpose(TermProps::from(task.clone()))
             .expect("Can't build subtask")
             .with_conditions(
                 self.terms
@@ -474,28 +437,34 @@ impl Solution {
             self.cache.clone(),
         );
 
-        if let Err(e) = solution.solve() {
-            trace!("Can't proof {}: {}", term, e);
-            self.cache
-                .update_status(&proof_purpose, TaskStatus::NotSolved);
-            return None;
+        match solution.solve() {
+            Ok(_) => {
+                let solution = Rc::new(solution);
+                self.cache
+                    .update_status(&task, TaskStatus::Solved(solution.clone()));
+                Some(solution)
+            }
+            Err(e) => {
+                trace!("Can't proof {}: {}", task, e);
+                self.cache.update_status(&task, TaskStatus::NotSolved);
+                None
+            }
         }
-        self.cache
-            .update_status(&proof_purpose, TaskStatus::Solved(Rc::new(solution)));
-        Some(proof_purpose)
     }
 
-    pub fn prepare_purpose(&mut self, level: usize) {
+    fn pick_purpose_term(&self) -> Option<usize> {
+        self.terms
+            .iter()
+            .filter(|x| !x.replaced && x.is_purpose)
+            .min_by_key(|x| x.weight)
+            .map(|x| x.id)
+    }
+
+    fn prepare_purpose(&mut self, level: usize) {
         match &self.purpose {
             Purpose::Find(_) => {}
             Purpose::Proof(_) => {
-                while let Some(index) = self
-                    .terms
-                    .iter()
-                    .filter(|x| !x.replaced && x.is_purpose)
-                    .min_by_key(|x| x.weight)
-                    .map(|x| x.id)
-                {
+                while let Some(index) = self.pick_purpose_term() {
                     if self.terms[index].weight > level {
                         return;
                     }
@@ -521,13 +490,7 @@ impl Solution {
                 }
             }
             Purpose::Transform(_) => {
-                while let Some(index) = self
-                    .terms
-                    .iter()
-                    .filter(|x| !x.replaced && x.is_purpose)
-                    .min_by_key(|x| x.weight)
-                    .map(|x| x.id)
-                {
+                while let Some(index) = self.pick_purpose_term() {
                     if self.terms[index].weight > level {
                         return;
                     }
@@ -551,7 +514,7 @@ impl Solution {
         }
     }
 
-    pub fn is_answer(&self, term: &TermProps) -> Option<Suppose> {
+    fn is_answer(&self, term: &TermProps) -> Option<Suppose> {
         let term_root = term.term.root();
 
         if !self.purpose.is_transform() &&
@@ -609,13 +572,7 @@ impl Solution {
                 None
             }
             Purpose::Transform(_) => {
-                if let Some(index) = self
-                    .terms
-                    .iter()
-                    .filter(|x| !x.replaced && x.is_purpose)
-                    .min_by_key(|x| x.weight)
-                    .map(|x| x.id)
-                {
+                if let Some(index) = self.pick_purpose_term() {
                     if self.terms[index].weight > MAX_LEVEL {
                         return Some(Suppose {
                             requirements: vec![],

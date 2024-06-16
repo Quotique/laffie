@@ -173,7 +173,7 @@ mod tests {
 
     use mcore::{
         rule::{RuleAttr, RuleAttrValue},
-        term::symbol::Symbol,
+        term::Symbol,
     };
 
     use crate::lang;
