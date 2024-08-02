@@ -8,9 +8,11 @@ path = "./lib.rs"
 
 [dependencies]
 mcore = { path = "../mcore" }
+utils = { path = "../utils" }
 
-eyre = "0.6"
-log = "0.4"
+eyre = { workspace = true }
+log = { workspace = true }
+trees = { workspace = true }
+smartstring = { workspace = true }
+
 peg = "0.8"
-trees = "0.4"
-smartstring = "1"

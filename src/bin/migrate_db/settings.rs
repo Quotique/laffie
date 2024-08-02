@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use config::{Config, ConfigError, File, FileFormat};
 use serde_derive::Deserialize;
 
-use mcore::utils::LogConfig;
+use utils::LogConfig;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {

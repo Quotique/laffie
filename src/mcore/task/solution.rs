@@ -9,19 +9,20 @@ use std::{
 use bincode::{Decode, Encode};
 use trees::tr;
 
-use crate::{
-    predefine::{normalize, symbol_by_name},
-    rule::{Rule, RuleAttr, RulesEngine, SharedRule, Suppose},
-    term::{swap_node, NodeMapping, Symbol, Term, TermNode, TermProps},
-    utils::{Dumper, DumperSink, VecDisplay},
-    NormalizationLevel, RuleId,
-};
+use utils::VecDisplay;
 
 use super::{
     builder::TaskBuilder,
     cache::{TaskStatus, TasksCache},
+    dump::{Dumper, DumperSink},
     purpose::Purpose,
     Task,
+};
+use crate::{
+    predefine::{normalize, symbol_by_name},
+    rule::{Rule, RuleAttr, RulesEngine, SharedRule, Suppose},
+    term::{swap_node, NodeMapping, Symbol, Term, TermNode, TermProps},
+    NormalizationLevel, RuleId,
 };
 
 pub const MAX_SUBTASK_LEVEL: usize = 10;
@@ -622,11 +623,11 @@ fn is_replace(root: &mut TermNode) {
 mod solution_tests {
     use std::sync::Arc;
 
+    use super::Dumper;
     use crate::{
         rule::RulesEngine,
         task::{parse_task, Solution},
         term::term_with_vars,
-        utils::Dumper,
     };
 
     #[test]

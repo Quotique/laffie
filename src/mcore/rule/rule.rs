@@ -3,9 +3,10 @@ use std::{collections::HashSet, fmt, rc::Rc, str::FromStr, sync::Arc};
 use eyre::{bail, Result};
 use multimap::MultiMap;
 
+use utils::VecDisplay;
+
 use crate::{
     term::{FuncSymbol, NodePosition, ParamsMapping, Term, TermNode, TermProps},
-    utils::VecDisplay,
     CompactString, NormalizationLevel, RuleId,
 };
 

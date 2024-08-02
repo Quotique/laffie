@@ -9,6 +9,7 @@ path = "./lib.rs"
 [dependencies]
 mcore = { path = "../mcore" }
 
+log = { workspace = true }
+
 bincode = "2.0.0-rc.3"
-log = "0.4"
 sled = "0.34"

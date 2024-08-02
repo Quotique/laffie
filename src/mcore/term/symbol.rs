@@ -18,31 +18,45 @@ pub struct Variable(CompactString);
 pub struct Placeholder(u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// Элемент дерева терма
 pub enum Symbol {
+    /// Функциональный символ, символ операции
     FuncSymbol(Arc<FuncSymbol>),
+    /// Именованый параметр, может быть заменен при процедуре унификации
     Param(Param),
+    /// Символ переменной
     Variable(Variable),
+    /// Числовая рациональная неотрицательная константа
     Number(Decimal),
+    /// Ссылка на другое поддерево
     Placeholder(Placeholder),
 }
 
 impl Symbol {
     #[inline]
+    /// Получить функциональный символ по названию
+    ///
+    /// возвращает None, если указанный символ не найден в базе
     pub fn with_func_symbol_opt(name: &str) -> Option<Self> {
         symbol_by_name(name).map(Self::FuncSymbol)
     }
 
     #[inline]
+    /// Аналог with_func_symbol_opt(arg).unwrap()
     pub fn with_func_symbol(name: &str) -> Self {
         Self::with_func_symbol_opt(name).unwrap()
     }
 
     #[inline]
+    /// Создать символ-константу
     pub fn with_number(number: impl Into<Decimal>) -> Self {
         Self::Number(number.into())
     }
 
     #[inline]
+    /// Получить содержимое функционального символа
+    ///
+    /// возвращает None, если содержит не функциональный символ
     pub fn func_symbol(&self) -> Option<Arc<FuncSymbol>> {
         if let Symbol::FuncSymbol(s) = self {
             return Some(s.clone());

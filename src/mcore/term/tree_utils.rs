@@ -7,13 +7,14 @@ use std::{
 
 use trees::{tr, Node, Tree};
 
-use crate::{utils::SubsetIterator, NormalizationLevel};
+use utils::SubsetIterator;
 
 use super::{
     func_symbol::TruthResult,
     symbol::{Param, Symbol, Variable},
     FuncSymbol, TermNode, TermTree,
 };
+use crate::NormalizationLevel;
 
 pub type ParamsMap = HashMap<Param, TermTree>;
 pub type VariablesMap = HashMap<Variable, TermTree>;

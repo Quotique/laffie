@@ -21,6 +21,6 @@ mod tests {
     fn vec_display_test() {
         let test = vec![1, 2, 3];
 
-        insta::assert_snapshot!(VecDisplay(&test).to_string(), @"");
+        insta::assert_snapshot!(VecDisplay(&test).to_string(), @"[1, 2, 3]");
     }
 }

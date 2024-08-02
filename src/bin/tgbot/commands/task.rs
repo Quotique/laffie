@@ -5,8 +5,7 @@ use telegram_bot::*;
 use database::{TaskDb, TaskRecord, UserDb, UserRecord};
 use mcore::{
     rule::RulesEngine,
-    task::Solution,
-    utils::{Dumper, DumperConfig},
+    task::{Dumper, DumperConfig, Solution},
 };
 use parser::{lang, TaskParser};
 use view::{Html, View};

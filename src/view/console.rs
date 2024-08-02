@@ -5,8 +5,8 @@ use colored::*;
 use mcore::{
     task::{Purpose, SolveStatus},
     term::{Term, TermProps},
-    utils::VecDisplay,
 };
+use utils::VecDisplay;
 
 use crate::Renderer;
 

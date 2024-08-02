@@ -6,7 +6,7 @@ use std::{
 
 use eyre::{bail, ensure, Result};
 
-use crate::utils::VecDisplay;
+use utils::VecDisplay;
 
 use super::{
     func_symbol::SymbolAttr,
@@ -256,10 +256,8 @@ impl fmt::Display for ParamsMapping {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        term::{term_with_params, term_with_vars, ParamsMapping},
-        utils::VecDisplay,
-    };
+    use crate::term::{term_with_params, term_with_vars, ParamsMapping};
+    use utils::VecDisplay;
 
     #[test]
     fn simple_param_map_test() {

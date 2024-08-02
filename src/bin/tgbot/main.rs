@@ -10,7 +10,7 @@ use futures::StreamExt;
 use telegram_bot::*;
 
 use database::{TaskDb, UserDb};
-use mcore::{rule::RulesEngine, utils::log_init};
+use mcore::rule::RulesEngine;
 use parser::DirectoryParser;
 
 use commands::process_update;
@@ -67,7 +67,7 @@ async fn main() {
         .unwrap_or_else(|_| {
             std::process::exit(-1);
         });
-    let _log_guard = log_init(&settings.logger);
+    let _log_guard = settings.logger.init();
 
     let parser = DirectoryParser::new(
         args.symbols

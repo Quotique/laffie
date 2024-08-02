@@ -1,5 +1,6 @@
 mod builder;
 mod cache;
+mod dump;
 mod purpose;
 mod solution;
 
@@ -9,6 +10,7 @@ use std::{fmt, iter::Iterator};
 pub use self::{
     builder::TaskBuilder,
     cache::TasksCache,
+    dump::{Config as DumperConfig, Dumper, DumperSink},
     purpose::Purpose,
     solution::{Solution, SolveStatus},
 };

@@ -9,11 +9,9 @@ use clap::Parser;
 use colored::*;
 
 use database::{TaskDb, TaskRecord};
-use mcore::{
-    task::{Solution, Task},
-    utils::{log_init, Dumper, DumperConfig, VecDisplay},
-};
+use mcore::task::{Dumper, DumperConfig, Solution, Task};
 use parser::DirectoryParser;
+use utils::VecDisplay;
 use view::View;
 
 use crate::settings::Settings;
@@ -63,7 +61,7 @@ fn main() {
         .unwrap_or_else(|_| {
             std::process::exit(-1);
         });
-    let _log_guard = log_init(&settings.logger);
+    let _log_guard = settings.logger.init();
 
     let parser = DirectoryParser::new(
         args.symbols

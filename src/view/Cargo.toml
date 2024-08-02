@@ -10,7 +10,9 @@ path = "./lib.rs"
 
 [dependencies]
 mcore = { path = "../mcore/" }
+utils = { path = "../utils/" }
+
+eyre = { workspace = true }
 
 colored = "2"
-eyre = "0.6"
 html-escape = "0.2"

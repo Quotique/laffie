@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use clap::Parser;
 
 use database::{TaskDb, TaskRecord, UserDb, UserRecord};
-use mcore::utils::log_init;
 
 use settings::Settings;
 
@@ -47,7 +46,7 @@ fn main() {
         .unwrap_or_else(|_| {
             std::process::exit(-1);
         });
-    let _log_guard = log_init(&settings.logger);
+    let _log_guard = settings.logger.init();
 
     let tasks_db = TaskDb::open(&settings.tasks_db).unwrap();
     tasks_db.backup(&settings.tasks_backup).unwrap();

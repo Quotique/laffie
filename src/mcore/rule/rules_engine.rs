@@ -7,14 +7,14 @@ use std::{
 
 use itertools::Itertools;
 
+use utils::VecDisplay;
+
+use super::rule::{Rule, RuleAttr, RuleAttrValue};
 use crate::{
     predefine::symbol_by_name,
     term::{FuncSymbol, TermProps},
-    utils::VecDisplay,
     CompactString, RuleId,
 };
-
-use super::rule::{Rule, RuleAttr, RuleAttrValue};
 
 // TODO: move to correct place
 type Level = usize;

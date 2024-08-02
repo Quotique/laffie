@@ -7,7 +7,6 @@ pub mod predefine;
 pub mod rule;
 pub mod task;
 pub mod term;
-pub mod utils;
 
 use bincode::{Decode, Encode};
 use derive_more::{Display, From};

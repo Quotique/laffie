@@ -296,6 +296,7 @@ dependencies = [
  "parser",
  "serde",
  "serde_derive",
+ "utils",
  "view",
 ]
 
@@ -1112,10 +1113,8 @@ version = "0.4.2"
 dependencies = [
  "bigdecimal",
  "bincode",
- "chrono",
  "derive_more",
  "eyre",
- "file-rotate",
  "indexmap 2.3.0",
  "insta",
  "itertools",
@@ -1126,17 +1125,11 @@ dependencies = [
  "num-bigint",
  "parking_lot 0.12.3",
  "parser",
- "patricia_tree",
- "regex",
  "serde",
  "serde_derive",
- "slog",
- "slog-async",
- "slog-scope",
- "slog-stdlog",
- "slog-term",
  "smartstring",
  "trees",
+ "utils",
 ]
 
 [[package]]
@@ -1156,6 +1149,7 @@ dependencies = [
  "mcore",
  "serde",
  "serde_derive",
+ "utils",
 ]
 
 [[package]]
@@ -1428,6 +1422,7 @@ dependencies = [
  "peg",
  "smartstring",
  "trees",
+ "utils",
 ]
 
 [[package]]
@@ -2241,6 +2236,7 @@ dependencies = [
  "sys-info",
  "telegram-bot",
  "tokio",
+ "utils",
  "view",
 ]
 
@@ -2538,6 +2534,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
+name = "utils"
+version = "0.4.2"
+dependencies = [
+ "chrono",
+ "file-rotate",
+ "insta",
+ "log",
+ "patricia_tree",
+ "serde",
+ "serde_derive",
+ "slog",
+ "slog-async",
+ "slog-scope",
+ "slog-stdlog",
+ "slog-term",
+]
+
+[[package]]
 name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2551,6 +2565,7 @@ dependencies = [
  "eyre",
  "html-escape",
  "mcore",
+ "utils",
 ]
 
 [[package]]
