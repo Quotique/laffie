@@ -1,5 +1,0 @@
----
-source: mcore/src/term/mapping.rs
-expression: VecDisplay(&maps)
----
-[{ a: x }]

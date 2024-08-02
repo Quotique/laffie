@@ -1,6 +1,0 @@
----
-source: src/statement/tree_utils.rs
-expression: dump_mapping(&maps)
-
----
-"[{ a: 1, b: x,}{ a: x, b: 1,}]"

@@ -1,7 +1,0 @@
----
-source: mcore/src/statement/mapping.rs
-assertion_line: 310
-expression: VecDisplay(&maps)
-
----
-[{ a: x }]

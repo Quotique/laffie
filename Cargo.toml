@@ -2,13 +2,13 @@
 resolver = "2"
 
 members = [
-    "database",
-    "macros",
-    "mcore",
-    "parser",
-    "view",
+    "src/database",
+    "src/macros",
+    "src/mcore",
+    "src/parser",
+    "src/view",
 
-    "bin/cli",
-    "bin/tgbot",
-    "bin/migrate_db"
+    "src/bin/cli",
+    "src/bin/tgbot",
+    "src/bin/migrate_db"
 ]

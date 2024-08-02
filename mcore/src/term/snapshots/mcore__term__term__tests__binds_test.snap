@@ -1,5 +1,0 @@
----
-source: mcore/src/term/term.rs
-expression: term
----
-set(a, b) is known ⟺  true

@@ -1,6 +1,0 @@
----
-source: src/statement/statement.rs
-expression: statement
-
----
-<=>(is(set(a, ..), known), true)

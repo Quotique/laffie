@@ -1,6 +1,0 @@
----
-source: src/utils/display.rs
-expression: VecDisplay(&test).to_string()
-
----
-[1, 2, 3]

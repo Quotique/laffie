@@ -1,5 +1,0 @@
----
-source: mcore/src/statement/term.rs
-expression: statement
----
-set(a, b) is known ⟺  true

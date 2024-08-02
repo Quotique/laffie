@@ -1,5 +1,0 @@
----
-source: mcore/src/term/mapping.rs
-expression: test
----
-2*x^2+1

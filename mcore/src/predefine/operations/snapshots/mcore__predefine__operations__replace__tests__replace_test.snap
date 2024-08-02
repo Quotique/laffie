@@ -1,6 +1,0 @@
----
-source: src/predefine/operations/replace.rs
-expression: state
-
----
-!=(264, 0)
