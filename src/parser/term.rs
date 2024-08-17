@@ -3,8 +3,8 @@ use std::{collections::HashMap, str::FromStr};
 use trees::tr;
 
 use mcore::{
-    predefine::symbol_by_name,
-    term::{NodePosition, Param, Placeholder, Symbol, Term, TermTree, Variable},
+    symbol::{FuncSymbol, Param, Placeholder, Symbol, SymbolTree, Variable},
+    term::{NodePosition, Term},
     Decimal,
 };
 
@@ -62,7 +62,7 @@ impl<'a> TermParser<'a> {
         node_position: NodePosition,
         positions_map: &mut HashMap<Param, NodePosition>,
         last_placeholder_id: &mut u64,
-    ) -> Result<TermTree, ParserError> {
+    ) -> Result<SymbolTree, ParserError> {
         while node.data().symbol == "as" {
             let param = Param::from_str(&node.back().unwrap().data().symbol)
                 .expect("unable to create param");
@@ -110,7 +110,7 @@ impl<'a> TermParser<'a> {
             Symbol::Placeholder(Placeholder::from(*last_placeholder_id))
         } else if let Ok(value) = Decimal::from_str(data) {
             Symbol::Number(value)
-        } else if let Some(symbol) = symbol_by_name(data) {
+        } else if let Some(symbol) = FuncSymbol::by_name(data) {
             Symbol::FuncSymbol(symbol)
         } else {
             match node_type {
@@ -129,7 +129,7 @@ impl<'a> TermParser<'a> {
 mod tests {
     use trees::tr;
 
-    use mcore::term::Symbol;
+    use mcore::symbol::Symbol;
 
     use crate::lang;
 

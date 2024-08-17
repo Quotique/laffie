@@ -2,7 +2,7 @@ use std::{str::FromStr, sync::Arc};
 
 use mcore::{
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
-    term::FuncSymbol,
+    symbol::FuncSymbol,
     CompactString,
 };
 
@@ -173,7 +173,7 @@ mod tests {
 
     use mcore::{
         rule::{RuleAttr, RuleAttrValue},
-        term::Symbol,
+        symbol::Symbol,
     };
 
     use crate::lang;

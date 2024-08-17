@@ -6,7 +6,8 @@ use trees::{tr, Node};
 #[cfg(test)]
 use crate::term::term_with_params;
 use crate::{
-    term::{NodeMapping, Symbol, SymbolAttr, TermNode, TermTree},
+    symbol::{func::SymbolAttr, Symbol, SymbolNode, SymbolTree},
+    term::NodeMapping,
     NormalizationLevel,
 };
 
@@ -53,7 +54,7 @@ fn associative_nesting_remove(root: &mut Node<Symbol>) -> bool {
     result
 }
 
-fn default_ordering(left: &TermNode, right: &TermNode) -> Ordering {
+fn default_ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {
     // Symbol < Param < Varible < Number < Placeholder
     match (left.data(), right.data()) {
         (Symbol::FuncSymbol(id_l), Symbol::FuncSymbol(id_r)) => id_l.cmp(id_r),
@@ -117,7 +118,7 @@ fn commutative_reorder(root: &mut Node<Symbol>) -> bool {
     result
 }
 
-pub fn normalize(root: &mut TermNode, level: NormalizationLevel) -> bool {
+pub fn normalize(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     let mut result = false;
     for mut i in root.iter_mut() {
         result |= normalize(&mut i, level);
@@ -132,7 +133,7 @@ pub fn normalize(root: &mut TermNode, level: NormalizationLevel) -> bool {
     result
 }
 
-fn from_const(d: Decimal) -> TermTree {
+fn from_const(d: Decimal) -> SymbolTree {
     if d < Decimal::zero() {
         tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-d))
     } else {
@@ -140,7 +141,7 @@ fn from_const(d: Decimal) -> TermTree {
     }
 }
 
-fn to_const(node: &TermNode) -> Option<Decimal> {
+fn to_const(node: &SymbolNode) -> Option<Decimal> {
     if let Some(d) = node.data().number() {
         Some(d.clone())
     } else if node.data().is_symbol_name("-") {
@@ -150,7 +151,7 @@ fn to_const(node: &TermNode) -> Option<Decimal> {
     }
 }
 
-fn compare_numbers(left: &TermNode, right: &TermNode) -> Option<Ordering> {
+fn compare_numbers(left: &SymbolNode, right: &SymbolNode) -> Option<Ordering> {
     let left_num = to_const(left)?;
     let right_num = to_const(right)?;
 
@@ -161,7 +162,7 @@ fn compare_numbers(left: &TermNode, right: &TermNode) -> Option<Ordering> {
 pub fn calculator_check(
     src: &'static str,
     res: &'static str,
-    f: impl Fn(&mut TermNode, NormalizationLevel) -> bool,
+    f: impl Fn(&mut SymbolNode, NormalizationLevel) -> bool,
     level: NormalizationLevel,
 ) {
     let mut s = term_with_params(src);

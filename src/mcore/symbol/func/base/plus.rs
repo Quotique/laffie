@@ -4,7 +4,8 @@ use bigdecimal::{BigDecimal as Decimal, Zero};
 use trees::{tr, Tree};
 
 use crate::{
-    term::{swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, TermNode},
+    symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
+    term::swap_node,
     NormalizationLevel,
 };
 
@@ -21,7 +22,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn plus(root: &mut TermNode, level: NormalizationLevel) -> bool {
+pub fn plus(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("+") || root.degree() < 2 {
         return false;
     }
@@ -116,7 +117,7 @@ pub fn plus(root: &mut TermNode, level: NormalizationLevel) -> bool {
     result
 }
 
-fn remove_unused_plus(root: &mut TermNode) -> bool {
+fn remove_unused_plus(root: &mut SymbolNode) -> bool {
     if root.degree() == 0 {
         *root.data_mut() = Symbol::Number(Decimal::from(0));
         true
@@ -129,7 +130,7 @@ fn remove_unused_plus(root: &mut TermNode) -> bool {
     }
 }
 
-fn attach_constant(root: &mut TermNode, constant: Decimal) {
+fn attach_constant(root: &mut SymbolNode, constant: Decimal) {
     match constant.cmp(&Decimal::zero()) {
         Ordering::Less => {
             root.push_back(tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-constant)))
@@ -168,7 +169,7 @@ fn merge_mul_const(mut root: Tree<Symbol>, d: Decimal) -> Tree<Symbol> {
     }
 }
 
-fn extract_mul_const(root: &mut TermNode) -> Decimal {
+fn extract_mul_const(root: &mut SymbolNode) -> Decimal {
     if let Some(d) = to_const(root) {
         let result = d.clone();
         swap_node(root, &mut tr(Symbol::Number(1.into())).root_mut());
@@ -197,7 +198,7 @@ fn extract_mul_const(root: &mut TermNode) -> Decimal {
     constant
 }
 
-fn cummulative_power(root: &TermNode) -> Decimal {
+fn cummulative_power(root: &SymbolNode) -> Decimal {
     if root.data().is_symbol_name("^") {
         if let Some(v) = root.back().unwrap().data().number() {
             v.clone()
@@ -230,7 +231,7 @@ fn cummulative_power(root: &TermNode) -> Decimal {
     }
 }
 
-fn mean_arg(root: &TermNode) -> &TermNode {
+fn mean_arg(root: &SymbolNode) -> &SymbolNode {
     let pa = if root.data().is_symbol_name("*") {
         // find first non-number argument and omit power
         // last number argument in non-number not found
@@ -264,7 +265,7 @@ fn mean_arg(root: &TermNode) -> &TermNode {
     }
 }
 
-fn ordering(left: &TermNode, right: &TermNode) -> Ordering {
+fn ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {
     match cummulative_power(left).cmp(&cummulative_power(right)) {
         Ordering::Equal => {}
         Ordering::Less => return Ordering::Greater,
@@ -296,7 +297,7 @@ fn ordering(left: &TermNode, right: &TermNode) -> Ordering {
 
 #[cfg(test)]
 mod tests {
-    use crate::{predefine::operations::calculator_check, term::term_with_vars};
+    use crate::{symbol::func::base::calculator_check, term::term_with_vars};
 
     use super::*;
 

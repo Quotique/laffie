@@ -8,7 +8,7 @@ use std::{
 use serde_derive::Deserialize;
 
 use crate::{
-    task::{SolveStatus, Task},
+    task::{Solution, Task},
     term::TermProps,
 };
 
@@ -26,7 +26,7 @@ pub struct Dumper {
 pub trait DumperSink: Send + Sync {
     fn subtask_start(&mut self, task: &Task);
 
-    fn subtask_end(&mut self, status: &SolveStatus);
+    fn subtask_end(&mut self, status: &Solution);
 
     fn add_term(&mut self, term: &TermProps, parent: &TermProps);
 }
@@ -63,7 +63,7 @@ impl DumperSink for Dumper {
         self.sink.lock().unwrap().subtask_start(task);
     }
 
-    fn subtask_end(&mut self, status: &SolveStatus) {
+    fn subtask_end(&mut self, status: &Solution) {
         self.sink.lock().unwrap().subtask_end(status);
     }
 
@@ -75,7 +75,7 @@ impl DumperSink for Dumper {
 impl DumperSink for NoneDumper {
     fn subtask_start(&mut self, _: &Task) {}
 
-    fn subtask_end(&mut self, _: &SolveStatus) {}
+    fn subtask_end(&mut self, _: &Solution) {}
 
     fn add_term(&mut self, _: &TermProps, _: &TermProps) {}
 }
@@ -117,19 +117,17 @@ impl DumperSink for FileDumper {
         self.subtask_level += 1;
     }
 
-    fn subtask_end(&mut self, status: &SolveStatus) {
+    fn subtask_end(&mut self, status: &Solution) {
         self.file
             .write_all(
                 format!(
-                    "{}Answer: {} [{} cycles, {} ms]\n",
+                    "{}Answer: {} [{} cycles]\n",
                     self.prefix(),
                     status
-                        .status
-                        .as_ref()
+                        .answer()
                         .map(|x| x.to_string())
                         .unwrap_or("not solved".to_owned()),
-                    status.cycles_count,
-                    status.absolute_time
+                    0, // status.cycles,
                 )
                 .as_bytes(),
             )

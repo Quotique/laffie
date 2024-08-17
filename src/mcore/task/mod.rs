@@ -12,7 +12,7 @@ pub use self::{
     cache::TasksCache,
     dump::{Config as DumperConfig, Dumper, DumperSink},
     purpose::Purpose,
-    solution::{Solution, SolveStatus},
+    solution::Solution,
 };
 
 #[derive(Clone)]

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use mcore::term::{FuncSymbol, SymbolAttr, SymbolAttrValue};
+use mcore::symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue};
 
 use super::{Node, ParserError};
 

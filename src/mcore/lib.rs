@@ -3,8 +3,8 @@
 #[macro_use]
 extern crate log;
 
-pub mod predefine;
 pub mod rule;
+pub mod symbol;
 pub mod task;
 pub mod term;
 

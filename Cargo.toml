@@ -3,7 +3,6 @@ resolver = "2"
 
 members = [
     "src/database",
-    "src/macros",
     "src/mcore",
     "src/parser",
     "src/view",

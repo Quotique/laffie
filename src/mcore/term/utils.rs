@@ -9,15 +9,15 @@ use trees::{tr, Node, Tree};
 
 use utils::SubsetIterator;
 
-use super::{
-    func_symbol::TruthResult,
-    symbol::{Param, Symbol, Variable},
-    FuncSymbol, TermNode, TermTree,
+use crate::{
+    symbol::{Param, Symbol, TruthResult, Variable},
+    NormalizationLevel,
 };
-use crate::NormalizationLevel;
 
-pub type ParamsMap = HashMap<Param, TermTree>;
-pub type VariablesMap = HashMap<Variable, TermTree>;
+use super::{FuncSymbol, SymbolNode, SymbolTree};
+
+pub type ParamsMap = HashMap<Param, SymbolTree>;
+pub type VariablesMap = HashMap<Variable, SymbolTree>;
 
 pub fn swap_node<F: Clone>(l: &mut Node<F>, r: &mut Node<F>) {
     let mut l_childs: Vec<Tree<F>> = vec![];
@@ -58,7 +58,7 @@ pub trait NodeMapping {
 
     fn apply_param_map(&mut self, params: &ParamsMap);
 
-    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = TermTree> + '_>;
+    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = SymbolTree> + '_>;
 
     fn evaluate(&mut self, level: NormalizationLevel) -> bool;
 
@@ -68,7 +68,7 @@ pub trait NodeMapping {
     fn symbols(&self) -> HashSet<Arc<FuncSymbol>>;
 }
 
-impl NodeMapping for TermNode {
+impl NodeMapping for SymbolNode {
     fn symbols(&self) -> HashSet<Arc<FuncSymbol>> {
         self.bfs()
             .iter
@@ -101,7 +101,7 @@ impl NodeMapping for TermNode {
         }
     }
 
-    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = TermTree> + '_> {
+    fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = SymbolTree> + '_> {
         Box::new(SubsetIterator::new(self.degree(), count).map(move |i| {
             let s = self.data().func_symbol().unwrap();
             let mut parts = vec![tr(Symbol::FuncSymbol(s.clone())); count];
@@ -124,17 +124,17 @@ impl NodeMapping for TermNode {
     }
 
     fn evaluate(&mut self, level: NormalizationLevel) -> bool {
-        if let Some(symbol) = &self.data().func_symbol() {
-            return symbol.evaluate(self, level);
-        }
-        false
+        self.data()
+            .func_symbol()
+            .map(|x| x.evaluate(self, level))
+            .unwrap_or(false)
     }
 
     fn check_truth(&self) -> TruthResult {
-        if let Some(symbol) = &self.data().func_symbol() {
-            return symbol.check_truth(self);
-        }
-        TruthResult::Unknown
+        self.data()
+            .func_symbol()
+            .map(|x| x.check_truth(self))
+            .unwrap_or(TruthResult::Unknown)
     }
 }
 

@@ -3,8 +3,8 @@ use num::traits::Pow;
 use trees::tr;
 
 use crate::{
-    predefine::symbol_by_name,
-    term::{swap_node, FuncSymbol, NodeMapping, Symbol, SymbolAttr, SymbolAttrValue, TermNode},
+    symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
+    term::{swap_node, NodeMapping},
     NormalizationLevel,
 };
 
@@ -18,7 +18,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn power(root: &mut TermNode, level: NormalizationLevel) -> bool {
+pub fn power(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("^") {
         return false;
     }
@@ -45,7 +45,7 @@ pub fn power(root: &mut TermNode, level: NormalizationLevel) -> bool {
                 if e >= 0 {
                     swap_node(root, &mut result.root_mut());
                 } else {
-                    *root.data_mut() = Symbol::FuncSymbol(symbol_by_name("/").unwrap());
+                    *root.data_mut() = Symbol::with_func_symbol("/");
                     root.push_back(tr(Symbol::Number(Decimal::one())));
                     root.push_back(result);
                     root.evaluate(level);
@@ -72,7 +72,7 @@ pub fn power(root: &mut TermNode, level: NormalizationLevel) -> bool {
     }
 }
 
-pub fn power_argument(root: &TermNode) -> &TermNode {
+pub fn power_argument(root: &SymbolNode) -> &SymbolNode {
     if root.data().is_symbol_name("^") {
         root.front().unwrap()
     } else {
@@ -83,7 +83,7 @@ pub fn power_argument(root: &TermNode) -> &TermNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::predefine::operations::calculator_check;
+    use crate::symbol::func::base::calculator_check;
 
     #[test]
     fn calculator_test() {

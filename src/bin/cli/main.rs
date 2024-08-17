@@ -134,22 +134,18 @@ fn main() {
                     "Solution:".italic().blue(),
                     View::try_from(&solution).unwrap()
                 );
-                if let Some(prev) = record.runs.last() {
-                    if let (Ok(prev_answer), Ok(answer)) =
-                        (&prev.status, &solution.perf_stats.status)
-                    {
-                        if answer != prev_answer {
-                            answer_changed += 1;
-                            println!(
-                                "{}\nOld:{}\nNew:{}",
-                                "Answer changed: ".bold().blink().red(),
-                                prev_answer,
-                                answer
-                            );
-                        }
+                if let Some(answer) = solution.answer() {
+                    if answer.as_ref() != &record.answer {
+                        answer_changed += 1;
+                        println!(
+                            "{}\nOld:{}\nNew:{}",
+                            "Answer changed: ".bold().blink().red(),
+                            record.answer,
+                            answer
+                        );
                     }
                 }
-                record.runs.push(solution.perf_stats);
+                record.runs.push(solution.cycles);
 
                 if let Err(e) = db.put(&record) {
                     println!("Cant put record {}", e);

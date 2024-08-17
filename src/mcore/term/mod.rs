@@ -1,13 +1,11 @@
 //#![warn(missing_docs)]
 
 mod codec;
-mod func_symbol;
+mod display;
 mod index;
 mod mapping;
-mod symbol;
-mod term_display;
-mod term_props;
-mod tree_utils;
+mod props;
+mod utils;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -18,30 +16,28 @@ use std::{
 };
 
 use eyre::Result;
-use trees::{tr, Node, Tree};
+use trees::{tr, Node};
 
-use crate::NormalizationLevel;
+use crate::{
+    symbol::{FuncSymbol, Param, Symbol, SymbolNode, SymbolTree},
+    NormalizationLevel,
+};
 
-use term_display::display_string;
+use display::display_string;
 
-pub use func_symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue, TruthChecker, TruthResult};
 pub use index::NodePosition;
 pub use mapping::ParamsMapping;
-pub use symbol::{Param, Placeholder, Symbol, Variable};
-pub use term_props::TermProps;
-pub use tree_utils::{replace, swap_node, NodeMapping, VariablesMap};
-
-pub type TermTree = Tree<Symbol>;
-pub type TermNode = Node<Symbol>;
+pub use props::TermProps;
+pub use utils::{replace, swap_node, NodeMapping, VariablesMap};
 
 #[derive(Clone, Eq)]
 pub struct Term {
-    pub(super) tree: TermTree,
+    pub(super) tree: SymbolTree,
     pub binds:       HashMap<Param, NodePosition>,
 }
 
 impl Term {
-    pub fn new(tree: TermTree, binds: HashMap<Param, NodePosition>) -> Self {
+    pub fn new(tree: SymbolTree, binds: HashMap<Param, NodePosition>) -> Self {
         Term { tree, binds }
     }
 
@@ -60,7 +56,7 @@ impl Term {
     }
 
     pub fn normalize(mut self, level: NormalizationLevel) -> Self {
-        crate::predefine::normalize(&mut self.tree.root_mut(), level);
+        crate::symbol::normalize(&mut self.tree.root_mut(), level);
         self
     }
 
@@ -86,7 +82,7 @@ impl Term {
         self.tree.root_mut()
     }
 
-    pub fn destruct(mut self) -> (TermTree, trees::Forest<Symbol>) {
+    pub fn destruct(mut self) -> (SymbolTree, trees::Forest<Symbol>) {
         let childs = self.tree.abandon();
         (self.tree, childs)
     }
@@ -118,8 +114,8 @@ impl PartialEq for Term {
     }
 }
 
-impl From<TermTree> for Term {
-    fn from(source: TermTree) -> Self {
+impl From<SymbolTree> for Term {
+    fn from(source: SymbolTree) -> Self {
         Self {
             tree:  source,
             binds: Default::default(),
@@ -167,7 +163,7 @@ mod tests {
         str::FromStr,
     };
 
-    use crate::term::{symbol::Placeholder, term_with_params};
+    use crate::{symbol::Placeholder, term::term_with_params};
 
     use super::*;
 

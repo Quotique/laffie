@@ -1,4 +1,4 @@
-use crate::term::{FuncSymbol, TermNode, TruthResult};
+use crate::symbol::{FuncSymbol, SymbolNode, TruthResult};
 
 pub fn symbol() -> FuncSymbol {
     FuncSymbol::builder()
@@ -7,7 +7,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn symbolic_eq(root: &TermNode) -> TruthResult {
+pub fn symbolic_eq(root: &SymbolNode) -> TruthResult {
     if !root.data().is_symbol_name("symbolic_eq") {
         return TruthResult::Unknown;
     }

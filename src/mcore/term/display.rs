@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use super::{
-    func_symbol::{FuncSymbol, SymbolAttr},
-    TermNode,
-};
+use crate::symbol::{FuncSymbol, SymbolAttr};
 
-pub fn display_string(node: &TermNode) -> String {
+use super::SymbolNode;
+
+pub fn display_string(node: &SymbolNode) -> String {
     match node.data().func_symbol() {
         Some(symbol) => symbol_display(symbol, node),
         _ => node.data().to_string(),
@@ -13,7 +12,7 @@ pub fn display_string(node: &TermNode) -> String {
     .replace("+-", "-")
 }
 
-fn symbol_display(symbol: Arc<FuncSymbol>, node: &TermNode) -> String {
+fn symbol_display(symbol: Arc<FuncSymbol>, node: &SymbolNode) -> String {
     match symbol.display_weight() {
         Some(weight) if node.degree() < 2 => format!(
             "{}{}",
@@ -45,7 +44,7 @@ fn symbol_display(symbol: Arc<FuncSymbol>, node: &TermNode) -> String {
     }
 }
 
-fn argument_display(parent_weight: u64, node: &TermNode, is_associative: bool) -> String {
+fn argument_display(parent_weight: u64, node: &SymbolNode, is_associative: bool) -> String {
     if let Some(symbol) = node.data().func_symbol() {
         if let Some(weight) = symbol.display_weight() {
             if weight > parent_weight || (weight == parent_weight && !is_associative) {
@@ -56,7 +55,7 @@ fn argument_display(parent_weight: u64, node: &TermNode, is_associative: bool) -
     display_string(node)
 }
 
-fn prefix_symbol_display(symbol: Arc<FuncSymbol>, node: &TermNode) -> String {
+fn prefix_symbol_display(symbol: Arc<FuncSymbol>, node: &SymbolNode) -> String {
     if node.degree() > 0 {
         format!(
             "{}({})",

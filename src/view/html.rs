@@ -3,7 +3,7 @@ use std::fmt;
 use html_escape::encode_text;
 
 use mcore::{
-    task::{Purpose, SolveStatus},
+    task::{Purpose, Solution},
     term::{Term, TermProps},
 };
 
@@ -34,7 +34,7 @@ impl<'a> Renderer for Html<'a> {
         &mut self,
         purpose: &Purpose,
         answer: Option<&Term>,
-        status: &SolveStatus,
+        status: &Solution,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {
             self.output.write_str(&format!(
@@ -47,10 +47,7 @@ impl<'a> Renderer for Html<'a> {
                         "<b>PROOFED!</b>".to_owned()
                     }
                 },
-                format_args!(
-                    "[{} cycles, {}ms]",
-                    status.cycles_count, status.absolute_time
-                )
+                format_args!("[{} cycles, ]", status.cycles)
             ))
         } else {
             self.output.write_str("<b>NOT SOLVED!</b>\n")

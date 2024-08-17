@@ -1,4 +1,4 @@
-use crate::term::{FuncSymbol, SymbolAttr, SymbolAttrValue, TermNode, TruthResult};
+use crate::symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue, SymbolNode, TruthResult};
 
 use super::compare_numbers;
 
@@ -10,7 +10,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn equal(root: &TermNode) -> TruthResult {
+pub fn equal(root: &SymbolNode) -> TruthResult {
     if !root.data().is_symbol_name("==") {
         return TruthResult::Unknown;
     }

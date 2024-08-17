@@ -7,7 +7,6 @@ edition = "2021"
 path = "./lib.rs"
 
 [dependencies]
-macros = { path = "../macros" }
 utils = { path = "../utils" }
 
 eyre = { workspace = true }
@@ -30,4 +29,4 @@ parking_lot = "0.12"
 [dev-dependencies]
 parser = { path = "../parser" }
 
-insta = "1.7"
+insta = "1.39"

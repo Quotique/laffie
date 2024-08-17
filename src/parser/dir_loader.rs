@@ -6,7 +6,7 @@ use std::{
 
 use trees::Tree;
 
-use mcore::{predefine::add_symbol, rule::RulesEngine, task::Task, term::FuncSymbol};
+use mcore::{rule::RulesEngine, symbol::FuncSymbol, task::Task};
 use utils::VecDisplay;
 
 use crate::{lang, FuncSymbolParser, NodeData, RuleParser, TaskParser};
@@ -37,7 +37,7 @@ impl DirectoryParser {
             &["sym"],
             &mut |src, s: &Tree<NodeData>| {
                 if let Ok(sym) = FuncSymbolParser::new(s).parse() {
-                    let sym = add_symbol(sym);
+                    let sym = FuncSymbol::register(sym);
                     last_sym.replace(sym);
                 } else if let Ok(rules) = RuleParser::with(s)
                     .with_func_symbol(last_sym.as_ref().unwrap().clone())
@@ -79,9 +79,7 @@ impl DirectoryParser {
             &self.symbols_path,
             &["sym"],
             &mut |_, s: &Tree<NodeData>| {
-                if let Ok(sym) = FuncSymbolParser::new(s).parse() {
-                    add_symbol(sym);
-                }
+                let _ = FuncSymbolParser::new(s).parse().map(|s| s.register());
             },
         )
     }

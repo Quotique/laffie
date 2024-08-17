@@ -7,7 +7,7 @@ pub use console::Console;
 pub use html::Html;
 
 use mcore::{
-    task::{Purpose, Solution, SolveStatus, TasksCache},
+    task::{Purpose, Solution, TasksCache},
     term::{Term, TermProps},
 };
 
@@ -20,7 +20,7 @@ pub trait Renderer {
         &mut self,
         purpose: &Purpose,
         answer: Option<&Term>,
-        status: &SolveStatus,
+        status: &Solution,
     ) -> fmt::Result;
 
     fn dump_frame(&mut self, _frame: &[TermProps]) -> fmt::Result {
@@ -130,7 +130,7 @@ impl<'a> View<'a> {
                 self.solution
                     .answer
                     .map(|x| self.solution.terms[x].term.as_ref()),
-                &self.solution.perf_stats,
+                self.solution,
             )?;
         }
         Ok(())

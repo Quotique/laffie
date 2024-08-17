@@ -10,11 +10,7 @@ use itertools::Itertools;
 use utils::VecDisplay;
 
 use super::rule::{Rule, RuleAttr, RuleAttrValue};
-use crate::{
-    predefine::symbol_by_name,
-    term::{FuncSymbol, TermProps},
-    CompactString, RuleId,
-};
+use crate::{symbol::FuncSymbol, term::TermProps, CompactString, RuleId};
 
 // TODO: move to correct place
 type Level = usize;
@@ -53,7 +49,7 @@ impl RulesEngine {
         let empty_level = LevelRules::new();
         #[allow(clippy::mutable_key_type)]
         let level = self.all_rules.get(&term.weight).unwrap_or(&empty_level);
-        let result: Vec<_> = once(&symbol_by_name("AnySymbol").unwrap())
+        let result: Vec<_> = once(&FuncSymbol::by_name("AnySymbol").unwrap())
             .chain(term.func_symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())

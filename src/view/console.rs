@@ -3,7 +3,7 @@ use std::fmt;
 use colored::*;
 
 use mcore::{
-    task::{Purpose, SolveStatus},
+    task::{Purpose, Solution},
     term::{Term, TermProps},
 };
 use utils::VecDisplay;
@@ -33,7 +33,7 @@ impl<'a, 'b> Renderer for Console<'a, 'b> {
         &mut self,
         purpose: &Purpose,
         answer: Option<&Term>,
-        status: &SolveStatus,
+        status: &Solution,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {
             writeln!(
@@ -47,11 +47,7 @@ impl<'a, 'b> Renderer for Console<'a, 'b> {
                         "PROOFED!".bold().green()
                     }
                 },
-                format!(
-                    "[{} cycles, {}ms]",
-                    status.cycles_count, status.absolute_time
-                )
-                .yellow()
+                format!("[{} cycles]", status.cycles).yellow()
             )
         } else {
             writeln!(self.output, "{}", "NOT SOLVED!".bold().blink().red())

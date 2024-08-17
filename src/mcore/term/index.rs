@@ -2,7 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use bincode::{Decode, Encode};
 
-use super::{Term, TermNode};
+use super::{SymbolNode, Term};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[derive(Decode, Encode)]
@@ -35,7 +35,7 @@ impl IndexMut<&NodePosition> for Term {
 }
 
 impl Index<&NodePosition> for Term {
-    type Output = TermNode;
+    type Output = SymbolNode;
 
     fn index(&self, pos: &NodePosition) -> &Self::Output {
         let mut root = self.tree.root();

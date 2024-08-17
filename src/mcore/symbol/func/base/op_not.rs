@@ -1,6 +1,6 @@
 use crate::{
-    predefine::symbol_by_name,
-    term::{swap_node, FuncSymbol, NodeMapping, Symbol, TermNode, TruthResult},
+    symbol::{FuncSymbol, Symbol, SymbolNode, TruthResult},
+    term::{swap_node, NodeMapping},
     NormalizationLevel,
 };
 
@@ -12,7 +12,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-fn not_replace(root: &mut TermNode, _: NormalizationLevel) -> bool {
+fn not_replace(root: &mut SymbolNode, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("!") || root.degree() != 1 {
         return false;
     }
@@ -27,20 +27,20 @@ fn not_replace(root: &mut TermNode, _: NormalizationLevel) -> bool {
         Some(name) if name == "==" => {
             let mut child = root.pop_front().unwrap();
             swap_node(root, &mut child.root_mut());
-            *root.data_mut() = Symbol::FuncSymbol(symbol_by_name("!=").unwrap());
+            *root.data_mut() = Symbol::with_func_symbol("!=");
             true
         }
         Some(name) if name == "!=" => {
             let mut child = root.pop_front().unwrap();
             swap_node(root, &mut child.root_mut());
-            *root.data_mut() = Symbol::FuncSymbol(symbol_by_name("==").unwrap());
+            *root.data_mut() = Symbol::with_func_symbol("==");
             true
         }
         _ => false,
     }
 }
 
-pub fn is_not(root: &TermNode) -> TruthResult {
+pub fn is_not(root: &SymbolNode) -> TruthResult {
     if !root.data().is_symbol_name("!") {
         return TruthResult::Unknown;
     }

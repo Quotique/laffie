@@ -5,7 +5,8 @@ use num::integer::gcd;
 use num_bigint::ToBigInt;
 
 use crate::{
-    term::{swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, TermNode},
+    symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
+    term::swap_node,
     NormalizationLevel,
 };
 
@@ -19,7 +20,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn divide(root: &mut TermNode, level: NormalizationLevel) -> bool {
+pub fn divide(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("/") {
         return false;
     }
@@ -115,7 +116,7 @@ fn impl_devide(num: &Decimal, den: &Decimal) -> Option<Decimal> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::predefine::operations::calculator_check;
+    use crate::symbol::func::base::calculator_check;
 
     #[test]
     fn derive_test() {

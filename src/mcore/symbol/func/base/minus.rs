@@ -2,7 +2,8 @@ use bigdecimal::Zero;
 use trees::tr;
 
 use crate::{
-    term::{swap_node, FuncSymbol, NodeMapping, Symbol, SymbolAttr, SymbolAttrValue, TermNode},
+    symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
+    term::{swap_node, NodeMapping},
     NormalizationLevel,
 };
 
@@ -14,7 +15,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn minus(root: &mut TermNode, level: NormalizationLevel) -> bool {
+pub fn minus(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("-") {
         return false;
     }
@@ -41,7 +42,7 @@ pub fn minus(root: &mut TermNode, level: NormalizationLevel) -> bool {
     }
 }
 
-fn remove_zeroes(root: &mut TermNode) -> bool {
+fn remove_zeroes(root: &mut SymbolNode) -> bool {
     match root.degree() {
         1 => {
             if let Symbol::Number(d) = root.back().unwrap().data() {
@@ -77,7 +78,7 @@ fn remove_zeroes(root: &mut TermNode) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::predefine::operations::calculator_check;
+    use crate::symbol::func::base::calculator_check;
 
     #[test]
     fn calculator_test() {

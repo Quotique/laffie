@@ -1,10 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt,
-    rc::Rc,
-    sync::Arc,
-    time::{Instant, SystemTime},
-};
+use std::{collections::HashMap, fmt, rc::Rc, sync::Arc};
 
 use bincode::{Decode, Encode};
 use trees::tr;
@@ -19,24 +13,15 @@ use super::{
     Task,
 };
 use crate::{
-    predefine::{normalize, symbol_by_name},
     rule::{Rule, RuleAttr, RulesEngine, SharedRule, Suppose},
-    term::{swap_node, NodeMapping, Symbol, Term, TermNode, TermProps},
+    symbol::{normalize, Symbol, SymbolNode},
+    term::{swap_node, NodeMapping, Term, TermProps},
     NormalizationLevel, RuleId,
 };
 
 pub const MAX_SUBTASK_LEVEL: usize = 10;
 pub const MAX_LEVEL: usize = 20;
 pub const STACK_SIZE: usize = 2048;
-
-#[derive(Debug, Clone, Encode, Decode)]
-pub struct SolveStatus {
-    pub timestamp: SystemTime,
-    pub status:    Result<Term, SolutionError>,
-
-    pub cycles_count:  usize,
-    pub absolute_time: f64,
-}
 
 pub struct Solution {
     pub task: Task,
@@ -52,8 +37,7 @@ pub struct Solution {
 
     pub answer: Option<usize>,
 
-    pub perf_stats: SolveStatus,
-
+    pub cycles:   usize,
     rules_engine: Arc<RulesEngine>,
     dumper:       Dumper,
 }
@@ -73,17 +57,6 @@ impl fmt::Display for SolutionError {
             SolutionError::MaxSubtaskLevelExceed => write!(f, "MaxSubtaskLevelExceed"),
             SolutionError::NoConditions => write!(f, "NoConditions"),
             SolutionError::NoSolutionsFound => write!(f, "NoSolutionsFound"),
-        }
-    }
-}
-
-impl Default for SolveStatus {
-    fn default() -> SolveStatus {
-        SolveStatus {
-            timestamp:     SystemTime::now(),
-            status:        Err(SolutionError::NoSolutionsFound),
-            cycles_count:  0,
-            absolute_time: 0.,
         }
     }
 }
@@ -125,8 +98,7 @@ impl Solution {
             purpose,
             answer: None,
 
-            perf_stats: SolveStatus::default(),
-
+            cycles: 0,
             task,
             rules_engine: rules.clone(),
             dumper,
@@ -142,25 +114,22 @@ impl Solution {
         self.answer.map(|i| self.terms[i].term.clone())
     }
 
-    pub fn solve(&mut self) -> Result<(), SolutionError> {
+    pub fn solve(&mut self) -> Result<Rc<Term>, SolutionError> {
         self.dumper.subtask_start(&self.task);
         trace!(target: "subtask", "Subtask: {}, {}", self.purpose, VecDisplay(&self.task.conditions));
         if self.task.subtask_level > MAX_SUBTASK_LEVEL {
             return Err(SolutionError::MaxSubtaskLevelExceed);
         }
 
-        let start = Instant::now();
         let result = self.solution_loop();
 
-        self.perf_stats.status = result.map(|_| (*self.terms[self.answer.unwrap()].term).clone());
-        self.perf_stats.absolute_time = (start.elapsed().as_nanos() as f64) / 1000000.;
-        self.dumper.subtask_end(&self.perf_stats);
+        self.dumper.clone().subtask_end(self);
         result
     }
 
-    fn solution_loop(&mut self) -> Result<(), SolutionError> {
+    fn solution_loop(&mut self) -> Result<Rc<Term>, SolutionError> {
         loop {
-            self.perf_stats.cycles_count += 1;
+            self.cycles += 1;
 
             let index = self
                 .terms
@@ -214,7 +183,7 @@ impl Solution {
                         self.task.subtask_level,
                         self.answer().unwrap()
                     );
-                    return Ok(());
+                    return Ok(self.answer().unwrap());
                 }
             }
             if let Some(r) = self.terms[index].rule(
@@ -437,6 +406,7 @@ impl Solution {
             self.dumper.clone(),
             self.cache.clone(),
         );
+        solution.cycles = self.cycles;
 
         match solution.solve() {
             Ok(_) => {
@@ -594,7 +564,7 @@ impl Solution {
     }
 }
 
-fn is_replace(root: &mut TermNode) {
+fn is_replace(root: &mut SymbolNode) {
     if !root.data().is_symbol_name("is") || root.degree() != 2 {
         return;
     }
@@ -612,7 +582,7 @@ fn is_replace(root: &mut TermNode) {
         }
         Some(name) if name == "false" => {
             let child = root.pop_front().unwrap();
-            let mut neg = tr(Symbol::FuncSymbol(symbol_by_name("!").unwrap())) / child;
+            let mut neg = tr(Symbol::with_func_symbol("!")) / child;
             swap_node(root, &mut neg.root_mut());
         }
         _ => {}

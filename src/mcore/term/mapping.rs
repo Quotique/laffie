@@ -8,27 +8,27 @@ use eyre::{bail, ensure, Result};
 
 use utils::VecDisplay;
 
+use crate::symbol::{Param, Placeholder, Symbol, SymbolAttr};
+
 use super::{
-    func_symbol::SymbolAttr,
     index::NodePosition,
-    symbol::{Param, Placeholder, Symbol},
-    tree_utils::{swap_node, NodeMapping},
-    TermNode, TermTree,
+    utils::{swap_node, NodeMapping},
+    SymbolNode, SymbolTree,
 };
 
 #[derive(Debug, Clone, Default)]
 pub struct ParamsMapping {
-    params:       BTreeMap<Param, TermTree>,
-    placeholders: BTreeMap<Placeholder, Vec<TermTree>>,
+    params:       BTreeMap<Param, SymbolTree>,
+    placeholders: BTreeMap<Placeholder, Vec<SymbolTree>>,
 }
 
 pub struct Mapper<'a> {
-    target:  &'a TermNode,
-    pattern: &'a TermNode,
+    target:  &'a SymbolNode,
+    pattern: &'a SymbolNode,
 }
 
-impl From<HashMap<Param, TermTree>> for ParamsMapping {
-    fn from(params: HashMap<Param, TermTree>) -> Self {
+impl From<HashMap<Param, SymbolTree>> for ParamsMapping {
+    fn from(params: HashMap<Param, SymbolTree>) -> Self {
         Self {
             params:       BTreeMap::from_iter(params),
             placeholders: Default::default(),
@@ -37,13 +37,13 @@ impl From<HashMap<Param, TermTree>> for ParamsMapping {
 }
 
 impl ParamsMapping {
-    pub fn mapper<'a>(target: &'a TermNode, pattern: &'a TermNode) -> Mapper<'a> {
+    pub fn mapper<'a>(target: &'a SymbolNode, pattern: &'a SymbolNode) -> Mapper<'a> {
         Mapper { target, pattern }
     }
 
     pub fn subtree_map(
-        target: &TermNode,
-        pattern: &TermNode,
+        target: &SymbolNode,
+        pattern: &SymbolNode,
     ) -> Vec<(Vec<ParamsMapping>, NodePosition)> {
         let mut result = vec![];
         let mut queue = VecDeque::new();
@@ -63,7 +63,7 @@ impl ParamsMapping {
         result
     }
 
-    pub fn apply<'a>(&self, node: &'a mut TermNode) -> &'a mut TermNode {
+    pub fn apply<'a>(&self, node: &'a mut SymbolNode) -> &'a mut SymbolNode {
         match node.data().clone() {
             Symbol::Param(p) => {
                 if let Some(p) = self.params.get(&p) {
@@ -96,8 +96,8 @@ impl<'a> Mapper<'a> {
 }
 
 fn params_map_arguments(
-    target: &TermNode,
-    pattern: &TermNode,
+    target: &SymbolNode,
+    pattern: &SymbolNode,
     result: &mut Vec<ParamsMapping>,
 ) -> Result<()> {
     let placeholder = pattern
@@ -157,8 +157,8 @@ fn params_map_arguments(
 }
 
 fn params_map_impl(
-    target: &TermNode,
-    pattern: &TermNode,
+    target: &SymbolNode,
+    pattern: &SymbolNode,
     mut params: ParamsMapping,
 ) -> Result<Vec<ParamsMapping>> {
     trace!(target: "pattern_match", "Pattern: {}, traget: {}, mapping: {:?}", pattern, target, params);

@@ -1,25 +1,23 @@
+pub mod base;
 mod builder;
+mod container;
 mod truth;
 
-use std::{cmp, collections::HashMap, fmt, hash};
+use std::{cmp, collections::HashMap, fmt, hash, str::FromStr, sync::Arc};
 
 use parking_lot::RwLock;
 
-use macros::FuncAttr;
-
 use crate::{CompactString, NormalizationLevel};
 
-use super::TermNode;
+use super::symbol_enum::SymbolNode;
 
 pub use builder::FuncSymbolBuilder;
 pub use truth::{TruthChecker, TruthResult};
 
-type BoxedComparator = Box<dyn Fn(&TermNode, &TermNode) -> std::cmp::Ordering>;
-type CalculatorSignature = dyn Fn(&mut TermNode, NormalizationLevel) -> bool;
+type BoxedComparator = Box<dyn Fn(&SymbolNode, &SymbolNode) -> std::cmp::Ordering + Send + Sync>;
+type CalculatorSignature = dyn Fn(&mut SymbolNode, NormalizationLevel) -> bool + Send + Sync;
 
-#[derive(FuncAttr)]
 pub struct Ordering(BoxedComparator);
-#[derive(FuncAttr)]
 pub struct Calculator(Box<CalculatorSignature>);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -37,7 +35,7 @@ pub enum SymbolAttrValue {
     UStr(String),
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct FuncSymbol {
     pub name:          CompactString,
     pub attrs:         RwLock<HashMap<SymbolAttr, SymbolAttrValue>>,
@@ -46,9 +44,38 @@ pub struct FuncSymbol {
     pub truth_checker: Option<TruthChecker>,
 }
 
+impl fmt::Debug for FuncSymbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{{ name: {}, attrs: {:?}, ordering: {}, calculator: {}, truth_checker: {} }}",
+            self.name,
+            self.attrs.read(),
+            self.arg_order.is_some(),
+            self.calculator.is_some(),
+            self.truth_checker.is_some()
+        )
+    }
+}
+
 impl FuncSymbol {
     pub fn builder() -> FuncSymbolBuilder {
         FuncSymbolBuilder::default()
+    }
+
+    pub fn register(self) -> Arc<FuncSymbol> {
+        container::add_symbol_impl(&mut container::all_func_symbols().write(), self)
+    }
+
+    pub fn by_name(name: &str) -> Option<Arc<Self>> {
+        container::all_func_symbols()
+            .read()
+            .get(&CompactString::from_str(name).unwrap())
+            .cloned()
+    }
+
+    pub fn add_with_name(symbols: &mut HashMap<CompactString, Arc<FuncSymbol>>, name: &str) {
+        container::add_symbol_impl(symbols, FuncSymbol::builder().name(name).build());
     }
 
     pub fn extend_attrs(&self, attrs: impl IntoIterator<Item = (SymbolAttr, SymbolAttrValue)>) {
@@ -62,7 +89,7 @@ impl FuncSymbol {
         None
     }
 
-    pub fn check_truth(&self, node: &TermNode) -> TruthResult {
+    pub fn check_truth(&self, node: &SymbolNode) -> TruthResult {
         if let Some(c) = self.truth_checker.as_ref() {
             c.0(node)
         } else {
@@ -70,7 +97,7 @@ impl FuncSymbol {
         }
     }
 
-    pub fn evaluate(&self, node: &mut TermNode, level: NormalizationLevel) -> bool {
+    pub fn evaluate(&self, node: &mut SymbolNode, level: NormalizationLevel) -> bool {
         if let Some(c) = self.calculator.as_ref() {
             c.0(node, level)
         } else {
@@ -78,7 +105,7 @@ impl FuncSymbol {
         }
     }
 
-    pub fn arg_order(&self, left: &TermNode, right: &TermNode) -> Option<std::cmp::Ordering> {
+    pub fn arg_order(&self, left: &SymbolNode, right: &SymbolNode) -> Option<std::cmp::Ordering> {
         self.arg_order.as_ref().as_ref().map(|o| o.0(left, right))
     }
 }
@@ -125,13 +152,12 @@ impl hash::Hash for FuncSymbol {
 
 #[cfg(test)]
 mod tests {
-    use crate::predefine::symbol_by_name;
 
     use super::*;
 
     #[test]
     fn by_name_test() {
-        let sym = symbol_by_name(&String::from("==")).unwrap();
+        let sym = FuncSymbol::by_name(&String::from("==")).unwrap();
         assert_eq!(
             sym.as_ref(),
             &FuncSymbol::builder()

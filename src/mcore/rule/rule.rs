@@ -6,7 +6,8 @@ use multimap::MultiMap;
 use utils::VecDisplay;
 
 use crate::{
-    term::{FuncSymbol, NodePosition, ParamsMapping, Term, TermNode, TermProps},
+    symbol::{FuncSymbol, SymbolNode},
+    term::{NodePosition, ParamsMapping, Term, TermProps},
     CompactString, NormalizationLevel, RuleId,
 };
 
@@ -203,12 +204,12 @@ impl Rule {
     }
 
     #[inline]
-    pub fn pattern_node(&self) -> &TermNode {
+    pub fn pattern_node(&self) -> &SymbolNode {
         &self.term[&self.pattern]
     }
 
     #[inline]
-    pub fn replace_node(&self) -> &TermNode {
+    pub fn replace_node(&self) -> &SymbolNode {
         &self.term[&self.replace]
     }
 

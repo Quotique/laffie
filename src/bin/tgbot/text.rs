@@ -1,7 +1,5 @@
 use std::env;
 
-use chrono::{offset::Utc, DateTime};
-
 use database::TaskRecord;
 
 pub struct Text;
@@ -39,14 +37,12 @@ impl Text {
         let answer = task
             .runs
             .last()
-            .map(|x| match &x.status {
-                Ok(s) => format!(
-                    "\n<i>Ответ:</i> {} [получен: {}, циклов сканирования: {}]\n",
-                    s,
-                    DateTime::<Utc>::from(x.timestamp).format("%Y-%m-%d %T"),
-                    x.cycles_count
-                ),
-                Err(_) => "<i>Задача не решена</i>\n".to_owned(),
+            .map(|x| {
+                // TODO: no answer, i18n
+                format!(
+                    "\n<i>Ответ:</i> {} [циклов сканирования: {}]\n",
+                    task.answer, x
+                )
             })
             .unwrap_or_else(|| "".to_owned());
         format!(

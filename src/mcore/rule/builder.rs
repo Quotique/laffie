@@ -3,8 +3,8 @@ use std::{collections::HashMap, convert::From, fmt, sync::Arc};
 use multimap::MultiMap;
 
 use crate::{
-    predefine::symbol_by_name,
-    term::{FuncSymbol, NodeMapping, NodePosition, Term},
+    symbol::FuncSymbol,
+    term::{NodeMapping, NodePosition, Term},
     NormalizationLevel, RuleId,
 };
 
@@ -52,7 +52,7 @@ impl Default for RuleBuilder {
             term:         None,
             requirements: Default::default(),
             attributes:   Default::default(),
-            func_symbol:  symbol_by_name("AnySymbol")
+            func_symbol:  FuncSymbol::by_name("AnySymbol")
                 .expect("System symbol AnySymbol is not found"),
             replaces:     Default::default(),
         }

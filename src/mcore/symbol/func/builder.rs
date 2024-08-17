@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
-use crate::{term::TermNode, CompactString};
+use crate::CompactString;
 
 use super::{
     BoxedComparator, Calculator, CalculatorSignature, FuncSymbol, Ordering, SymbolAttr,
-    SymbolAttrValue, TruthChecker, TruthResult,
+    SymbolAttrValue, SymbolNode, TruthChecker, TruthResult,
 };
 
 #[derive(Default)]
@@ -37,7 +37,7 @@ impl FuncSymbolBuilder {
 
     pub fn with_truth_checker(
         mut self,
-        truth_checker: Box<dyn Fn(&TermNode) -> TruthResult>,
+        truth_checker: Box<dyn Fn(&SymbolNode) -> TruthResult + Send + Sync>,
     ) -> Self {
         self.sym.truth_checker = Some(TruthChecker(truth_checker));
         self

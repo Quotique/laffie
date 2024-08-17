@@ -1,9 +1,11 @@
 use std::{fmt, hash::Hash, sync::Arc};
 
 use derive_more::{AsRef, Display, From, FromStr, Into};
+use trees::{Node, Tree};
 
-use super::func_symbol::FuncSymbol;
-use crate::{predefine::symbol_by_name, CompactString, Decimal, Signed};
+use crate::{CompactString, Decimal, Signed};
+
+use super::func::FuncSymbol;
 
 #[derive(Clone, Debug, Display)]
 #[derive(PartialEq, Eq, Hash, AsRef, From, FromStr, Into, Ord, PartialOrd)]
@@ -17,46 +19,49 @@ pub struct Variable(CompactString);
 #[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
 pub struct Placeholder(u64);
 
+pub type SymbolNode = Node<Symbol>;
+pub type SymbolTree = Tree<Symbol>;
+
+/// Term tree element
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-/// Элемент дерева терма
 pub enum Symbol {
-    /// Функциональный символ, символ операции
+    /// Functional (operation) symbol
     FuncSymbol(Arc<FuncSymbol>),
-    /// Именованый параметр, может быть заменен при процедуре унификации
+    /// Named parameter. Can be replaced during the unification procedure
     Param(Param),
-    /// Символ переменной
+    /// Variable symbol
     Variable(Variable),
-    /// Числовая рациональная неотрицательная константа
+    /// Rational non-negative constant
     Number(Decimal),
-    /// Ссылка на другое поддерево
+    /// Link to another subtree
     Placeholder(Placeholder),
 }
 
 impl Symbol {
-    #[inline]
-    /// Получить функциональный символ по названию
+    /// Get function symbol by name
     ///
-    /// возвращает None, если указанный символ не найден в базе
+    /// returns None if the specified symbol name is not found in the database
+    #[inline]
     pub fn with_func_symbol_opt(name: &str) -> Option<Self> {
-        symbol_by_name(name).map(Self::FuncSymbol)
+        FuncSymbol::by_name(name).map(Self::FuncSymbol)
     }
 
+    /// Same as with_func_symbol_opt(arg).unwrap()
     #[inline]
-    /// Аналог with_func_symbol_opt(arg).unwrap()
     pub fn with_func_symbol(name: &str) -> Self {
         Self::with_func_symbol_opt(name).unwrap()
     }
 
+    /// Create a constant symbol
     #[inline]
-    /// Создать символ-константу
     pub fn with_number(number: impl Into<Decimal>) -> Self {
         Self::Number(number.into())
     }
 
-    #[inline]
-    /// Получить содержимое функционального символа
+    /// Get the contents of a function symbol
     ///
-    /// возвращает None, если содержит не функциональный символ
+    /// returns None if the content is non a functional symbol
+    #[inline]
     pub fn func_symbol(&self) -> Option<Arc<FuncSymbol>> {
         if let Symbol::FuncSymbol(s) = self {
             return Some(s.clone());
@@ -64,6 +69,9 @@ impl Symbol {
         None
     }
 
+    /// Get the contents of a variable symbol
+    ///
+    /// returns None if the content is non a variable symbol
     #[inline]
     pub fn variable(&self) -> Option<&Variable> {
         if let Symbol::Variable(v) = &self {
@@ -72,6 +80,9 @@ impl Symbol {
         None
     }
 
+    /// Get the contents of a parameter
+    ///
+    /// returns None if the content is non a parameter
     #[inline]
     pub fn param(&self) -> Option<&Param> {
         if let Symbol::Param(p) = &self {
@@ -80,6 +91,9 @@ impl Symbol {
         None
     }
 
+    /// Get the contents of a constant
+    ///
+    /// returns None if the content is non a constant
     #[inline]
     pub fn number(&self) -> Option<&Decimal> {
         if let Symbol::Number(d) = &self {
@@ -89,6 +103,9 @@ impl Symbol {
     }
 
     #[inline]
+    /// Get the contents of a placeholder
+    ///
+    /// returns None if the content is non a placeholder
     pub fn placeholder(&self) -> Option<&Placeholder> {
         if let Symbol::Placeholder(p) = &self {
             return Some(p);
@@ -97,6 +114,7 @@ impl Symbol {
     }
 
     #[inline]
+    /// Check if content is symbol with the name
     pub fn is_symbol_name(&self, name: &str) -> bool {
         if let Symbol::FuncSymbol(s) = self {
             return s.name == name;
@@ -106,6 +124,7 @@ impl Symbol {
     }
 
     #[inline]
+    /// Check if content is constant with the value
     pub fn is_number_value(&self, value: &Decimal) -> bool {
         if let Symbol::Number(num) = &self {
             return num == value;

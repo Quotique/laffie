@@ -1,11 +1,6 @@
-use std::fmt;
+use crate::symbol::SymbolNode;
 
-use macros::FuncAttr;
-
-use crate::term::TermNode;
-
-#[derive(FuncAttr)]
-pub struct TruthChecker(pub Box<dyn Fn(&TermNode) -> TruthResult>);
+pub struct TruthChecker(pub Box<dyn Fn(&SymbolNode) -> TruthResult + Sync + Send>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TruthResult {

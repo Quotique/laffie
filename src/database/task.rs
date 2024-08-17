@@ -8,7 +8,7 @@ use bincode::{config, config::Configuration, Decode, Encode};
 use sled::{Db, Error};
 
 use mcore::{
-    task::{SolveStatus, Task},
+    task::Task,
     term::{Term, TermProps},
 };
 
@@ -29,7 +29,8 @@ pub mod old {
         pub conditions: Vec<Term>,
         pub purpose:    Term,
 
-        pub runs:    Vec<SolveStatus>,
+        pub answer:  Term,
+        pub runs:    Vec<usize>,
         pub reports: Vec<u64>,
     }
 }
@@ -42,7 +43,8 @@ pub struct TaskRecord {
     pub conditions: Vec<Term>,
     pub purpose:    Term,
 
-    pub runs:    Vec<SolveStatus>,
+    pub answer:  Term,
+    pub runs:    Vec<usize>,
     pub reports: Vec<u64>,
 }
 
@@ -59,6 +61,7 @@ impl From<old::TaskRecord> for TaskRecord {
             conditions: value.conditions,
             purpose:    value.purpose,
 
+            answer:  value.answer,
             runs:    value.runs,
             reports: Default::default(),
         }
@@ -73,6 +76,7 @@ impl From<&Task> for TaskRecord {
             conditions: Vec::from_iter(value.conditions.iter().map(|x| (*x.term).clone())),
             purpose:    (*value.purpose.term).clone(),
 
+            answer:  Term::zero(),
             runs:    Default::default(),
             reports: Default::default(),
         }

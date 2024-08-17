@@ -4,7 +4,8 @@ use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use trees::{tr, Tree};
 
 use crate::{
-    term::{swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, TermNode},
+    symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
+    term::swap_node,
     NormalizationLevel,
 };
 
@@ -21,7 +22,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn multiply(root: &mut TermNode, level: NormalizationLevel) -> bool {
+pub fn multiply(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("*") {
         return false;
     }
@@ -87,7 +88,7 @@ pub fn multiply(root: &mut TermNode, level: NormalizationLevel) -> bool {
     }
 }
 
-fn attach_constant(root: &mut TermNode, constant: Decimal) -> bool {
+fn attach_constant(root: &mut SymbolNode, constant: Decimal) -> bool {
     if constant == Decimal::zero() {
         swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
         true
@@ -102,7 +103,7 @@ fn attach_constant(root: &mut TermNode, constant: Decimal) -> bool {
     }
 }
 
-fn fold_constant(root: &mut TermNode) -> (Decimal, bool) {
+fn fold_constant(root: &mut SymbolNode) -> (Decimal, bool) {
     root.iter_mut()
         .enumerate()
         .fold((Decimal::from(1), false), |acc, (num, mut x)| {
@@ -121,7 +122,7 @@ fn fold_constant(root: &mut TermNode) -> (Decimal, bool) {
         })
 }
 
-fn remove_unused_mul(root: &mut TermNode) -> bool {
+fn remove_unused_mul(root: &mut SymbolNode) -> bool {
     match root.degree() {
         0 => {
             *root.data_mut() = Symbol::Number(Decimal::from(1));
@@ -148,7 +149,7 @@ fn merge_power(root: Tree<Symbol>, pow: Tree<Symbol>) -> Tree<Symbol> {
     tr(Symbol::with_func_symbol("^")) / root / pow
 }
 
-fn extract_power(root: &mut TermNode) -> Tree<Symbol> {
+fn extract_power(root: &mut SymbolNode) -> Tree<Symbol> {
     if root.data().is_symbol_name("^") {
         let power = root.pop_back().unwrap();
         let mut arg = root.pop_front().unwrap();
@@ -161,7 +162,7 @@ fn extract_power(root: &mut TermNode) -> Tree<Symbol> {
     }
 }
 
-fn ordering(left: &TermNode, right: &TermNode) -> Ordering {
+fn ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {
     // Number < Param < Variable < Symbol < Placeholder
     let pa_left = power_argument(left);
     let pa_right = power_argument(right);
@@ -198,7 +199,7 @@ fn ordering(left: &TermNode, right: &TermNode) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::predefine::operations::calculator_check;
+    use crate::symbol::func::base::calculator_check;
 
     #[test]
     fn calculator_test() {

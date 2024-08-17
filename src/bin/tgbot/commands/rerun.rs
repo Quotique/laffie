@@ -52,7 +52,11 @@ fn rerun(
         })
         .unwrap();
 
-    record.runs.push(solution.perf_stats.clone());
+    if let Some(answer) = solution.answer() {
+        // TODO: answer changed
+        record.answer = answer.as_ref().clone();
+    }
+    record.runs.push(solution.cycles);
     tasks.put(&record).map_err(|e| e.to_string())?;
 
     Ok(output)

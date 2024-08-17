@@ -1,7 +1,8 @@
 use trees::Tree;
 
 use crate::{
-    term::{swap_node, FuncSymbol, NodeMapping, Symbol, TermNode, VariablesMap},
+    symbol::{FuncSymbol, Symbol, SymbolNode},
+    term::{swap_node, NodeMapping, VariablesMap},
     NormalizationLevel,
 };
 
@@ -12,7 +13,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn replace(root: &mut TermNode, _: NormalizationLevel) -> bool {
+pub fn replace(root: &mut SymbolNode, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }
