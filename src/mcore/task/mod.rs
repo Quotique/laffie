@@ -1,8 +1,8 @@
 mod builder;
 mod cache;
-mod dump;
 mod purpose;
 mod solution;
+mod tracing;
 
 use crate::term::TermProps;
 use std::{fmt, iter::Iterator};
@@ -10,9 +10,9 @@ use std::{fmt, iter::Iterator};
 pub use self::{
     builder::TaskBuilder,
     cache::TasksCache,
-    dump::{Config as DumperConfig, Dumper, DumperSink},
     purpose::Purpose,
-    solution::Solution,
+    solution::{Solution, EXECUTION_DEADLINE_DEFAULT},
+    tracing::{Config as DumperConfig, SolutionTracer, Tracer},
 };
 
 #[derive(Clone)]

@@ -5,7 +5,7 @@ use telegram_bot::*;
 use database::{TaskDb, TaskRecord, UserDb, UserRecord};
 use mcore::{
     rule::RulesEngine,
-    task::{Dumper, DumperConfig, Solution},
+    task::{DumperConfig, Solution, EXECUTION_DEADLINE_DEFAULT},
 };
 use parser::{lang, TaskParser};
 use view::{Html, View};
@@ -31,10 +31,12 @@ fn task(
     let mut solution = Solution::new(
         task,
         engine,
-        Dumper::new(DumperConfig {
+        DumperConfig {
             sink:     "none".into(),
             filename: "".to_owned(),
-        }),
+        }
+        .build(),
+        EXECUTION_DEADLINE_DEFAULT,
         Default::default(),
     );
 
@@ -60,7 +62,7 @@ fn task(
         record.answer = answer.as_ref().clone();
     }
 
-    record.runs.push(solution.cycles);
+    record.runs.push(solution.current_cycles());
     tasks.put(&record).map_err(|e| e.to_string())?;
 
     Ok(output)

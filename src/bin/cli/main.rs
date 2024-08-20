@@ -9,7 +9,7 @@ use clap::Parser;
 use colored::*;
 
 use database::{TaskDb, TaskRecord};
-use mcore::task::{Dumper, DumperConfig, Solution, Task};
+use mcore::task::{DumperConfig, Solution, Task};
 use parser::DirectoryParser;
 use utils::VecDisplay;
 use view::View;
@@ -47,6 +47,10 @@ struct Args {
     /// Dump solution trace into a file
     #[clap(short, long)]
     trace: bool,
+
+    /// Execution deadline (in cycles) for individual problem
+    #[clap(short, long, default_value = "100000")]
+    exec_deadline: usize,
 }
 
 fn main() {
@@ -115,14 +119,16 @@ fn main() {
         let mut solution = Solution::new(
             p,
             rules_engine.clone(),
-            Dumper::new(DumperConfig {
+            DumperConfig {
                 sink:     if args.trace {
                     "file".into()
                 } else {
                     "none".into()
                 },
                 filename: format!("dumps/{p_id:x}.dump"),
-            }),
+            }
+            .build(),
+            args.exec_deadline,
             Default::default(),
         );
 
@@ -145,7 +151,7 @@ fn main() {
                         );
                     }
                 }
-                record.runs.push(solution.cycles);
+                record.runs.push(solution.current_cycles());
 
                 if let Err(e) = db.put(&record) {
                     println!("Cant put record {}", e);

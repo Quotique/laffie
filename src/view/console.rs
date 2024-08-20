@@ -47,10 +47,15 @@ impl<'a, 'b> Renderer for Console<'a, 'b> {
                         "PROOFED!".bold().green()
                     }
                 },
-                format!("[{} cycles]", status.cycles).yellow()
+                format!("[{} cycles]", status.current_cycles()).yellow()
             )
         } else {
-            writeln!(self.output, "{}", "NOT SOLVED!".bold().blink().red())
+            writeln!(
+                self.output,
+                "{} {}",
+                "NOT SOLVED!".bold().blink().red(),
+                format!("[{} cycles]", status.current_cycles()).yellow()
+            )
         }
     }
 

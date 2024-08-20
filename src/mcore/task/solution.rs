@@ -1,6 +1,7 @@
-use std::{collections::HashMap, fmt, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use bincode::{Decode, Encode};
+use derive_more::Display;
 use trees::tr;
 
 use utils::VecDisplay;
@@ -8,8 +9,8 @@ use utils::VecDisplay;
 use super::{
     builder::TaskBuilder,
     cache::{TaskStatus, TasksCache},
-    dump::{Dumper, DumperSink},
     purpose::Purpose,
+    tracing::{SolutionTracer, Tracer},
     Task,
 };
 use crate::{
@@ -22,6 +23,7 @@ use crate::{
 pub const MAX_SUBTASK_LEVEL: usize = 10;
 pub const MAX_LEVEL: usize = 20;
 pub const STACK_SIZE: usize = 2048;
+pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 
 pub struct Solution {
     pub task: Task,
@@ -37,35 +39,27 @@ pub struct Solution {
 
     pub answer: Option<usize>,
 
-    pub cycles:   usize,
-    rules_engine: Arc<RulesEngine>,
-    dumper:       Dumper,
+    pub cycles:         Rc<RefCell<usize>>,
+    execution_deadline: usize,
+    rules_engine:       Arc<RulesEngine>,
+    dumper:             SolutionTracer,
 }
 
-#[derive(Debug, Clone, Copy, Encode, Decode)]
+#[derive(Debug, Display, Clone, Copy, Encode, Decode)]
 pub enum SolutionError {
     StackOverflow,
     MaxSubtaskLevelExceed,
     NoConditions,
     NoSolutionsFound,
-}
-
-impl fmt::Display for SolutionError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            SolutionError::StackOverflow => write!(f, "StackOverflow"),
-            SolutionError::MaxSubtaskLevelExceed => write!(f, "MaxSubtaskLevelExceed"),
-            SolutionError::NoConditions => write!(f, "NoConditions"),
-            SolutionError::NoSolutionsFound => write!(f, "NoSolutionsFound"),
-        }
-    }
+    ExecutionDeadline,
 }
 
 impl Solution {
     pub fn new(
         task: Task,
         rules: Arc<RulesEngine>,
-        dumper: Dumper,
+        dumper: SolutionTracer,
+        execution_deadline: usize,
         cache: Arc<TasksCache>,
     ) -> Solution {
         let purpose = Purpose::try_from((*task.purpose.term).clone()).unwrap();
@@ -98,10 +92,11 @@ impl Solution {
             purpose,
             answer: None,
 
-            cycles: 0,
+            cycles: RefCell::new(0).into(),
             task,
             rules_engine: rules.clone(),
             dumper,
+            execution_deadline,
         };
         for i in conditions.into_iter() {
             let _ = result.add_main(i);
@@ -115,7 +110,8 @@ impl Solution {
     }
 
     pub fn solve(&mut self) -> Result<Rc<Term>, SolutionError> {
-        self.dumper.subtask_start(&self.task);
+        self.dumper
+            .on_subtask_start(&self.task, self.current_cycles());
         trace!(target: "subtask", "Subtask: {}, {}", self.purpose, VecDisplay(&self.task.conditions));
         if self.task.subtask_level > MAX_SUBTASK_LEVEL {
             return Err(SolutionError::MaxSubtaskLevelExceed);
@@ -123,13 +119,21 @@ impl Solution {
 
         let result = self.solution_loop();
 
-        self.dumper.clone().subtask_end(self);
+        self.dumper.clone().on_subtask_end(self);
         result
+    }
+
+    #[inline]
+    pub fn current_cycles(&self) -> usize {
+        *self.cycles.as_ref().borrow()
     }
 
     fn solution_loop(&mut self) -> Result<Rc<Term>, SolutionError> {
         loop {
-            self.cycles += 1;
+            *self.cycles.as_ref().borrow_mut() += 1;
+            if self.current_cycles() > self.execution_deadline {
+                return Err(SolutionError::ExecutionDeadline);
+            }
 
             let index = self
                 .terms
@@ -138,6 +142,7 @@ impl Solution {
                 .min_by_key(|x| x.weight)
                 .map(|x| x.id)
                 .ok_or(SolutionError::NoConditions)?;
+            self.dumper.on_term_focus(&self.terms[index]);
 
             let level = self.terms[index].weight;
             trace!(
@@ -231,7 +236,7 @@ impl Solution {
     }
 
     fn add_term(&mut self, mut term: TermProps) -> Result<usize, SolutionError> {
-        self.dumper.add_term(
+        self.dumper.on_new_term(
             &term,
             &term
                 .parent
@@ -268,6 +273,7 @@ impl Solution {
             .collect();
 
         for rule in suggested_rules {
+            self.dumper.on_rule_selection(&rule);
             let supposes = match rule.apply(&mut self.terms[index], &self.task.purpose) {
                 Ok(x) => x,
                 Err(e) => {
@@ -404,9 +410,10 @@ impl Solution {
             subtask,
             self.rules_engine.clone(),
             self.dumper.clone(),
+            self.execution_deadline,
             self.cache.clone(),
         );
-        solution.cycles = self.cycles;
+        solution.cycles = self.cycles.clone();
 
         match solution.solve() {
             Ok(_) => {
@@ -593,7 +600,7 @@ fn is_replace(root: &mut SymbolNode) {
 mod solution_tests {
     use std::sync::Arc;
 
-    use super::Dumper;
+    use super::SolutionTracer;
     use crate::{
         rule::RulesEngine,
         task::{parse_task, Solution},
@@ -604,7 +611,13 @@ mod solution_tests {
     fn check_answer_find_test() {
         let task = parse_task("task {purpose find(x); x == 1;}");
         let rules = Arc::new(RulesEngine::default());
-        let mut solution = Solution::new(task, rules, Dumper::default(), Default::default());
+        let mut solution = Solution::new(
+            task,
+            rules,
+            SolutionTracer::default(),
+            usize::MAX,
+            Default::default(),
+        );
         assert!(solution.solve().is_ok());
         assert_eq!(*solution.answer().unwrap(), term_with_vars("x == 1"));
     }
@@ -613,7 +626,13 @@ mod solution_tests {
     fn check_answer_proof_test() {
         let task = parse_task("task { purpose proof(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
-        let mut solution = Solution::new(task, rules, Dumper::default(), Default::default());
+        let mut solution = Solution::new(
+            task,
+            rules,
+            SolutionTracer::default(),
+            usize::MAX,
+            Default::default(),
+        );
         assert!(solution.solve().is_ok());
         assert!(solution.answer().is_some());
     }

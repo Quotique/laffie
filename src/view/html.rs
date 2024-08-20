@@ -47,7 +47,7 @@ impl<'a> Renderer for Html<'a> {
                         "<b>PROOFED!</b>".to_owned()
                     }
                 },
-                format_args!("[{} cycles, ]", status.cycles)
+                format_args!("[{} cycles, ]", status.current_cycles())
             ))
         } else {
             self.output.write_str("<b>NOT SOLVED!</b>\n")
