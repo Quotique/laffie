@@ -13,6 +13,11 @@ members = [
     "src/bin/migrate_db"
 ]
 
+[workspace.package]
+version = "0.4.2"
+authors = ["Alexander A"]
+edition = "2021"
+
 [workspace.dependencies]
 chrono = "0.4"
 log = "0.4"
