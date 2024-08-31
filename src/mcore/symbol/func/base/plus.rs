@@ -175,11 +175,20 @@ fn extract_mul_const(root: &mut SymbolNode) -> Decimal {
         swap_node(root, &mut tr(Symbol::Number(1.into())).root_mut());
         return result;
     }
+
+    let base_constant = if root.data().is_symbol_name("-") && root.degree() == 1 {
+        let mut child = root.pop_front().unwrap();
+        swap_node(root, &mut child.root_mut());
+        Decimal::from(-1)
+    } else {
+        Decimal::from(1)
+    };
+
     if !root.data().is_symbol_name("*") {
-        return Decimal::from(1);
+        return base_constant;
     }
 
-    let constant = root.iter_mut().fold(Decimal::from(1), |prev, mut x| {
+    let constant = root.iter_mut().fold(base_constant, |prev, mut x| {
         if let Some(d) = to_const(&x) {
             let res = prev * d;
             x.detach();

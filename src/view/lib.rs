@@ -56,8 +56,8 @@ impl<'a> View<'a> {
     ) -> fmt::Result {
         renderer.display_purpose(subtask_level, purpose)?;
         match purpose {
-            Purpose::Find(_) => {}
-            Purpose::Proof(_) | Purpose::Transform(_) => {
+            Purpose::Find(_) | Purpose::Transform(_) => {}
+            Purpose::Proof(_) => {
                 let answer_idx = self
                     .solution
                     .terms

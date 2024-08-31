@@ -23,6 +23,12 @@ task {
 }
 
 task {
+    purpose transform((x+1)/(x-1)+(x+5)/(x-5) == (x+3)/(x-3)+(x+4)/(x-4));
+
+    y == 100;
+}
+
+task {
     purpose find(x);
 
     (x+1)/(x-1) + (x+5)/(x-5) == (x+3)/(x-3) + (x+4)/(x-4);
