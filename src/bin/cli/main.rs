@@ -37,7 +37,7 @@ struct Args {
     symbols: Option<PathBuf>,
 
     /// Specify tasks path
-    #[clap(short, long)]
+    #[clap(short = 'p', long)]
     tasks: Option<PathBuf>,
 
     /// Specify tasks DB path
