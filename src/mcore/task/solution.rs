@@ -282,10 +282,12 @@ impl Solution {
                 }
             };
 
+            let mut dumper = self.dumper.clone();
             let res: Vec<_> = supposes
                 .into_iter()
                 .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
                 .inspect(|suppose| trace!(target: "rule_selection", "Suppose: {}", suppose))
+                .inspect(|suppose| dumper.on_new_suppose(rule.as_ref(), suppose))
                 .filter_map(|mut suppose| {
                     if let Some(proofed) = self.suppose_proof(&suppose) {
                         suppose.resolution.requirements = proofed;

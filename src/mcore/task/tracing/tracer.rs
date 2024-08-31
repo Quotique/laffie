@@ -3,7 +3,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 
 use crate::{
-    rule::Rule,
+    rule::{Rule, Suppose},
     task::{Solution, Task},
     term::TermProps,
 };
@@ -23,6 +23,9 @@ pub trait Tracer: Send + Sync {
 
     // Called on each attempt to apply rule
     fn on_rule_selection(&mut self, _rule: &Rule) {}
+
+    // Called on each new suppose
+    fn on_new_suppose(&mut self, _rule: &Rule, _suppose: &Suppose) {}
 }
 
 #[derive(Clone)]
@@ -68,5 +71,9 @@ impl Tracer for SolutionTracer {
 
     fn on_rule_selection(&mut self, rule: &Rule) {
         self.sink.lock().on_rule_selection(rule);
+    }
+
+    fn on_new_suppose(&mut self, rule: &Rule, suppose: &Suppose) {
+        self.sink.lock().on_new_suppose(rule, suppose);
     }
 }

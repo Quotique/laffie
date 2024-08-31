@@ -1,11 +1,14 @@
 use std::{fs::File, io::prelude::*, path::Path};
 
 use crate::{
+    rule::{Rule, Suppose},
     task::{Solution, Task},
     term::TermProps,
 };
 
 use super::Tracer;
+
+const WRITE_ERROR_TEXT: &str = "Unable write into dump file";
 
 pub struct FileDumpTracer {
     subtask_start_cycle: Vec<usize>,
@@ -45,7 +48,7 @@ impl Tracer for FileDumpTracer {
                 )
                 .as_bytes(),
             )
-            .expect("Unable write into dump file");
+            .expect(WRITE_ERROR_TEXT);
         self.subtask_start_cycle.push(cycle);
     }
 
@@ -53,20 +56,21 @@ impl Tracer for FileDumpTracer {
         self.file
             .write_all(
                 format!(
-                    "{}Answer: {} [{} cycles]\n",
+                    "{} [{} cycles] {} Answer: {}\n",
                     self.idention(),
-                    status
-                        .answer()
-                        .map(|x| x.to_string())
-                        .unwrap_or("not solved".to_owned()),
                     *status.cycles.as_ref().borrow() -
                         self.subtask_start_cycle
                             .pop()
                             .expect("finished task never starts"),
+                    status.task.purpose.to_string().replace("\n", "; "),
+                    status
+                        .answer()
+                        .map(|x| x.to_string())
+                        .unwrap_or("not solved".to_owned()),
                 )
                 .as_bytes(),
             )
-            .expect("Unable write into dump file");
+            .expect(WRITE_ERROR_TEXT);
     }
 
     fn on_new_term(&mut self, term: &TermProps, parent: &TermProps) {
@@ -84,12 +88,24 @@ impl Tracer for FileDumpTracer {
                 )
                 .as_bytes(),
             )
-            .expect("Unable write into dump file");
+            .expect(WRITE_ERROR_TEXT);
     }
 
     fn on_term_focus(&mut self, term: &TermProps) {
         self.file
-            .write_all(format!("{}[> {}", self.idention(), term).as_bytes())
-            .expect("Unable write into dump file");
+            .write_all(format!("{}[> {}\n", self.idention(), term).as_bytes())
+            .expect(WRITE_ERROR_TEXT);
+    }
+
+    fn on_rule_selection(&mut self, rule: &Rule) {
+        self.file
+            .write_all(format!("{}>> {}\n", self.idention(), rule).as_bytes())
+            .expect(WRITE_ERROR_TEXT);
+    }
+
+    fn on_new_suppose(&mut self, rule: &Rule, suppose: &Suppose) {
+        self.file
+            .write_all(format!("{}|> {} {}\n", self.idention(), rule, suppose).as_bytes())
+            .expect(WRITE_ERROR_TEXT);
     }
 }

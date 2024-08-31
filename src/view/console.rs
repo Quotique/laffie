@@ -22,10 +22,14 @@ impl<'a, 'b> Renderer for Console<'a, 'b> {
     fn display_term(&mut self, subtask_level: usize, term: &TermProps) -> fmt::Result {
         writeln!(
             self.output,
-            "{}=> {} from: {}",
+            "{}=> {}{}",
             "  ".repeat(subtask_level),
             term.term.to_string().bold().yellow(),
-            VecDisplay(&term.requirements),
+            if term.requirements.is_empty() {
+                Default::default()
+            } else {
+                format!(" needed: [{}]", VecDisplay(&term.requirements))
+            }
         )
     }
 
