@@ -31,6 +31,11 @@ peg::parser! {
 
         rule comma() = ","
 
+        pub rule string() -> String =
+            "\"" s:quoted_char()* "\"" { s.into_iter().collect() }
+
+        rule quoted_char() -> char = !("\"" / "\\") c:$([_]) { c.chars().next().unwrap() }
+
         rule commasep<T>(x: rule<T>) -> Vec<T> = v:( (_ a:x() { a }) ** ",") ","? {v}
 
         rule semicolonsep<T>(x: rule<T>) -> Vec<T> = v:( (_ a:x() { a }) ** ";") ";"? {v}
@@ -60,11 +65,14 @@ peg::parser! {
         pub rule terms() -> Vec<Tree<Data>> = _ c:semicolonsep(<arithmetic()>) _ { c }
 
         pub rule task() -> Tree<Data> = _ pp:position!() keyword("task") _ "{"
-            _ pt:position!() keyword("purpose") _ t:eval() ";"
+                _ pt:position!() keyword("purpose") _ p:eval() ";"
+                _ tt:position!() t:(keyword("text") _ t:string() ";" {t} )?
                 _ c:semicolonsep(<arithmetic()>)
             _ "}"
             {
-                let mut p = Data::new("Task", pp) /(Data::new("Purpose", pt) / t);
+                let mut p = Data::new("Task", pp)
+                              /(Data::new("Purpose", pt) / p)
+                              /(Data::new("Text", tt) / Data::new(t.unwrap_or_default().as_str(), tt));
                 for i in c.iter().cloned() {
                     p.push_back(i);
                 }
@@ -161,11 +169,6 @@ peg::parser! {
             }
             t
         }
-
-        pub rule string() -> String =
-            "\"" s:quoted_char()* "\"" { s.into_iter().collect() }
-
-        rule quoted_char() -> char = !("\"" / "\\") c:$([_]) { c.chars().next().unwrap() }
     }
 }
 
@@ -280,6 +283,7 @@ mod tests {
             states,
             Data::new("Task", 0) /
                 (Data::new("Purpose", 31) / (Data::new("find", 39) / Data::new("x", 44))) /
+                (Data::new("Text", 72) / Data::new("", 72)) /
                 (Data::new("==", 78) /
                     (Data::new("+", 75) /
                         (Data::new("*", 73) / Data::new("2", 72) / Data::new("x", 74)) /
@@ -374,5 +378,26 @@ mod tests {
             states[0],
             Data::new("/", 3) / Data::new("2.1", 0) / Data::new("3.5", 4)
         );
+    }
+
+    #[test]
+    fn task_text_parse_test() {
+        let test = r#"task {
+                        purpose find(x);
+                        text "Решите уравнение 2x+5 = 0";
+                        2*x+5 == 0;
+                    }"#;
+        let states = ra::task(test).unwrap();
+        assert_eq!(
+            states,
+            Data::new("Task", 0) /
+                (Data::new("Purpose", 31) / (Data::new("find", 39) / Data::new("x", 44))) /
+                (Data::new("Text", 72) / Data::new("Решите уравнение 2x+5 = 0", 72)) /
+                (Data::new("==", 151) /
+                    (Data::new("+", 148) /
+                        (Data::new("*", 146) / Data::new("2", 145) / Data::new("x", 147)) /
+                        Data::new("5", 149)) /
+                    Data::new("0", 154))
+        )
     }
 }

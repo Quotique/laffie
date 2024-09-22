@@ -38,23 +38,31 @@ impl<'a> TaskParser<'a> {
 
         for child in self.syntax_tree.iter() {
             if child.data().symbol == "Purpose" {
-                if child.degree() != 1 {
-                    return Err(ParserError {
-                        loc: child.data().location.clone(),
-                        msg: "must have one argument".to_owned(),
-                    });
-                }
-
                 builder = builder
                     .with_purpose(TermProps::from(Rc::new(
-                        TermParser::new(child.front().unwrap())
-                            .with_variables()
-                            .parse()?,
+                        TermParser::new(child.front().ok_or_else(|| ParserError {
+                            loc: child.data().location.clone(),
+                            msg: "must have one argument".to_owned(),
+                        })?)
+                        .with_variables()
+                        .parse()?,
                     )))
                     .map_err(|e| ParserError {
                         loc: child.data().location.clone(),
                         msg: e.to_string(),
                     })?;
+            } else if child.data().symbol == "Text" {
+                builder = builder.with_text(
+                    child
+                        .front()
+                        .ok_or_else(|| ParserError {
+                            loc: child.data().location.clone(),
+                            msg: "must have one argument".to_owned(),
+                        })?
+                        .data()
+                        .symbol
+                        .to_string(),
+                );
             } else {
                 builder = builder.with_condition(TermProps::from(Rc::new(
                     TermParser::new(child)
