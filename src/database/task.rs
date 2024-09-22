@@ -19,7 +19,7 @@ const VERSION: u64 = 2;
 pub mod old {
     use super::*;
 
-    pub const VERSION: u64 = 2;
+    pub const VERSION: u64 = 1;
 
     #[derive(Clone, Encode, Decode)]
     pub struct TaskRecord {
@@ -40,6 +40,7 @@ pub struct TaskRecord {
     pub version: u64,
 
     pub id:         u128,
+    pub text:       String,
     pub conditions: Vec<Term>,
     pub purpose:    Term,
 
@@ -58,6 +59,7 @@ impl From<old::TaskRecord> for TaskRecord {
         Self {
             version:    VERSION,
             id:         value.id,
+            text:       Default::default(),
             conditions: value.conditions,
             purpose:    value.purpose,
 
@@ -73,6 +75,7 @@ impl From<&Task> for TaskRecord {
         Self {
             version:    VERSION,
             id:         value.id as u128,
+            text:       value.text.clone(),
             conditions: Vec::from_iter(value.conditions.iter().map(|x| (*x.term).clone())),
             purpose:    (*value.purpose.term).clone(),
 
@@ -88,6 +91,7 @@ impl Into<Task> for TaskRecord {
     fn into(self) -> Task {
         Task {
             id:            self.id as u64,
+            text:          self.text,
             conditions:    Vec::from_iter(
                 self.conditions
                     .into_iter()

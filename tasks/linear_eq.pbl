@@ -30,24 +30,28 @@ task {
 
 task {
     purpose find(x);
+    text "Решить уравнение 2x+5=0";
 
     2*x+5 == 0;
 }
 
 task {
     purpose find(x);
+    text "Решить уравнение 2x-5=0";
 
     2*x-5 == 0;
 }
 
 task {
     purpose find(x);
+    text "Решить уравнение 2(x+4)+3(x-5)=0";
 
     2*(x+4) + 3*(x-5) == 0;
 }
 
 task {
     purpose find(x);
+    text "Решить уравнение в зависимости от параметра 2x-5+t=0";
 
     2*x-5+t == 0;
     t is known;
@@ -55,6 +59,7 @@ task {
 
 task {
     purpose find(x);
+    text "Решить уравнение в зависимости от параметра 2x-t=0";
 
     2*x-t == 0;
     t is known;
@@ -62,6 +67,7 @@ task {
 
 task {
     purpose find(x);
+    text "Решить уравнение 3x+5=1-x";
 
     3*x+5 == 1-x;
 }

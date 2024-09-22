@@ -18,6 +18,7 @@ pub use self::{
 #[derive(Clone)]
 pub struct Task {
     pub id:            u64,
+    pub text:          String,
     pub conditions:    Vec<TermProps>,
     pub purpose:       TermProps,
     pub subtask_level: usize,
@@ -27,8 +28,13 @@ impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{:x} {}\n  {}",
+            "{:x}\n{}{}\n  {}",
             self.id,
+            if self.text.is_empty() {
+                "".to_owned()
+            } else {
+                format!("{}\n", self.text)
+            },
             self.purpose,
             self.conditions
                 .iter()

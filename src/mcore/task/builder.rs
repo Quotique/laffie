@@ -12,6 +12,7 @@ pub enum TaskBuilderError {
 #[derive(Default)]
 pub struct TaskBuilder {
     id:          u64,
+    text:        String,
     conditions:  Vec<TermProps>,
     purpose:     Option<TermProps>,
     term_id_map: HashMap<usize, usize>,
@@ -22,6 +23,11 @@ pub struct TaskBuilder {
 impl TaskBuilder {
     pub fn with_id(mut self, id: u64) -> Self {
         self.id = id;
+        self
+    }
+
+    pub fn with_text(mut self, text: String) -> Self {
+        self.text = text;
         self
     }
 
@@ -60,6 +66,7 @@ impl TaskBuilder {
     pub fn build(self) -> Result<Task, TaskBuilderError> {
         Ok(Task {
             id:            self.id,
+            text:          self.text,
             conditions:    self.conditions,
             purpose:       self.purpose.ok_or(TaskBuilderError::NoPurposeFound)?,
             subtask_level: self.subtask_level,
