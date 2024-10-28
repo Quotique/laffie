@@ -10,7 +10,8 @@ members = [
 
     "src/bin/cli",
     "src/bin/tgbot",
-    "src/bin/migrate_db"
+    "src/bin/migrate_db",
+    "src/bin/tui"
 ]
 
 [workspace.package]

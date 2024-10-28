@@ -31,6 +31,12 @@ unsafe impl Send for RulesEngine {}
 unsafe impl Sync for RulesEngine {}
 
 impl RulesEngine {
+    pub fn iter(&self) -> impl Iterator<Item = SharedRule> + '_ {
+        self.all_rules
+            .values()
+            .flat_map(|x| x.values().flat_map(|x| x.iter().cloned()))
+    }
+
     pub fn register_rule(&mut self, mut rule: Rule) {
         self.last_id.increment();
         rule.id = self.last_id;

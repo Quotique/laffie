@@ -19,7 +19,7 @@ trees = { workspace = true }
 
 bigdecimal = "0.4"
 bincode = "2.0.0-rc.3"
-derive_more = "0.99"
+derive_more = { version = "1.0", features = ["full"] }
 indexmap = "2.0"
 itertools = "0.13"
 multimap = { git = "https://github.com/Quotique/multimap.git" }
