@@ -3,10 +3,12 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 
 use crate::{
-    rule::{Rule, Suppose},
+    rule::{SharedRule, Suppose},
     task::{Solution, Task},
     term::TermProps,
 };
+
+use super::profiler::Profiler;
 
 pub trait Tracer: Send + Sync {
     // Called each time when new task spawned
@@ -22,32 +24,48 @@ pub trait Tracer: Send + Sync {
     fn on_term_focus(&mut self, _term: &TermProps) {}
 
     // Called on each attempt to apply rule
-    fn on_rule_selection(&mut self, _rule: &Rule) {}
+    fn on_rule_selection(&mut self, _rule: SharedRule) {}
 
     // Called on each new suppose
-    fn on_new_suppose(&mut self, _rule: &Rule, _suppose: &Suppose) {}
+    fn on_new_suppose(&mut self, _rule: SharedRule, _suppose: &Suppose) {}
+
+    // Called on suppose processing finished
+    fn on_suppose_finish(&mut self, _suppose: &Suppose, _result: bool) {}
 }
 
 #[derive(Clone)]
 pub struct SolutionTracer {
-    sink: Arc<Mutex<Box<dyn Tracer>>>,
+    sink:     Arc<Mutex<Box<dyn Tracer>>>,
+    profiler: Option<Arc<Mutex<Profiler>>>,
 }
+
 pub struct EmptyTracer {}
 
 impl Tracer for EmptyTracer {}
 
 impl SolutionTracer {
-    pub fn new(tracer: impl Tracer + 'static) -> Self {
+    pub fn new(tracer: impl Tracer + 'static, use_profiler: bool) -> Self {
         Self {
-            sink: Arc::new(Mutex::new(Box::new(tracer))),
+            sink:     Arc::new(Mutex::new(Box::new(tracer))),
+            profiler: if use_profiler {
+                Some(Arc::new(Mutex::new(Profiler::default())))
+            } else {
+                None
+            },
         }
+    }
+
+    #[inline]
+    pub fn profiler(&self) -> Option<&Mutex<Profiler>> {
+        self.profiler.as_ref().map(|x| x.as_ref())
     }
 }
 
 impl Default for SolutionTracer {
     fn default() -> Self {
         Self {
-            sink: Arc::new(Mutex::new(Box::new(EmptyTracer {}))),
+            sink:     Arc::new(Mutex::new(Box::new(EmptyTracer {}))),
+            profiler: None,
         }
     }
 }
@@ -55,25 +73,43 @@ impl Default for SolutionTracer {
 impl Tracer for SolutionTracer {
     fn on_subtask_start(&mut self, task: &Task, cycle: usize) {
         self.sink.lock().on_subtask_start(task, cycle);
+        if let Some(profiler) = self.profiler() {
+            profiler.lock().on_subtask_start(task, cycle);
+        }
     }
 
     fn on_subtask_end(&mut self, status: &Solution) {
         self.sink.lock().on_subtask_end(status);
+        if let Some(profiler) = self.profiler() {
+            profiler.lock().on_subtask_end(status);
+        }
     }
 
     fn on_new_term(&mut self, term: &TermProps, parent: &TermProps) {
         self.sink.lock().on_new_term(term, parent);
+        if let Some(profiler) = self.profiler() {
+            profiler.lock().on_new_term(term, parent);
+        }
     }
 
     fn on_term_focus(&mut self, term: &TermProps) {
         self.sink.lock().on_term_focus(term);
+        if let Some(profiler) = self.profiler() {
+            profiler.lock().on_term_focus(term);
+        }
     }
 
-    fn on_rule_selection(&mut self, rule: &Rule) {
-        self.sink.lock().on_rule_selection(rule);
+    fn on_rule_selection(&mut self, rule: SharedRule) {
+        self.sink.lock().on_rule_selection(rule.clone());
+        if let Some(profiler) = self.profiler() {
+            profiler.lock().on_rule_selection(rule);
+        }
     }
 
-    fn on_new_suppose(&mut self, rule: &Rule, suppose: &Suppose) {
-        self.sink.lock().on_new_suppose(rule, suppose);
+    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose) {
+        self.sink.lock().on_new_suppose(rule.clone(), suppose);
+        if let Some(profiler) = self.profiler() {
+            profiler.lock().on_new_suppose(rule, suppose);
+        }
     }
 }

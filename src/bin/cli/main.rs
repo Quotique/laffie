@@ -120,12 +120,13 @@ fn main() {
             p,
             rules_engine.clone(),
             DumperConfig {
-                sink:     if args.trace {
+                sink:         if args.trace {
                     "file".into()
                 } else {
                     "none".into()
                 },
-                filename: format!("dumps/{p_id:x}.dump"),
+                filename:     Some(format!("dumps/{p_id:x}.dump")),
+                use_profiler: false,
             }
             .build(),
             args.exec_deadline,

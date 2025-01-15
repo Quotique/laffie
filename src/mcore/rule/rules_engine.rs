@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
     iter::once,
-    rc::Rc,
     sync::Arc,
 };
 
@@ -15,7 +14,7 @@ use crate::{symbol::FuncSymbol, term::TermProps, CompactString, RuleId};
 // TODO: move to correct place
 type Level = usize;
 
-pub type SharedRule = Rc<Rule>;
+pub type SharedRule = Arc<Rule>;
 #[allow(clippy::mutable_key_type)]
 type LevelRules = HashMap<Arc<FuncSymbol>, Vec<SharedRule>>;
 
@@ -110,7 +109,7 @@ impl RulesEngine {
                 .or_default()
                 .entry(rule.func_symbol.clone())
                 .or_default()
-                .push(Rc::new(rule));
+                .push(Arc::new(rule));
         }
     }
 }

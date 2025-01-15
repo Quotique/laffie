@@ -42,7 +42,7 @@ pub struct Solution {
     pub cycles:         Rc<RefCell<usize>>,
     execution_deadline: usize,
     rules_engine:       Arc<RulesEngine>,
-    dumper:             SolutionTracer,
+    pub dumper:         SolutionTracer,
 }
 
 #[derive(Debug, Display, Clone, Copy, Encode, Decode)]
@@ -298,7 +298,7 @@ impl Solution {
             .collect();
 
         for rule in suggested_rules {
-            self.dumper.on_rule_selection(&rule);
+            self.dumper.on_rule_selection(rule.clone());
             let supposes = match rule.apply(&mut self.terms[index], &self.task.purpose) {
                 Ok(x) => x,
                 Err(e) => {
@@ -311,19 +311,25 @@ impl Solution {
             let res: Vec<_> = supposes
                 .into_iter()
                 .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
-                .inspect(|suppose| trace!(target: "rule_selection", "Suppose: {}", suppose))
-                .inspect(|suppose| dumper.on_new_suppose(rule.as_ref(), suppose))
+                .inspect({
+                    let mut dumper = self.dumper.clone();
+                    let rule = rule.clone();
+                    move |suppose| {
+                        trace!(target: "rule_selection", "Suppose: {}", suppose);
+                        dumper.on_new_suppose(rule.clone(), suppose)
+                    }
+                })
                 .filter_map(|mut suppose| {
                     if let Some(proofed) = self.suppose_proof(&suppose) {
                         suppose.resolution.requirements = proofed;
+                        dumper.on_suppose_finish(&suppose, true);
+                        trace!(target: "rule_selection", "Suppose: proofed, resolution applied");
                         Some(suppose)
                     } else {
+                        dumper.on_suppose_finish(&suppose, false);
                         None
                     }
                 })
-                .inspect(
-                    |_| trace!(target: "rule_selection", "Suppose: proofed, resolution applied"),
-                )
                 .map(|mut suppose| {
                     suppose.resolution.rule = Some(rule.clone());
                     suppose.resolution

@@ -9,7 +9,7 @@ use std::{
 
 use super::{FuncSymbol, Term};
 use crate::{
-    rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
+    rule::{RuleAttr, RuleAttrValue, RuleBuilder, SharedRule},
     RuleId,
 };
 
@@ -17,12 +17,12 @@ use crate::{
 pub struct TermProps {
     pub id:           usize,
     pub parent:       Option<usize>,
-    pub rule:         Option<Rc<Rule>>,
+    pub rule:         Option<SharedRule>,
     pub requirements: Vec<Rc<Term>>,
 
     pub term:         Rc<Term>,
     pub func_symbols: HashSet<Arc<FuncSymbol>>,
-    as_rule:          Option<Rc<Rule>>,
+    as_rule:          Option<SharedRule>,
 
     pub applied_rules: HashSet<RuleId>,
     pub blocked_rules: HashSet<RuleId>,
@@ -89,7 +89,7 @@ impl TermProps {
         self
     }
 
-    pub fn rule(&mut self, id: RuleId, level: u64) -> Option<Rc<Rule>> {
+    pub fn rule(&mut self, id: RuleId, level: u64) -> Option<SharedRule> {
         if self.not_rule {
             return None;
         }
@@ -110,7 +110,7 @@ impl TermProps {
                 if let Some(rule) = rule.pop() {
                     if rule.pattern_node().data().variable().is_some() {
                         trace!("New rule: {}", rule);
-                        let rule = Rc::new(rule);
+                        let rule = Arc::new(rule);
                         self.as_rule = Some(rule.clone());
                         self.blocked_rules.insert(id);
                         return Some(rule);

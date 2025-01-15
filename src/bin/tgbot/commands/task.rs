@@ -32,8 +32,9 @@ fn task(
         task,
         engine,
         DumperConfig {
-            sink:     "none".into(),
-            filename: "".to_owned(),
+            sink:         "none".into(),
+            filename:     None,
+            use_profiler: false,
         }
         .build(),
         EXECUTION_DEADLINE_DEFAULT,

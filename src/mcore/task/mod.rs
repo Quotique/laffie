@@ -12,7 +12,9 @@ pub use self::{
     cache::TasksCache,
     purpose::Purpose,
     solution::{Solution, EXECUTION_DEADLINE_DEFAULT},
-    tracing::{Config as DumperConfig, SolutionTracer, Tracer},
+    tracing::{
+        Config as DumperConfig, Profiler, SolutionTracer, TaskProfileInfo, TermProfileInfo, Tracer,
+    },
 };
 
 #[derive(Clone)]
