@@ -1,3 +1,5 @@
+use ego_tree::{NodeId, Tree};
+
 use crate::{
     rule::{SharedRule, Suppose},
     task::{Solution, Task},
@@ -7,21 +9,19 @@ use super::Tracer;
 
 #[derive(Clone, Debug, Default)]
 pub struct TermProfileInfo {
-    pub rule:     String, // TODO: SharedRule
-    pub term:     String, // TODO: Term
-    pub supposes: Vec<TaskProfileInfo>,
+    pub rule: String, // TODO: SharedRule
+    pub term: String, // TODO: Term
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TaskProfileInfo {
     pub purpose: String,
-    pub terms:   Vec<TermProfileInfo>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Profiler {
-    pub task:          TaskProfileInfo,
-    current_task_path: Vec<usize>,
+    pub task:     Tree<ProfilerNode>,
+    current_node: NodeId,
 }
 
 #[derive(Clone, Debug)]
@@ -32,93 +32,49 @@ pub enum ProfilerNode {
 
 impl Default for Profiler {
     fn default() -> Self {
+        let tree = Tree::new(ProfilerNode::Helper(TaskProfileInfo {
+            purpose: "Profiler root".to_owned(),
+        }));
         Self {
-            task:              TaskProfileInfo {
-                purpose: Default::default(),
-                terms:   Default::default(),
-            },
-            current_task_path: Default::default(),
+            current_node: tree.root().id(),
+            task:         tree,
         }
     }
 }
 
 impl Tracer for Profiler {
     fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose) {
-        error!("new suppose {}", suppose);
-        error!("current\n{}", Self::tree_view(&self.task, 0));
-
-        self.current_task().terms.push(TermProfileInfo {
-            rule:     rule.to_string(),
-            term:     format!("suppose {}", suppose.resolution),
-            supposes: Default::default(),
-        });
-        error!("current after\n{}", Self::tree_view(&self.task, 0));
+        self.current_node = self
+            .task
+            .get_mut(self.current_node)
+            .unwrap()
+            .append(ProfilerNode::Suppose(TermProfileInfo {
+                rule: rule.to_string(),
+                term: format!("suppose {}", suppose.resolution),
+            }))
+            .id();
     }
 
     fn on_subtask_start(&mut self, task: &Task, _cycle: usize) {
-        error!("new subtask {}", task);
-        error!("current\n{}", Self::tree_view(&self.task, 0));
-
-        let pos = {
-            let current_task = self.current_task();
-            if current_task.terms.is_empty() {
-                current_task.terms.push(TermProfileInfo {
-                    rule:     task
-                        .purpose
-                        .rule
-                        .as_ref()
-                        .map(|x| x.to_string())
-                        .unwrap_or_default(),
-                    term:     format!("sym {}", task.purpose.term.to_string()),
-                    supposes: Default::default(),
-                });
-            }
-            let current_suppose = current_task.terms.last_mut().unwrap();
-            current_suppose.supposes.push(TaskProfileInfo {
+        self.current_node = self
+            .task
+            .get_mut(self.current_node)
+            .unwrap()
+            .append(ProfilerNode::Helper(TaskProfileInfo {
                 purpose: format!("task {}", task.purpose),
-                terms:   vec![],
-            });
-            current_suppose.supposes.len() - 1
-        };
-        self.current_task_path.push(pos);
+            }))
+            .id();
     }
 
     fn on_subtask_end(&mut self, _status: &Solution) {
-        error!("subtask ends ");
-        error!("current\n{}", Self::tree_view(&self.task, 0));
-
-        let _ = self.current_task_path.pop();
-    }
-}
-
-impl Profiler {
-    fn current_task(&mut self) -> &mut TaskProfileInfo {
-        error!("current_task {:?}", self.current_task_path);
-        error!("current\n{}", Self::tree_view(&self.task, 0));
-
-        let mut current = &mut self.task;
-
-        for i in self.current_task_path.iter() {
-            current = current
-                .terms
-                .last_mut()
-                .unwrap()
-                .supposes
-                .get_mut(*i)
-                .unwrap();
+        if let Some(parent) = self.task.get(self.current_node).unwrap().parent() {
+            self.current_node = parent.id();
         }
-
-        current
     }
 
-    fn tree_view(task: &TaskProfileInfo, level: usize) -> String {
-        let mut result = String::default();
-        for term in task.terms.iter() {
-            result = format!("{}\n{}{}", result, " ".repeat(level), term.term);
-            for sup in term.supposes.iter() {
-                result = format!("{}{}", result, Self::tree_view(sup, level + 1));
-            }
+    fn on_suppose_finish(&mut self, _suppose: &Suppose, _result: bool) {
+        if let Some(parent) = self.task.get(self.current_node).unwrap().parent() {
+            self.current_node = parent.id();
         }
-        result
     }
 }

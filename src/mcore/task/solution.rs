@@ -135,12 +135,13 @@ impl Solution {
     }
 
     pub fn solve(&mut self) -> Result<Rc<Term>, SolutionError> {
-        self.dumper
-            .on_subtask_start(&self.task, self.current_cycles());
         trace!(target: "subtask", "Subtask: {}, {}", self.purpose, VecDisplay(&self.task.conditions));
         if self.task.subtask_level > MAX_SUBTASK_LEVEL {
             return Err(SolutionError::MaxSubtaskLevelExceed);
         }
+
+        self.dumper
+            .on_subtask_start(&self.task, self.current_cycles());
 
         let result = self.solution_loop();
 

@@ -13,7 +13,8 @@ pub use self::{
     purpose::Purpose,
     solution::{Solution, EXECUTION_DEADLINE_DEFAULT},
     tracing::{
-        Config as DumperConfig, Profiler, SolutionTracer, TaskProfileInfo, TermProfileInfo, Tracer,
+        Config as DumperConfig, Profiler, ProfilerNode, SolutionTracer, TaskProfileInfo,
+        TermProfileInfo, Tracer,
     },
 };
 

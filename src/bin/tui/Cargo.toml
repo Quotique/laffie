@@ -20,6 +20,8 @@ serde = { workspace = true }
 serde_derive = { workspace = true }
 trees = { workspace = true }
 
+ego-tree = "0.10"
+
 clap = { version = "4.5", features = ["derive"] }
 colored = "2"
 config = "0.14"

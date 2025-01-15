@@ -112,4 +112,11 @@ impl Tracer for SolutionTracer {
             profiler.lock().on_new_suppose(rule, suppose);
         }
     }
+
+    fn on_suppose_finish(&mut self, suppose: &Suppose, result: bool) {
+        self.sink.lock().on_suppose_finish(suppose, result);
+        if let Some(profiler) = self.profiler() {
+            profiler.lock().on_suppose_finish(suppose, result);
+        }
+    }
 }
