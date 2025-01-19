@@ -44,7 +44,7 @@ pub struct TaskRecord {
     pub conditions: Vec<Term>,
     pub purpose:    Term,
 
-    pub answer:  Term,
+    pub answer:  Vec<Term>,
     pub runs:    Vec<usize>,
     pub reports: Vec<u64>,
 }
@@ -63,7 +63,7 @@ impl From<old::TaskRecord> for TaskRecord {
             conditions: value.conditions,
             purpose:    value.purpose,
 
-            answer:  value.answer,
+            answer:  vec![value.answer],
             runs:    value.runs,
             reports: Default::default(),
         }
@@ -79,7 +79,7 @@ impl From<&Task> for TaskRecord {
             conditions: Vec::from_iter(value.conditions.iter().map(|x| (*x.term).clone())),
             purpose:    (*value.purpose.term).clone(),
 
-            answer:  Term::zero(),
+            answer:  value.possible_answers.clone(),
             runs:    Default::default(),
             reports: Default::default(),
         }
@@ -90,15 +90,16 @@ impl From<&Task> for TaskRecord {
 impl Into<Task> for TaskRecord {
     fn into(self) -> Task {
         Task {
-            id:            self.id as u64,
-            text:          self.text,
-            conditions:    Vec::from_iter(
+            id:               self.id as u64,
+            text:             self.text,
+            conditions:       Vec::from_iter(
                 self.conditions
                     .into_iter()
                     .map(|x| TermProps::from(Rc::new(x))),
             ),
-            purpose:       TermProps::from(Rc::new(self.purpose)),
-            subtask_level: 0,
+            possible_answers: self.answer,
+            purpose:          TermProps::from(Rc::new(self.purpose)),
+            subtask_level:    0,
         }
     }
 }

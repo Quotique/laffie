@@ -140,16 +140,14 @@ fn main() {
                     "Solution:".italic().blue(),
                     View::try_from(&solution).unwrap()
                 );
-                if let Some(answer) = solution.answer() {
-                    if answer.as_ref() != &record.answer {
-                        answer_changed += 1;
-                        println!(
-                            "{}\nOld:{}\nNew:{}",
-                            "Answer changed: ".bold().blink().red(),
-                            record.answer,
-                            answer
-                        );
-                    }
+                if !solution.validate_answer() {
+                    answer_changed += 1;
+                    println!(
+                        "{}\nValid answers: {}\nObtained: {}",
+                        "Answer changed: ".bold().blink().red(),
+                        VecDisplay(&solution.task.possible_answers),
+                        solution.answer().unwrap()
+                    );
                 }
                 record.runs.push(solution.current_cycles());
 
@@ -180,6 +178,6 @@ fn main() {
         "Stats:\n {}: {solved}\n {}: {not_solved}\n {}: {answer_changed}",
         "solved".bold().green(),
         "not solved".bold().yellow(),
-        "answer changed".bold().red()
+        "answer missmatch".bold().red()
     );
 }

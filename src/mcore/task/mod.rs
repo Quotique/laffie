@@ -4,7 +4,7 @@ mod purpose;
 mod solution;
 mod tracing;
 
-use crate::term::TermProps;
+use crate::term::{Term, TermProps};
 use std::{fmt, iter::Iterator};
 
 pub use self::{
@@ -22,6 +22,8 @@ pub struct Task {
     pub conditions:    Vec<TermProps>,
     pub purpose:       TermProps,
     pub subtask_level: usize,
+
+    pub possible_answers: Vec<Term>,
 }
 
 impl fmt::Display for Task {

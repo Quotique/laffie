@@ -1,4 +1,4 @@
-use crate::term::TermProps;
+use crate::term::{Term, TermProps};
 use std::{collections::HashMap, fmt, iter::Iterator};
 
 use super::Task;
@@ -16,6 +16,8 @@ pub struct TaskBuilder {
     conditions:  Vec<TermProps>,
     purpose:     Option<TermProps>,
     term_id_map: HashMap<usize, usize>,
+
+    possible_answers: Vec<Term>,
 
     subtask_level: usize,
 }
@@ -51,6 +53,7 @@ impl TaskBuilder {
         self
     }
 
+    #[inline]
     pub fn with_conditions(mut self, reqs: impl Iterator<Item = TermProps>) -> Self {
         for i in reqs {
             self = self.with_condition(i);
@@ -58,18 +61,27 @@ impl TaskBuilder {
         self
     }
 
+    #[inline]
+    pub fn with_answer(mut self, answer: Term) -> Self {
+        self.possible_answers.push(answer);
+        self
+    }
+
+    #[inline]
     pub fn with_level(mut self, level: usize) -> Self {
         self.subtask_level = level;
         self
     }
 
+    #[inline]
     pub fn build(self) -> Result<Task, TaskBuilderError> {
         Ok(Task {
-            id:            self.id,
-            text:          self.text,
-            conditions:    self.conditions,
-            purpose:       self.purpose.ok_or(TaskBuilderError::NoPurposeFound)?,
-            subtask_level: self.subtask_level,
+            id:               self.id,
+            text:             self.text,
+            conditions:       self.conditions,
+            purpose:          self.purpose.ok_or(TaskBuilderError::NoPurposeFound)?,
+            subtask_level:    self.subtask_level,
+            possible_answers: self.possible_answers,
         })
     }
 }

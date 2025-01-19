@@ -109,6 +109,31 @@ impl Solution {
         self.answer.map(|i| self.terms[i].term.clone())
     }
 
+    pub fn validate_answer(&self) -> bool {
+        if self.task.possible_answers.is_empty() {
+            return true;
+        }
+
+        if let Some(answer) = self.answer() {
+            if self
+                .task
+                .possible_answers
+                .iter()
+                .any(|x| x == answer.as_ref())
+            {
+                return true;
+            }
+            // TODO: есть проблема с неправильным преобразованием дерева, что приводит к
+            // некорректному прямому сравнению дерева.
+            return self
+                .task
+                .possible_answers
+                .iter()
+                .any(|x| x.to_string() == answer.to_string());
+        }
+        false
+    }
+
     pub fn solve(&mut self) -> Result<Rc<Term>, SolutionError> {
         self.dumper
             .on_subtask_start(&self.task, self.current_cycles());

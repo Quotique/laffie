@@ -30,4 +30,4 @@ parking_lot = "0.12"
 [dev-dependencies]
 parser = { path = "../parser" }
 
-insta = "1.39"
+insta = "1.42"

@@ -37,39 +37,53 @@ impl<'a> TaskParser<'a> {
         let mut builder = TaskBuilder::default().with_id(hash);
 
         for child in self.syntax_tree.iter() {
-            if child.data().symbol == "Purpose" {
-                builder = builder
-                    .with_purpose(TermProps::from(Rc::new(
-                        TermParser::new(child.front().ok_or_else(|| ParserError {
+            match child.data().symbol.as_str() {
+                "Purpose" => {
+                    builder = builder
+                        .with_purpose(TermProps::from(Rc::new(
+                            TermParser::new(child.front().ok_or_else(|| ParserError {
+                                loc: child.data().location.clone(),
+                                msg: "must have one argument".to_owned(),
+                            })?)
+                            .with_variables()
+                            .parse()?,
+                        )))
+                        .map_err(|e| ParserError {
                             loc: child.data().location.clone(),
-                            msg: "must have one argument".to_owned(),
-                        })?)
-                        .with_variables()
-                        .parse()?,
-                    )))
-                    .map_err(|e| ParserError {
-                        loc: child.data().location.clone(),
-                        msg: e.to_string(),
-                    })?;
-            } else if child.data().symbol == "Text" {
-                builder = builder.with_text(
-                    child
-                        .front()
-                        .ok_or_else(|| ParserError {
-                            loc: child.data().location.clone(),
-                            msg: "must have one argument".to_owned(),
+                            msg: e.to_string(),
                         })?
-                        .data()
-                        .symbol
-                        .to_string(),
-                );
-            } else {
-                builder = builder.with_condition(TermProps::from(Rc::new(
-                    TermParser::new(child)
-                        .with_variables()
-                        .parse()?
-                        .normalize(NormalizationLevel::max()),
-                )));
+                }
+                "Text" => {
+                    builder = builder.with_text(
+                        child
+                            .front()
+                            .ok_or_else(|| ParserError {
+                                loc: child.data().location.clone(),
+                                msg: "must have one argument".to_owned(),
+                            })?
+                            .data()
+                            .symbol
+                            .to_string(),
+                    );
+                }
+                "Answer" => {
+                    for i in child.iter() {
+                        builder = builder.with_answer(
+                            TermParser::new(i)
+                                .with_variables()
+                                .parse()?
+                                .normalize(NormalizationLevel::max()),
+                        )
+                    }
+                }
+                _ => {
+                    builder = builder.with_condition(TermProps::from(Rc::new(
+                        TermParser::new(child)
+                            .with_variables()
+                            .parse()?
+                            .normalize(NormalizationLevel::max()),
+                    )));
+                }
             }
         }
         builder.build().map_err(|e| ParserError {

@@ -1,6 +1,7 @@
 use std::env;
 
 use database::TaskRecord;
+use utils::VecDisplay;
 
 pub struct Text;
 
@@ -40,8 +41,9 @@ impl Text {
             .map(|x| {
                 // TODO: no answer, i18n
                 format!(
-                    "\n<i>Ответ:</i> {} [циклов сканирования: {}]\n",
-                    task.answer, x
+                    "\n<i>Возможные ответы:</i> {} [циклов сканирования: {}]\n",
+                    VecDisplay(&task.answer),
+                    x
                 )
             })
             .unwrap_or_else(|| "".to_owned());

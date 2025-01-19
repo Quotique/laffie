@@ -13,7 +13,7 @@ log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 
-file-rotate = "0.7.5"
+file-rotate = "0.7"
 patricia_tree = { version = "0.8" }
 slog-async = { version = "2.7" }
 slog-scope = { version = "4.4" }
@@ -22,4 +22,4 @@ slog-term = { version = "2.9" }
 slog = { version = "2.7", features = ["max_level_trace", "release_max_level_trace"] }
 
 [dev-dependencies]
-insta = "1.7"
+insta = "1.42"

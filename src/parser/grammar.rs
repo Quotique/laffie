@@ -67,12 +67,20 @@ peg::parser! {
         pub rule task() -> Tree<Data> = _ pp:position!() keyword("task") _ "{"
                 _ pt:position!() keyword("purpose") _ p:eval() ";"
                 _ tt:position!() t:(keyword("text") _ t:string() ";" {t} )?
+                _ at:position!() a:(keyword("answer") _ a:commasep(<arithmetic()>) _ ";" {a} )?
                 _ c:semicolonsep(<arithmetic()>)
             _ "}"
             {
                 let mut p = Data::new("Task", pp)
                               /(Data::new("Purpose", pt) / p)
                               /(Data::new("Text", tt) / Data::new(t.unwrap_or_default().as_str(), tt));
+                if let Some(ans) = a {
+                    let mut answers = Data::new("Answer", at);
+                    for i in ans.iter().cloned() {
+                        answers.push_back(i);
+                    }
+                    p.push_back(answers);
+                }
                 for i in c.iter().cloned() {
                     p.push_back(i);
                 }
@@ -385,6 +393,7 @@ mod tests {
         let test = r#"task {
                         purpose find(x);
                         text "Решите уравнение 2x+5 = 0";
+                        answer x == -2.5;
                         2*x+5 == 0;
                     }"#;
         let states = ra::task(test).unwrap();
@@ -393,11 +402,15 @@ mod tests {
             Data::new("Task", 0) /
                 (Data::new("Purpose", 31) / (Data::new("find", 39) / Data::new("x", 44))) /
                 (Data::new("Text", 72) / Data::new("Решите уравнение 2x+5 = 0", 72)) /
-                (Data::new("==", 151) /
-                    (Data::new("+", 148) /
-                        (Data::new("*", 146) / Data::new("2", 145) / Data::new("x", 147)) /
-                        Data::new("5", 149)) /
-                    Data::new("0", 154))
+                (Data::new("Answer", 145) /
+                    (Data::new("==", 154) /
+                        Data::new("x", 152) /
+                        (Data::new("-", 157) / Data::new("2.5", 158)))) /
+                (Data::new("==", 193) /
+                    (Data::new("+", 190) /
+                        (Data::new("*", 188) / Data::new("2", 187) / Data::new("x", 189)) /
+                        Data::new("5", 191)) /
+                    Data::new("0", 196))
         )
     }
 }

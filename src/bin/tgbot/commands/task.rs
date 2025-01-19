@@ -57,10 +57,7 @@ fn task(
         })
         .unwrap();
 
-    if let Some(answer) = solution.answer() {
-        // TODO: answer changed
-        record.answer = answer.as_ref().clone();
-    }
+    // TODO: answer validation
 
     record.runs.push(solution.current_cycles());
     tasks.put(&record).map_err(|e| e.to_string())?;
