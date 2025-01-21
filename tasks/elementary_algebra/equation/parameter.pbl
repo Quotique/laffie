@@ -1,0 +1,18 @@
+task {
+    purpose find(x);
+    text "Решить уравнение в зависимости от параметра 2x-5+t=0";
+    answer x == (5-t)/2;
+
+    2*x-5+t == 0;
+    t is known;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение в зависимости от параметра 2x-t=0";
+    answer x == t/2;
+
+    2*x-t == 0;
+    t is known;
+}
+

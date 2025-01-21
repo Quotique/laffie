@@ -1,0 +1,24 @@
+task {
+	purpose proof((6039797760*sqrt(192)-83751862272)/(-67108864) != 0);
+
+	x == 2;
+}
+
+task {
+    purpose transform((x+1)/(x-1)+(x+5)/(x-5) == (x+3)/(x-3)+(x+4)/(x-4));
+
+    y == 100;
+}
+
+task {
+    purpose find(x);
+    answer x == (-5)/3 || x == 1, x == 1 || -5/3;
+
+    3*x*x + x + x - 5 == 0;
+}
+
+task {
+	purpose proof(4*sqrt(5) + 9 != 0);
+
+	x == 2;
+}
