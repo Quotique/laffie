@@ -18,3 +18,11 @@ rule {
     b >= 0,
     a != 0;
 }
+
+// rule {
+//     attr level(4),purpose(find(x)),one(a);
+// 
+//     a*sqrt(b) + c == 0 => ( a*c <= 0 && b == (c/a)^2 ) || ( a*c > 0 && b in empty_set );
+// 
+//     a != 0;
+// }
