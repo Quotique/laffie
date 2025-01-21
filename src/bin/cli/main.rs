@@ -3,7 +3,7 @@
 
 mod settings;
 
-use std::{convert::TryFrom, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, fmt, path::PathBuf, sync::Arc};
 
 use clap::Parser;
 use colored::*;
@@ -51,6 +51,28 @@ struct Args {
     /// Execution deadline (in cycles) for individual problem
     #[clap(short, long, default_value = "100000")]
     exec_deadline: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+struct SolveStats {
+    solved:         usize,
+    not_solved:     usize,
+    answer_changed: usize,
+}
+
+impl fmt::Display for SolveStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {}, {}: {}, {}: {}",
+            "solved".bold().green(),
+            self.solved,
+            "not solved".bold().yellow(),
+            self.not_solved,
+            "wrong answer".bold().red(),
+            self.answer_changed
+        )
+    }
 }
 
 fn main() {
@@ -102,10 +124,7 @@ fn main() {
         }
     }
 
-    let mut solved = 0;
-    let mut not_solved = 0;
-    let mut answer_changed = 0;
-
+    let mut stats: HashMap<String, SolveStats> = Default::default();
     let db_tasks_iter = Box::new(db.iter());
 
     for mut record in db_tasks_iter.filter(move |x| {
@@ -135,14 +154,17 @@ fn main() {
 
         match solution.solve() {
             Ok(_) => {
-                solved += 1;
+                stats.entry(record.group.clone()).or_default().solved += 1;
                 println!(
                     "{}\n{}",
                     "Solution:".italic().blue(),
                     View::try_from(&solution).unwrap()
                 );
                 if !solution.validate_answer() {
-                    answer_changed += 1;
+                    stats
+                        .entry(record.group.clone())
+                        .or_default()
+                        .answer_changed += 1;
                     println!(
                         "{}\nValid answers: {}\nObtained: {}",
                         "Answer changed: ".bold().blink().red(),
@@ -157,7 +179,7 @@ fn main() {
                 }
             }
             Err(e) => {
-                not_solved += 1;
+                stats.entry(record.group.clone()).or_default().not_solved += 1;
                 println!(
                     "{} {}\n{}",
                     "Solution:".italic().blue(),
@@ -175,10 +197,12 @@ fn main() {
         }
     }
 
-    println!(
-        "Stats:\n {}: {solved}\n {}: {not_solved}\n {}: {answer_changed}",
-        "solved".bold().green(),
-        "not solved".bold().yellow(),
-        "answer missmatch".bold().red()
-    );
+    let mut total: SolveStats = Default::default();
+    for (group, stats) in stats.iter() {
+        total.solved += stats.solved;
+        total.not_solved += stats.not_solved;
+        total.answer_changed += stats.answer_changed;
+        println!("{group}: {stats}");
+    }
+    println!("total: {total}");
 }

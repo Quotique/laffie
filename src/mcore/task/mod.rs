@@ -22,6 +22,7 @@ pub use self::{
 pub struct Task {
     pub id:            u64,
     pub text:          String,
+    pub group:         String,
     pub conditions:    Vec<TermProps>,
     pub purpose:       TermProps,
     pub subtask_level: usize,

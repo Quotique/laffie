@@ -41,6 +41,7 @@ pub struct TaskRecord {
 
     pub id:         u128,
     pub text:       String,
+    pub group:      String,
     pub conditions: Vec<Term>,
     pub purpose:    Term,
 
@@ -60,6 +61,7 @@ impl From<old::TaskRecord> for TaskRecord {
             version:    VERSION,
             id:         value.id,
             text:       Default::default(),
+            group:      Default::default(),
             conditions: value.conditions,
             purpose:    value.purpose,
 
@@ -76,6 +78,7 @@ impl From<&Task> for TaskRecord {
             version:    VERSION,
             id:         value.id as u128,
             text:       value.text.clone(),
+            group:      value.group.clone(),
             conditions: Vec::from_iter(value.conditions.iter().map(|x| (*x.term).clone())),
             purpose:    (*value.purpose.term).clone(),
 
@@ -92,6 +95,7 @@ impl Into<Task> for TaskRecord {
         Task {
             id:               self.id as u64,
             text:             self.text,
+            group:            "".to_string(),
             conditions:       Vec::from_iter(
                 self.conditions
                     .into_iter()

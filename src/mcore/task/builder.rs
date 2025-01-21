@@ -78,6 +78,7 @@ impl TaskBuilder {
         Ok(Task {
             id:               self.id,
             text:             self.text,
+            group:            "".to_owned(),
             conditions:       self.conditions,
             purpose:          self.purpose.ok_or(TaskBuilderError::NoPurposeFound)?,
             subtask_level:    self.subtask_level,

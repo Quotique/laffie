@@ -35,7 +35,7 @@ impl DirectoryParser {
         Self::load_dir(
             &self.symbols_path,
             &["sym"],
-            &mut |src, s: &Tree<NodeData>| {
+            &mut |_, src, s: &Tree<NodeData>| {
                 if let Ok(sym) = FuncSymbolParser::new(s).parse() {
                     let sym = FuncSymbol::register(sym);
                     last_sym.replace(sym);
@@ -55,17 +55,18 @@ impl DirectoryParser {
 
     pub fn load_tasks(&self) -> io::Result<Vec<Task>> {
         let mut result = vec![];
-        Self::load_dir(self.tasks_path.as_ref(), &["pbl"], &mut |src, s| {
+        Self::load_dir(self.tasks_path.as_ref(), &["pbl"], &mut |path, src, s| {
             if s.root().data().symbol == "Task" {
                 match TaskParser::with(s).parse() {
-                    Ok(p) => {
+                    Ok(mut t) => {
                         trace!(
                             "New task: [{:x}] {} {}",
-                            p.id,
-                            p.purpose,
-                            VecDisplay(&p.conditions)
+                            t.id,
+                            t.purpose,
+                            VecDisplay(&t.conditions)
                         );
-                        result.push(p)
+                        t.group = path.to_string_lossy().to_string();
+                        result.push(t)
                     }
                     Err(e) => error!("Task not parsed: {}", e.error_string(src)),
                 }
@@ -78,17 +79,16 @@ impl DirectoryParser {
         Self::load_dir(
             &self.symbols_path,
             &["sym"],
-            &mut |_, s: &Tree<NodeData>| {
+            &mut |_, _, s: &Tree<NodeData>| {
                 let _ = FuncSymbolParser::new(s).parse().map(|s| s.register());
             },
         )
     }
 
-    fn load_dir<F: FnMut(&str, &Tree<NodeData>)>(
-        dir: &Path,
-        extensions: &[&str],
-        cb: &mut F,
-    ) -> io::Result<()> {
+    fn load_dir<F>(dir: &Path, extensions: &[&str], cb: &mut F) -> io::Result<()>
+    where
+        F: FnMut(&Path, &str, &Tree<NodeData>),
+    {
         trace!("Processing dir: {}", dir.to_string_lossy());
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
@@ -107,10 +107,11 @@ impl DirectoryParser {
         Ok(())
     }
 
-    fn load_file<P: AsRef<Path>, F: FnMut(&str, &Tree<NodeData>)>(
-        file: P,
-        cb: &mut F,
-    ) -> io::Result<()> {
+    fn load_file<P, F>(file: P, cb: &mut F) -> io::Result<()>
+    where
+        P: AsRef<Path>,
+        F: FnMut(&Path, &str, &Tree<NodeData>),
+    {
         info!("Processing file: {}", file.as_ref().to_string_lossy());
         let content = fs::read_to_string(file.as_ref())?;
         let states = lang::any(content.as_str())
@@ -123,7 +124,7 @@ impl DirectoryParser {
             })
             .unwrap();
         for s in states {
-            cb(content.as_str(), &s);
+            cb(file.as_ref(), content.as_str(), &s);
         }
 
         Ok(())
