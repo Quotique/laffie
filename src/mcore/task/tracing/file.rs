@@ -103,7 +103,7 @@ impl Tracer for FileDumpTracer {
             .expect(WRITE_ERROR_TEXT);
     }
 
-    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose) {
+    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose, _cycle: usize) {
         self.file
             .write_all(format!("{}|> {} {}\n", self.idention(), rule, suppose).as_bytes())
             .expect(WRITE_ERROR_TEXT);

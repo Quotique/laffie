@@ -89,7 +89,7 @@ impl ParamsMapping {
     }
 }
 
-impl<'a> Mapper<'a> {
+impl Mapper<'_> {
     pub fn try_map(self) -> Result<Vec<ParamsMapping>> {
         params_map_impl(self.target, self.pattern, Default::default())
     }

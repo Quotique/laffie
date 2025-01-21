@@ -14,7 +14,7 @@ pub struct Console<'a, 'b> {
     pub output: &'a mut fmt::Formatter<'b>,
 }
 
-impl<'a, 'b> Renderer for Console<'a, 'b> {
+impl Renderer for Console<'_, '_> {
     fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result {
         writeln!(self.output, "{}{purpose}", "  ".repeat(subtask_level))
     }

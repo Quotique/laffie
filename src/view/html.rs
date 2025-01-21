@@ -13,7 +13,7 @@ pub struct Html<'a> {
     pub output: &'a mut dyn fmt::Write,
 }
 
-impl<'a> Renderer for Html<'a> {
+impl Renderer for Html<'_> {
     fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result {
         self.output.write_str(&format!(
             "{}{}\n",

@@ -11,11 +11,20 @@ use super::Tracer;
 pub struct TermProfileInfo {
     pub rule: String, // TODO: SharedRule
     pub term: String, // TODO: Term
+
+    pub requirements: Vec<String>,
+    pub result:       bool,
+
+    pub start_cycle: usize,
+    pub end_cycle:   usize,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct TaskProfileInfo {
     pub purpose: String,
+
+    pub start_cycle: usize,
+    pub end_cycle:   usize,
 }
 
 #[derive(Clone, Debug)]
@@ -30,10 +39,23 @@ pub enum ProfilerNode {
     Suppose(TermProfileInfo),
 }
 
+impl ProfilerNode {
+    #[inline]
+    pub fn cycles(&self) -> usize {
+        match self {
+            Self::Suppose(suppose) => suppose.end_cycle - suppose.start_cycle,
+            Self::Helper(task) => task.end_cycle - task.start_cycle,
+        }
+    }
+}
+
 impl Default for Profiler {
     fn default() -> Self {
         let tree = Tree::new(ProfilerNode::Helper(TaskProfileInfo {
             purpose: "Profiler root".to_owned(),
+
+            start_cycle: Default::default(),
+            end_cycle:   Default::default(),
         }));
         Self {
             current_node: tree.root().id(),
@@ -42,37 +64,73 @@ impl Default for Profiler {
     }
 }
 
+impl TaskProfileInfo {
+    #[inline]
+    pub fn cycles(&self) -> usize {
+        self.end_cycle - self.start_cycle
+    }
+}
+
+impl TermProfileInfo {
+    #[inline]
+    pub fn cycles(&self) -> usize {
+        self.end_cycle - self.start_cycle
+    }
+}
+
 impl Tracer for Profiler {
-    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose) {
+    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose, cycle: usize) {
         self.current_node = self
             .task
             .get_mut(self.current_node)
             .unwrap()
             .append(ProfilerNode::Suppose(TermProfileInfo {
                 rule: rule.to_string(),
-                term: format!("suppose {}", suppose.resolution),
+                term: suppose.resolution.to_string(),
+
+                requirements: suppose.requirements.iter().map(|x| x.to_string()).collect(),
+                result:       false,
+
+                start_cycle: cycle,
+                end_cycle:   Default::default(),
             }))
             .id();
     }
 
-    fn on_subtask_start(&mut self, task: &Task, _cycle: usize) {
+    fn on_subtask_start(&mut self, task: &Task, cycle: usize) {
         self.current_node = self
             .task
             .get_mut(self.current_node)
             .unwrap()
             .append(ProfilerNode::Helper(TaskProfileInfo {
-                purpose: format!("task {}", task.purpose),
+                purpose: task.purpose.to_string(),
+
+                start_cycle: cycle,
+                end_cycle:   Default::default(),
             }))
             .id();
     }
 
-    fn on_subtask_end(&mut self, _status: &Solution) {
+    fn on_subtask_end(&mut self, status: &Solution) {
+        match self.task.get_mut(self.current_node).unwrap().value() {
+            ProfilerNode::Helper(task) => task.end_cycle = *status.cycles.borrow(),
+            ProfilerNode::Suppose(_) => unreachable!("last node is not subtask"),
+        }
+
         if let Some(parent) = self.task.get(self.current_node).unwrap().parent() {
             self.current_node = parent.id();
         }
     }
 
-    fn on_suppose_finish(&mut self, _suppose: &Suppose, _result: bool) {
+    fn on_suppose_finish(&mut self, _suppose: &Suppose, cycle: usize, result: bool) {
+        match self.task.get_mut(self.current_node).unwrap().value() {
+            ProfilerNode::Helper(_) => unreachable!("last node is not suppose"),
+            ProfilerNode::Suppose(suppose) => {
+                suppose.end_cycle = cycle;
+                suppose.result = result;
+            }
+        }
+
         if let Some(parent) = self.task.get(self.current_node).unwrap().parent() {
             self.current_node = parent.id();
         }

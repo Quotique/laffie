@@ -315,19 +315,24 @@ impl Solution {
                 .inspect({
                     let mut dumper = self.dumper.clone();
                     let rule = rule.clone();
-                    move |suppose| {
-                        trace!(target: "rule_selection", "Suppose: {}", suppose);
-                        dumper.on_new_suppose(rule.clone(), suppose)
+                    {
+                        let cycle = *self.cycles.borrow();
+                        move |suppose| {
+                            trace!(target: "rule_selection", "Suppose: {}", suppose);
+                            dumper.on_new_suppose(rule.clone(), suppose, cycle)
+                        }
                     }
                 })
                 .filter_map(|mut suppose| {
                     if let Some(proofed) = self.suppose_proof(&suppose) {
+                        let cycles = *self.cycles.borrow();
                         suppose.resolution.requirements = proofed;
-                        dumper.on_suppose_finish(&suppose, true);
+                        dumper.on_suppose_finish(&suppose, cycles, true);
                         trace!(target: "rule_selection", "Suppose: proofed, resolution applied");
                         Some(suppose)
                     } else {
-                        dumper.on_suppose_finish(&suppose, false);
+                        let cycles = *self.cycles.borrow();
+                        dumper.on_suppose_finish(&suppose, cycles, false);
                         None
                     }
                 })

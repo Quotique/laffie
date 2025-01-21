@@ -6,10 +6,7 @@ use ratatui::{
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use mcore::{
-    rule::Suppose,
-    task::{ProfilerNode, Solution},
-};
+use mcore::task::{ProfilerNode, Solution};
 
 use super::interface::{border_focus, border_unfocus, draw_scrollbar};
 use crate::tasks::TaskStatus;
@@ -42,12 +39,12 @@ impl Tracing {
 
     #[inline]
     pub fn left(&mut self) {
-        self.focused_pane = 0;
+        self.tree_state.key_left();
     }
 
     #[inline]
     pub fn right(&mut self) {
-        self.focused_pane = 1;
+        self.tree_state.key_right();
     }
 
     #[inline]
@@ -55,17 +52,39 @@ impl Tracing {
         self.tree_state.toggle_selected();
     }
 
-    fn tree(profiler: &NodeRef<ProfilerNode>) -> TreeItem<'static, Option<NodeId>> {
+    fn tree(
+        profiler: &NodeRef<ProfilerNode>,
+        total_cycles: usize,
+    ) -> TreeItem<'static, Option<NodeId>> {
+        let default_style = Style::new();
+        let not_proved_style = Style::new().crossed_out().dim();
+
         let text = match profiler.value() {
-            ProfilerNode::Helper(task) => task.purpose.clone(),
-            ProfilerNode::Suppose(suppose) => suppose.term.clone(),
+            ProfilerNode::Helper(task) => Line::from(vec![
+                Span::from(task.purpose.clone()),
+                Span::from(format!(" {} {}", profiler.value().cycles(), total_cycles)),
+            ]),
+            ProfilerNode::Suppose(suppose) => Line::from(vec![
+                Span::styled(
+                    suppose.term.clone(),
+                    if suppose.result {
+                        default_style
+                    } else {
+                        not_proved_style
+                    },
+                ),
+                Span::from(format!(" {} {}", profiler.value().cycles(), total_cycles)),
+            ]),
         };
 
         if profiler.has_children() {
             TreeItem::new(
                 Some(profiler.id()),
                 text,
-                profiler.children().map(|s| Self::tree(&s)).collect(),
+                profiler
+                    .children()
+                    .map(|s| Self::tree(&s, profiler.value().cycles()))
+                    .collect(),
             )
             .unwrap()
         } else {
@@ -74,18 +93,85 @@ impl Tracing {
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        let pane_style = self.pane_style(0);
-
-        // if !self.task.solved {
-        //     todo!();
-        //     // return self.draw_solution(frame, area);
-        // }
-
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
 
+        self.draw_profiler_tree(frame, layout[0]);
+        self.draw_profiler_node_details(frame, layout[1]);
+    }
+
+    fn draw_profiler_node_details(&mut self, frame: &mut Frame, area: Rect) {
+        let pane_style = self.pane_style(1);
+        let highlighted = Style::new().fg(Color::LightBlue).bold();
+
+        if let Some(selected) = self.tree_state.selected().last() {
+            let node = self.task.solution.dumper.profiler().unwrap().lock();
+
+            let text = match node.task.get(selected.unwrap()).unwrap().value() {
+                ProfilerNode::Helper(task) => vec![
+                    Line::from(vec![
+                        Span::styled("Task: ", highlighted),
+                        Span::from(&task.purpose),
+                    ]),
+                    Line::default(),
+                    Line::from(vec![
+                        Span::styled("Cycles: ", highlighted),
+                        Span::from(task.cycles().to_string()),
+                    ]),
+                ],
+                ProfilerNode::Suppose(suppose) => {
+                    let mut result = vec![
+                        Line::from(vec![
+                            Span::styled("Term: ", highlighted),
+                            Span::from(&suppose.term),
+                        ]),
+                        Line::default(),
+                        Line::from(vec![
+                            Span::styled("Rule: ", highlighted),
+                            Span::from(&suppose.rule),
+                        ]),
+                        Line::default(),
+                        Line::from(vec![
+                            Span::styled("Cycles: ", highlighted),
+                            Span::from(suppose.cycles().to_string()),
+                        ]),
+                        Line::default(),
+                        Line::from(Span::styled("Requirements:", highlighted)),
+                    ];
+                    result.append(
+                        &mut suppose
+                            .requirements
+                            .iter()
+                            .map(|x| Line::from(vec![Span::raw("  "), Span::from(x)]))
+                            .collect(),
+                    );
+                    result
+                }
+            };
+            frame.render_widget(
+                List::new(text.iter().cloned())
+                    .highlight_style(Style::new().underlined())
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .border_style(pane_style)
+                            .title("Detailed"),
+                    ),
+                area,
+            );
+            draw_scrollbar(
+                frame,
+                area,
+                text.len(),
+                // task.scroll.selected().unwrap()
+                0,
+            );
+        }
+    }
+
+    fn draw_profiler_tree(&mut self, frame: &mut Frame, area: Rect) {
         let items = [Self::tree(
             &self
                 .task
@@ -96,6 +182,7 @@ impl Tracing {
                 .lock()
                 .task
                 .root(),
+            *self.task.solution.cycles.borrow(),
         )];
         let widget = Tree::new(&items)
             .expect("all item identifiers are unique")
@@ -116,48 +203,8 @@ impl Tracing {
                     .bg(Color::LightGreen)
                     .add_modifier(Modifier::BOLD),
             )
-            .highlight_symbol(">> ");
-        frame.render_stateful_widget(widget, layout[0], &mut self.tree_state);
-
-        if let Some(selected) = self.tree_state.selected().last() {
-            let node = self.task.solution.dumper.profiler().unwrap().lock();
-
-            let text1 = match node.task.get(selected.unwrap()).unwrap().value() {
-                ProfilerNode::Helper(task) => task.purpose.clone(),
-                ProfilerNode::Suppose(suppose) => suppose.term.clone(),
-            };
-            let text = [
-                text1,
-                "test1".to_owned(),
-                "test2".to_owned(),
-                format!("{:?}", self.tree_state.selected()),
-            ];
-            frame.render_widget(
-                List::new(text.iter().cloned())
-                    .highlight_style(Style::new().underlined())
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .border_style(pane_style)
-                            .title("Detailed"),
-                    ),
-                layout[1],
-            );
-            draw_scrollbar(
-                frame,
-                layout[1],
-                text.len(),
-                // task.scroll.selected().unwrap()
-                0,
-            );
-        }
-        // Self::draw_solution_text(&self.task.solution, pane_style, frame,
-        // layout[0]); Self::draw_solution_text(
-        //    &task.solution.terms.first().unwrap(),
-        //    pane_style,
-        //    frame,
-        //    layout[1],
-        //)
+            .highlight_symbol(">");
+        frame.render_stateful_widget(widget, area, &mut self.tree_state);
     }
 
     fn _draw_solution_text(solution: &Solution, pane_style: Style, frame: &mut Frame, area: Rect) {

@@ -46,7 +46,7 @@ impl<'a> TryFrom<&'a Solution> for View<'a> {
     }
 }
 
-impl<'a> View<'a> {
+impl View<'_> {
     fn display_purpose(
         &self,
         purpose: &Purpose,
@@ -137,7 +137,7 @@ impl<'a> View<'a> {
     }
 }
 
-impl<'a> fmt::Display for View<'a> {
+impl fmt::Display for View<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.display_impl(&mut Console { output: f })
     }

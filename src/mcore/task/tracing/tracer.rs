@@ -27,10 +27,10 @@ pub trait Tracer: Send + Sync {
     fn on_rule_selection(&mut self, _rule: SharedRule) {}
 
     // Called on each new suppose
-    fn on_new_suppose(&mut self, _rule: SharedRule, _suppose: &Suppose) {}
+    fn on_new_suppose(&mut self, _rule: SharedRule, _suppose: &Suppose, _cycle: usize) {}
 
     // Called on suppose processing finished
-    fn on_suppose_finish(&mut self, _suppose: &Suppose, _result: bool) {}
+    fn on_suppose_finish(&mut self, _suppose: &Suppose, _cycle: usize, _result: bool) {}
 }
 
 #[derive(Clone)]
@@ -106,17 +106,19 @@ impl Tracer for SolutionTracer {
         }
     }
 
-    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose) {
-        self.sink.lock().on_new_suppose(rule.clone(), suppose);
+    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose, cycle: usize) {
+        self.sink
+            .lock()
+            .on_new_suppose(rule.clone(), suppose, cycle);
         if let Some(profiler) = self.profiler() {
-            profiler.lock().on_new_suppose(rule, suppose);
+            profiler.lock().on_new_suppose(rule, suppose, cycle);
         }
     }
 
-    fn on_suppose_finish(&mut self, suppose: &Suppose, result: bool) {
-        self.sink.lock().on_suppose_finish(suppose, result);
+    fn on_suppose_finish(&mut self, suppose: &Suppose, cycle: usize, result: bool) {
+        self.sink.lock().on_suppose_finish(suppose, cycle, result);
         if let Some(profiler) = self.profiler() {
-            profiler.lock().on_suppose_finish(suppose, result);
+            profiler.lock().on_suppose_finish(suppose, cycle, result);
         }
     }
 }

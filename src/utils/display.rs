@@ -2,7 +2,7 @@ use std::fmt;
 
 pub struct VecDisplay<'a, T: fmt::Display>(pub &'a Vec<T>);
 
-impl<'a, T: fmt::Display> fmt::Display for VecDisplay<'a, T> {
+impl<T: fmt::Display> fmt::Display for VecDisplay<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut iter = self.0.iter().peekable();
         write!(f, "[")?;
