@@ -10,6 +10,8 @@ cargo run --release --bin cli -- -c config/cli.yaml
 
 Рекомендуется использовать имено релизную сборку (флаг --release), так как время работы отличается существенно.
 
+## [Интерфейс TUI](doc/tui_ru.md)
+
 ## [Терминология](doc/terminology_ru.md)
 
 ## [Принцип работы](doc/work_principle_ru.md)
@@ -19,4 +21,3 @@ cargo run --release --bin cli -- -c config/cli.yaml
 ## [Как вводить правила](doc/rule_syntax_ru.md)
 
 ## [Структура каталогов](doc/code_structure_ru.md)
-
