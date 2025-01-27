@@ -74,15 +74,15 @@ fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
                     KeyCode::F(2) => status.current_tab = Itab::Tasks,
                     KeyCode::F(3) => status.current_tab = Itab::Tracing,
                     // KeyCode::F(4) => status.current_tab = Itab::Setting,
-                    KeyCode::Down | KeyCode::Char('j') => status.next(),
-                    KeyCode::Up | KeyCode::Char('k') => status.previous(),
-                    KeyCode::Left | KeyCode::Char('h') => status.left(),
-                    KeyCode::Right | KeyCode::Char('l') => status.right(),
+                    KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('о') => status.next(),
+                    KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('л') => status.previous(),
+                    KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('р') => status.left(),
+                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('д') => status.right(),
                     KeyCode::Enter | KeyCode::Char(' ') => status.toggle(),
 
-                    KeyCode::Char('s') => status.solve(),
+                    KeyCode::Char('s') | KeyCode::Char('ы') => status.solve(),
 
-                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
                     _ => {}
                 }
             }
