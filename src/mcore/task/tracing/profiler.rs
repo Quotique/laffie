@@ -1,19 +1,23 @@
+use std::rc::Rc;
+
 use ego_tree::{NodeId, Tree};
 
 use crate::{
     rule::{SharedRule, Suppose},
     task::{Solution, Task},
+    term::Term,
 };
 
 use super::Tracer;
 
 #[derive(Clone, Debug, Default)]
 pub struct TermProfileInfo {
-    pub rule: String, // TODO: SharedRule
-    pub term: String, // TODO: Term
+    pub parent: String, // TODO: Term
+    pub rule:   String, // TODO: SharedRule
+    pub term:   String, // TODO: Term
 
-    pub requirements: Vec<String>,
-    pub result:       bool,
+    pub requirements:   Vec<String>,
+    pub first_unproven: usize,
 
     pub start_cycle: usize,
     pub end_cycle:   usize,
@@ -79,17 +83,24 @@ impl TermProfileInfo {
 }
 
 impl Tracer for Profiler {
-    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose, cycle: usize) {
+    fn on_new_suppose(
+        &mut self,
+        parent: Rc<Term>,
+        rule: SharedRule,
+        suppose: &Suppose,
+        cycle: usize,
+    ) {
         self.current_node = self
             .task
             .get_mut(self.current_node)
             .unwrap()
             .append(ProfilerNode::Suppose(TermProfileInfo {
-                rule: rule.to_string(),
-                term: suppose.resolution.to_string(),
+                parent: parent.to_string(),
+                rule:   rule.to_string(),
+                term:   suppose.resolution.to_string(),
 
-                requirements: suppose.requirements.iter().map(|x| x.to_string()).collect(),
-                result:       false,
+                requirements:   suppose.requirements.iter().map(|x| x.to_string()).collect(),
+                first_unproven: 0,
 
                 start_cycle: cycle,
                 end_cycle:   Default::default(),
@@ -122,12 +133,12 @@ impl Tracer for Profiler {
         }
     }
 
-    fn on_suppose_finish(&mut self, _suppose: &Suppose, cycle: usize, result: bool) {
+    fn on_suppose_finish(&mut self, _suppose: &Suppose, cycle: usize, first_unproven: usize) {
         match self.task.get_mut(self.current_node).unwrap().value() {
             ProfilerNode::Helper(_) => unreachable!("last node is not suppose"),
             ProfilerNode::Suppose(suppose) => {
                 suppose.end_cycle = cycle;
-                suppose.result = result;
+                suppose.first_unproven = first_unproven;
             }
         }
 

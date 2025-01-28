@@ -110,7 +110,7 @@ impl TermProps {
                 if let Some(rule) = rule.pop() {
                     if rule.pattern_node().data().variable().is_some() {
                         trace!("New rule: {}", rule);
-                        let rule = Arc::new(rule);
+                        let rule = SharedRule::new(rule);
                         self.as_rule = Some(rule.clone());
                         self.blocked_rules.insert(id);
                         return Some(rule);

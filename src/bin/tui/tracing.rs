@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use ego_tree::{NodeId, NodeRef};
 use ratatui::{
     prelude::*,
@@ -67,7 +69,7 @@ impl Tracing {
             ProfilerNode::Suppose(suppose) => Line::from(vec![
                 Span::styled(
                     suppose.term.clone(),
-                    if suppose.result {
+                    if suppose.first_unproven == suppose.requirements.len() {
                         default_style
                     } else {
                         not_proved_style
@@ -129,6 +131,11 @@ impl Tracing {
                         ]),
                         Line::default(),
                         Line::from(vec![
+                            Span::styled("Parent: ", highlighted),
+                            Span::from(&suppose.parent),
+                        ]),
+                        Line::default(),
+                        Line::from(vec![
                             Span::styled("Rule: ", highlighted),
                             Span::from(&suppose.rule),
                         ]),
@@ -140,11 +147,23 @@ impl Tracing {
                         Line::default(),
                         Line::from(Span::styled("Requirements:", highlighted)),
                     ];
+                    let first_unproven = suppose.first_unproven;
+                    let proven = Style::new().fg(Color::Green).bold();
+                    let unproven = Style::new().fg(Color::Red).bold();
+                    let skiped = Style::new().fg(Color::Gray).bold();
                     result.append(
                         &mut suppose
                             .requirements
                             .iter()
-                            .map(|x| Line::from(vec![Span::raw("  "), Span::from(x)]))
+                            .enumerate()
+                            .map(|(num, x)| {
+                                let (symbol, style) = match first_unproven.cmp(&num) {
+                                    Ordering::Greater => ("☑", proven),
+                                    Ordering::Equal => ("☒", unproven),
+                                    Ordering::Less => ("☐", skiped),
+                                };
+                                Line::from(vec![Span::styled(format!("  {symbol} {x}"), style)])
+                            })
                             .collect(),
                     );
                     result

@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use parking_lot::Mutex;
 
 use crate::{
     rule::{SharedRule, Suppose},
     task::{Solution, Task},
-    term::TermProps,
+    term::{Term, TermProps},
 };
 
 use super::profiler::Profiler;
@@ -27,10 +27,17 @@ pub trait Tracer: Send + Sync {
     fn on_rule_selection(&mut self, _rule: SharedRule) {}
 
     // Called on each new suppose
-    fn on_new_suppose(&mut self, _rule: SharedRule, _suppose: &Suppose, _cycle: usize) {}
+    fn on_new_suppose(
+        &mut self,
+        _parent: Rc<Term>,
+        _rule: SharedRule,
+        _suppose: &Suppose,
+        _cycle: usize,
+    ) {
+    }
 
     // Called on suppose processing finished
-    fn on_suppose_finish(&mut self, _suppose: &Suppose, _cycle: usize, _result: bool) {}
+    fn on_suppose_finish(&mut self, _suppose: &Suppose, _cycle: usize, _first_unproven: usize) {}
 }
 
 #[derive(Clone)]
@@ -106,19 +113,29 @@ impl Tracer for SolutionTracer {
         }
     }
 
-    fn on_new_suppose(&mut self, rule: SharedRule, suppose: &Suppose, cycle: usize) {
+    fn on_new_suppose(
+        &mut self,
+        parent: Rc<Term>,
+        rule: SharedRule,
+        suppose: &Suppose,
+        cycle: usize,
+    ) {
         self.sink
             .lock()
-            .on_new_suppose(rule.clone(), suppose, cycle);
+            .on_new_suppose(parent.clone(), rule.clone(), suppose, cycle);
         if let Some(profiler) = self.profiler() {
-            profiler.lock().on_new_suppose(rule, suppose, cycle);
+            profiler.lock().on_new_suppose(parent, rule, suppose, cycle);
         }
     }
 
-    fn on_suppose_finish(&mut self, suppose: &Suppose, cycle: usize, result: bool) {
-        self.sink.lock().on_suppose_finish(suppose, cycle, result);
+    fn on_suppose_finish(&mut self, suppose: &Suppose, cycle: usize, first_unproven: usize) {
+        self.sink
+            .lock()
+            .on_suppose_finish(suppose, cycle, first_unproven);
         if let Some(profiler) = self.profiler() {
-            profiler.lock().on_suppose_finish(suppose, cycle, result);
+            profiler
+                .lock()
+                .on_suppose_finish(suppose, cycle, first_unproven);
         }
     }
 }

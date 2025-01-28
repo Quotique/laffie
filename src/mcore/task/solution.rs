@@ -193,7 +193,7 @@ impl Solution {
             }
 
             if let Some(suppose) = self.is_answer(&self.terms[index]) {
-                if self.suppose_proof(&suppose).is_some() {
+                if self.suppose_proof(&suppose) == suppose.requirements.len() {
                     trace!("Resolution: {}", suppose.resolution);
                     if self.terms[index] == suppose.resolution {
                         trace!("Equivalence");
@@ -315,24 +315,25 @@ impl Solution {
                 .inspect({
                     let mut dumper = self.dumper.clone();
                     let rule = rule.clone();
+                    let parrent = self.terms[index].term.clone();
                     {
                         let cycle = *self.cycles.borrow();
                         move |suppose| {
                             trace!(target: "rule_selection", "Suppose: {}", suppose);
-                            dumper.on_new_suppose(rule.clone(), suppose, cycle)
+                            dumper.on_new_suppose(parrent.clone(), rule.clone(), suppose, cycle)
                         }
                     }
                 })
                 .filter_map(|mut suppose| {
-                    if let Some(proofed) = self.suppose_proof(&suppose) {
-                        let cycles = *self.cycles.borrow();
-                        suppose.resolution.requirements = proofed;
-                        dumper.on_suppose_finish(&suppose, cycles, true);
+                    let proof_res = self.suppose_proof(&suppose);
+                    let cycles = *self.cycles.borrow();
+                    dumper.on_suppose_finish(&suppose, cycles, proof_res);
+
+                    if proof_res == suppose.requirements.len() {
+                        suppose.resolution.requirements = suppose.requirements.clone();
                         trace!(target: "rule_selection", "Suppose: proofed, resolution applied");
                         Some(suppose)
                     } else {
-                        let cycles = *self.cycles.borrow();
-                        dumper.on_suppose_finish(&suppose, cycles, false);
                         None
                     }
                 })
@@ -348,17 +349,16 @@ impl Solution {
         vec![]
     }
 
-    fn suppose_proof(&self, suppose: &Suppose) -> Option<Vec<Rc<Term>>> {
-        let mut result = vec![];
-        for req in suppose.requirements.iter() {
-            if let Some(proofed) = self.proof(req) {
-                result.push(proofed);
-            } else {
+    // returns len(requirements) if all requirements proven or id of first unproven
+    // term
+    fn suppose_proof(&self, suppose: &Suppose) -> usize {
+        for (num, req) in suppose.requirements.iter().enumerate() {
+            if self.proof(req).is_none() {
                 trace!(target: "rule_selection", "Can't proof: {}", req);
-                return None;
+                return num;
             }
         }
-        Some(result)
+        suppose.requirements.len()
     }
 
     // Returns proof purpose (is a key for tasks cache)
