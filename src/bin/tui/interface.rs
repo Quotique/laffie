@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::{io, path::Path, sync::Arc};
 
 use derive_more::Display;
 use ratatui::{
@@ -26,18 +26,18 @@ pub enum Tab {
 }
 
 impl Status {
-    pub fn new(symbols_dir: impl AsRef<Path>, tasks_dir: impl AsRef<Path>) -> Self {
+    pub fn try_new(symbols_dir: impl AsRef<Path>, tasks_dir: impl AsRef<Path>) -> io::Result<Self> {
         let parser = DirectoryParser::new(symbols_dir.as_ref(), tasks_dir.as_ref());
 
-        let rules = Arc::new(parser.load_rules().unwrap());
-        let tasks = parser.load_tasks().unwrap();
+        let rules = parser.load_rules().map(Arc::new)?;
+        let tasks = parser.load_tasks()?;
 
-        Status {
+        Ok(Status {
             current_tab: Tab::Rules,
             tasks:       Tasks::new(rules.clone(), tasks),
 
             rules: Rules::new(rules),
-        }
+        })
     }
 
     pub fn solve(&mut self) {

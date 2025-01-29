@@ -1,4 +1,4 @@
-use std::{convert::From, error::Error, fmt};
+use std::{convert::From, error::Error, fmt, path::Path};
 
 use crate::Location;
 
@@ -46,22 +46,20 @@ impl From<PegError> for ParserError {
 }
 
 impl ParserError {
-    pub fn error_string(&self, src_text: &str) -> String {
+    pub fn error_string(&self, src_text: &str, path: Option<&Path>) -> String {
         let count_len = src_text.lines().count().to_string().len();
         let mut lines: Vec<_> = src_text
             .lines()
             .map(|x| x.to_owned())
             .enumerate()
-            .map(|(n, s)| format!("{n:>count_len$}: {s}"))
+            .map(|(n, s)| format!("{:>count_len$}: {s}", n + 1))
             .collect();
-        let len = std::cmp::min(self.loc.len, lines[self.loc.row - 1].len() - self.loc.col);
 
         lines.insert(
             self.loc.row,
             format!(
-                "{}{}: {}",
+                "{}^~~: {}",
                 " ".repeat(self.loc.col + count_len + 2),
-                "^".repeat(len),
                 self.msg
             ),
         );
@@ -73,6 +71,13 @@ impl ParserError {
         };
         let last_line = std::cmp::min(lines.len(), self.loc.row + LINES_AROUND);
 
-        format!("\n{}", lines[first_line..last_line].join("\n"))
+        format!(
+            "\n{}:{}:{}: error: parsing error\n{}",
+            path.map(|x| x.to_string_lossy().to_string())
+                .unwrap_or_default(),
+            self.loc.row,
+            self.loc.col,
+            lines[first_line..last_line].join("\n")
+        )
     }
 }

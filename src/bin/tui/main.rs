@@ -43,10 +43,10 @@ struct Args {
 }
 
 fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
-    let mut status = interface::Status::new(
+    let mut status = interface::Status::try_new(
         args.symbols.clone().unwrap_or("symbols".into()),
         args.tasks.clone().unwrap_or("tasks".into()),
-    );
+    )?;
 
     loop {
         terminal.draw(|frame| {
@@ -107,5 +107,9 @@ fn main() -> io::Result<()> {
     terminal.clear()?;
     let app_result = run(terminal, &args);
     ratatui::restore();
-    app_result
+    if let Err(e) = app_result {
+        eprintln!("{e}");
+    }
+
+    Ok(())
 }

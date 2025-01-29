@@ -35,14 +35,14 @@ impl DirectoryParser {
         Self::load_dir(
             &self.symbols_path,
             &["sym"],
-            &mut |_, src, s: &Tree<NodeData>| {
+            &mut |path, src, s: &Tree<NodeData>| {
                 if let Ok(sym) = FuncSymbolParser::new(s).parse() {
                     let sym = FuncSymbol::register(sym);
                     last_sym.replace(sym);
                 } else if let Ok(rules) = RuleParser::with(s)
                     .with_func_symbol(last_sym.as_ref().unwrap().clone())
                     .parse()
-                    .map_err(|e| error!("Rule not parsed: {}", e.error_string(src)))
+                    .map_err(|e| error!("Rule not parsed: {}", e.error_string(src, Some(path))))
                 {
                     for rule in rules {
                         result.register_rule(rule);
@@ -68,7 +68,7 @@ impl DirectoryParser {
                         t.group = path.to_string_lossy().to_string();
                         result.push(t)
                     }
-                    Err(e) => error!("Task not parsed: {}", e.error_string(src)),
+                    Err(e) => error!("Task not parsed: {}", e.error_string(src, Some(path))),
                 }
             }
         })?;
@@ -114,15 +114,15 @@ impl DirectoryParser {
     {
         info!("Processing file: {}", file.as_ref().to_string_lossy());
         let content = fs::read_to_string(file.as_ref())?;
-        let states = lang::any(content.as_str())
-            .map_err(|e| {
-                error!(
-                    "Unable to parse file {}: {}",
-                    file.as_ref().to_string_lossy(),
-                    e.error_string(content.as_str())
-                )
-            })
-            .unwrap();
+        let states = lang::any(content.as_str()).map_err(|e| {
+            let error_string = e.error_string(content.as_str(), Some(file.as_ref()));
+            error!(
+                "Unable to parse file {}: {}",
+                file.as_ref().to_string_lossy(),
+                error_string
+            );
+            io::Error::new(io::ErrorKind::InvalidData, error_string)
+        })?;
         for s in states {
             cb(file.as_ref(), content.as_str(), &s);
         }

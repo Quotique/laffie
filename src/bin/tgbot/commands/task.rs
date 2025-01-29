@@ -20,7 +20,7 @@ fn task(
     user: &mut UserRecord,
 ) -> Result<Paginator, String> {
     let states = lang::task(&task_text)
-        .map_err(|e| format!("<code>{}</code>", e.error_string(&task_text)))?;
+        .map_err(|e| format!("<code>{}</code>", e.error_string(&task_text, None)))?;
     let task = TaskParser::with(&states)
         .parse()
         .map_err(|e| e.to_string())?;

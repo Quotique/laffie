@@ -106,8 +106,16 @@ fn main() {
             }),
     );
 
-    let rules_engine = Arc::new(parser.load_rules().unwrap());
-    let tasks = parser.load_tasks().unwrap();
+    let Ok(rules_engine) = parser
+        .load_rules()
+        .map(Arc::new)
+        .inspect_err(|e| eprintln!("{e}"))
+    else {
+        return;
+    };
+    let Ok(tasks) = parser.load_tasks().inspect_err(|e| eprintln!("{e}")) else {
+        return;
+    };
     let db = TaskDb::open(args.tasks_db).unwrap();
 
     if !args.remove.is_empty() {

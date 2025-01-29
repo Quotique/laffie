@@ -100,10 +100,10 @@ mod tests {
 
         let error = ParserError {
             loc: location.clone(),
-            msg: "Hui".to_owned(),
+            msg: "Error text".to_owned(),
         };
 
-        println!("{}", error.error_string(test_str));
+        println!("{}", error.error_string(test_str, None));
 
         assert_eq!(location.len, 4);
         assert_eq!(location.row, 1);
