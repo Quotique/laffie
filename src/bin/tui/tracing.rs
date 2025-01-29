@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, vec};
 
 use ego_tree::{NodeId, NodeRef};
 use ratatui::{
@@ -126,27 +126,33 @@ impl Tracing {
                 ProfilerNode::Suppose(suppose) => {
                     let mut result = vec![
                         Line::from(vec![
-                            Span::styled("Term: ", highlighted),
-                            Span::from(&suppose.term),
-                        ]),
-                        Line::default(),
-                        Line::from(vec![
                             Span::styled("Parent: ", highlighted),
                             Span::from(&suppose.parent),
+                        ]),
+                        Line::from(vec![
+                            Span::styled("Term: ", highlighted),
+                            Span::from(&suppose.term),
                         ]),
                         Line::default(),
                         Line::from(vec![
                             Span::styled("Rule: ", highlighted),
                             Span::from(&suppose.rule),
                         ]),
-                        Line::default(),
-                        Line::from(vec![
-                            Span::styled("Cycles: ", highlighted),
-                            Span::from(suppose.cycles().to_string()),
-                        ]),
+                        Line::from(Span::styled("Params:", highlighted)),
+                    ];
+                    result.append(
+                        &mut suppose
+                            .params
+                            .iter()
+                            .map(|(param, value)| {
+                                Line::from(vec![Span::raw(format!("  {param} = {value}"))])
+                            })
+                            .collect(),
+                    );
+                    result.append(&mut vec![
                         Line::default(),
                         Line::from(Span::styled("Requirements:", highlighted)),
-                    ];
+                    ]);
                     let first_unproven = suppose.first_unproven;
                     let proven = Style::new().fg(Color::Green).bold();
                     let unproven = Style::new().fg(Color::Red).bold();
@@ -166,6 +172,13 @@ impl Tracing {
                             })
                             .collect(),
                     );
+                    result.append(&mut vec![
+                        Line::default(),
+                        Line::from(vec![
+                            Span::styled("Cycles: ", highlighted),
+                            Span::from(suppose.cycles().to_string()),
+                        ]),
+                    ]);
                     result
                 }
             };

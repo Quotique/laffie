@@ -16,6 +16,8 @@ pub struct TermProfileInfo {
     pub rule:   String, // TODO: SharedRule
     pub term:   String, // TODO: Term
 
+    pub params: Vec<(String, String)>,
+
     pub requirements:   Vec<String>,
     pub first_unproven: usize,
 
@@ -98,6 +100,12 @@ impl Tracer for Profiler {
                 parent: parent.to_string(),
                 rule:   rule.to_string(),
                 term:   suppose.resolution.to_string(),
+
+                params: suppose
+                    .params
+                    .params()
+                    .map(|(param, value)| (param.to_string(), value.to_string()))
+                    .collect(),
 
                 requirements:   suppose.requirements.iter().map(|x| x.to_string()).collect(),
                 first_unproven: 0,

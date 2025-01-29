@@ -37,6 +37,10 @@ impl From<HashMap<Param, SymbolTree>> for ParamsMapping {
 }
 
 impl ParamsMapping {
+    pub fn params(&self) -> impl Iterator<Item = (&Param, &SymbolTree)> {
+        self.params.iter()
+    }
+
     pub fn mapper<'a>(target: &'a SymbolNode, pattern: &'a SymbolNode) -> Mapper<'a> {
         Mapper { target, pattern }
     }

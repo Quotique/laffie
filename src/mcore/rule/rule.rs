@@ -45,6 +45,7 @@ pub enum RuleDeclineReason {
 pub struct Suppose {
     pub requirements: Vec<Rc<Term>>,
     pub resolution:   TermProps,
+    pub params:       ParamsMapping,
 }
 
 #[derive(Clone, Debug)]
@@ -220,13 +221,13 @@ impl Rule {
         }
 
         let mut result = vec![];
-        for (maps, pos) in maps.iter() {
-            for i in maps.iter() {
+        for (maps, pos) in maps.into_iter() {
+            for i in maps.into_iter() {
                 let replace = Term::from(self.replace_node().deep_clone());
 
-                let mut replace = replace.apply_map(&self.binds).apply_map(i);
+                let mut replace = replace.apply_map(&self.binds).apply_map(&i);
                 let mut src = (*arg.term).clone();
-                replace.swap_node(&mut src[pos]);
+                replace.swap_node(&mut src[&pos]);
                 // src = src.normalize(NormalizationLevel::max());
                 src = src.normalize(self.norm_level());
                 let mut resolution = TermProps::from(Rc::new(src)).with_parent(arg.id);
@@ -236,9 +237,10 @@ impl Rule {
                     requirements: self
                         .requirements
                         .iter()
-                        .map(|r| Rc::new(r.apply_map(&self.binds).apply_map(i)))
+                        .map(|r| Rc::new(r.apply_map(&self.binds).apply_map(&i)))
                         .collect(),
                     resolution,
+                    params: i,
                 };
                 trace!(target: "rule_selection", "New suppose: {}", suppose);
                 result.push(suppose);

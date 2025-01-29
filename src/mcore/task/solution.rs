@@ -547,6 +547,7 @@ impl Solution {
             return Some(Suppose {
                 requirements: vec![],
                 resolution,
+                params: Default::default(),
             });
         }
 
@@ -567,6 +568,7 @@ impl Solution {
                     return Some(Suppose {
                         requirements: vec![Rc::new(Term::from(is_known))],
                         resolution:   term.clone(),
+                        params:       Default::default(),
                     });
                 }
                 None
@@ -577,12 +579,14 @@ impl Solution {
                         return Some(Suppose {
                             requirements: vec![],
                             resolution:   term.clone(),
+                            params:       Default::default(),
                         });
                     }
                     if self.terms[*i].term.root().check_truth().is_true() {
                         return Some(Suppose {
                             requirements: vec![],
                             resolution:   self.terms[*i].clone().without_parents(),
+                            params:       Default::default(),
                         });
                     }
                 }
@@ -601,6 +605,7 @@ impl Solution {
                                 .unwrap()
                                 .clone()
                                 .without_parents(),
+                            params:       Default::default(),
                         });
                     }
                 }
