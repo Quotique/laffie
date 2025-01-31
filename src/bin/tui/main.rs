@@ -4,7 +4,7 @@ use clap::Parser;
 use ratatui::{
     crossterm::event::{self, KeyCode, KeyEventKind},
     prelude::*,
-    widgets::Tabs,
+    widgets::{Block, Borders, Paragraph, Tabs},
     DefaultTerminal,
 };
 
@@ -53,18 +53,25 @@ fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
             let vertical_layout = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(vec![
-                    Constraint::Percentage(5),
-                    Constraint::Percentage(90),
-                    Constraint::Percentage(5),
+                    Constraint::Min(1),
+                    Constraint::Percentage(100),
+                    Constraint::Min(1),
                 ])
                 .split(frame.area());
 
             let tabs = Tabs::new((0..=Itab::MAX).map(|x| format!("F{}: {}", x + 1, Itab::from(x))))
-                .select(Some(status.current_tab.into()));
-
+                .select(Some(status.current_tab.into()))
+                .block(Block::default().borders(Borders::LEFT | Borders::RIGHT));
             frame.render_widget(tabs, vertical_layout[0]);
 
             status.draw(frame, vertical_layout[1]);
+
+            let help = Paragraph::new(
+                "←↑→↓ - navigation | q - quit | s - solve selected | Space - toggle tree node",
+            )
+            .block(Block::default().borders(Borders::LEFT | Borders::RIGHT));
+
+            frame.render_widget(help, vertical_layout[2]);
         })?;
 
         if let event::Event::Key(key) = event::read()? {
