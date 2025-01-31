@@ -8,7 +8,7 @@ use ratatui::{
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use mcore::task::{ProfilerNode, Solution, TaskProfileInfo, TermProfileInfo};
+use solver::task::{ProfilerNode, Solution, TaskProfileInfo, TermProfileInfo};
 
 use super::interface::{border_focus, border_unfocus, draw_scrollbar};
 use crate::tasks::TaskStatus;

@@ -9,7 +9,7 @@ use rust_i18n::t;
 use telegram_bot::*;
 
 use database::{TaskDb, UserDb};
-use mcore::{rule::RulesEngine, CompactString};
+use solver::{rule::RulesEngine, CompactString};
 
 use crate::text::Text;
 

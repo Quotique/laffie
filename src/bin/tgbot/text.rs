@@ -30,7 +30,7 @@ impl Text {
         format!(
             "Laffie: v{}\nMinerva: v{}",
             env!("CARGO_PKG_VERSION"),
-            mcore::version_str()
+            solver::version_str()
         )
     }
 

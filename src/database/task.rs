@@ -7,7 +7,7 @@ use std::{
 use bincode::{config, config::Configuration, Decode, Encode};
 use sled::{Db, Error};
 
-use mcore::{
+use solver::{
     task::Task,
     term::{Term, TermProps},
 };

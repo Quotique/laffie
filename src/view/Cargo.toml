@@ -10,8 +10,8 @@ edition.workspace = true
 path = "./lib.rs"
 
 [dependencies]
-mcore = { path = "../mcore/" }
-utils = { path = "../utils/" }
+solver = { path = "../solver" }
+utils = { path = "../utils" }
 
 eyre = { workspace = true }
 

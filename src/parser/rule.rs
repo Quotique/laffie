@@ -1,6 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
-use mcore::{
+use solver::{
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
     symbol::FuncSymbol,
     CompactString,
@@ -171,7 +171,7 @@ impl<'a> RuleParser<'a> {
 mod tests {
     use trees::tr;
 
-    use mcore::{
+    use solver::{
         rule::{RuleAttr, RuleAttrValue},
         symbol::Symbol,
     };

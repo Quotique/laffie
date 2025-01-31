@@ -2,7 +2,7 @@ use std::fmt;
 
 use colored::*;
 
-use mcore::{
+use solver::{
     task::{Purpose, Solution},
     term::{Term, TermProps},
 };

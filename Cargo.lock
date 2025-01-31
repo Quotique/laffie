@@ -331,10 +331,10 @@ dependencies = [
  "colored 3.0.0",
  "config",
  "database",
- "mcore",
  "parser",
  "serde",
  "serde_derive",
+ "solver",
  "utils",
  "view",
 ]
@@ -562,8 +562,8 @@ version = "0.4.2"
 dependencies = [
  "bincode",
  "log",
- "mcore",
  "sled",
+ "solver",
 ]
 
 [[package]]
@@ -1245,31 +1245,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mcore"
-version = "0.4.2"
-dependencies = [
- "bigdecimal",
- "bincode",
- "derive_more",
- "ego-tree",
- "eyre",
- "indexmap 2.3.0",
- "insta",
- "itertools 0.14.0",
- "log",
- "multimap",
- "num",
- "num-bigint",
- "parking_lot 0.12.3",
- "parser",
- "serde",
- "serde_derive",
- "smartstring",
- "trees",
- "utils",
-]
-
-[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1283,9 +1258,9 @@ dependencies = [
  "config",
  "database",
  "eyre",
- "mcore",
  "serde",
  "serde_derive",
+ "solver",
  "utils",
 ]
 
@@ -1549,9 +1524,9 @@ version = "0.4.2"
 dependencies = [
  "eyre",
  "log",
- "mcore",
  "peg",
  "smartstring",
+ "solver",
  "trees",
  "utils",
 ]
@@ -2276,6 +2251,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "solver"
+version = "0.4.2"
+dependencies = [
+ "bigdecimal",
+ "bincode",
+ "derive_more",
+ "ego-tree",
+ "eyre",
+ "indexmap 2.3.0",
+ "insta",
+ "itertools 0.14.0",
+ "log",
+ "multimap",
+ "num",
+ "num-bigint",
+ "parking_lot 0.12.3",
+ "parser",
+ "serde",
+ "serde_derive",
+ "smartstring",
+ "trees",
+ "utils",
+]
+
+[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2424,11 +2424,11 @@ dependencies = [
  "cpu-freq",
  "database",
  "futures",
- "mcore",
  "parser",
  "rust-i18n",
  "serde",
  "serde_derive",
+ "solver",
  "strip-ansi-escapes",
  "sys-info",
  "telegram-bot",
@@ -2692,11 +2692,11 @@ dependencies = [
  "derive_more",
  "ego-tree",
  "log",
- "mcore",
  "parser",
  "ratatui",
  "serde",
  "serde_derive",
+ "solver",
  "trees",
  "tui-tree-widget",
  "utils",
@@ -2830,7 +2830,7 @@ dependencies = [
  "colored 2.1.0",
  "eyre",
  "html-escape",
- "mcore",
+ "solver",
  "utils",
 ]
 

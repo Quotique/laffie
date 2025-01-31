@@ -9,8 +9,8 @@ use clap::Parser;
 use colored::*;
 
 use database::{TaskDb, TaskRecord};
-use mcore::task::{DumperConfig, Solution, Task};
 use parser::DirectoryParser;
+use solver::task::{DumperConfig, Solution, Task};
 use utils::VecDisplay;
 use view::View;
 

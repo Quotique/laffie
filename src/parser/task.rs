@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use mcore::{
+use solver::{
     task::{Task, TaskBuilder},
     term::TermProps,
     NormalizationLevel,
@@ -98,7 +98,7 @@ impl<'a> TaskParser<'a> {
 mod tests {
     use trees::tr;
 
-    use mcore::symbol::Symbol;
+    use solver::symbol::Symbol;
 
     use crate::lang;
 

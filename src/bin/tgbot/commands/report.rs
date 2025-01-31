@@ -4,7 +4,7 @@ use rust_i18n::t;
 use telegram_bot::*;
 
 use database::{TaskDb, UserDb, UserRecord};
-use mcore::CompactString;
+use solver::CompactString;
 
 use super::Command;
 

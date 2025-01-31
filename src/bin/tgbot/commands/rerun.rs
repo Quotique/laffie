@@ -4,7 +4,7 @@ use rust_i18n::t;
 use telegram_bot::*;
 
 use database::{TaskDb, UserDb, UserRecord};
-use mcore::{
+use solver::{
     rule::RulesEngine,
     task::{DumperConfig, Solution, EXECUTION_DEADLINE_DEFAULT},
     CompactString,

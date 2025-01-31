@@ -6,7 +6,7 @@ use std::{cell::RefCell, collections::HashSet, convert::TryFrom, fmt, sync::Arc}
 pub use console::Console;
 pub use html::Html;
 
-use mcore::{
+use solver::{
     task::{Purpose, Solution, TasksCache},
     term::{Term, TermProps},
 };

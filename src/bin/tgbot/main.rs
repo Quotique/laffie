@@ -10,8 +10,8 @@ use futures::StreamExt;
 use telegram_bot::*;
 
 use database::{TaskDb, UserDb};
-use mcore::rule::RulesEngine;
 use parser::DirectoryParser;
+use solver::rule::RulesEngine;
 
 use commands::process_update;
 use settings::Settings;

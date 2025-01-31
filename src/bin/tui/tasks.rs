@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListState},
 };
 
-use mcore::{
+use solver::{
     rule::RulesEngine,
     task::{DumperConfig, Solution, Task, EXECUTION_DEADLINE_DEFAULT},
 };

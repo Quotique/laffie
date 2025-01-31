@@ -3,11 +3,11 @@ use std::{convert::TryFrom, fmt::Write, sync::Arc};
 use telegram_bot::*;
 
 use database::{TaskDb, TaskRecord, UserDb, UserRecord};
-use mcore::{
+use parser::{lang, TaskParser};
+use solver::{
     rule::RulesEngine,
     task::{DumperConfig, Solution, EXECUTION_DEADLINE_DEFAULT},
 };
-use parser::{lang, TaskParser};
 use view::{Html, View};
 
 use super::Command;

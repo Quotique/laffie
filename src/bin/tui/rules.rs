@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListState, Paragraph},
 };
 
-use mcore::rule::RulesEngine;
+use solver::rule::RulesEngine;
 
 use super::interface::{border_focus, border_unfocus, default_state, draw_scrollbar};
 

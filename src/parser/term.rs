@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use trees::tr;
 
-use mcore::{
+use solver::{
     symbol::{FuncSymbol, Param, Placeholder, Symbol, SymbolTree, Variable},
     term::{NodePosition, Term},
     Decimal,
@@ -129,7 +129,7 @@ impl<'a> TermParser<'a> {
 mod tests {
     use trees::tr;
 
-    use mcore::symbol::Symbol;
+    use solver::symbol::Symbol;
 
     use crate::lang;
 

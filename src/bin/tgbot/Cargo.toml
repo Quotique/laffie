@@ -10,7 +10,7 @@ path = "./main.rs"
 
 [dependencies]
 database = { path = "../../database" }
-mcore = { path = "../../mcore/" }
+solver = { path = "../../solver" }
 parser = { path = "../../parser" }
 view = { path = "../../view" }
 utils = { path = "../../utils" }

@@ -1,5 +1,5 @@
 [package]
-name = "mcore"
+name = "solver"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
