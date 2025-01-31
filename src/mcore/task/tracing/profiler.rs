@@ -27,7 +27,8 @@ pub struct TermProfileInfo {
 
 #[derive(Clone, Debug, Default)]
 pub struct TaskProfileInfo {
-    pub purpose: String,
+    pub purpose: String, // TODO: Term
+    pub answer:  Option<String>,
 
     pub start_cycle: usize,
     pub end_cycle:   usize,
@@ -58,7 +59,8 @@ impl ProfilerNode {
 impl Default for Profiler {
     fn default() -> Self {
         let tree = Tree::new(ProfilerNode::Helper(TaskProfileInfo {
-            purpose: "Profiler root".to_owned(),
+            purpose: "Solution".to_owned(),
+            answer:  Some("".to_owned()),
 
             start_cycle: Default::default(),
             end_cycle:   Default::default(),
@@ -123,6 +125,7 @@ impl Tracer for Profiler {
             .unwrap()
             .append(ProfilerNode::Helper(TaskProfileInfo {
                 purpose: task.purpose.to_string(),
+                answer:  None,
 
                 start_cycle: cycle,
                 end_cycle:   Default::default(),
@@ -132,7 +135,10 @@ impl Tracer for Profiler {
 
     fn on_subtask_end(&mut self, status: &Solution) {
         match self.task.get_mut(self.current_node).unwrap().value() {
-            ProfilerNode::Helper(task) => task.end_cycle = *status.cycles.borrow(),
+            ProfilerNode::Helper(task) => {
+                task.end_cycle = *status.cycles.borrow();
+                task.answer = status.answer().map(|x| x.to_string());
+            }
             ProfilerNode::Suppose(_) => unreachable!("last node is not subtask"),
         }
 

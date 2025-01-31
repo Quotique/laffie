@@ -8,7 +8,7 @@ use ratatui::{
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use mcore::task::{ProfilerNode, Solution};
+use mcore::task::{ProfilerNode, Solution, TaskProfileInfo, TermProfileInfo};
 
 use super::interface::{border_focus, border_unfocus, draw_scrollbar};
 use crate::tasks::TaskStatus;
@@ -63,7 +63,14 @@ impl Tracing {
 
         let text = match profiler.value() {
             ProfilerNode::Helper(task) => Line::from(vec![
-                Span::from(task.purpose.clone()),
+                Span::styled(
+                    task.purpose.clone(),
+                    if task.answer.is_some() {
+                        default_style
+                    } else {
+                        not_proved_style
+                    },
+                ),
                 Span::from(format!(" {} {}", profiler.value().cycles(), total_cycles)),
             ]),
             ProfilerNode::Suppose(suppose) => Line::from(vec![
@@ -106,81 +113,13 @@ impl Tracing {
 
     fn draw_profiler_node_details(&mut self, frame: &mut Frame, area: Rect) {
         let pane_style = self.pane_style(1);
-        let highlighted = Style::new().fg(Color::LightBlue).bold();
 
         if let Some(selected) = self.tree_state.selected().last() {
             let node = self.task.solution.dumper.profiler().unwrap().lock();
 
             let text = match node.task.get(selected.unwrap()).unwrap().value() {
-                ProfilerNode::Helper(task) => vec![
-                    Line::from(vec![
-                        Span::styled("Task: ", highlighted),
-                        Span::from(&task.purpose),
-                    ]),
-                    Line::default(),
-                    Line::from(vec![
-                        Span::styled("Cycles: ", highlighted),
-                        Span::from(task.cycles().to_string()),
-                    ]),
-                ],
-                ProfilerNode::Suppose(suppose) => {
-                    let mut result = vec![
-                        Line::from(vec![
-                            Span::styled("Parent: ", highlighted),
-                            Span::from(&suppose.parent),
-                        ]),
-                        Line::from(vec![
-                            Span::styled("Term: ", highlighted),
-                            Span::from(&suppose.term),
-                        ]),
-                        Line::default(),
-                        Line::from(vec![
-                            Span::styled("Rule: ", highlighted),
-                            Span::from(&suppose.rule),
-                        ]),
-                        Line::from(Span::styled("Params:", highlighted)),
-                    ];
-                    result.append(
-                        &mut suppose
-                            .params
-                            .iter()
-                            .map(|(param, value)| {
-                                Line::from(vec![Span::raw(format!("  {param} = {value}"))])
-                            })
-                            .collect(),
-                    );
-                    result.append(&mut vec![
-                        Line::default(),
-                        Line::from(Span::styled("Requirements:", highlighted)),
-                    ]);
-                    let first_unproven = suppose.first_unproven;
-                    let proven = Style::new().fg(Color::Green).bold();
-                    let unproven = Style::new().fg(Color::Red).bold();
-                    let skiped = Style::new().fg(Color::Gray).bold();
-                    result.append(
-                        &mut suppose
-                            .requirements
-                            .iter()
-                            .enumerate()
-                            .map(|(num, x)| {
-                                let (symbol, style) = match first_unproven.cmp(&num) {
-                                    Ordering::Greater => ("☑", proven),
-                                    Ordering::Equal => ("☒", unproven),
-                                    Ordering::Less => ("☐", skiped),
-                                };
-                                Line::from(vec![Span::styled(format!("  {symbol} {x}"), style)])
-                            })
-                            .collect(),
-                    );
-                    result.append(&mut vec![
-                        Line::default(),
-                        Line::from(vec![
-                            Span::styled("Cycles: ", highlighted),
-                            Span::from(suppose.cycles().to_string()),
-                        ]),
-                    ]);
-                    result
-                }
+                ProfilerNode::Helper(task) => Self::task_lines(task),
+                ProfilerNode::Suppose(suppose) => Self::term_lines(suppose),
             };
             frame.render_widget(
                 List::new(text.iter().cloned())
@@ -203,6 +142,90 @@ impl Tracing {
         }
     }
 
+    fn task_lines(task: &TaskProfileInfo) -> Vec<Line> {
+        let highlighted = Style::new().fg(Color::LightBlue).bold();
+        let no_answer = Style::new().fg(Color::Red).bold();
+
+        vec![
+            Line::from(vec![
+                Span::styled("Task: ", highlighted),
+                Span::from(&task.purpose),
+            ]),
+            Line::default(),
+            Line::from(vec![
+                Span::styled("Answer: ", highlighted),
+                if let Some(answer) = &task.answer {
+                    Span::from(answer)
+                } else {
+                    Span::styled("no answer".to_owned(), no_answer)
+                },
+            ]),
+            Line::default(),
+            Line::from(vec![
+                Span::styled("Cycles: ", highlighted),
+                Span::from(task.cycles().to_string()),
+            ]),
+        ]
+    }
+
+    fn term_lines(suppose: &TermProfileInfo) -> Vec<Line> {
+        let highlighted = Style::new().fg(Color::LightBlue).bold();
+        let mut result = vec![
+            Line::from(vec![
+                Span::styled("Parent: ", highlighted),
+                Span::from(&suppose.parent),
+            ]),
+            Line::from(vec![
+                Span::styled("Term: ", highlighted),
+                Span::from(&suppose.term),
+            ]),
+            Line::default(),
+            Line::from(vec![
+                Span::styled("Rule: ", highlighted),
+                Span::from(&suppose.rule),
+            ]),
+            Line::from(Span::styled("Params:", highlighted)),
+        ];
+        result.append(
+            &mut suppose
+                .params
+                .iter()
+                .map(|(param, value)| Line::from(vec![Span::raw(format!("  {param} = {value}"))]))
+                .collect(),
+        );
+        result.append(&mut vec![
+            Line::default(),
+            Line::from(Span::styled("Requirements:", highlighted)),
+        ]);
+        let first_unproven = suppose.first_unproven;
+        let proven = Style::new().fg(Color::Green).bold();
+        let unproven = Style::new().fg(Color::Red).bold();
+        let skiped = Style::new().fg(Color::Gray).bold();
+        result.append(
+            &mut suppose
+                .requirements
+                .iter()
+                .enumerate()
+                .map(|(num, x)| {
+                    let (symbol, style) = match first_unproven.cmp(&num) {
+                        Ordering::Greater => ("☑", proven),
+                        Ordering::Equal => ("☒", unproven),
+                        Ordering::Less => ("☐", skiped),
+                    };
+                    Line::from(vec![Span::styled(format!("  {symbol} {x}"), style)])
+                })
+                .collect(),
+        );
+        result.append(&mut vec![
+            Line::default(),
+            Line::from(vec![
+                Span::styled("Cycles: ", highlighted),
+                Span::from(suppose.cycles().to_string()),
+            ]),
+        ]);
+        result
+    }
+
     fn draw_profiler_tree(&mut self, frame: &mut Frame, area: Rect) {
         let items = [Self::tree(
             &self
@@ -220,8 +243,8 @@ impl Tracing {
             .expect("all item identifiers are unique")
             .block(
                 Block::bordered()
-                    .title("Tree Widget")
-                    .title_bottom(format!("{:?}", &mut self.tree_state)),
+                    .title("Tracing")
+                    //.title_bottom(format!("{:?}", &mut self.tree_state)),
             )
             .experimental_scrollbar(Some(
                 Scrollbar::new(ScrollbarOrientation::VerticalRight)
