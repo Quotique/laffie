@@ -8,7 +8,7 @@ use ratatui::{
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use solver::task::{ProfilerNode, Solution, TaskProfileInfo, TermProfileInfo};
+use solver::task::{ProfilerNode, Solver, TaskProfileInfo, TermProfileInfo};
 
 use super::interface::{border_focus, border_unfocus, draw_scrollbar};
 use crate::tasks::TaskStatus;
@@ -115,7 +115,7 @@ impl Tracing {
         let pane_style = self.pane_style(1);
 
         if let Some(selected) = self.tree_state.selected().last() {
-            let node = self.task.solution.dumper.profiler().unwrap().lock();
+            let node = self.task.solution.tracer.profiler().unwrap().lock();
 
             let text = match node.task.get(selected.unwrap()).unwrap().value() {
                 ProfilerNode::Helper(task) => Self::task_lines(task),
@@ -231,7 +231,7 @@ impl Tracing {
             &self
                 .task
                 .solution
-                .dumper
+                .tracer
                 .profiler()
                 .unwrap()
                 .lock()
@@ -262,7 +262,7 @@ impl Tracing {
         frame.render_stateful_widget(widget, area, &mut self.tree_state);
     }
 
-    fn _draw_solution_text(solution: &Solution, pane_style: Style, frame: &mut Frame, area: Rect) {
+    fn _draw_solution_text(solution: &Solver, pane_style: Style, frame: &mut Frame, area: Rect) {
         let solution: Vec<_> = solution
             .terms
             .iter()

@@ -6,7 +6,7 @@ use database::{TaskDb, TaskRecord, UserDb, UserRecord};
 use parser::{lang, TaskParser};
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, Solution, EXECUTION_DEADLINE_DEFAULT},
+    task::{DumperConfig, Solver, EXECUTION_DEADLINE_DEFAULT},
 };
 use view::{Html, View};
 
@@ -28,7 +28,7 @@ fn task(
     let record = TaskRecord::from(&task);
     let mut record = tasks.get_or_insert(record).map_err(|e| e.to_string())?;
 
-    let mut solution = Solution::new(
+    let mut solution = Solver::new(
         task,
         engine,
         DumperConfig {

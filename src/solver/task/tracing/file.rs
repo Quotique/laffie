@@ -2,7 +2,7 @@ use std::{fs::File, io::prelude::*, path::Path, rc::Rc};
 
 use crate::{
     rule::{SharedRule, Suppose},
-    task::{Solution, Task},
+    task::{Solver, Task},
     term::{Term, TermProps},
 };
 
@@ -52,7 +52,7 @@ impl Tracer for FileDumpTracer {
         self.subtask_start_cycle.push(cycle);
     }
 
-    fn on_subtask_end(&mut self, status: &Solution) {
+    fn on_subtask_end(&mut self, status: &Solver) {
         self.file
             .write_all(
                 format!(

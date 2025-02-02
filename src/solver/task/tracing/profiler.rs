@@ -4,7 +4,7 @@ use ego_tree::{NodeId, Tree};
 
 use crate::{
     rule::{SharedRule, Suppose},
-    task::{Solution, Task},
+    task::{Solver, Task},
     term::Term,
 };
 
@@ -133,7 +133,7 @@ impl Tracer for Profiler {
             .id();
     }
 
-    fn on_subtask_end(&mut self, status: &Solution) {
+    fn on_subtask_end(&mut self, status: &Solver) {
         match self.task.get_mut(self.current_node).unwrap().value() {
             ProfilerNode::Helper(task) => {
                 task.end_cycle = *status.cycles.borrow();

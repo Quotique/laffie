@@ -6,7 +6,7 @@ use telegram_bot::*;
 use database::{TaskDb, UserDb, UserRecord};
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, Solution, EXECUTION_DEADLINE_DEFAULT},
+    task::{DumperConfig, Solver, EXECUTION_DEADLINE_DEFAULT},
     CompactString,
 };
 use view::{Html, View};
@@ -27,7 +27,7 @@ fn rerun(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| t!("errors.task_not_found"))?;
 
-    let mut solution = Solution::new(
+    let mut solution = Solver::new(
         record.clone().into(),
         engine,
         DumperConfig {

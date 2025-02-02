@@ -4,11 +4,11 @@ use parking_lot::RwLock;
 
 use crate::term::Term;
 
-use super::solution::Solution;
+use super::solver::Solver;
 
 #[derive(Clone)]
 pub enum TaskStatus {
-    Solved(Rc<Solution>),
+    Solved(Rc<Solver>),
     NotSolved,
     InProgress,
 }
@@ -19,7 +19,7 @@ pub struct TasksCache {
 }
 
 impl TaskStatus {
-    pub fn solution(&self) -> Option<Rc<Solution>> {
+    pub fn solution(&self) -> Option<Rc<Solver>> {
         match self {
             TaskStatus::Solved(solution) => Some(solution.clone()),
             _ => None,

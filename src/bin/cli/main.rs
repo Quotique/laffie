@@ -10,7 +10,7 @@ use colored::*;
 
 use database::{TaskDb, TaskRecord};
 use parser::DirectoryParser;
-use solver::task::{DumperConfig, Solution, Task};
+use solver::task::{DumperConfig, Solver, Task};
 use utils::VecDisplay;
 use view::View;
 
@@ -143,7 +143,7 @@ fn main() {
 
         println!("{} {}", "Task".bold().green(), p);
         let p_id = p.id;
-        let mut solution = Solution::new(
+        let mut solution = Solver::new(
             p,
             rules_engine.clone(),
             DumperConfig {

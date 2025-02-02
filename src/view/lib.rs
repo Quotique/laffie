@@ -7,7 +7,7 @@ pub use console::Console;
 pub use html::Html;
 
 use solver::{
-    task::{Purpose, Solution, TasksCache},
+    task::{Purpose, Solver, TasksCache},
     term::{Term, TermProps},
 };
 
@@ -20,7 +20,7 @@ pub trait Renderer {
         &mut self,
         purpose: &Purpose,
         answer: Option<&Term>,
-        status: &Solution,
+        status: &Solver,
     ) -> fmt::Result;
 
     fn dump_frame(&mut self, _frame: &[TermProps]) -> fmt::Result {
@@ -29,15 +29,15 @@ pub trait Renderer {
 }
 
 pub struct View<'a> {
-    solution: &'a Solution,
+    solution: &'a Solver,
     subtasks: Arc<TasksCache>,
     rendered: Arc<RefCell<HashSet<Term>>>,
 }
 
-impl<'a> TryFrom<&'a Solution> for View<'a> {
+impl<'a> TryFrom<&'a Solver> for View<'a> {
     type Error = eyre::Error;
 
-    fn try_from(solution: &'a Solution) -> eyre::Result<Self> {
+    fn try_from(solution: &'a Solver) -> eyre::Result<Self> {
         Ok(Self {
             solution,
             subtasks: solution.cache.clone(),

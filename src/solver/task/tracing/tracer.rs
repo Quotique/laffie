@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 
 use crate::{
     rule::{SharedRule, Suppose},
-    task::{Solution, Task},
+    task::{Solver, Task},
     term::{Term, TermProps},
 };
 
@@ -15,7 +15,7 @@ pub trait Tracer: Send + Sync {
     fn on_subtask_start(&mut self, _task: &Task, _cycle: usize) {}
 
     // Called each time when task finished
-    fn on_subtask_end(&mut self, _status: &Solution) {}
+    fn on_subtask_end(&mut self, _status: &Solver) {}
 
     // Called each time when new term was added to the solution frame
     fn on_new_term(&mut self, _term: &TermProps, _parent: &TermProps) {}
@@ -85,7 +85,7 @@ impl Tracer for SolutionTracer {
         }
     }
 
-    fn on_subtask_end(&mut self, status: &Solution) {
+    fn on_subtask_end(&mut self, status: &Solver) {
         self.sink.lock().on_subtask_end(status);
         if let Some(profiler) = self.profiler() {
             profiler.lock().on_subtask_end(status);

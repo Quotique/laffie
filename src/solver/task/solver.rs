@@ -25,7 +25,7 @@ pub const MAX_LEVEL: usize = 20;
 pub const STACK_SIZE: usize = 2048;
 pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 
-pub struct Solution {
+pub struct Solver {
     pub task: Task,
 
     pub terms:     Vec<TermProps>,
@@ -42,11 +42,11 @@ pub struct Solution {
     pub cycles:         Rc<RefCell<usize>>,
     execution_deadline: usize,
     rules_engine:       Arc<RulesEngine>,
-    pub dumper:         SolutionTracer,
+    pub tracer:         SolutionTracer,
 }
 
 #[derive(Debug, Display, Clone, Copy, Encode, Decode)]
-pub enum SolutionError {
+pub enum SolverError {
     StackOverflow,
     MaxSubtaskLevelExceed,
     NoConditions,
@@ -54,14 +54,14 @@ pub enum SolutionError {
     ExecutionDeadline,
 }
 
-impl Solution {
+impl Solver {
     pub fn new(
         task: Task,
         rules: Arc<RulesEngine>,
-        dumper: SolutionTracer,
+        tracer: SolutionTracer,
         execution_deadline: usize,
         cache: Arc<TasksCache>,
-    ) -> Solution {
+    ) -> Solver {
         let purpose = Purpose::try_from((*task.purpose.term).clone()).unwrap();
 
         let (root, mut childs) = (*task.purpose.term).clone().destruct();
@@ -80,7 +80,7 @@ impl Solution {
 
         let conditions = task.conditions.clone();
 
-        let mut result = Solution {
+        let mut result = Solver {
             // TODO: init values
             terms: Default::default(),
             main_index: Default::default(),
@@ -95,7 +95,7 @@ impl Solution {
             cycles: RefCell::new(0).into(),
             task,
             rules_engine: rules.clone(),
-            dumper,
+            tracer,
             execution_deadline,
         };
         for i in conditions.into_iter() {
@@ -134,18 +134,18 @@ impl Solution {
         false
     }
 
-    pub fn solve(&mut self) -> Result<Rc<Term>, SolutionError> {
+    pub fn solve(&mut self) -> Result<Rc<Term>, SolverError> {
         trace!(target: "subtask", "Subtask: {}, {}", self.purpose, VecDisplay(&self.task.conditions));
         if self.task.subtask_level > MAX_SUBTASK_LEVEL {
-            return Err(SolutionError::MaxSubtaskLevelExceed);
+            return Err(SolverError::MaxSubtaskLevelExceed);
         }
 
-        self.dumper
+        self.tracer
             .on_subtask_start(&self.task, self.current_cycles());
 
-        let result = self.solution_loop();
+        let result = self.solver_loop();
 
-        self.dumper.clone().on_subtask_end(self);
+        self.tracer.clone().on_subtask_end(self);
         result
     }
 
@@ -154,11 +154,11 @@ impl Solution {
         *self.cycles.as_ref().borrow()
     }
 
-    fn solution_loop(&mut self) -> Result<Rc<Term>, SolutionError> {
+    fn solver_loop(&mut self) -> Result<Rc<Term>, SolverError> {
         loop {
             *self.cycles.as_ref().borrow_mut() += 1;
             if self.current_cycles() > self.execution_deadline {
-                return Err(SolutionError::ExecutionDeadline);
+                return Err(SolverError::ExecutionDeadline);
             }
 
             let index = self
@@ -167,8 +167,8 @@ impl Solution {
                 .filter(|x| !(x.replaced || x.is_purpose))
                 .min_by_key(|x| x.weight)
                 .map(|x| x.id)
-                .ok_or(SolutionError::NoConditions)?;
-            self.dumper.on_term_focus(&self.terms[index]);
+                .ok_or(SolverError::NoConditions)?;
+            self.tracer.on_term_focus(&self.terms[index]);
 
             let level = self.terms[index].weight;
             trace!(
@@ -178,7 +178,7 @@ impl Solution {
                 level, self.terms[index]
             );
             if level > MAX_LEVEL {
-                return Err(SolutionError::NoSolutionsFound);
+                return Err(SolverError::NoSolutionsFound);
             }
             self.prepare_purpose(level);
 
@@ -240,7 +240,7 @@ impl Solution {
         }
     }
 
-    fn add_main(&mut self, term: TermProps) -> Result<(), SolutionError> {
+    fn add_main(&mut self, term: TermProps) -> Result<(), SolverError> {
         if self.main_index.contains_key(&term.term) {
             return Ok(());
         }
@@ -250,7 +250,7 @@ impl Solution {
         Ok(())
     }
 
-    fn add_purpose(&mut self, mut term: TermProps) -> Result<(), SolutionError> {
+    fn add_purpose(&mut self, mut term: TermProps) -> Result<(), SolverError> {
         term.is_purpose = true;
         if self.purpose_index.contains_key(&term.term) {
             return Ok(());
@@ -261,8 +261,8 @@ impl Solution {
         Ok(())
     }
 
-    fn add_term(&mut self, mut term: TermProps) -> Result<usize, SolutionError> {
-        self.dumper.on_new_term(
+    fn add_term(&mut self, mut term: TermProps) -> Result<usize, SolverError> {
+        self.tracer.on_new_term(
             &term,
             &term
                 .parent
@@ -273,7 +273,7 @@ impl Solution {
         let id = self.terms.len();
         term.id = id;
         if self.terms.len() + 1 > STACK_SIZE {
-            return Err(SolutionError::StackOverflow);
+            return Err(SolverError::StackOverflow);
         }
         self.terms.push(term);
         Ok(id)
@@ -299,7 +299,7 @@ impl Solution {
             .collect();
 
         for rule in suggested_rules {
-            self.dumper.on_rule_selection(rule.clone());
+            self.tracer.on_rule_selection(rule.clone());
             let supposes = match rule.apply(&mut self.terms[index], &self.task.purpose) {
                 Ok(x) => x,
                 Err(e) => {
@@ -308,26 +308,24 @@ impl Solution {
                 }
             };
 
-            let mut dumper = self.dumper.clone();
+            let mut tracer = self.tracer.clone();
             let res: Vec<_> = supposes
                 .into_iter()
                 .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
                 .inspect({
-                    let mut dumper = self.dumper.clone();
+                    let mut tracer = self.tracer.clone();
                     let rule = rule.clone();
                     let parrent = self.terms[index].term.clone();
-                    {
-                        let cycle = *self.cycles.borrow();
-                        move |suppose| {
-                            trace!(target: "rule_selection", "Suppose: {}", suppose);
-                            dumper.on_new_suppose(parrent.clone(), rule.clone(), suppose, cycle)
-                        }
+                    let cycle = *self.cycles.borrow();
+                    move |suppose| {
+                        trace!(target: "rule_selection", "Suppose: {}", suppose);
+                        tracer.on_new_suppose(parrent.clone(), rule.clone(), suppose, cycle)
                     }
                 })
                 .filter_map(|mut suppose| {
                     let proof_res = self.suppose_proof(&suppose);
                     let cycles = *self.cycles.borrow();
-                    dumper.on_suppose_finish(&suppose, cycles, proof_res);
+                    tracer.on_suppose_finish(&suppose, cycles, proof_res);
 
                     if proof_res == suppose.requirements.len() {
                         suppose.resolution.requirements = suppose.requirements.clone();
@@ -401,9 +399,9 @@ impl Solution {
             tr(Symbol::with_func_symbol("transform")) / to_transform,
         ));
 
-        let solution = self.solve_subtask(task.clone())?;
+        let subtask_solver = self.solve_subtask(task.clone())?;
 
-        let mut answer = solution.answer().unwrap().as_ref().clone();
+        let mut answer = subtask_solver.answer().unwrap().as_ref().clone();
         if answer_wrap {
             let mut tmp = tr(Symbol::with_func_symbol("answer"));
             swap_node(&mut answer.root_mut(), &mut tmp.root_mut());
@@ -424,7 +422,7 @@ impl Solution {
         Some(result)
     }
 
-    fn solve_subtask(&self, task: Rc<Term>) -> Option<Rc<Solution>> {
+    fn solve_subtask(&self, task: Rc<Term>) -> Option<Rc<Solver>> {
         match self.cache.status(&task) {
             Some(TaskStatus::Solved(x)) => return Some(x),
             Some(_) => return None,
@@ -445,18 +443,18 @@ impl Solution {
             .with_level(self.task.subtask_level + 1)
             .build()
             .expect("Can't build subtask");
-        let mut solution = Solution::new(
+        let mut subtask_solver = Solver::new(
             subtask,
             self.rules_engine.clone(),
-            self.dumper.clone(),
+            self.tracer.clone(),
             self.execution_deadline,
             self.cache.clone(),
         );
-        solution.cycles = self.cycles.clone();
+        subtask_solver.cycles = self.cycles.clone();
 
-        match solution.solve() {
+        match subtask_solver.solve() {
             Ok(_) => {
-                let solution = Rc::new(solution);
+                let solution = Rc::new(subtask_solver);
                 self.cache
                     .update_status(&task, TaskStatus::Solved(solution.clone()));
                 Some(solution)
@@ -647,7 +645,7 @@ mod solution_tests {
     use super::SolutionTracer;
     use crate::{
         rule::RulesEngine,
-        task::{parse_task, Solution},
+        task::{parse_task, Solver},
         term::term_with_vars,
     };
 
@@ -655,7 +653,7 @@ mod solution_tests {
     fn check_answer_find_test() {
         let task = parse_task("task {purpose find(x); x == 1;}");
         let rules = Arc::new(RulesEngine::default());
-        let mut solution = Solution::new(
+        let mut solution = Solver::new(
             task,
             rules,
             SolutionTracer::default(),
@@ -670,7 +668,7 @@ mod solution_tests {
     fn check_answer_proof_test() {
         let task = parse_task("task { purpose proof(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
-        let mut solution = Solution::new(
+        let mut solution = Solver::new(
             task,
             rules,
             SolutionTracer::default(),

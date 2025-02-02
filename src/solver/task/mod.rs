@@ -1,7 +1,7 @@
 mod builder;
 mod cache;
 mod purpose;
-mod solution;
+mod solver;
 mod tracing;
 
 use crate::term::{Term, TermProps};
@@ -11,7 +11,7 @@ pub use self::{
     builder::TaskBuilder,
     cache::TasksCache,
     purpose::Purpose,
-    solution::{Solution, EXECUTION_DEADLINE_DEFAULT},
+    solver::{Solver, EXECUTION_DEADLINE_DEFAULT},
     tracing::{
         Config as DumperConfig, Profiler, ProfilerNode, SolutionTracer, TaskProfileInfo,
         TermProfileInfo, Tracer,

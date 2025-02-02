@@ -8,7 +8,7 @@ use ratatui::{
 
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, Solution, Task, EXECUTION_DEADLINE_DEFAULT},
+    task::{DumperConfig, Solver, Task, EXECUTION_DEADLINE_DEFAULT},
 };
 use utils::VecDisplay;
 use view::View;
@@ -18,7 +18,7 @@ use crate::tracing::Tracing;
 use super::interface::{border_focus, border_unfocus, default_state, draw_scrollbar};
 
 pub struct TaskStatus {
-    pub solution: Solution,
+    pub solution: Solver,
     pub solved:   bool,
     pub scroll:   ListState,
 }
@@ -38,7 +38,7 @@ impl Tasks {
                 .into_iter()
                 .map(|x| {
                     Tracing::new(TaskStatus {
-                        solution: Solution::new(
+                        solution: Solver::new(
                             x,
                             rules.clone(),
                             DumperConfig {
