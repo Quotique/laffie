@@ -5,7 +5,7 @@ use ego_tree::{NodeId, Tree};
 use crate::{
     rule::{SharedRule, Suppose},
     task::{Solver, Task},
-    term::Term,
+    term::{display_string, Term},
 };
 
 use super::Tracer;
@@ -106,7 +106,7 @@ impl Tracer for Profiler {
                 params: suppose
                     .params
                     .params()
-                    .map(|(param, value)| (param.to_string(), value.to_string()))
+                    .map(|(param, value)| (param.to_string(), display_string(value.root())))
                     .collect(),
 
                 requirements:   suppose.requirements.iter().map(|x| x.to_string()).collect(),

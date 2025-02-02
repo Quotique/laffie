@@ -23,8 +23,7 @@ use crate::{
     NormalizationLevel,
 };
 
-use display::display_string;
-
+pub use display::display_string;
 pub use index::NodePosition;
 pub use mapping::ParamsMapping;
 pub use props::TermProps;
