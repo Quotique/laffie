@@ -19,7 +19,7 @@ pub struct TasksCache {
 }
 
 impl TaskStatus {
-    pub fn solution(&self) -> Option<Rc<Solver>> {
+    pub fn solver(&self) -> Option<Rc<Solver>> {
         match self {
             TaskStatus::Solved(solution) => Some(solution.clone()),
             _ => None,

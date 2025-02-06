@@ -17,3 +17,4 @@ eyre = { workspace = true }
 
 colored = "2"
 html-escape = "0.2"
+ratatui = { version = "0.29", features = ["all-widgets"] }

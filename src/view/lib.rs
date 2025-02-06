@@ -1,13 +1,15 @@
 mod console;
 mod html;
+mod tui;
 
 use std::{cell::RefCell, collections::HashSet, convert::TryFrom, fmt, sync::Arc};
 
 pub use console::Console;
 pub use html::Html;
+pub use tui::Tui;
 
 use solver::{
-    task::{Purpose, Solver, TasksCache},
+    task::{Purpose, Solver},
     term::{Term, TermProps},
 };
 
@@ -30,7 +32,6 @@ pub trait Renderer {
 
 pub struct View<'a> {
     solution: &'a Solver,
-    subtasks: Arc<TasksCache>,
     rendered: Arc<RefCell<HashSet<Term>>>,
 }
 
@@ -40,7 +41,6 @@ impl<'a> TryFrom<&'a Solver> for View<'a> {
     fn try_from(solution: &'a Solver) -> eyre::Result<Self> {
         Ok(Self {
             solution,
-            subtasks: solution.cache.clone(),
             rendered: Default::default(),
         })
     }
@@ -90,10 +90,9 @@ impl View<'_> {
         while let Some(id) = trace.pop() {
             for r in &frame[id].requirements {
                 if self.rendered.borrow_mut().insert(r.as_ref().clone()) {
-                    if let Some(solution) = self.subtasks.status(r).and_then(|x| x.solution()) {
+                    if let Some(solution) = self.solution.cache.status(r).and_then(|x| x.solver()) {
                         View {
                             solution: &solution,
-                            subtasks: self.subtasks.clone(),
                             rendered: self.rendered.clone(),
                         }
                         .display_impl(renderer)?;

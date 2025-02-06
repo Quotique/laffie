@@ -11,7 +11,7 @@ use solver::{
     task::{DumperConfig, Solver, Task, EXECUTION_DEADLINE_DEFAULT},
 };
 use utils::VecDisplay;
-use view::View;
+use view::{Tui, View};
 
 use crate::tracing::Tracing;
 
@@ -128,7 +128,7 @@ impl Tasks {
                 VecDisplay(&x.task.solution.task.conditions)
             )
         }))
-        .highlight_symbol("> ")
+        .highlight_symbol(">")
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -149,22 +149,22 @@ impl Tasks {
             .engine
             .get_mut(self.list_state.selected().unwrap())
             .unwrap();
-        let solution = if tracing.task.solved {
-            format!(
-                "Solution\n{}",
-                View::try_from(&tracing.task.solution).unwrap()
-            )
+        let mut renderer = Tui::default();
+        View::try_from(&tracing.task.solution)
+            .unwrap()
+            .display_impl(&mut renderer)
+            .unwrap();
+
+        let solution_lines: Vec<_> = if tracing.task.solved {
+            format!("Conditions:\n{}\n\nSolution", tracing.task.solution.task)
+                .split('\n')
+                .map(|x| Line::from(Span::from(x.to_owned())))
+                .chain(renderer.output)
+                .collect()
         } else {
-            "Press s to solve".to_owned()
+            vec![Line::from(Span::from("Press s to solve".to_owned()))]
         };
 
-        let solution_lines: Vec<String> = format!(
-            "Conditions:\n{}\n\n{}",
-            tracing.task.solution.task, solution
-        )
-        .split('\n')
-        .map(|x| x.to_owned())
-        .collect();
         frame.render_stateful_widget(
             List::new(solution_lines.iter().cloned())
                 .highlight_style(Style::new().underlined())

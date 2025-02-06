@@ -2830,6 +2830,7 @@ dependencies = [
  "colored 2.1.0",
  "eyre",
  "html-escape",
+ "ratatui",
  "solver",
  "utils",
 ]
