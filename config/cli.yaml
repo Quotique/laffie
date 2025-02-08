@@ -1,6 +1,6 @@
 logger:
   filename: "logs/cli.log"
-  level: "Trace"
+  level: "Info"
   num_files: 3
   file_rotate_bytes: 100000000
   target_levels:
