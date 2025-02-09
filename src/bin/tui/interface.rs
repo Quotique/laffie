@@ -40,6 +40,14 @@ impl Status {
         })
     }
 
+    #[inline]
+    pub fn solve_all(&mut self) {
+        if self.current_tab == Tab::Tasks {
+            self.tasks.solve_all();
+        }
+    }
+
+    #[inline]
     pub fn solve(&mut self) {
         if self.current_tab == Tab::Tasks {
             self.tasks.solve();

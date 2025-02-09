@@ -115,7 +115,7 @@ impl Tracing {
         let pane_style = self.pane_style(1);
 
         if let Some(selected) = self.tree_state.selected().last() {
-            let node = self.task.solution.tracer.profiler().unwrap().lock();
+            let node = self.task.solver.tracer.profiler().unwrap().lock();
 
             let text = match node.task.get(selected.unwrap()).unwrap().value() {
                 ProfilerNode::Helper(task) => Self::task_lines(task),
@@ -230,14 +230,14 @@ impl Tracing {
         let items = [Self::tree(
             &self
                 .task
-                .solution
+                .solver
                 .tracer
                 .profiler()
                 .unwrap()
                 .lock()
                 .task
                 .root(),
-            *self.task.solution.cycles.borrow(),
+            *self.task.solver.cycles.borrow(),
         )];
         let widget = Tree::new(&items)
             .expect("all item identifiers are unique")

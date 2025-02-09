@@ -67,7 +67,7 @@ fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
             status.draw(frame, vertical_layout[1]);
 
             let help = Paragraph::new(
-                "←↑→↓ - navigation | q - quit | s - solve selected | Space - toggle tree node",
+                "←↑→↓ - navigation | q - quit | s - solve selected | a - solve all | Space - toggle tree node",
             )
             .block(Block::default().borders(Borders::LEFT | Borders::RIGHT));
 
@@ -88,6 +88,7 @@ fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
                     KeyCode::Enter | KeyCode::Char(' ') => status.toggle(),
 
                     KeyCode::Char('s') | KeyCode::Char('ы') => status.solve(),
+                    KeyCode::Char('a') | KeyCode::Char('ф') => status.solve_all(),
 
                     KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
                     _ => {}
