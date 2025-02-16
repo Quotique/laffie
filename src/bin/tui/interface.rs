@@ -58,7 +58,9 @@ impl Status {
         match self.current_tab {
             Tab::Rules => self.rules.select_next(),
             Tab::Tasks => self.tasks.select_next(),
-            Tab::Tracing => self.tasks.tracing().select_next(),
+            Tab::Tracing => {
+                let _ = self.tasks.tracing().map(|x| x.select_next());
+            }
         }
     }
 
@@ -66,7 +68,9 @@ impl Status {
         match self.current_tab {
             Tab::Rules => self.rules.select_previous(),
             Tab::Tasks => self.tasks.select_previous(),
-            Tab::Tracing => self.tasks.tracing().select_previous(),
+            Tab::Tracing => {
+                let _ = self.tasks.tracing().map(|x| x.select_previous());
+            }
         }
     }
 
@@ -74,7 +78,9 @@ impl Status {
         match self.current_tab {
             Tab::Rules => self.rules.left(),
             Tab::Tasks => self.tasks.left(),
-            Tab::Tracing => self.tasks.tracing().left(),
+            Tab::Tracing => {
+                let _ = self.tasks.tracing().map(|x| x.left());
+            }
         }
     }
 
@@ -82,13 +88,19 @@ impl Status {
         match self.current_tab {
             Tab::Rules => self.rules.right(),
             Tab::Tasks => self.tasks.right(),
-            Tab::Tracing => self.tasks.tracing().right(),
+            Tab::Tracing => {
+                let _ = self.tasks.tracing().map(|x| x.right());
+            }
         }
     }
 
     pub fn toggle(&mut self) {
-        if self.current_tab == Tab::Tracing {
-            self.tasks.tracing().toggle()
+        match self.current_tab {
+            Tab::Tracing => {
+                let _ = self.tasks.tracing().map(|x| x.toggle());
+            }
+            Tab::Tasks => self.tasks.toggle(),
+            _ => {}
         }
     }
 
@@ -96,7 +108,9 @@ impl Status {
         match self.current_tab {
             Tab::Rules => self.rules.draw(frame, area),
             Tab::Tasks => self.tasks.draw(frame, area),
-            Tab::Tracing => self.tasks.tracing().draw(frame, area),
+            Tab::Tracing => {
+                let _ = self.tasks.tracing().map(|x| x.draw(frame, area));
+            }
         }
     }
 }

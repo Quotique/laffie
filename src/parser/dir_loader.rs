@@ -65,7 +65,7 @@ impl DirectoryParser {
                             t.purpose,
                             VecDisplay(&t.conditions)
                         );
-                        t.group = path.to_string_lossy().to_string();
+                        t.group = path.with_extension("").display().to_string();
                         result.push(t)
                     }
                     Err(e) => error!("Task not parsed: {}", e.error_string(src, Some(path))),
