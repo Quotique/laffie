@@ -94,14 +94,19 @@ impl Tracer for Profiler {
         suppose: &Suppose,
         cycle: usize,
     ) {
+        let mut term = suppose.resolution.to_string();
+        if term == "true" || term == "false" {
+            term = format!("{parent} <=> {term}");
+        }
+
         self.current_node = self
             .task
             .get_mut(self.current_node)
             .unwrap()
             .append(ProfilerNode::Suppose(TermProfileInfo {
                 parent: parent.to_string(),
-                rule:   rule.to_string(),
-                term:   suppose.resolution.to_string(),
+                rule: rule.to_string(),
+                term,
 
                 params: suppose
                     .params
@@ -109,11 +114,11 @@ impl Tracer for Profiler {
                     .map(|(param, value)| (param.to_string(), display_string(value.root())))
                     .collect(),
 
-                requirements:   suppose.requirements.iter().map(|x| x.to_string()).collect(),
+                requirements: suppose.requirements.iter().map(|x| x.to_string()).collect(),
                 first_unproven: 0,
 
                 start_cycle: cycle,
-                end_cycle:   Default::default(),
+                end_cycle: Default::default(),
             }))
             .id();
     }
