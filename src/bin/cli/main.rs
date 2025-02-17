@@ -126,19 +126,24 @@ fn main() {
         return;
     }
 
-    for record in tasks.into_iter().map(|p| TaskRecord::from(&p)) {
-        if let Err(e) = db.get_or_insert(record) {
-            println!("task write error: {}", e);
-        }
-    }
-
+    // TODO: db is temporary disabled
+    // for record in tasks.into_iter().map(|p| TaskRecord::from(&p)) {
+    //     if let Err(e) = db.get_or_insert(record) {
+    //         println!("task write error: {}", e);
+    //     }
+    // }
+    // let db_tasks_iter = Box::new(db.iter());
+    // db_tasks_iter
     let mut stats: HashMap<String, SolveStats> = Default::default();
-    let db_tasks_iter = Box::new(db.iter());
 
-    for mut record in db_tasks_iter.filter(move |x| {
-        let id = format!("{:x}", x.id);
-        id.starts_with(&only) || id.ends_with(&only)
-    }) {
+    for mut record in tasks
+        .into_iter()
+        .map(|p| TaskRecord::from(&p))
+        .filter(move |x| {
+            let id = format!("{:x}", x.id);
+            id.starts_with(&only) || id.ends_with(&only)
+        })
+    {
         let p: Task = record.clone().into();
 
         println!("{} {}", "Task".bold().green(), p);
@@ -182,9 +187,10 @@ fn main() {
                 }
                 record.runs.push(solution.current_cycles());
 
-                if let Err(e) = db.put(&record) {
-                    println!("Cant put record {}", e);
-                }
+                // TODO: db is temporary disabled
+                // if let Err(e) = db.put(&record) {
+                //     println!("Cant put record {}", e);
+                // }
             }
             Err(e) => {
                 stats.entry(record.group.clone()).or_default().not_solved += 1;
