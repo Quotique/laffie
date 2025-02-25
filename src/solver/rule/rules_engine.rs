@@ -63,7 +63,7 @@ impl RulesEngine {
                 rule.is_term_suitable(term).map_err(|e| {
                     trace!(target: "rule_selection", "Rule {} rejected for term {} by reason {:?}", rule, term, e);
                 }).is_ok() &&
-                    rule.is_purpose_suitable(purpose).map_err(|e| {
+                    rule.purpose_mapping(purpose).map_err(|e| {
                     trace!(target: "rule_selection", "Rule {} rejected for term {} by reason {:?}", rule, term, e);
                 }).is_ok()
             })

@@ -22,11 +22,6 @@ pub struct ParamsMapping {
     placeholders: BTreeMap<Placeholder, Vec<SymbolTree>>,
 }
 
-pub struct Mapper<'a> {
-    target:  &'a SymbolNode,
-    pattern: &'a SymbolNode,
-}
-
 impl From<HashMap<Param, SymbolTree>> for ParamsMapping {
     fn from(params: HashMap<Param, SymbolTree>) -> Self {
         Self {
@@ -37,24 +32,34 @@ impl From<HashMap<Param, SymbolTree>> for ParamsMapping {
 }
 
 impl ParamsMapping {
+    #[inline]
     pub fn params(&self) -> impl Iterator<Item = (&Param, &SymbolTree)> {
         self.params.iter()
     }
 
-    pub fn mapper<'a>(target: &'a SymbolNode, pattern: &'a SymbolNode) -> Mapper<'a> {
-        Mapper { target, pattern }
+    #[inline]
+    pub fn try_map(target: &SymbolNode, pattern: &SymbolNode) -> Result<Vec<ParamsMapping>> {
+        Self::try_map_with_params(target, pattern, Default::default())
     }
 
     pub fn subtree_map(
         target: &SymbolNode,
         pattern: &SymbolNode,
     ) -> Vec<(Vec<ParamsMapping>, NodePosition)> {
+        Self::subtree_map_extend(target, pattern, Default::default())
+    }
+
+    pub fn subtree_map_extend(
+        target: &SymbolNode,
+        pattern: &SymbolNode,
+        params: ParamsMapping,
+    ) -> Vec<(Vec<ParamsMapping>, NodePosition)> {
         let mut result = vec![];
         let mut queue = VecDeque::new();
         queue.push_back((target, NodePosition::root()));
 
         while let Some((node, pos)) = queue.pop_front() {
-            if let Ok(mapping) = Self::mapper(node, pattern).try_map().map_err(
+            if let Ok(mapping) = Self::try_map_with_params(node, pattern, params.clone()).map_err(
                 |_| trace!(target: "pattern_match", "No match for {} to {}", pattern, node),
             ) {
                 result.push((mapping, pos.clone()));
@@ -91,11 +96,84 @@ impl ParamsMapping {
         }
         node
     }
-}
 
-impl Mapper<'_> {
-    pub fn try_map(self) -> Result<Vec<ParamsMapping>> {
-        params_map_impl(self.target, self.pattern, Default::default())
+    pub fn try_map_with_params(
+        target: &SymbolNode,
+        pattern: &SymbolNode,
+        mut params: ParamsMapping,
+    ) -> Result<Vec<ParamsMapping>> {
+        trace!(target: "pattern_match", "Pattern: {}, traget: {}, mapping: {:?}", pattern, target, params);
+        let mut result = vec![];
+
+        match (&pattern.data(), &target.data()) {
+            (Symbol::FuncSymbol(sym), Symbol::FuncSymbol(t_sym)) => {
+                ensure!(sym == t_sym, "Expect symbol {}, found: {}", sym, t_sym);
+
+                if sym.attrs.read().contains_key(&SymbolAttr::Associative) &&
+                    sym.attrs.read().contains_key(&SymbolAttr::Commutative)
+                {
+                    // TODO: priority mapping
+                    // not even trying to map subsets twice
+                    for parts in target.subsets(pattern.degree()) {
+                        let mut loc_result = vec![params.clone()];
+                        params_map_arguments(&parts, pattern, &mut loc_result).expect("must match");
+                        result.append(&mut loc_result);
+                    }
+                } else {
+                    result.push(params);
+                    params_map_arguments(target, pattern, &mut result)?;
+                }
+                ensure!(!result.is_empty(), "No mapping found");
+                return Ok(result);
+            }
+            (Symbol::FuncSymbol(p_id), _) => {
+                bail!(
+                    "Expect symbol id: {}, found target: {:?}",
+                    p_id,
+                    &target.data()
+                );
+            }
+            (Symbol::Param(p), _) => {
+                if params.params.contains_key(p) {
+                    let node = params.params.get(p).unwrap();
+                    let _ = ParamsMapping::try_map(target, node)?;
+                } else {
+                    params.params.insert(p.clone(), target.deep_clone());
+                }
+
+                result.push(params);
+            }
+            (Symbol::Number(value), Symbol::Number(other_value)) => {
+                ensure!(
+                    value == other_value,
+                    "Expect Number {}, found {:?}",
+                    value,
+                    target.data()
+                );
+
+                result.push(params);
+            }
+            (Symbol::Number(_), _) => {
+                bail!("Expect Number, found: {:?}", target.data());
+            }
+            (Symbol::Variable(value), Symbol::Variable(other_value)) => {
+                ensure!(
+                    value == other_value,
+                    "Expect Varible {}, found {:?}",
+                    value,
+                    target.data()
+                );
+
+                result.push(params);
+            }
+            (Symbol::Variable(_), _) => {
+                bail!("Expect Varible, found: {:?}", target.data());
+            }
+            (Symbol::Placeholder(_), _) => {
+                bail!("Mapping placeholder")
+            }
+        }
+        Ok(result)
     }
 }
 
@@ -136,7 +214,7 @@ fn params_map_arguments(
 
         let mut new_result = vec![];
         for r in result.drain(..) {
-            if let Ok(mut p) = params_map_impl(t, p, r) {
+            if let Ok(mut p) = ParamsMapping::try_map_with_params(t, p, r) {
                 trace!(target: "pattern_match", "New mapping: [{}]", VecDisplay(&p));
                 new_result.append(&mut p);
             }
@@ -158,85 +236,6 @@ fn params_map_arguments(
     }
 
     Ok(())
-}
-
-fn params_map_impl(
-    target: &SymbolNode,
-    pattern: &SymbolNode,
-    mut params: ParamsMapping,
-) -> Result<Vec<ParamsMapping>> {
-    trace!(target: "pattern_match", "Pattern: {}, traget: {}, mapping: {:?}", pattern, target, params);
-    let mut result = vec![];
-
-    match (&pattern.data(), &target.data()) {
-        (Symbol::FuncSymbol(sym), Symbol::FuncSymbol(t_sym)) => {
-            ensure!(sym == t_sym, "Expect symbol {}, found: {}", sym, t_sym);
-
-            if sym.attrs.read().contains_key(&SymbolAttr::Associative) &&
-                sym.attrs.read().contains_key(&SymbolAttr::Commutative)
-            {
-                // TODO: priority mapping
-                // not even trying to map subsets twice
-                for parts in target.subsets(pattern.degree()) {
-                    let mut loc_result = vec![params.clone()];
-                    params_map_arguments(&parts, pattern, &mut loc_result).expect("must match");
-                    result.append(&mut loc_result);
-                }
-            } else {
-                result.push(params);
-                params_map_arguments(target, pattern, &mut result)?;
-            }
-            ensure!(!result.is_empty(), "No mapping found");
-            return Ok(result);
-        }
-        (Symbol::FuncSymbol(p_id), _) => {
-            bail!(
-                "Expect symbol id: {}, found target: {:?}",
-                p_id,
-                &target.data()
-            );
-        }
-        (Symbol::Param(p), _) => {
-            if params.params.contains_key(p) {
-                let node = params.params.get(p).unwrap();
-                let _ = ParamsMapping::mapper(target, node).try_map()?;
-            } else {
-                params.params.insert(p.clone(), target.deep_clone());
-            }
-
-            result.push(params);
-        }
-        (Symbol::Number(value), Symbol::Number(other_value)) => {
-            ensure!(
-                value == other_value,
-                "Expect Number {}, found {:?}",
-                value,
-                target.data()
-            );
-
-            result.push(params);
-        }
-        (Symbol::Number(_), _) => {
-            bail!("Expect Number, found: {:?}", target.data());
-        }
-        (Symbol::Variable(value), Symbol::Variable(other_value)) => {
-            ensure!(
-                value == other_value,
-                "Expect Varible {}, found {:?}",
-                value,
-                target.data()
-            );
-
-            result.push(params);
-        }
-        (Symbol::Variable(_), _) => {
-            bail!("Expect Varible, found: {:?}", target.data());
-        }
-        (Symbol::Placeholder(_), _) => {
-            bail!("Mapping placeholder")
-        }
-    }
-    Ok(result)
 }
 
 impl fmt::Display for ParamsMapping {
@@ -268,8 +267,7 @@ mod tests {
         let term = term_with_vars("x + 1 == 0");
         let pattern = term_with_params("a + b == 0");
 
-        let maps = ParamsMapping::mapper(term.root(), pattern.root())
-            .try_map()
+        let maps = ParamsMapping::try_map(term.root(), pattern.root())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 1, b: x }, { a: x, b: 1 }]");
@@ -280,8 +278,7 @@ mod tests {
         let term = term_with_vars("x + 1 == x");
         let pattern = term_with_params("a + 1 == a");
 
-        let maps = ParamsMapping::mapper(term.root(), pattern.root())
-            .try_map()
+        let maps = ParamsMapping::try_map(term.root(), pattern.root())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: x }]");
@@ -292,8 +289,7 @@ mod tests {
         let term = term_with_vars("2*x^2 + 4 == x - 1");
         let pattern = term_with_params("a + 4 == b");
 
-        let maps = ParamsMapping::mapper(term.root(), pattern.root())
-            .try_map()
+        let maps = ParamsMapping::try_map(term.root(), pattern.root())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: *( 2 ^( x 2 ) ), b: +( x -( 1 ) ) }]");
@@ -304,8 +300,7 @@ mod tests {
         let term = term_with_vars("2*x^2 + 4 == x - 1");
         let pattern = term_with_params("a + 4 == b");
 
-        let maps = ParamsMapping::mapper(term.root(), pattern.root())
-            .try_map()
+        let maps = ParamsMapping::try_map(term.root(), pattern.root())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
         assert_eq!(maps.len(), 1);
@@ -320,8 +315,7 @@ mod tests {
         let pattern = term_with_params("set(a, ..) is known");
         let term = term_with_vars("set(3, 5, 7) is known");
 
-        let maps = ParamsMapping::mapper(term.root(), pattern.root())
-            .try_map()
+        let maps = ParamsMapping::try_map(term.root(), pattern.root())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 3, ..1: [5, 7] }]");
@@ -332,8 +326,6 @@ mod tests {
         let pattern = term_with_params("set(a, ..) is known");
         let term = term_with_vars("set(3) is known");
 
-        assert!(ParamsMapping::mapper(term.root(), pattern.root())
-            .try_map()
-            .is_err());
+        assert!(ParamsMapping::try_map(term.root(), pattern.root()).is_err());
     }
 }

@@ -15,7 +15,6 @@ use std::{
     sync::Arc,
 };
 
-use eyre::Result;
 use trees::{tr, Node};
 
 use crate::{
@@ -84,10 +83,6 @@ impl Term {
     pub fn destruct(mut self) -> (SymbolTree, trees::Forest<Symbol>) {
         let childs = self.tree.abandon();
         (self.tree, childs)
-    }
-
-    pub fn map(&self, target: &Self) -> Result<Vec<ParamsMapping>> {
-        ParamsMapping::mapper(target.tree.root(), self.tree.root()).try_map()
     }
 
     pub fn apply_map(&self, params: &ParamsMapping) -> Self {

@@ -27,3 +27,11 @@ rule {
     b is known;
 }
 
+rule {
+    attr level(5),purpose(find(x)),one(a),zero(b),block(move_left);
+
+    b*a + c == 0 => b == - c/a;
+
+    a != 0,
+    c is known;
+}

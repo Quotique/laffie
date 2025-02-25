@@ -325,10 +325,10 @@ impl Tasks {
                         ),
                     ]),
                     Line::from(vec![
-                        Span::styled("Wrong answers: ", Style::new().fg(Color::Red)),
+                        Span::styled("Wrong answers: ", Style::new().fg(Color::LightBlue)),
                         Span::styled(
                             format!(" {}", wrong_answer_count),
-                            Style::new().fg(Color::Yellow),
+                            Style::new().fg(Color::Red),
                         ),
                     ]),
                 ];

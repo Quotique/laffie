@@ -170,20 +170,22 @@ impl Rule {
         Ok(())
     }
 
-    pub fn is_purpose_suitable(&self, purpose: &TermProps) -> Result<(), RuleDeclineReason> {
+    pub fn purpose_mapping(
+        &self,
+        purpose: &TermProps,
+    ) -> Result<Vec<ParamsMapping>, RuleDeclineReason> {
         // TODO: multiple purposes
         if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Purpose).next() {
-            if pattern.map(&purpose.term).is_err() {
+            return ParamsMapping::try_map(purpose.term.root(), pattern.root()).map_err(|_| {
                 trace!(target: "rule_selection", "no match purpose: {}, required: {}", purpose, pattern);
-                return Err(RuleDeclineReason::PurposeMissmatch);
-            }
-            return Ok(());
+                RuleDeclineReason::PurposeMissmatch
+            });
         }
         if (*purpose.term).root().data().is_symbol_name("transform") {
             // Only transform rules for transform
             return Err(RuleDeclineReason::PurposeMissmatch);
         }
-        Ok(())
+        Ok(vec![])
     }
 
     pub fn apply(
@@ -192,7 +194,10 @@ impl Rule {
         purpose: &TermProps,
     ) -> Result<Vec<Suppose>, RuleDeclineReason> {
         self.is_term_suitable(arg)?;
-        self.is_purpose_suitable(purpose)?;
+        let mut mapping = self.purpose_mapping(purpose)?;
+        if mapping.is_empty() {
+            mapping.push(Default::default());
+        }
 
         if !arg.applied_rules.insert(self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
@@ -201,21 +206,14 @@ impl Rule {
             return Err(RuleDeclineReason::Blocked);
         }
 
-        self.apply_subtree(arg)
-    }
-
-    #[inline]
-    pub fn pattern_node(&self) -> &SymbolNode {
-        &self.term[&self.pattern]
-    }
-
-    #[inline]
-    pub fn replace_node(&self) -> &SymbolNode {
-        &self.term[&self.replace]
-    }
-
-    fn apply_subtree(&self, arg: &mut TermProps) -> Result<Vec<Suppose>, RuleDeclineReason> {
-        let maps = ParamsMapping::subtree_map(arg.term.root(), self.pattern_node());
+        let maps: Vec<_> = mapping
+            .into_iter()
+            .flat_map(|m| {
+                ParamsMapping::subtree_map_extend(arg.term.root(), self.pattern_node(), m)
+                    .into_iter()
+            })
+            .collect();
+        // let maps = ParamsMapping::subtree_map(arg.term.root(), self.pattern_node());
         if maps.is_empty() {
             return Err(RuleDeclineReason::ParamsMappingErr("no match".into()));
         }
@@ -249,6 +247,16 @@ impl Rule {
 
         Ok(result)
     }
+
+    #[inline]
+    pub fn pattern_node(&self) -> &SymbolNode {
+        &self.term[&self.pattern]
+    }
+
+    #[inline]
+    pub fn replace_node(&self) -> &SymbolNode {
+        &self.term[&self.replace]
+    }
 }
 
 #[cfg(test)]
@@ -257,7 +265,7 @@ pub mod tests {
 
     use crate::{
         rule::{parse_rule, Rule, RuleDeclineReason},
-        term::{term_with_vars, TermProps},
+        term::{term_with_params, term_with_vars, TermProps},
         NormalizationLevel,
     };
 
@@ -302,7 +310,7 @@ pub mod tests {
     }
 
     fn test_purpose() -> TermProps {
-        TermProps::from(Rc::new(term_with_vars(r#"find(x)"#)))
+        TermProps::from(Rc::new(term_with_params(r#"find(x)"#)))
     }
 
     #[test]
@@ -408,5 +416,26 @@ pub mod tests {
             *suppose[0].resolution.term,
             term_with_vars("2 == 0 && x + 1 != 0")
         );
+    }
+
+    #[test]
+    fn purpose_mapping_test() {
+        let rule = parse_rule(
+            r#"rule {
+                attr level(0),purpose(find(x));
+                a + x == 0 => x == -a;
+            }"#,
+        );
+
+        let test_term = r#"1 + a + 2 == 0"#;
+        let mut term = TermProps::from(Rc::new(term_with_vars(test_term)));
+
+        let purpose = TermProps::from(Rc::new(term_with_vars(r#"find(a+2)"#)));
+        term.weight = 0;
+
+        let suppose = rule.apply(&mut term, &purpose);
+        assert!(suppose.is_ok());
+        let suppose = suppose.unwrap();
+        assert_eq!(suppose.len(), 1);
     }
 }
