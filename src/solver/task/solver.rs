@@ -105,6 +105,10 @@ impl Solver {
         result
     }
 
+    pub fn replace_rules(&mut self, rules: Arc<RulesEngine>) {
+        self.rules_engine = rules;
+    }
+
     pub fn answer(&self) -> Option<Rc<Term>> {
         self.answer.map(|i| self.terms[i].term.clone())
     }

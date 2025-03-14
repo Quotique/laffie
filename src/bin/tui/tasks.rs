@@ -78,6 +78,12 @@ impl Tasks {
         result
     }
 
+    pub fn replace_rules(&mut self, rules: Arc<RulesEngine>) {
+        for task in self.tasks.iter_mut() {
+            task.task.solver.replace_rules(rules.clone());
+        }
+    }
+
     #[inline]
     pub fn solve_all(&mut self) {
         let ids: Vec<_> = self.tasks_index.nodes().map(|x| x.id()).collect();

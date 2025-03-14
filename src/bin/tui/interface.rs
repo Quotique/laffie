@@ -1,20 +1,31 @@
-use std::{io, path::Path, sync::Arc};
+use std::{
+    io,
+    iter::once,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use derive_more::Display;
 use ratatui::{
     prelude::*,
-    widgets::{ListState, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    text::Line,
+    widgets::{ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
 use parser::DirectoryParser;
 
-use super::{rules::Rules, tasks::Tasks};
+use super::{popup::Popup, rules::Rules, tasks::Tasks};
 
 pub struct Status {
     pub current_tab: Tab,
 
+    rules_path: PathBuf,
+    tasks_path: PathBuf,
+
     rules: Rules,
     tasks: Tasks,
+
+    popup: Option<Popup<'static>>,
 }
 
 #[derive(Debug, Clone, Copy, Display, Eq, PartialEq)]
@@ -34,14 +45,55 @@ impl Status {
 
         Ok(Status {
             current_tab: Tab::Rules,
-            tasks:       Tasks::new(rules.clone(), tasks),
 
-            rules: Rules::new(rules),
+            rules_path: symbols_dir.as_ref().into(),
+            tasks_path: tasks_dir.as_ref().into(),
+
+            rules: Rules::new(rules.clone()),
+            tasks: Tasks::new(rules, tasks),
+
+            popup: None,
         })
+    }
+
+    pub fn reload(&mut self) {
+        if self.popup.is_some() {
+            return;
+        }
+
+        let parser = DirectoryParser::new(&self.rules_path, &self.tasks_path);
+
+        match parser.load_rules().map(Arc::new) {
+            Ok(rules) => {
+                self.rules = Rules::new(rules.clone());
+                self.tasks.replace_rules(rules);
+            }
+            Err(e) => {
+                self.popup = Some(Popup::new(
+                    Line::from(Span::from("Error".to_owned())),
+                    Paragraph::new(
+                        once(Line::from(Span::from("Error or rules update!".to_owned())))
+                            .chain(
+                                e.to_string()
+                                    .lines()
+                                    .map(|x| Line::from(Span::from(format!("|{}", x)))),
+                            )
+                            .chain(once(Line::from(Span::from(
+                                "Rules not updated!".to_owned(),
+                            ))))
+                            .collect::<Vec<_>>(),
+                    ),
+                ))
+            }
+        };
     }
 
     #[inline]
     pub fn solve_all(&mut self) {
+        if self.popup.is_some() {
+            return;
+        }
+
         if self.current_tab == Tab::Tasks {
             self.tasks.solve_all();
         }
@@ -49,12 +101,20 @@ impl Status {
 
     #[inline]
     pub fn solve(&mut self) {
+        if self.popup.is_some() {
+            return;
+        }
+
         if self.current_tab == Tab::Tasks {
             self.tasks.solve();
         }
     }
 
     pub fn next(&mut self) {
+        if self.popup.is_some() {
+            return;
+        }
+
         match self.current_tab {
             Tab::Rules => self.rules.select_next(),
             Tab::Tasks => self.tasks.select_next(),
@@ -65,6 +125,10 @@ impl Status {
     }
 
     pub fn previous(&mut self) {
+        if self.popup.is_some() {
+            return;
+        }
+
         match self.current_tab {
             Tab::Rules => self.rules.select_previous(),
             Tab::Tasks => self.tasks.select_previous(),
@@ -75,6 +139,10 @@ impl Status {
     }
 
     pub fn left(&mut self) {
+        if self.popup.is_some() {
+            return;
+        }
+
         match self.current_tab {
             Tab::Rules => self.rules.left(),
             Tab::Tasks => self.tasks.left(),
@@ -85,6 +153,10 @@ impl Status {
     }
 
     pub fn right(&mut self) {
+        if self.popup.is_some() {
+            return;
+        }
+
         match self.current_tab {
             Tab::Rules => self.rules.right(),
             Tab::Tasks => self.tasks.right(),
@@ -95,6 +167,10 @@ impl Status {
     }
 
     pub fn toggle(&mut self) {
+        if self.popup.is_some() {
+            let _ = self.popup.take();
+        }
+
         match self.current_tab {
             Tab::Tracing => {
                 let _ = self.tasks.tracing().map(|x| x.toggle());
@@ -111,6 +187,10 @@ impl Status {
             Tab::Tracing => {
                 let _ = self.tasks.tracing().map(|x| x.draw(frame, area));
             }
+        }
+
+        if let Some(popup) = self.popup.as_mut() {
+            popup.draw(frame, area);
         }
     }
 }

@@ -9,6 +9,7 @@ use ratatui::{
 };
 
 mod interface;
+mod popup;
 mod rules;
 mod settings;
 mod tasks;
@@ -67,7 +68,7 @@ fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
             status.draw(frame, vertical_layout[1]);
 
             let help = Paragraph::new(
-                "←↑→↓ - navigation | q - quit | s - solve selected | a - solve all | Space - toggle tree node",
+                "←↑→↓ - navigation | q - quit | s - solve selected | r - reload symbols | a - solve all | Space - toggle tree node",
             )
             .block(Block::default().borders(Borders::LEFT | Borders::RIGHT));
 
@@ -89,6 +90,7 @@ fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
 
                     KeyCode::Char('s') | KeyCode::Char('ы') => status.solve(),
                     KeyCode::Char('a') | KeyCode::Char('ф') => status.solve_all(),
+                    KeyCode::Char('r') | KeyCode::Char('к') => status.reload(),
 
                     KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
                     _ => {}
