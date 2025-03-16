@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ego_tree::{NodeId, NodeMut, NodeRef, Tree};
+use ego_tree::{iter::Edge, NodeId, NodeMut, NodeRef, Tree};
 use ratatui::{
     prelude::*,
     style::Stylize,
@@ -447,6 +447,24 @@ impl Tasks {
         let Some(TasksNode::Task(task_idx)) =
             self.tasks_index.get(node_id).map(|node| node.value())
         else {
+            if let Some(node) = self.tasks_index.get(node_id) {
+                let child_ids: Vec<_> = node
+                    .traverse()
+                    .filter_map(|x| {
+                        let node = match x {
+                            Edge::Open(node) => node,
+                            Edge::Close(node) => node,
+                        };
+                        match node.value() {
+                            TasksNode::Task(_) => Some(node.id()),
+                            TasksNode::Directory { .. } => None,
+                        }
+                    })
+                    .collect();
+                for id in child_ids {
+                    self.solve_node_id(id);
+                }
+            }
             return;
         };
         let mut solved_delta: isize = 0;
