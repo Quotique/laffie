@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt, rc::Rc, str::FromStr, sync::Arc};
+use std::{collections::HashSet, fmt, hash::Hash, rc::Rc, str::FromStr, sync::Arc};
 
 use eyre::{bail, Result};
 use multimap::MultiMap;
@@ -65,6 +65,20 @@ pub struct Rule {
     pub requirements: Vec<Term>,
 
     pub pattern_symbols: HashSet<Arc<FuncSymbol>>,
+}
+
+impl PartialEq for Rule {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for Rule {}
+
+impl Hash for Rule {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
 }
 
 impl FromStr for RuleAttr {
@@ -177,7 +191,7 @@ impl Rule {
         // TODO: multiple purposes
         if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Purpose).next() {
             return ParamsMapping::try_map(purpose.term.root(), pattern.root()).map_err(|_| {
-                trace!(target: "rule_selection", "no match purpose: {}, required: {}", purpose, pattern);
+                debug!(target: "rule_selection", "no match purpose: {}, required: {}", purpose, pattern);
                 RuleDeclineReason::PurposeMissmatch
             });
         }

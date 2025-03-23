@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use bincode::{Decode, Encode};
 use derive_more::Display;
+use itertools::Itertools;
 use trees::tr;
 
 use utils::VecDisplay;
@@ -284,66 +285,67 @@ impl Solver {
     }
 
     fn next_term(&mut self, index: usize) -> Vec<TermProps> {
-        self.next_term_with_filter(index, |_| true)
+        self.next_term_with_filter(index, |_| true, None)
     }
 
     fn next_term_with_filter(
         &mut self,
         index: usize,
         filter: impl Fn(&Rule) -> bool,
+        purpose: Option<&TermProps>,
     ) -> Vec<TermProps> {
-        let engine_rules = self
-            .rules_engine
-            .suggest_rules(&self.terms[index], &self.task.purpose);
+        let purpose = purpose.unwrap_or(&self.task.purpose);
+        let engine_rules = self.rules_engine.suggest_rules(&self.terms[index], purpose);
         let suggested_rules: Vec<_> = engine_rules
             .into_iter()
-            .chain(self.local_rules.iter().cloned())
-            .inspect(|rule| trace!(target: "rule_selection", "Rule: {}", rule))
+            .chain(self.local_rules.iter().unique().cloned())
             .filter(|rule| filter(rule))
             .collect();
+        trace!(target: "rule_selection",
+               "purpose: {purpose}, term: {}, suggested_rules: {}",
+               self.terms[index],
+               VecDisplay(&suggested_rules)
+        );
 
         for rule in suggested_rules {
             self.tracer.on_rule_selection(rule.clone());
-            let supposes = match rule.apply(&mut self.terms[index], &self.task.purpose) {
+            let supposes = match rule.apply(&mut self.terms[index], purpose) {
                 Ok(x) => x,
                 Err(e) => {
-                    trace!(target: "rule_selection", "Rule not applied: {:?}", e);
+                    trace!(target: "rule_selection",
+                           "rule {rule} not applied to term {}: {e:?}",
+                           self.terms[index]);
                     continue;
                 }
             };
 
-            let mut tracer = self.tracer.clone();
-            let res: Vec<_> = supposes
+            let mut res = vec![];
+            for mut suppose in supposes
                 .into_iter()
                 .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
-                .inspect({
-                    let mut tracer = self.tracer.clone();
-                    let rule = rule.clone();
-                    let parrent = self.terms[index].term.clone();
-                    let cycle = *self.cycles.borrow();
-                    move |suppose| {
-                        trace!(target: "rule_selection", "Suppose: {}", suppose);
-                        tracer.on_new_suppose(parrent.clone(), rule.clone(), suppose, cycle)
-                    }
-                })
-                .filter_map(|mut suppose| {
-                    let proof_res = self.suppose_proof(&suppose);
-                    let cycles = *self.cycles.borrow();
-                    tracer.on_suppose_finish(&suppose, cycles, proof_res);
+            {
+                trace!(target: "rule_selection",
+                       "new suppose {suppose}, rule {rule}, term: {}",
+                       self.terms[index]);
+                self.tracer.on_new_suppose(
+                    self.terms[index].term.clone(),
+                    rule.clone(),
+                    &suppose,
+                    *self.cycles.borrow(),
+                );
 
-                    if proof_res == suppose.requirements.len() {
-                        suppose.resolution.requirements = suppose.requirements.clone();
-                        trace!(target: "rule_selection", "Suppose: proofed, resolution applied");
-                        Some(suppose)
-                    } else {
-                        None
-                    }
-                })
-                .map(|mut suppose| {
+                let proof_res = self.suppose_proof(&suppose);
+                self.tracer
+                    .on_suppose_finish(&suppose, *self.cycles.borrow(), proof_res);
+
+                if proof_res == suppose.requirements.len() {
+                    suppose.resolution.requirements = suppose.requirements.clone();
                     suppose.resolution.rule = Some(rule.clone());
-                    suppose.resolution
-                })
-                .collect();
+                    trace!(target: "rule_selection",
+                           "suppose {suppose} proven, resolution {} applied", suppose.resolution);
+                    res.push(suppose.resolution);
+                }
+            }
             if !res.is_empty() {
                 return res;
             }
@@ -356,7 +358,9 @@ impl Solver {
     fn suppose_proof(&self, suppose: &Suppose) -> usize {
         for (num, req) in suppose.requirements.iter().enumerate() {
             if self.proof(req).is_none() {
-                trace!(target: "rule_selection", "Can't proof: {}", req);
+                trace!(target: "rule_selection",
+                       "term {} rejected, requirement not proven {req}",
+                       suppose.resolution);
                 return num;
             }
         }
@@ -497,9 +501,14 @@ impl Solver {
                         self.terms[index].simplified = true;
                     }
 
-                    let new_states = self.next_term_with_filter(index, |rule| {
-                        rule.contains_attribute(&RuleAttr::Equivalence)
-                    });
+                    let new_states = self.next_term_with_filter(
+                        index,
+                        |rule| rule.contains_attribute(&RuleAttr::Equivalence),
+                        Some(&TermProps::from(Rc::new(Term::from(
+                            tr(Symbol::with_func_symbol("proof")) /
+                                self.terms[index].term.root().deep_clone(),
+                        )))),
+                    );
                     if new_states.is_empty() {
                         self.terms[index].weight += 1;
                     }
