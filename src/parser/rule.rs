@@ -209,7 +209,9 @@ mod tests {
             rule.replace_node().deep_clone(),
             (tr(Symbol::with_func_symbol("==")) /
                 tr(Symbol::Param("x".parse().unwrap())) /
-                (tr(Symbol::with_func_symbol("-")) / tr(Symbol::Param("a".parse().unwrap()))))
+                (tr(Symbol::with_func_symbol("*")) /
+                    tr(Symbol::Number((-1).into())) /
+                    tr(Symbol::Param("a".parse().unwrap()))))
         );
         assert_eq!(rule.requirements.len(), 1);
         assert_eq!(

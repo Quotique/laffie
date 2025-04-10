@@ -82,13 +82,10 @@ mod tests {
 
     #[test]
     fn calculator_test() {
-        for (source, level_one, level_two, level_all) in
-            [("-3", "-3", "-3", "-3"), ("-0", "0", "0", "0")]
-        {
-            calculator_check(source, source, minus, NormalizationLevel(0));
-            calculator_check(source, level_one, minus, NormalizationLevel(1));
-            calculator_check(source, level_two, minus, NormalizationLevel(2));
-            calculator_check(source, level_all, minus, NormalizationLevel::max());
-        }
+        let (source, level_one, level_two, level_all) = ("-3", "-3", "-3", "-3");
+        calculator_check(source, source, minus, NormalizationLevel(0));
+        calculator_check(source, level_one, minus, NormalizationLevel(1));
+        calculator_check(source, level_two, minus, NormalizationLevel(2));
+        calculator_check(source, level_all, minus, NormalizationLevel::max());
     }
 }

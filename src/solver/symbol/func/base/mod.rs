@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, rc::Rc};
 
-use bigdecimal::{BigDecimal as Decimal, Zero};
+use bigdecimal::BigDecimal as Decimal;
 use trees::{tr, Node};
 
 #[cfg(test)]
@@ -134,11 +134,12 @@ pub fn normalize(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
 }
 
 fn from_const(d: Decimal) -> SymbolTree {
-    if d < Decimal::zero() {
-        tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-d))
-    } else {
-        tr(Symbol::Number(d))
-    }
+    // if d < Decimal::zero() {
+    //    tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-d))
+    // } else {
+    //    tr(Symbol::Number(d))
+    // }
+    tr(Symbol::Number(d))
 }
 
 fn to_const(node: &SymbolNode) -> Option<Decimal> {
@@ -273,7 +274,7 @@ mod operations_tests {
             test_tree,
             tr(Symbol::with_func_symbol("+")) /
                 tr(Symbol::Variable("x".parse().unwrap())) /
-                (tr(Symbol::with_func_symbol("-")) / tr(Symbol::with_number(2)))
+                tr(Symbol::with_number(-2))
         );
     }
 

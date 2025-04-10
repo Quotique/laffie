@@ -132,10 +132,10 @@ fn remove_unused_plus(root: &mut SymbolNode) -> bool {
 
 fn attach_constant(root: &mut SymbolNode, constant: Decimal) {
     match constant.cmp(&Decimal::zero()) {
-        Ordering::Less => {
-            root.push_back(tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-constant)))
-        }
-        Ordering::Greater => root.push_back(tr(Symbol::Number(constant))),
+        // Ordering::Less => {
+        //    root.push_back(tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-constant)))
+        //}
+        Ordering::Less | Ordering::Greater => root.push_back(tr(Symbol::Number(constant))),
         Ordering::Equal => {}
     }
 }
@@ -145,17 +145,15 @@ fn merge_mul_const(mut root: Tree<Symbol>, d: Decimal) -> Tree<Symbol> {
         return root;
     } else if d == Decimal::from(0) {
         return tr(Symbol::Number(Decimal::from(0)));
-    } else if d == Decimal::from(-1) {
-        return tr(Symbol::with_func_symbol("-")) / root;
+        //} else if d == Decimal::from(-1) {
+        //    return tr(Symbol::with_func_symbol("-")) / root;
     }
-    if d == Decimal::from(-1) {
-        return tr(Symbol::with_func_symbol("-")) / root;
-    }
-    let constant = if d < Decimal::zero() {
-        tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-d))
-    } else {
-        tr(Symbol::Number(d))
-    };
+    // let constant = if d < Decimal::zero() {
+    //    tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-d))
+    //} else {
+    //    tr(Symbol::Number(d))
+    //};
+    let constant = tr(Symbol::Number(d));
 
     if root.data().is_number_value(&Decimal::from(1)) {
         return constant;

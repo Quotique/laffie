@@ -31,7 +31,7 @@ pub enum Symbol {
     Param(Param),
     /// Variable symbol
     Variable(Variable),
-    /// Rational non-negative constant
+    /// Rational constant
     Number(Decimal),
     /// Link to another subtree
     Placeholder(Placeholder),

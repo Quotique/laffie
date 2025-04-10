@@ -292,7 +292,7 @@ mod tests {
         let maps = ParamsMapping::try_map(term.root(), pattern.root())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: *( 2 ^( x 2 ) ), b: +( x -( 1 ) ) }]");
+        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: *( 2 ^( x 2 ) ), b: +( x (-1) ) }]");
     }
 
     #[test]

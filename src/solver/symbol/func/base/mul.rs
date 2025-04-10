@@ -92,9 +92,9 @@ fn attach_constant(root: &mut SymbolNode, constant: Decimal) -> bool {
     if constant == Decimal::zero() {
         swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
         true
-    } else if constant < Decimal::zero() {
-        root.push_front(tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-constant)));
-        false
+    //} else if constant < Decimal::zero() {
+    //    root.push_front(tr(Symbol::with_func_symbol("-")) /
+    // tr(Symbol::Number(-constant)));    false
     } else if constant != Decimal::one() {
         root.push_front(tr(Symbol::Number(constant)));
         false

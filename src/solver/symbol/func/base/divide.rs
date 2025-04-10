@@ -44,7 +44,7 @@ pub fn divide(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
             ) {
                 (Some(d1), Some(d2)) => {
                     let (num, den) = simplify(d1.clone(), d2.clone());
-                    if let Some(t) = impl_devide(&num, &den) {
+                    if let Some(t) = impl_divide(&num, &den) {
                         swap_node(root, &mut from_const(t).root_mut());
                         true
                     } else if d1 != num || d2 != den {
@@ -99,7 +99,7 @@ fn simplify(num: Decimal, den: Decimal) -> (Decimal, Decimal) {
     (Decimal::from(num_m / g.clone()), Decimal::from(den_m / g))
 }
 
-fn impl_devide(num: &Decimal, den: &Decimal) -> Option<Decimal> {
+fn impl_divide(num: &Decimal, den: &Decimal) -> Option<Decimal> {
     if den.is_one() {
         Some(num.clone())
     } else {
@@ -120,12 +120,12 @@ mod tests {
 
     #[test]
     fn derive_test() {
-        assert_eq!(impl_devide(&5.into(), &1.into()), Some(5.into()));
+        assert_eq!(impl_divide(&5.into(), &1.into()), Some(5.into()));
         assert_eq!(
-            impl_devide(&5.into(), &2.into()),
+            impl_divide(&5.into(), &2.into()),
             Some(Decimal::new(25.into(), 1))
         );
-        assert_eq!(impl_devide(&1.into(), &3.into()), None);
+        assert_eq!(impl_divide(&1.into(), &3.into()), None);
     }
 
     #[test]

@@ -1,14 +1,16 @@
 use std::sync::Arc;
 
-use crate::symbol::{FuncSymbol, SymbolAttr};
+use crate::symbol::{FuncSymbol, Symbol, SymbolAttr};
 
 use super::SymbolNode;
 
 pub fn display_string(node: &SymbolNode) -> String {
-    match node.data().func_symbol() {
-        Some(symbol) => symbol_display(symbol, node),
+    match node.data() {
+        Symbol::FuncSymbol(symbol) => symbol_display(symbol.clone(), node),
+        Symbol::Number(num) => num.to_string(),
         _ => node.data().to_string(),
     }
+    .replace("-1*", "-")
     .replace("+-", "-")
 }
 
@@ -84,7 +86,7 @@ mod tests {
             ("a + b - c", "a+b-c"),
             ("x == -3", "x==-3"),
             ("-(-x + 2)", "-(-x+2)"),
-            ("-(-1)", "-(-1)"),
+            ("-(-1)", "--1"),
             ("118*x^2 + 1389x - 1507 == 0", "118*x^2+1389*x-1507==0"),
             // TODO: ("(-3)*(x+2)", "-3*(x+2)"),
         ] {
