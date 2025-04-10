@@ -5,7 +5,7 @@ use crate::symbol::{codec::encode_node, Symbol};
 
 use super::{SymbolTree, Term};
 
-impl<'de> BorrowDecode<'de> for Term {
+impl<'de, Context> BorrowDecode<'de, Context> for Term {
     fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
@@ -39,7 +39,7 @@ impl<'de> BorrowDecode<'de> for Term {
     }
 }
 
-impl Decode for Term {
+impl<Context> Decode<Context> for Term {
     fn decode<D: bincode::de::Decoder>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {

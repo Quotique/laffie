@@ -13,9 +13,9 @@ log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 
-file-rotate = "0.7"
-patricia_tree = { version = "0.8" }
-slog-async = { version = "2.7" }
+file-rotate = "0.8"
+patricia_tree = { version = "0.9" }
+slog-async = { version = "2.8" }
 slog-scope = { version = "4.4" }
 slog-stdlog = { version = "4.1" }
 slog-term = { version = "2.9" }

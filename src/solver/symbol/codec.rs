@@ -37,7 +37,7 @@ impl Encode for Symbol {
     }
 }
 
-impl Decode for Symbol {
+impl<Context> Decode<Context> for Symbol {
     fn decode<D: bincode::de::Decoder>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
@@ -72,7 +72,7 @@ impl Decode for Symbol {
     }
 }
 
-impl<'de> BorrowDecode<'de> for Symbol {
+impl<'de, Context> BorrowDecode<'de, Context> for Symbol {
     fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {

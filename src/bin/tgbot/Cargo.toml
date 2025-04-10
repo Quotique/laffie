@@ -23,8 +23,8 @@ clap = "4.5"
 config = "0.15"
 cpu-freq = "0.0.2"
 futures = "0.3"
-rust-i18n = "3.0"
+rust-i18n = "3.1"
 strip-ansi-escapes = "0.2"
 sys-info = "0.9"
 telegram-bot = { git ="https://github.com/Quotique/telegram-bot", default-features = false, features = ["rustls"]}
-tokio = { version = "1.17", features = ["macros", "time", "fs", "rt-multi-thread"] }
+tokio = { version = "1.42", features = ["macros", "time", "fs", "rt-multi-thread"] }

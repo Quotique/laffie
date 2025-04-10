@@ -20,8 +20,8 @@ trees = { workspace = true }
 ego-tree = "0.10"
 
 bigdecimal = "0.4"
-bincode = "2.0.0-rc.3"
-derive_more = { version = "1.0", features = ["full"] }
+bincode = "2.0"
+derive_more = { version = "2.0", features = ["full"] }
 indexmap = "2.0"
 itertools = "0.14"
 multimap = { git = "https://github.com/Quotique/multimap.git" }
