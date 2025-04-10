@@ -8,8 +8,6 @@ use crate::{
     NormalizationLevel,
 };
 
-use super::to_const;
-
 pub fn symbol() -> FuncSymbol {
     FuncSymbol::builder()
         .name("^")
@@ -28,20 +26,14 @@ pub fn power(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     }
 
     match (
-        to_const(root.front().unwrap()),
-        to_const(root.back().unwrap()),
+        root.front().unwrap().data().number(),
+        root.back().unwrap().data().number(),
     ) {
         (Some(d1), Some(d2)) if level > 1.into() => {
             if let Some(e) = d2.to_i8() {
                 let (m, exp) = d1.as_bigint_and_exponent();
                 let result = Decimal::new(m.pow(e.unsigned_abs()), exp * (e.abs() as i64));
                 let mut result = tr(Symbol::Number(result));
-                // if result > Decimal::zero() {
-                //     tr(Symbol::Number(result))
-                // } else {
-                //     tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-result))
-                // };
-                // TODO: negative result
                 while root.pop_front().is_some() {}
                 if e >= 0 {
                     swap_node(root, &mut result.root_mut());

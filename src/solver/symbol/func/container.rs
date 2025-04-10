@@ -31,7 +31,6 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Arc<F
         add_symbol_impl(&mut result, ops::equal::symbol());
 
         add_symbol_impl(&mut result, ops::plus::symbol());
-        add_symbol_impl(&mut result, ops::minus::symbol());
         add_symbol_impl(&mut result, ops::inequal::symbol());
         add_symbol_impl(&mut result, ops::more::symbol());
         add_symbol_impl(&mut result, ops::less::symbol());

@@ -9,7 +9,7 @@ use crate::{
     NormalizationLevel,
 };
 
-use super::{power::power_argument, to_const};
+use super::power::power_argument;
 
 pub fn symbol() -> FuncSymbol {
     FuncSymbol::builder()
@@ -31,10 +31,7 @@ pub fn plus(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
         NormalizationLevel(0) => return false,
         NormalizationLevel(1) => {
             let result = root.iter_mut().fold(false, |acc, mut x| {
-                if x.data().is_number_value(&0.into()) ||
-                    (x.data().is_symbol_name("-") &&
-                        x.front().unwrap().data().is_number_value(&0.into()))
-                {
+                if x.data().is_number_value(&0.into()) {
                     x.detach();
                     true
                 } else {
@@ -53,13 +50,6 @@ pub fn plus(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
                         acc.1 |= d.is_zero();
                         acc.1 |= degree != num - 1;
                         acc.0 += d;
-                    } else if x.data().is_symbol_name("-") {
-                        if let Some(d) = x.front().unwrap().data().number().cloned() {
-                            x.detach();
-                            acc.1 |= d.is_zero();
-                            acc.1 |= degree != num - 1;
-                            acc.0 -= d;
-                        }
                     }
                     acc
                 },
@@ -74,12 +64,8 @@ pub fn plus(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
 
     let mut constant_mapping = indexmap::IndexMap::new();
 
-    let mut children = vec![];
-    while let Some(mut child) = root.pop_front() {
-        if child.data().is_symbol_name("-") && child.degree() == 2 {
-            // +(a -(b c)) -> +(a b -c)
-            children.push(child.pop_front().unwrap());
-        }
+    let mut children: Vec<_> = vec![];
+    while let Some(child) = root.pop_front() {
         children.push(child);
     }
 
@@ -131,12 +117,8 @@ fn remove_unused_plus(root: &mut SymbolNode) -> bool {
 }
 
 fn attach_constant(root: &mut SymbolNode, constant: Decimal) {
-    match constant.cmp(&Decimal::zero()) {
-        // Ordering::Less => {
-        //    root.push_back(tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-constant)))
-        //}
-        Ordering::Less | Ordering::Greater => root.push_back(tr(Symbol::Number(constant))),
-        Ordering::Equal => {}
+    if !constant.is_zero() {
+        root.push_back(tr(Symbol::Number(constant)))
     }
 }
 
@@ -145,14 +127,7 @@ fn merge_mul_const(mut root: Tree<Symbol>, d: Decimal) -> Tree<Symbol> {
         return root;
     } else if d == Decimal::from(0) {
         return tr(Symbol::Number(Decimal::from(0)));
-        //} else if d == Decimal::from(-1) {
-        //    return tr(Symbol::with_func_symbol("-")) / root;
     }
-    // let constant = if d < Decimal::zero() {
-    //    tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-d))
-    //} else {
-    //    tr(Symbol::Number(d))
-    //};
     let constant = tr(Symbol::Number(d));
 
     if root.data().is_number_value(&Decimal::from(1)) {
@@ -168,33 +143,38 @@ fn merge_mul_const(mut root: Tree<Symbol>, d: Decimal) -> Tree<Symbol> {
 }
 
 fn extract_mul_const(root: &mut SymbolNode) -> Decimal {
-    if let Some(d) = to_const(root) {
+    if let Some(d) = root.data().number() {
         let result = d.clone();
         swap_node(root, &mut tr(Symbol::Number(1.into())).root_mut());
         return result;
     }
 
-    let base_constant = if root.data().is_symbol_name("-") && root.degree() == 1 {
-        let mut child = root.pop_front().unwrap();
-        swap_node(root, &mut child.root_mut());
-        Decimal::from(-1)
-    } else {
-        Decimal::from(1)
-    };
-
+    let mut constant = Decimal::from(1);
     if !root.data().is_symbol_name("*") {
-        return base_constant;
+        return constant;
     }
 
-    let constant = root.iter_mut().fold(base_constant, |prev, mut x| {
-        if let Some(d) = to_const(&x) {
-            let res = prev * d;
-            x.detach();
-            res
+    let mut children = vec![];
+    while let Some(child) = root.pop_front() {
+        if let Some(d) = child.data().number() {
+            constant *= d;
         } else {
-            prev
+            children.push(child);
         }
-    });
+    }
+    while let Some(child) = children.pop() {
+        root.push_front(child);
+    }
+    // Possible bug in Tree detach: degree stay 2 after detach
+    // constant = root.iter_mut().fold(constant, |prev, mut x| {
+    //     if let Some(d) = x.data().number() {
+    //         let res = prev * d;
+    //         x.detach();
+    //         res
+    //     } else {
+    //         prev
+    //     }
+    // });
 
     if root.degree() == 0 {
         *root.data_mut() = Symbol::Number(Decimal::from(1));
@@ -217,9 +197,6 @@ fn cummulative_power(root: &SymbolNode) -> Decimal {
         for i in root.iter() {
             match i.data() {
                 Symbol::Number(_) | Symbol::Placeholder(_) => {}
-                Symbol::FuncSymbol(_)
-                    if i.data().is_symbol_name("-") &&
-                        i.front().unwrap().data().number().is_some() => {}
                 Symbol::FuncSymbol(_) if i.data().is_symbol_name("^") => {
                     result += if let Some(v) = i.back().unwrap().data().number() {
                         v.clone()
@@ -252,11 +229,6 @@ fn mean_arg(root: &SymbolNode) -> &SymbolNode {
                     if pa.data().number().is_some() {
                         return false;
                     }
-                    if pa.data().is_symbol_name("-") &&
-                        pa.front().unwrap().data().number().is_some()
-                    {
-                        return false;
-                    }
                     true
                 })
                 .unwrap_or_else(|| root.back().unwrap()),
@@ -265,11 +237,7 @@ fn mean_arg(root: &SymbolNode) -> &SymbolNode {
         power_argument(root)
     };
 
-    if pa.data().is_symbol_name("-") {
-        pa.front().unwrap()
-    } else {
-        pa
-    }
+    pa
 }
 
 fn ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {

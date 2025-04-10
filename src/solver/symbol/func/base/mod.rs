@@ -1,12 +1,11 @@
 use std::{cmp::Ordering, rc::Rc};
 
-use bigdecimal::BigDecimal as Decimal;
-use trees::{tr, Node};
+use trees::Node;
 
 #[cfg(test)]
 use crate::term::term_with_params;
 use crate::{
-    symbol::{func::SymbolAttr, Symbol, SymbolNode, SymbolTree},
+    symbol::{func::SymbolAttr, Symbol, SymbolNode},
     term::NodeMapping,
     NormalizationLevel,
 };
@@ -17,7 +16,7 @@ pub mod inequal;
 pub mod is;
 pub mod less;
 pub mod less_or_equal;
-pub mod minus;
+// pub mod minus;
 pub mod more;
 pub mod more_or_equal;
 pub mod mul;
@@ -133,30 +132,11 @@ pub fn normalize(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     result
 }
 
-fn from_const(d: Decimal) -> SymbolTree {
-    // if d < Decimal::zero() {
-    //    tr(Symbol::with_func_symbol("-")) / tr(Symbol::Number(-d))
-    // } else {
-    //    tr(Symbol::Number(d))
-    // }
-    tr(Symbol::Number(d))
-}
-
-fn to_const(node: &SymbolNode) -> Option<Decimal> {
-    if let Some(d) = node.data().number() {
-        Some(d.clone())
-    } else if node.data().is_symbol_name("-") {
-        node.front().unwrap().data().number().map(|d| -d.clone())
-    } else {
-        None
-    }
-}
-
 fn compare_numbers(left: &SymbolNode, right: &SymbolNode) -> Option<Ordering> {
-    let left_num = to_const(left)?;
-    let right_num = to_const(right)?;
+    let left_num = left.data().number()?;
+    let right_num = right.data().number()?;
 
-    Some(left_num.cmp(&right_num))
+    Some(left_num.cmp(right_num))
 }
 
 #[cfg(test)]
@@ -254,28 +234,6 @@ mod operations_tests {
             tr(Symbol::with_number(1));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, tr(Symbol::Variable("x".parse().unwrap())));
-    }
-
-    #[test]
-    fn evaluate_minus_test() {
-        // 10 - 2 -> 8
-        let mut test_tree = tr(Symbol::with_func_symbol("-")) /
-            tr(Symbol::with_number(10)) /
-            tr(Symbol::with_number(2));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree, tr(Symbol::with_number(8)));
-
-        // x - 2 -> x + (- 2)
-        let mut test_tree = tr(Symbol::with_func_symbol("-")) /
-            tr(Symbol::Variable("x".parse().unwrap())) /
-            tr(Symbol::with_number(2));
-        assert!(!test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(
-            test_tree,
-            tr(Symbol::with_func_symbol("+")) /
-                tr(Symbol::Variable("x".parse().unwrap())) /
-                tr(Symbol::with_number(-2))
-        );
     }
 
     #[test]

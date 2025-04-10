@@ -3,6 +3,7 @@ use std::cmp::max;
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use num::integer::gcd;
 use num_bigint::ToBigInt;
+use trees::tr;
 
 use crate::{
     symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
@@ -10,7 +11,7 @@ use crate::{
     NormalizationLevel,
 };
 
-use super::{from_const, to_const, MAX_DEC_CONVERSION_EXP};
+use super::MAX_DEC_CONVERSION_EXP;
 
 pub fn symbol() -> FuncSymbol {
     FuncSymbol::builder()
@@ -39,15 +40,15 @@ pub fn divide(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
         }
         _ => {
             match (
-                to_const(root.front().unwrap()),
-                to_const(root.back().unwrap()),
+                root.front().unwrap().data().number(),
+                root.back().unwrap().data().number(),
             ) {
                 (Some(d1), Some(d2)) => {
                     let (num, den) = simplify(d1.clone(), d2.clone());
                     if let Some(t) = impl_divide(&num, &den) {
-                        swap_node(root, &mut from_const(t).root_mut());
+                        swap_node(root, &mut tr(Symbol::Number(t)).root_mut());
                         true
-                    } else if d1 != num || d2 != den {
+                    } else if *d1 != num || *d2 != den {
                         let sign = if (&num * &den) < Decimal::zero() {
                             Decimal::from(-1)
                         } else {
@@ -56,7 +57,7 @@ pub fn divide(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
 
                         swap_node(
                             &mut root.front_mut().unwrap(),
-                            &mut from_const(sign * num.abs()).root_mut(),
+                            &mut tr(Symbol::Number(sign * num.abs())).root_mut(),
                         );
                         *root.back_mut().unwrap().data_mut() = Symbol::Number(den.abs());
                         true

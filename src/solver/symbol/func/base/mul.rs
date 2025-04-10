@@ -9,7 +9,7 @@ use crate::{
     NormalizationLevel,
 };
 
-use super::{plus::plus, power::power_argument, to_const};
+use super::{plus::plus, power::power_argument};
 
 pub fn symbol() -> FuncSymbol {
     FuncSymbol::builder()
@@ -92,9 +92,6 @@ fn attach_constant(root: &mut SymbolNode, constant: Decimal) -> bool {
     if constant == Decimal::zero() {
         swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
         true
-    //} else if constant < Decimal::zero() {
-    //    root.push_front(tr(Symbol::with_func_symbol("-")) /
-    // tr(Symbol::Number(-constant)));    false
     } else if constant != Decimal::one() {
         root.push_front(tr(Symbol::Number(constant)));
         false
@@ -107,15 +104,10 @@ fn fold_constant(root: &mut SymbolNode) -> (Decimal, bool) {
     root.iter_mut()
         .enumerate()
         .fold((Decimal::from(1), false), |acc, (num, mut x)| {
-            if let Some(d) = to_const(&x) {
+            if let Some(d) = x.data().clone().number() {
                 x.detach();
                 let res = d.is_one() || num != 0;
                 (acc.0 * d, res)
-            } else if x.data().is_symbol_name("-") {
-                let mut front = x.pop_front().unwrap();
-                swap_node(&mut x, &mut front.root_mut());
-                let res = acc.1 || num != 0;
-                (-acc.0, res)
             } else {
                 acc
             }
@@ -167,8 +159,8 @@ fn ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {
     let pa_left = power_argument(left);
     let pa_right = power_argument(right);
 
-    match (to_const(pa_left), to_const(pa_right)) {
-        (Some(left), Some(right)) => return left.cmp(&right),
+    match (pa_left.data().number(), pa_right.data().number()) {
+        (Some(left), Some(right)) => return left.cmp(right),
         (Some(_), _) => return Ordering::Less,
         (_, Some(_)) => return Ordering::Greater,
         _ => {}
