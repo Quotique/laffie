@@ -71,18 +71,18 @@ peg::parser! {
 
         rule placeholder() -> Tree<Token> = p:position!() ".." { Token::new("..", p) }
 
-        rule attrs() -> Vec<Tree<Token>> = _ keyword("attr") _ a:commasep(<arithmetic()>) { a }
+        rule attrs() -> Vec<Tree<Token>> = _ keyword("attr") _ a:commasep(<term()>) { a }
 
         pub rule any() -> Vec<Tree<Token>> =
             _ s:( (task()/lang_rule()/symbol())* ) _ { s }
 
-        pub rule terms() -> Vec<Tree<Token>> = _ c:semicolonsep(<arithmetic()>) _ { c }
+        pub rule terms() -> Vec<Tree<Token>> = _ c:semicolonsep(<term()>) _ { c }
 
         pub rule task() -> Tree<Token> = _ pp:position!() keyword("task") _ "{"
                 _ pt:position!() keyword("purpose") _ p:eval() ";"
                 _ tt:position!() t:(keyword("text") _ t:string() ";" {t} )?
-                _ at:position!() a:(keyword("answer") _ a:commasep(<arithmetic()>) _ ";" {a} )?
-                _ c:semicolonsep(<arithmetic()>)
+                _ at:position!() a:(keyword("answer") _ a:commasep(<term()>) _ ";" {a} )?
+                _ c:semicolonsep(<term()>)
             _ "}"
             {
                 let mut p = Token::new(TOKEN_TASK, pp)
@@ -124,8 +124,8 @@ peg::parser! {
         pub rule lang_rule() -> Tree<Token> =
             _ rp:position!() keyword("rule") _ "{"
                 _ ap:position!() a:(a:attrs() _ ";" {a})?
-                _ r:arithmetic() _ ";"
-                _ pp:position!() p:commasep(<arithmetic()>)
+                _ r:term() _ ";"
+                _ pp:position!() p:commasep(<term()>)
                 _ ";"?
             _ "}"
             {
@@ -146,54 +146,75 @@ peg::parser! {
                 t
             }
 
-        pub rule arithmetic() -> Tree<Token> = precedence!{
-            p:position!() s:string() { Token::new(s.as_str(), p) }
-            --
-            x:(@) _ p:position!() "=>" _ y:@ { Token::new("=>", p) /x /y }
-            x:(@) _ p:position!() "<=>" _ y:@ { Token::new("<=>", p) /x /y }
-            --
-            x:(@) _ p:position!() "||" _ y:@ { Token::new("||", p) /x /y }
-            x:(@) _ p:position!() "&&" _ y:@ { Token::new("&&", p) /x /y }
-            --
-            x:(@) _ p:position!() "is" _ y:@ { Token::new("is", p) /x /y }
-            x:(@) _ p:position!() "in" _ y:@ { Token::new("in", p) /x /y }
-            x:(@) _ p:position!() "==" _ y:@ { Token::new("==", p) /x /y }
-            x:(@) _ p:position!() "!=" _ y:@ { Token::new("!=", p) /x /y }
-            x:(@) _ p:position!() "<=" _ y:@ { Token::new("<=", p) /x /y }
-            x:(@) _ p:position!() ">=" _ y:@ { Token::new(">=", p) /x /y }
-            x:(@) _ p:position!() "<" _ y:@ { Token::new("<", p) /x /y }
-            x:(@) _ p:position!() ">" _ y:@ { Token::new(">", p) /x /y }
-            --
-            x:(@) _ p:position!() "as" _ y:ident() { Token::new("as", p) /x /y }
-            --
-            x:(@) _ p:position!() "+" _ y:@ { Token::new("+", p) /x /y }
-            x:(@) _ p:position!() _ m:minus_number() _ y:@ { Token::new("+", p) /x /(Token::new("*", p) /m /y) }
-            x:(@) _ p:position!() _ m:minus_number() _ "*" _ y:@ { Token::new("+", p) /x /(Token::new("*", p) /m /y) }
-            x:(@) _ p:position!() _ m:minus_number() { Token::new("+", p) /x /m }
-            x:(@) _ p:position!() "-" _ y:@ {
-                Token::new("+", p) /x /(Token::new("*", p) /Token::new("-1", p) /y)
-            }
-            --
-            n:minus_number() { n }
-            p:position!() "-" _ x:@ { Token::new("*", p) /Token::new("-1", p) /x }
-            p:position!() "+" _ x:@ { Token::new("+", p) /x }
-            p:position!() "!" _ x:@ { Token::new("!", p) /x }
-            --
-            x:(@) _ p:position!() "*" _ y:@ { Token::new("*", p) /x /y }
-            x:(@) _ p:position!() "/" _ y:@ { Token::new("/", p) /x /y }
-            --
-            x:@ p:position!() "^" y:(@) { Token::new("^", p) /x /y }
-            --
-            n:number() p:position!() e:eval() { Token::new("*", p) /n /e }
-            e:eval() { e }
-            p:placeholder() { p }
-            n:number() p:position!() i:char_first_ident() { Token::new("*", p) /n /i }
-            n:number() { n }
-            i:ident() { i }
-            "(" _  a:arithmetic() _ ")" {a}
-        }
+        rule predicate_op() -> &'input str =
+            s:$("is" / "in" / "==" / "!=" / "<=" / ">=" / "<" / ">") { s }
 
-        rule eval() -> Tree<Token> = t:char_first_ident() "(" _ a:commasep(<arithmetic()>) _ ")" {
+        pub rule term() -> Tree<Token> =
+            deduction()
+            / or()
+
+        rule deduction() -> Tree<Token> =
+            l:or() _ p:position!() op:$("=>"/"<=>") _ r:or() { Token::new(op, p) /l /r}
+
+        #[cache_left_rec]
+        rule or() -> Tree<Token> =
+            l:or() _ p:position!() "||" _ r:and() { Token::new("||", p) /l /r}
+            / and()
+
+        #[cache_left_rec]
+        rule and() -> Tree<Token> =
+            l:and() _ p:position!() "&&" _ r:predicate() { Token::new("&&", p) /l /r}
+            / predicate()
+
+        #[cache_left_rec]
+        rule predicate() -> Tree<Token> =
+            l:bind() _ p:position!() op:predicate_op() _ r:bind() { Token::new(op, p) /l /r}
+            / bind()
+
+        rule bind() -> Tree<Token> =
+            l:sum() _ p:position!() "as" _ r:ident() { Token::new("as", p) /l /r}
+            / sum()
+
+        #[cache_left_rec]
+        rule sum() -> Tree<Token> =
+            l:sum() _ p:position!() "+" _ r:product() { Token::new("+", p) /l /r }
+            / l:sum() _ p:position!() "+" _ n:number() _ r:product() { Token::new("+", p) /l /(Token::new("*", p) /n /r) }
+            / l:sum() _ p:position!() _ n:minus_number() _ "*" _ r:product() { Token::new("+", p) /l /(Token::new("*", p) /n /r) }
+            / l:sum() _ p:position!() _ n:minus_number() _ "/" _ r:product() { Token::new("+", p) /l /(Token::new("/", p) /n /r) }
+            / l:sum() _ p:position!() _ n:minus_number() _ r:product() { Token::new("+", p) /l /(Token::new("*", p) /n /r) }
+            / l:sum() _ p:position!() _ n:minus_number() { Token::new("+", p) /l /n }
+            / l:sum() _ p:position!() "-" _ r:product() { Token::new("+", p) /l /(Token::new("*", p) /Token::new("-1", p) /r) }
+            / unary()
+
+        rule unary() -> Tree<Token> =
+            p:position!() n:minus_number() _ "/" _ x:product() { Token::new("/", p) /n /x }
+            / p:position!() n:minus_number() _ x:product() { Token::new("*", p) /n /x }
+            / n:minus_number() { n }
+            / p:position!() "-" _ x:product() { Token::new("*", p) /Token::new("-1", p) /x }
+            / p:position!() "+" _ x:product() { Token::new("+", p) /x }
+            / p:position!() "!" _ x:product() { Token::new("!", p) /x }
+            / product()
+
+        #[cache_left_rec]
+        rule product() -> Tree<Token> =
+            l:product() _ p:position!() "*" _ r:power() { Token::new("*", p) /l /r }
+            / l:product() _ p:position!() "/" _ r:power() { Token::new("/", p) /l /r }
+            / power()
+
+        rule power() -> Tree<Token> =
+            x:atom() _ p:position!() "^" y:atom() { Token::new("^", p) /x /y }
+            / atom()
+
+        rule atom() -> Tree<Token> =
+            n:number() p:position!() e:eval() { Token::new("*", p) /n /e }
+            / "(" _ b:or() _ ")" { b }
+            / e:eval() { e }
+            / p:placeholder() { p }
+            / n:number() p:position!() i:char_first_ident() { Token::new("*", p) /n /i }
+            / n:number() { n }
+            / i:ident() { i }
+
+        rule eval() -> Tree<Token> = t:char_first_ident() "(" _ a:commasep(<or()>) _ ")" {
             let mut t = t;
             for i in a.iter().cloned() {
                 t.push_back(i);
@@ -206,6 +227,14 @@ peg::parser! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::ParserError;
+
+    fn terms_test(text: &str, expect: Vec<Tree<Token>>) {
+        let states = ra::terms(text)
+            .map_err(|e| println!("{}", ParserError::from(e).error_string(text, None)))
+            .unwrap();
+        assert_eq!(states, expect)
+    }
 
     #[test]
     fn string_test() {
@@ -215,7 +244,7 @@ mod tests {
     #[test]
     fn args_test() {
         assert_eq!(
-            ra::arithmetic("sum(one + three, two)"),
+            ra::term("sum(one + three, two)"),
             Ok(Token::new("sum", 0) /
                 (Token::new("+", 8) / Token::new("one", 4) / Token::new("three", 10)) /
                 Token::new("two", 17))
@@ -224,32 +253,26 @@ mod tests {
 
     #[test]
     fn bindings_test() {
-        let test = "set(a, b) as S is Known";
-        let states = ra::terms(test).unwrap();
-        assert_eq!(states.len(), 1);
-        assert_eq!(
-            states[0],
-            Token::new("is", 15) /
-                (Token::new("as", 10) /
-                    (Token::new("set", 0) / Token::new("a", 4) / Token::new("b", 7)) /
-                    Token::new("S", 13)) /
-                Token::new("Known", 18)
-        )
+        terms_test(
+            "set(a, b) as S is Known",
+            vec![
+                Token::new("is", 15) /
+                    (Token::new("as", 10) /
+                        (Token::new("set", 0) / Token::new("a", 4) / Token::new("b", 7)) /
+                        Token::new("S", 13)) /
+                    Token::new("Known", 18),
+            ],
+        );
     }
 
     #[test]
     fn predicate_parse_test() {
-        let test = "x in Real; x is Unknown;";
-        let states = ra::terms(test).unwrap();
-
-        assert_eq!(states.len(), 2);
-        assert_eq!(
-            states[0],
-            Token::new("in", 2) / Token::new("x", 0) / Token::new("Real", 5)
-        );
-        assert_eq!(
-            states[1],
-            Token::new("is", 13) / Token::new("x", 11) / Token::new("Unknown", 16)
+        terms_test(
+            "x in Real; x is Unknown;",
+            vec![
+                Token::new("in", 2) / Token::new("x", 0) / Token::new("Real", 5),
+                Token::new("is", 13) / Token::new("x", 11) / Token::new("Unknown", 16),
+            ],
         );
     }
 
@@ -290,6 +313,172 @@ mod tests {
                         (Token::new("*", 81) / Token::new("Pi", 79) / Token::new("n", 82))) /
                     (Token::new("in", 89) / Token::new("n", 87) / Token::new("Z", 92)))
         );
+    }
+
+    #[test]
+    fn priority_test() {
+        terms_test(
+            r#"-a/b"#,
+            vec![
+                Token::new("*", 0) /
+                    Token::new("-1", 0) /
+                    (Token::new("/", 2) / Token::new("a", 1) / Token::new("b", 3)),
+            ],
+        );
+
+        terms_test(
+            r#"-a+b"#,
+            vec![
+                Token::new("+", 2) /
+                    (Token::new("*", 0) / Token::new("-1", 0) / Token::new("a", 1)) /
+                    Token::new("b", 3),
+            ],
+        );
+    }
+
+    #[test]
+    fn comment_test() {
+        terms_test(
+            r#"// test comment before
+            -a/b // test comment near
+            //test comment after"#,
+            vec![
+                Token::new("*", 35) /
+                    Token::new("-1", 35) /
+                    (Token::new("/", 37) / Token::new("a", 36) / Token::new("b", 38)),
+            ],
+        );
+    }
+
+    #[test]
+    fn placeholder_test() {
+        terms_test(
+            "set(..) as S is Known",
+            vec![
+                Token::new("is", 13) /
+                    (Token::new("as", 8) /
+                        (Token::new("set", 0) / Token::new("..", 4)) /
+                        Token::new("S", 11)) /
+                    Token::new("Known", 16),
+            ],
+        );
+    }
+
+    #[test]
+    fn linear_test() {
+        terms_test(
+            r#"2*x-5+t == 0"#,
+            vec![
+                Token::new("==", 8) /
+                    (Token::new("+", 5) /
+                        (Token::new("+", 3) /
+                            (Token::new("*", 1) / Token::new("2", 0) / Token::new("x", 2)) /
+                            Token::new("-5", 4)) /
+                        Token::new("t", 6)) /
+                    Token::new("0", 11),
+            ],
+        );
+    }
+
+    #[test]
+    fn polynom_test() {
+        terms_test(
+            r#"x^4 - 25*x^2 + 60*x - 36 != 0"#,
+            vec![
+                Token::new("!=", 25) /
+                    (Token::new("+", 20) /
+                        (Token::new("+", 13) /
+                            (Token::new("+", 4) /
+                                (Token::new("^", 1) /
+                                    Token::new("x", 0) /
+                                    Token::new("4", 2)) /
+                                (Token::new("*", 4) /
+                                    Token::new("-25", 6) /
+                                    (Token::new("^", 10) /
+                                        Token::new("x", 9) /
+                                        Token::new("2", 11)))) /
+                            (Token::new("*", 17) /
+                                Token::new("60", 15) /
+                                Token::new("x", 18))) /
+                        Token::new("-36", 22)) /
+                    Token::new("0", 28),
+            ],
+        );
+    }
+
+    #[test]
+    fn short_mul_ident_test() {
+        terms_test(
+            r#"6x"#,
+            vec![Token::new("*", 1) / Token::new("6", 0) / Token::new("x", 1)],
+        );
+    }
+
+    #[test]
+    fn short_mul_expr_test() {
+        terms_test(
+            r#"6sin(x)"#,
+            vec![
+                Token::new("*", 1) /
+                    Token::new("6", 0) /
+                    (Token::new("sin", 1) / Token::new("x", 5)),
+            ],
+        );
+    }
+
+    #[test]
+    fn fraction_test() {
+        terms_test(
+            r#"x == -5/3"#,
+            vec![
+                Token::new("==", 2) /
+                    Token::new("x", 0) /
+                    (Token::new("/", 5) / Token::new("-5", 6) / Token::new("3", 8)),
+            ],
+        );
+    }
+
+    #[test]
+    fn decimal_fraction_test() {
+        terms_test(
+            r#"2.1sin(x)"#,
+            vec![
+                Token::new("*", 3) /
+                    Token::new("2.1", 0) /
+                    (Token::new("sin", 3) / Token::new("x", 7)),
+            ],
+        );
+
+        terms_test(
+            r#"2.1/3.5"#,
+            vec![Token::new("/", 3) / Token::new("2.1", 0) / Token::new("3.5", 4)],
+        );
+    }
+
+    #[test]
+    fn task_text_parse_test() {
+        let test = r#"task {
+                        purpose find(x);
+                        text "Решите уравнение 2x+5 = 0";
+                        answer x == -2.5;
+                        2*x+5 == 0;
+                    }"#;
+        let states = ra::task(test).unwrap();
+        assert_eq!(
+            states,
+            Token::new("Task", 0) /
+                (Token::new("Purpose", 31) / (Token::new("find", 39) / Token::new("x", 44))) /
+                (Token::new("Text", 72) / Token::new("Решите уравнение 2x+5 = 0", 72)) /
+                (Token::new("Answer", 145) /
+                    (Token::new("==", 154) / Token::new("x", 152) / Token::new("-2.5", 158))) /
+                (Token::new("==", 193) /
+                    (Token::new("+", 190) /
+                        (Token::new("*", 188) /
+                            Token::new("2", 187) /
+                            Token::new("x", 189)) /
+                        Token::new("5", 191)) /
+                    Token::new("0", 196))
+        )
     }
 
     #[test]
@@ -335,152 +524,6 @@ mod tests {
                         (Token::new("*", 73) / Token::new("2", 72) / Token::new("x", 74)) /
                         Token::new("5", 76)) /
                     Token::new("0", 81))
-        )
-    }
-
-    #[test]
-    fn priority_test() {
-        let test = r#"-a/b"#;
-        let states = ra::terms(test).unwrap();
-        assert_eq!(
-            states[0],
-            Token::new("*", 0) /
-                Token::new("-1", 0) /
-                (Token::new("/", 2) / Token::new("a", 1) / Token::new("b", 3))
-        );
-
-        let test = r#"-a+b"#;
-        let states = ra::terms(test).unwrap();
-        assert_eq!(
-            states[0],
-            Token::new("+", 2) /
-                (Token::new("*", 0) / Token::new("-1", 0) / Token::new("a", 1)) /
-                Token::new("b", 3)
-        );
-    }
-
-    #[test]
-    fn comment_test() {
-        let test = r#"// test comment before
-            -a/b // test comment near
-            //test comment after
-        "#;
-        let states = ra::terms(test).unwrap();
-        assert_eq!(
-            states[0],
-            Token::new("*", 35) /
-                Token::new("-1", 35) /
-                (Token::new("/", 37) / Token::new("a", 36) / Token::new("b", 38))
-        );
-    }
-
-    #[test]
-    fn placeholder_test() {
-        let test = "set(..) as S is Known";
-        let states = ra::terms(test).unwrap();
-        assert_eq!(states.len(), 1);
-        assert_eq!(
-            states[0],
-            Token::new("is", 13) /
-                (Token::new("as", 8) /
-                    (Token::new("set", 0) / Token::new("..", 4)) /
-                    Token::new("S", 11)) /
-                Token::new("Known", 16)
-        )
-    }
-
-    #[test]
-    fn polynom_test() {
-        let test = r#"x^4 - 25*x^2 + 60*x - 36 != 0"#;
-        let states = ra::terms(test).unwrap();
-
-        assert_eq!(states.len(), 1);
-        assert_eq!(
-            states[0],
-            Token::new("!=", 25) /
-                (Token::new("+", 20) /
-                    (Token::new("+", 13) /
-                        (Token::new("+", 4) /
-                            (Token::new("^", 1) /
-                                Token::new("x", 0) /
-                                Token::new("4", 2)) /
-                            (Token::new("*", 4) /
-                                Token::new("-25", 6) /
-                                (Token::new("^", 10) /
-                                    Token::new("x", 9) /
-                                    Token::new("2", 11)))) /
-                        (Token::new("*", 17) / Token::new("60", 15) / Token::new("x", 18))) /
-                    Token::new("-36", 22)) /
-                Token::new("0", 28)
-        )
-    }
-
-    #[test]
-    fn short_mul_ident_test() {
-        let test = r#"6x"#;
-        let states = ra::terms(test).unwrap();
-        assert_eq!(states.len(), 1);
-
-        assert_eq!(
-            states[0],
-            Token::new("*", 1) / Token::new("6", 0) / Token::new("x", 1)
-        );
-    }
-
-    #[test]
-    fn short_mul_expr_test() {
-        let test = r#"6sin(x)"#;
-        let states = ra::terms(test).unwrap();
-        assert_eq!(states.len(), 1);
-
-        assert_eq!(
-            states[0],
-            Token::new("*", 1) / Token::new("6", 0) / (Token::new("sin", 1) / Token::new("x", 5))
-        );
-    }
-
-    #[test]
-    fn decimal_fraction_test() {
-        let test = r#"2.1sin(x)"#;
-        let states = ra::terms(test).unwrap();
-        assert_eq!(states.len(), 1);
-        assert_eq!(
-            states[0],
-            Token::new("*", 3) / Token::new("2.1", 0) / (Token::new("sin", 3) / Token::new("x", 7))
-        );
-
-        let test = r#"2.1/3.5"#;
-        let states = ra::terms(test).unwrap();
-        assert_eq!(states.len(), 1);
-        assert_eq!(
-            states[0],
-            Token::new("/", 3) / Token::new("2.1", 0) / Token::new("3.5", 4)
-        );
-    }
-
-    #[test]
-    fn task_text_parse_test() {
-        let test = r#"task {
-                        purpose find(x);
-                        text "Решите уравнение 2x+5 = 0";
-                        answer x == -2.5;
-                        2*x+5 == 0;
-                    }"#;
-        let states = ra::task(test).unwrap();
-        assert_eq!(
-            states,
-            Token::new("Task", 0) /
-                (Token::new("Purpose", 31) / (Token::new("find", 39) / Token::new("x", 44))) /
-                (Token::new("Text", 72) / Token::new("Решите уравнение 2x+5 = 0", 72)) /
-                (Token::new("Answer", 145) /
-                    (Token::new("==", 154) / Token::new("x", 152) / Token::new("-2.5", 158))) /
-                (Token::new("==", 193) /
-                    (Token::new("+", 190) /
-                        (Token::new("*", 188) /
-                            Token::new("2", 187) /
-                            Token::new("x", 189)) /
-                        Token::new("5", 191)) /
-                    Token::new("0", 196))
         )
     }
 }

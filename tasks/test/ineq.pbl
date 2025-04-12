@@ -53,7 +53,7 @@ task {
     purpose find(x);
     answer x == 1;
 
-    --x == 1;
+    -(-x) == 1;
 }
 
 task {

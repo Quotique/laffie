@@ -139,7 +139,9 @@ pub fn term_with_params(text: &'static str) -> Term {
 
 #[cfg(test)]
 pub fn term_with_vars(text: &'static str) -> Term {
-    let states = parser::lang::terms(text).unwrap();
+    let states = parser::lang::terms(text)
+        .map_err(|e| println!("parsing error {text}: {e}"))
+        .unwrap();
     let term = parser::TermParser::new(&states[0])
         .with_variables()
         .parse()
