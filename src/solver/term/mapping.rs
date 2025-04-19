@@ -4,8 +4,11 @@ use std::{
     iter::{FromIterator, Iterator},
 };
 
+use bigdecimal::BigDecimal;
 use eyre::{bail, ensure, Result};
+use trees::tr;
 
+use num::Zero;
 use utils::VecDisplay;
 
 use crate::symbol::{Param, Placeholder, Symbol, SymbolAttr};
@@ -59,9 +62,9 @@ impl ParamsMapping {
         queue.push_back((target, NodePosition::root()));
 
         while let Some((node, pos)) = queue.pop_front() {
-            if let Ok(mapping) = Self::try_map_with_params(node, pattern, params.clone()).map_err(
-                |_| trace!(target: "pattern_match", "No match for {} to {}", pattern, node),
-            ) {
+            if let Ok(mapping) = Self::try_map_with_params(node, pattern, params.clone())
+                .map_err(|_| trace!(target: "pattern_match", "No match for {pattern} to {node}"))
+            {
                 result.push((mapping, pos.clone()));
             }
 
@@ -102,12 +105,12 @@ impl ParamsMapping {
         pattern: &SymbolNode,
         mut params: ParamsMapping,
     ) -> Result<Vec<ParamsMapping>> {
-        trace!(target: "pattern_match", "Pattern: {}, traget: {}, mapping: {:?}", pattern, target, params);
+        trace!(target: "pattern_match", "Pattern: {pattern}, traget: {target}, mapping: {params:?}");
         let mut result = vec![];
 
         match (&pattern.data(), &target.data()) {
             (Symbol::FuncSymbol(sym), Symbol::FuncSymbol(t_sym)) => {
-                ensure!(sym == t_sym, "Expect symbol {}, found: {}", sym, t_sym);
+                ensure!(sym == t_sym, "Expect symbol {sym}, found: {t_sym}");
 
                 if sym.attrs.read().contains_key(&SymbolAttr::Associative) &&
                     sym.attrs.read().contains_key(&SymbolAttr::Commutative)
@@ -126,10 +129,22 @@ impl ParamsMapping {
                 ensure!(!result.is_empty(), "No mapping found");
                 return Ok(result);
             }
+            // try map (-1)*param on (-number)
+            (Symbol::FuncSymbol(mul), Symbol::Number(neg)) if neg < &BigDecimal::zero() => {
+                if !pattern.data().is_symbol_name("*") {
+                    bail!(
+                        "Expect symbol id: {mul}, found target: {:?}",
+                        &target.data()
+                    );
+                }
+                let mul_num = tr(Symbol::FuncSymbol(mul.clone())) /
+                    tr(Symbol::Number((-1).into())) /
+                    tr(Symbol::Number(neg.abs()));
+                return Self::try_map_with_params(&mul_num, pattern, params);
+            }
             (Symbol::FuncSymbol(p_id), _) => {
                 bail!(
-                    "Expect symbol id: {}, found target: {:?}",
-                    p_id,
+                    "Expect symbol id: {p_id}, found target: {:?}",
                     &target.data()
                 );
             }
@@ -146,8 +161,7 @@ impl ParamsMapping {
             (Symbol::Number(value), Symbol::Number(other_value)) => {
                 ensure!(
                     value == other_value,
-                    "Expect Number {}, found {:?}",
-                    value,
+                    "Expect Number {value}, found {:?}",
                     target.data()
                 );
 
@@ -159,8 +173,7 @@ impl ParamsMapping {
             (Symbol::Variable(value), Symbol::Variable(other_value)) => {
                 ensure!(
                     value == other_value,
-                    "Expect Varible {}, found {:?}",
-                    value,
+                    "Expect Varible {value}, found {:?}",
                     target.data()
                 );
 
@@ -271,6 +284,28 @@ mod tests {
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 1, b: x }, { a: x, b: 1 }]");
+    }
+
+    #[test]
+    fn param_mapping_minus_sign_test() {
+        let term = term_with_vars("-x - 5 == 0");
+        let pattern = term_with_params("-a + b == 0");
+
+        let maps = ParamsMapping::try_map(term.root(), pattern.root())
+            .map_err(|e| println!("Error: {e}"))
+            .unwrap();
+        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 5, b: *( (-1) x ) }, { a: x, b: (-5) }]");
+    }
+
+    #[test]
+    fn param_mapping_minus_sign_2_test() {
+        let term = term_with_vars("-x - 5 == 0");
+        let pattern = term_with_params("-a - b == 0");
+
+        let maps = ParamsMapping::try_map(term.root(), pattern.root())
+            .map_err(|e| println!("Error: {e}"))
+            .unwrap();
+        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 5, b: x }, { a: x, b: 5 }]");
     }
 
     #[test]
