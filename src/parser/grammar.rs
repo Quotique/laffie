@@ -213,6 +213,7 @@ peg::parser! {
             / n:number() p:position!() i:char_first_ident() { Token::new("*", p) /n /i }
             / n:number() { n }
             / i:ident() { i }
+            / p:position!() s:string() { Token::new(s.as_str(), p) }
 
         rule eval() -> Tree<Token> = t:char_first_ident() "(" _ a:commasep(<or()>) _ ")" {
             let mut t = t;
