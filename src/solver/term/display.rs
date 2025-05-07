@@ -5,12 +5,16 @@ use crate::symbol::{FuncSymbol, Symbol, SymbolAttr};
 use super::SymbolNode;
 
 pub fn display_string(node: &SymbolNode) -> String {
+    let mul_sym_str = FuncSymbol::by_name("*")
+        .map(|x| x.to_string())
+        .unwrap_or("*".to_owned());
+
     match node.data() {
         Symbol::FuncSymbol(symbol) => symbol_display(symbol.clone(), node),
         Symbol::Number(num) => num.to_string(),
         _ => node.data().to_string(),
     }
-    .replace("-1*", "-")
+    .replace(&format!("-1{mul_sym_str}"), "-")
     .replace("+-", "-")
 }
 
