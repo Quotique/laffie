@@ -89,6 +89,11 @@ impl TermProps {
         self
     }
 
+    pub fn with_rule(mut self, rule: SharedRule) -> Self {
+        self.rule = Some(rule);
+        self
+    }
+
     pub fn rule(&mut self, id: RuleId, level: u64) -> Option<SharedRule> {
         if self.not_rule {
             return None;

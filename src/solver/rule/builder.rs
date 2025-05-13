@@ -8,7 +8,10 @@ use crate::{
     NormalizationLevel, RuleId,
 };
 
-use super::rule::{Rule, RuleAttr, RuleAttrValue};
+use super::{
+    rule::Rule,
+    rule_attribute::{RuleAttr, RuleAttrValue},
+};
 
 #[derive(Clone, Debug)]
 pub enum RuleBuilderError {

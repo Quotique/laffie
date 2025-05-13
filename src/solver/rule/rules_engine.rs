@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
     iter::once,
-    rc::Rc,
     sync::Arc,
 };
 
@@ -9,13 +8,15 @@ use itertools::Itertools;
 
 use utils::VecDisplay;
 
-use super::rule::{Rule, RuleAttr, RuleAttrValue};
+use super::{
+    rule::{Rule, SharedRule},
+    rule_attribute::{RuleAttr, RuleAttrValue},
+};
 use crate::{symbol::FuncSymbol, term::TermProps, CompactString, RuleId};
 
 // TODO: move to correct place
 type Level = usize;
 
-pub type SharedRule = Rc<Rule>;
 #[allow(clippy::mutable_key_type)]
 type LevelRules = HashMap<Arc<FuncSymbol>, Vec<SharedRule>>;
 

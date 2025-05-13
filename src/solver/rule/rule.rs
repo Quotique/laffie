@@ -1,36 +1,19 @@
-use std::{collections::HashSet, fmt, hash::Hash, rc::Rc, str::FromStr, sync::Arc};
+use std::{collections::HashSet, fmt, hash::Hash, rc::Rc, sync::Arc};
 
-use eyre::{bail, Result};
+use eyre::Result;
 use multimap::MultiMap;
 
 use utils::VecDisplay;
 
+use super::{
+    rule_attribute::{RuleAttr, RuleAttrValue},
+    suppose::Suppose,
+};
 use crate::{
     symbol::{FuncSymbol, SymbolNode},
     term::{NodePosition, ParamsMapping, Term, TermProps},
-    CompactString, NormalizationLevel, RuleId,
+    NormalizationLevel, RuleId,
 };
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum RuleAttr {
-    Equivalence,
-    Replace,
-    Purpose,
-    Level,
-    Zero,
-    One,
-    Block,
-    Id,
-    Normalize,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum RuleAttrValue {
-    None,
-    UInt(u64),
-    Str(CompactString),
-    Target(Term),
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RuleDeclineReason {
@@ -41,13 +24,7 @@ pub enum RuleDeclineReason {
     ParamsMappingErr(String),
 }
 
-#[derive(Debug)]
-pub struct Suppose {
-    pub requirements: Vec<Rc<Term>>,
-    pub resolution:   TermProps,
-    pub params:       ParamsMapping,
-}
-
+pub type SharedRule = Rc<Rule>;
 #[derive(Clone, Debug)]
 pub struct Rule {
     pub id:          RuleId,
@@ -81,36 +58,6 @@ impl Hash for Rule {
     }
 }
 
-impl FromStr for RuleAttr {
-    type Err = eyre::Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "equivalence" => Ok(RuleAttr::Equivalence),
-            "replace" => Ok(RuleAttr::Replace),
-            "level" => Ok(RuleAttr::Level),
-            "purpose" => Ok(RuleAttr::Purpose),
-            "zero" => Ok(RuleAttr::Zero),
-            "one" => Ok(RuleAttr::One),
-            "id" => Ok(RuleAttr::Id),
-            "block" => Ok(RuleAttr::Block),
-            "normalize" => Ok(RuleAttr::Normalize),
-            _ => bail!(""),
-        }
-    }
-}
-
-impl fmt::Display for Suppose {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "[{}] => {}",
-            VecDisplay(&self.requirements),
-            self.resolution,
-        )
-    }
-}
-
 impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -121,24 +68,6 @@ impl fmt::Display for Rule {
             VecDisplay(&self.requirements),
             self.term
         )
-    }
-}
-
-impl RuleAttrValue {
-    pub fn str(&self) -> Option<&str> {
-        if let RuleAttrValue::Str(s) = self {
-            Some(s)
-        } else {
-            None
-        }
-    }
-
-    pub fn uint(&self) -> Option<u64> {
-        if let RuleAttrValue::UInt(u) = self {
-            Some(*u)
-        } else {
-            None
-        }
     }
 }
 
@@ -202,9 +131,29 @@ impl Rule {
         Ok(vec![])
     }
 
-    pub fn apply(
+    #[inline]
+    pub fn pattern_node(&self) -> &SymbolNode {
+        &self.term[&self.pattern]
+    }
+
+    #[inline]
+    pub fn replace_node(&self) -> &SymbolNode {
+        &self.term[&self.replace]
+    }
+}
+
+pub trait ApplyRule {
+    fn apply(
         &self,
-        arg: &mut TermProps,
+        arg: &TermProps,
+        purpose: &TermProps,
+    ) -> Result<Vec<Suppose>, RuleDeclineReason>;
+}
+
+impl ApplyRule for SharedRule {
+    fn apply(
+        &self,
+        arg: &TermProps,
         purpose: &TermProps,
     ) -> Result<Vec<Suppose>, RuleDeclineReason> {
         self.is_term_suitable(arg)?;
@@ -213,7 +162,7 @@ impl Rule {
             mapping.push(Default::default());
         }
 
-        if !arg.applied_rules.insert(self.id) {
+        if arg.applied_rules.contains(&self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
         }
         if arg.blocked_rules.contains(&self.id) {
@@ -227,7 +176,6 @@ impl Rule {
                     .into_iter()
             })
             .collect();
-        // let maps = ParamsMapping::subtree_map(arg.term.root(), self.pattern_node());
         if maps.is_empty() {
             return Err(RuleDeclineReason::ParamsMappingErr("no match".into()));
         }
@@ -240,9 +188,10 @@ impl Rule {
                 let mut replace = replace.apply_map(&self.binds).apply_map(&i);
                 let mut src = (*arg.term).clone();
                 replace.swap_node(&mut src[&pos]);
-                // src = src.normalize(NormalizationLevel::max());
                 src = src.normalize(self.norm_level());
-                let mut resolution = TermProps::from(Rc::new(src)).with_parent(arg.id);
+                let mut resolution = TermProps::from(Rc::new(src))
+                    .with_rule(self.clone())
+                    .with_parent(arg.id);
                 resolution.blocked_rules.extend(self.block.iter().cloned());
 
                 let suppose = Suppose {
@@ -261,16 +210,6 @@ impl Rule {
 
         Ok(result)
     }
-
-    #[inline]
-    pub fn pattern_node(&self) -> &SymbolNode {
-        &self.term[&self.pattern]
-    }
-
-    #[inline]
-    pub fn replace_node(&self) -> &SymbolNode {
-        &self.term[&self.replace]
-    }
 }
 
 #[cfg(test)]
@@ -278,37 +217,39 @@ pub mod tests {
     use std::rc::Rc;
 
     use crate::{
-        rule::{parse_rule, Rule, RuleDeclineReason},
+        rule::{parse_rule, RuleDeclineReason},
         term::{term_with_params, term_with_vars, TermProps},
         NormalizationLevel,
     };
 
-    fn base_rule() -> Rule {
-        parse_rule(
+    use super::{ApplyRule, SharedRule};
+
+    fn base_rule() -> SharedRule {
+        Rc::new(parse_rule(
             r#"rule {
                 attr level(1);
                 a + x == 0 => x == -a;
                 a!=0;
             }"#,
-        )
+        ))
     }
 
-    fn subtree_rule() -> Rule {
-        parse_rule(
+    fn subtree_rule() -> SharedRule {
+        Rc::new(parse_rule(
             r#"rule {
                 attr subtree,level(1);
                 --a <=> a;
             }"#,
-        )
+        ))
     }
 
-    fn rule_with_binds() -> Rule {
-        parse_rule(
+    fn rule_with_binds() -> SharedRule {
+        Rc::new(parse_rule(
             r#"rule {
                 attr level(1);
                 a/((b + c) as D) == 0 <=> a == 0 && D != 0;
             }"#,
-        )
+        ))
     }
 
     fn test_term_fraction() -> TermProps {
@@ -330,11 +271,11 @@ pub mod tests {
     #[test]
     fn level_comparsion_test() {
         let rule = base_rule();
-        let mut term = test_term();
+        let term = test_term();
         let purpose = test_purpose();
 
         assert_eq!(
-            rule.apply(&mut term, &purpose).err(),
+            rule.apply(&term, &purpose).err(),
             Some(RuleDeclineReason::LevelMissmatch)
         );
     }
@@ -346,7 +287,7 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.weight = 1;
-        let suppose = rule.apply(&mut term, &purpose);
+        let suppose = rule.apply(&term, &purpose);
         assert!(suppose.is_ok());
         let mut suppose = suppose.unwrap();
         suppose.sort_by_key(|x| x.requirements[0].to_string());
@@ -371,7 +312,7 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.weight = 1;
-        let suppose = rule.apply(&mut term, &purpose);
+        let suppose = rule.apply(&term, &purpose);
         assert!(suppose.is_ok());
         let suppose = suppose.unwrap();
         assert_eq!(suppose.len(), 1);
@@ -381,14 +322,14 @@ pub mod tests {
 
     #[test]
     fn subtree_apply_test_2() {
-        let rule = parse_rule(
+        let rule = Rc::new(parse_rule(
             r#"rule {
                 attr level(0),purpose(transform(x)),replace;
                 a && b <=> b;
 
                 a is true;
             }"#,
-        );
+        ));
 
         let test_term = r#"(x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 < 0 && x in empty_set) || (3600 >= 0 && x in set(1, 2)))"#;
         let mut term = TermProps::from(Rc::new(term_with_vars(test_term)));
@@ -396,7 +337,7 @@ pub mod tests {
         let purpose = TermProps::from(Rc::new(term_with_vars(r#"transform(a)"#)));
         term.weight = 0;
 
-        let suppose = rule.apply(&mut term, &purpose);
+        let suppose = rule.apply(&term, &purpose);
         assert!(suppose.is_ok());
         let suppose = suppose.unwrap();
         assert_eq!(suppose.len(), 3);
@@ -410,9 +351,9 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.weight = 1;
-        assert!(rule.apply(&mut term, &purpose).is_ok());
+        assert!(rule.apply(&term, &purpose).is_ok());
         assert_eq!(
-            rule.apply(&mut term, &purpose).err(),
+            rule.apply(&term, &purpose).err(),
             Some(RuleDeclineReason::AlreadyApplied)
         );
     }
@@ -424,7 +365,7 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.weight = 1;
-        let suppose = rule.apply(&mut term, &purpose).unwrap();
+        let suppose = rule.apply(&term, &purpose).unwrap();
         assert_eq!(suppose[0].requirements.len(), 0);
         assert_eq!(
             *suppose[0].resolution.term,
@@ -434,12 +375,12 @@ pub mod tests {
 
     #[test]
     fn purpose_mapping_test() {
-        let rule = parse_rule(
+        let rule = Rc::new(parse_rule(
             r#"rule {
                 attr level(0),purpose(find(x));
                 a + x == 0 => x == -a;
             }"#,
-        );
+        ));
 
         let test_term = r#"1 + a + 2 == 0"#;
         let mut term = TermProps::from(Rc::new(term_with_vars(test_term)));
@@ -447,7 +388,7 @@ pub mod tests {
         let purpose = TermProps::from(Rc::new(term_with_vars(r#"find(a+2)"#)));
         term.weight = 0;
 
-        let suppose = rule.apply(&mut term, &purpose);
+        let suppose = rule.apply(&term, &purpose);
         assert!(suppose.is_ok());
         let suppose = suppose.unwrap();
         assert_eq!(suppose.len(), 1);

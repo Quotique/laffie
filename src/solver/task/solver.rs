@@ -11,11 +11,11 @@ use super::{
     builder::TaskBuilder,
     cache::{TaskStatus, TasksCache},
     purpose::Purpose,
-    tracing::{SolutionTracer, Tracer},
+    tracing::SolutionTracer,
     Task,
 };
 use crate::{
-    rule::{Rule, RuleAttr, RulesEngine, SharedRule, Suppose},
+    rule::{Rule, RuleAttr, RulesEngine, SharedRule, Suppose, SupposesIterator},
     symbol::{normalize, Symbol, SymbolNode},
     term::{swap_node, NodeMapping, Term, TermProps},
     NormalizationLevel, RuleId,
@@ -197,8 +197,8 @@ impl Solver {
                 }
             }
 
-            if let Some(suppose) = self.is_answer(&self.terms[index]) {
-                if self.suppose_proof(&suppose) == suppose.requirements.len() {
+            if let Some(mut suppose) = self.is_answer(&self.terms[index]) {
+                if self.suppose_proof(&mut suppose).is_some() {
                     trace!("Resolution: {}", suppose.resolution);
                     if self.terms[index] == suppose.resolution {
                         trace!("Equivalence");
@@ -231,13 +231,29 @@ impl Solver {
             }
 
             if !self.purpose.is_transform() {
-                let terms = self.next_term(index);
-                if terms.is_empty() {
-                    self.terms[index].weight += 1;
+                let mut added = false;
+                for rule in self.suggest_rules(index, |_| true, None) {
+                    match SupposesIterator::new(
+                        rule.clone(),
+                        self.terms[index].clone(),
+                        &self.task.purpose,
+                    )
+                    .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
+                    .filter_map(|mut suppose| self.suppose_proof(&mut suppose))
+                    .next()
+                    {
+                        Some(s) => {
+                            trace!("{} => {}", self.terms[index], s);
+                            self.add_main(s)?;
+                            added = true;
+                        }
+                        None => {
+                            self.terms[index].applied_rules.insert(rule.id);
+                        }
+                    }
                 }
-                for s in terms {
-                    trace!("{} => {}", self.terms[index], s);
-                    self.add_main(s)?;
+                if !added {
+                    self.terms[index].weight += 1;
                 }
             } else {
                 self.terms[index].weight += 1;
@@ -284,16 +300,12 @@ impl Solver {
         Ok(id)
     }
 
-    fn next_term(&mut self, index: usize) -> Vec<TermProps> {
-        self.next_term_with_filter(index, |_| true, None)
-    }
-
-    fn next_term_with_filter(
-        &mut self,
+    fn suggest_rules(
+        &self,
         index: usize,
         filter: impl Fn(&Rule) -> bool,
         purpose: Option<&TermProps>,
-    ) -> Vec<TermProps> {
+    ) -> Vec<SharedRule> {
         let purpose = purpose.unwrap_or(&self.task.purpose);
         let engine_rules = self.rules_engine.suggest_rules(&self.terms[index], purpose);
         let suggested_rules: Vec<_> = engine_rules
@@ -306,65 +318,41 @@ impl Solver {
                self.terms[index],
                VecDisplay(&suggested_rules)
         );
-
-        for rule in suggested_rules {
-            self.tracer.on_rule_selection(rule.clone());
-            let supposes = match rule.apply(&mut self.terms[index], purpose) {
-                Ok(x) => x,
-                Err(e) => {
-                    trace!(target: "rule_selection",
-                           "rule {rule} not applied to term {}: {e:?}",
-                           self.terms[index]);
-                    continue;
-                }
-            };
-
-            let mut res = vec![];
-            for mut suppose in supposes
-                .into_iter()
-                .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
-            {
-                trace!(target: "rule_selection",
-                       "new suppose {suppose}, rule {rule}, term: {}",
-                       self.terms[index]);
-                self.tracer.on_new_suppose(
-                    self.terms[index].term.clone(),
-                    rule.clone(),
-                    &suppose,
-                    *self.cycles.borrow(),
-                );
-
-                let proof_res = self.suppose_proof(&suppose);
-                self.tracer
-                    .on_suppose_finish(&suppose, *self.cycles.borrow(), proof_res);
-
-                if proof_res == suppose.requirements.len() {
-                    suppose.resolution.requirements = suppose.requirements.clone();
-                    suppose.resolution.rule = Some(rule.clone());
-                    trace!(target: "rule_selection",
-                           "suppose {suppose} proven, resolution {} applied", suppose.resolution);
-                    res.push(suppose.resolution);
-                }
-            }
-            if !res.is_empty() {
-                return res;
-            }
-        }
-        vec![]
+        suggested_rules
     }
 
-    // returns len(requirements) if all requirements proven or id of first unproven
-    // term
-    fn suppose_proof(&self, suppose: &Suppose) -> usize {
+    fn suppose_proof(&self, suppose: &mut Suppose) -> Option<TermProps> {
+        if let (Some(index), Some(rule)) = (suppose.parent_idx(), suppose.rule()) {
+            trace!(target: "rule_selection", "new suppose {suppose}, rule {rule}, term: {}", self.terms[index]);
+            self.tracer.on_new_suppose(
+                self.terms[index].term.clone(),
+                rule.clone(),
+                suppose,
+                *self.cycles.borrow(),
+            );
+        }
+
+        let mut proof_res = 0;
         for (num, req) in suppose.requirements.iter().enumerate() {
             if self.proof(req).is_none() {
-                trace!(target: "rule_selection",
-                       "term {} rejected, requirement not proven {req}",
-                       suppose.resolution);
-                return num;
+                trace!(target: "rule_selection", "term {} rejected, requirement not proven {req}", suppose.resolution);
+                break;
             }
+            proof_res = num + 1;
         }
-        suppose.requirements.len()
+
+        if suppose.parent_idx().is_some() && suppose.rule().is_some() {
+            self.tracer
+                .on_suppose_finish(suppose, *self.cycles.borrow(), proof_res);
+        }
+
+        if proof_res == suppose.requirements.len() {
+            suppose.resolution.requirements = suppose.requirements.clone();
+            trace!(target: "rule_selection", "suppose {suppose} proven, resolution {} applied", suppose.resolution);
+            Some(suppose.resolution.clone())
+        } else {
+            None
+        }
     }
 
     // Returns proof purpose (is a key for tasks cache)
@@ -501,19 +489,39 @@ impl Solver {
                         self.terms[index].simplified = true;
                     }
 
-                    let new_states = self.next_term_with_filter(
+                    let purpose = TermProps::from(Rc::new(Term::from(
+                        tr(Symbol::with_func_symbol("proof")) /
+                            self.terms[index].term.root().deep_clone(),
+                    )));
+                    let mut added = false;
+                    for rule in self.suggest_rules(
                         index,
                         |rule| rule.contains_attribute(&RuleAttr::Equivalence),
-                        Some(&TermProps::from(Rc::new(Term::from(
-                            tr(Symbol::with_func_symbol("proof")) /
-                                self.terms[index].term.root().deep_clone(),
-                        )))),
-                    );
-                    if new_states.is_empty() {
-                        self.terms[index].weight += 1;
+                        Some(&purpose),
+                    ) {
+                        match SupposesIterator::new(
+                            rule.clone(),
+                            self.terms[index].clone(),
+                            &purpose,
+                        )
+                        .filter(|suppose| {
+                            !self.purpose_index.contains_key(&suppose.resolution.term)
+                        })
+                        .filter_map(|mut suppose| self.suppose_proof(&mut suppose))
+                        .next()
+                        {
+                            Some(s) => {
+                                trace!("{} => {}", self.terms[index], s);
+                                let _ = self.add_purpose(s);
+                                added = true;
+                            }
+                            None => {
+                                self.terms[index].applied_rules.insert(rule.id);
+                            }
+                        }
                     }
-                    for s in new_states {
-                        let _ = self.add_purpose(s);
+                    if !added {
+                        self.terms[index].weight += 1;
                     }
                 }
             }
@@ -522,20 +530,35 @@ impl Solver {
                     if self.terms[index].weight > level {
                         return;
                     }
-                    let new_states = self.next_term(index);
 
-                    if new_states.is_empty() {
-                        self.terms[index].weight += 1;
+                    let mut added = false;
+                    for rule in self.suggest_rules(index, |_| true, None) {
+                        match SupposesIterator::new(
+                            rule.clone(),
+                            self.terms[index].clone(),
+                            &self.task.purpose,
+                        )
+                        .filter(|suppose| {
+                            !self.purpose_index.contains_key(&suppose.resolution.term)
+                        })
+                        .filter_map(|mut suppose| self.suppose_proof(&mut suppose))
+                        .next()
+                        {
+                            Some(s) => {
+                                trace!("{} => {}", self.terms[index], s);
+                                if self.add_purpose(s).is_ok() {
+                                    self.terms[index].weight = MAX_LEVEL + 1;
+                                    break;
+                                }
+                                added = true;
+                            }
+                            None => {
+                                self.terms[index].applied_rules.insert(rule.id);
+                            }
+                        }
                     }
-                    for s in new_states {
-                        if self.purpose_index.contains_key(&s.term) {
-                            continue;
-                        }
-
-                        if self.add_purpose(s).is_ok() {
-                            self.terms[index].weight = MAX_LEVEL + 1;
-                            break;
-                        }
+                    if !added {
+                        self.terms[index].weight += 1;
                     }
                 }
             }

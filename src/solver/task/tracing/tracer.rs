@@ -77,44 +77,44 @@ impl Default for SolutionTracer {
     }
 }
 
-impl Tracer for SolutionTracer {
-    fn on_subtask_start(&mut self, task: &Task, cycle: usize) {
+impl SolutionTracer {
+    pub fn on_subtask_start(&self, task: &Task, cycle: usize) {
         self.sink.lock().on_subtask_start(task, cycle);
         if let Some(profiler) = self.profiler() {
             profiler.lock().on_subtask_start(task, cycle);
         }
     }
 
-    fn on_subtask_end(&mut self, status: &Solver) {
+    pub fn on_subtask_end(&self, status: &Solver) {
         self.sink.lock().on_subtask_end(status);
         if let Some(profiler) = self.profiler() {
             profiler.lock().on_subtask_end(status);
         }
     }
 
-    fn on_new_term(&mut self, term: &TermProps, parent: &TermProps) {
+    pub fn on_new_term(&self, term: &TermProps, parent: &TermProps) {
         self.sink.lock().on_new_term(term, parent);
         if let Some(profiler) = self.profiler() {
             profiler.lock().on_new_term(term, parent);
         }
     }
 
-    fn on_term_focus(&mut self, term: &TermProps) {
+    pub fn on_term_focus(&self, term: &TermProps) {
         self.sink.lock().on_term_focus(term);
         if let Some(profiler) = self.profiler() {
             profiler.lock().on_term_focus(term);
         }
     }
 
-    fn on_rule_selection(&mut self, rule: SharedRule) {
+    pub fn on_rule_selection(&self, rule: SharedRule) {
         self.sink.lock().on_rule_selection(rule.clone());
         if let Some(profiler) = self.profiler() {
             profiler.lock().on_rule_selection(rule);
         }
     }
 
-    fn on_new_suppose(
-        &mut self,
+    pub fn on_new_suppose(
+        &self,
         parent: Rc<Term>,
         rule: SharedRule,
         suppose: &Suppose,
@@ -128,7 +128,7 @@ impl Tracer for SolutionTracer {
         }
     }
 
-    fn on_suppose_finish(&mut self, suppose: &Suppose, cycle: usize, first_unproven: usize) {
+    pub fn on_suppose_finish(&self, suppose: &Suppose, cycle: usize, first_unproven: usize) {
         self.sink
             .lock()
             .on_suppose_finish(suppose, cycle, first_unproven);
