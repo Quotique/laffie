@@ -1,15 +1,15 @@
 mod builder;
+mod hypothesis;
 mod rule;
 mod rule_attribute;
 mod rules_engine;
-mod suppose;
 
 pub use self::{
     builder::RuleBuilder,
+    hypothesis::{Hypothesis, HypothesisIterator},
     rule::{ApplyRule, Rule, RuleDeclineReason, SharedRule},
     rule_attribute::{RuleAttr, RuleAttrValue},
     rules_engine::RulesEngine,
-    suppose::{Suppose, SupposesIterator},
 };
 
 #[cfg(test)]

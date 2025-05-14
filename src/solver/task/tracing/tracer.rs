@@ -3,7 +3,7 @@ use std::{rc::Rc, sync::Arc};
 use parking_lot::Mutex;
 
 use crate::{
-    rule::{SharedRule, Suppose},
+    rule::{Hypothesis, SharedRule},
     task::{Solver, Task},
     term::{Term, TermProps},
 };
@@ -26,18 +26,24 @@ pub trait Tracer: Send + Sync {
     // Called on each attempt to apply rule
     fn on_rule_selection(&mut self, _rule: SharedRule) {}
 
-    // Called on each new suppose
-    fn on_new_suppose(
+    // Called on each new hypothesis
+    fn on_new_hypothesis(
         &mut self,
         _parent: Rc<Term>,
         _rule: SharedRule,
-        _suppose: &Suppose,
+        _hypothesis: &Hypothesis,
         _cycle: usize,
     ) {
     }
 
-    // Called on suppose processing finished
-    fn on_suppose_finish(&mut self, _suppose: &Suppose, _cycle: usize, _first_unproven: usize) {}
+    // Called on hypothesis processing finished
+    fn on_hypothesis_finish(
+        &mut self,
+        _hypothesis: &Hypothesis,
+        _cycle: usize,
+        _first_unproven: usize,
+    ) {
+    }
 }
 
 #[derive(Clone)]
@@ -113,29 +119,36 @@ impl SolutionTracer {
         }
     }
 
-    pub fn on_new_suppose(
+    pub fn on_new_hypothesis(
         &self,
         parent: Rc<Term>,
         rule: SharedRule,
-        suppose: &Suppose,
+        hypothesis: &Hypothesis,
         cycle: usize,
     ) {
         self.sink
             .lock()
-            .on_new_suppose(parent.clone(), rule.clone(), suppose, cycle);
-        if let Some(profiler) = self.profiler() {
-            profiler.lock().on_new_suppose(parent, rule, suppose, cycle);
-        }
-    }
-
-    pub fn on_suppose_finish(&self, suppose: &Suppose, cycle: usize, first_unproven: usize) {
-        self.sink
-            .lock()
-            .on_suppose_finish(suppose, cycle, first_unproven);
+            .on_new_hypothesis(parent.clone(), rule.clone(), hypothesis, cycle);
         if let Some(profiler) = self.profiler() {
             profiler
                 .lock()
-                .on_suppose_finish(suppose, cycle, first_unproven);
+                .on_new_hypothesis(parent, rule, hypothesis, cycle);
+        }
+    }
+
+    pub fn on_hypothesis_finish(
+        &self,
+        hypothesis: &Hypothesis,
+        cycle: usize,
+        first_unproven: usize,
+    ) {
+        self.sink
+            .lock()
+            .on_hypothesis_finish(hypothesis, cycle, first_unproven);
+        if let Some(profiler) = self.profiler() {
+            profiler
+                .lock()
+                .on_hypothesis_finish(hypothesis, cycle, first_unproven);
         }
     }
 }

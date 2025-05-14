@@ -3,7 +3,7 @@ use std::rc::Rc;
 use ego_tree::{NodeId, Tree};
 
 use crate::{
-    rule::{SharedRule, Suppose},
+    rule::{Hypothesis, SharedRule},
     task::{Solver, Task},
     term::{display_string, Term},
 };
@@ -43,14 +43,14 @@ pub struct Profiler {
 #[derive(Clone, Debug)]
 pub enum ProfilerNode {
     Helper(TaskProfileInfo),
-    Suppose(TermProfileInfo),
+    Hypothesis(TermProfileInfo),
 }
 
 impl ProfilerNode {
     #[inline]
     pub fn cycles(&self) -> usize {
         match self {
-            Self::Suppose(suppose) => suppose.end_cycle - suppose.start_cycle,
+            Self::Hypothesis(hypothesis) => hypothesis.end_cycle - hypothesis.start_cycle,
             Self::Helper(task) => task.end_cycle - task.start_cycle,
         }
     }
@@ -87,14 +87,14 @@ impl TermProfileInfo {
 }
 
 impl Tracer for Profiler {
-    fn on_new_suppose(
+    fn on_new_hypothesis(
         &mut self,
         parent: Rc<Term>,
         rule: SharedRule,
-        suppose: &Suppose,
+        hypothesis: &Hypothesis,
         cycle: usize,
     ) {
-        let mut term = suppose.resolution.to_string();
+        let mut term = hypothesis.resolution.to_string();
         if term == "true" || term == "false" {
             term = format!("{parent} <=> {term}");
         }
@@ -103,18 +103,22 @@ impl Tracer for Profiler {
             .task
             .get_mut(self.current_node)
             .unwrap()
-            .append(ProfilerNode::Suppose(TermProfileInfo {
+            .append(ProfilerNode::Hypothesis(TermProfileInfo {
                 parent: parent.to_string(),
                 rule: rule.to_string(),
                 term,
 
-                params: suppose
+                params: hypothesis
                     .params
                     .params()
                     .map(|(param, value)| (param.to_string(), display_string(value.root())))
                     .collect(),
 
-                requirements: suppose.requirements.iter().map(|x| x.to_string()).collect(),
+                requirements: hypothesis
+                    .requirements
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect(),
                 first_unproven: 0,
 
                 start_cycle: cycle,
@@ -144,7 +148,7 @@ impl Tracer for Profiler {
                 task.end_cycle = *status.cycles.borrow();
                 task.answer = status.answer().map(|x| x.to_string());
             }
-            ProfilerNode::Suppose(_) => unreachable!("last node is not subtask"),
+            ProfilerNode::Hypothesis(_) => unreachable!("last node is not subtask"),
         }
 
         if let Some(parent) = self.task.get(self.current_node).unwrap().parent() {
@@ -152,12 +156,17 @@ impl Tracer for Profiler {
         }
     }
 
-    fn on_suppose_finish(&mut self, _suppose: &Suppose, cycle: usize, first_unproven: usize) {
+    fn on_hypothesis_finish(
+        &mut self,
+        _hypothesis: &Hypothesis,
+        cycle: usize,
+        first_unproven: usize,
+    ) {
         match self.task.get_mut(self.current_node).unwrap().value() {
-            ProfilerNode::Helper(_) => unreachable!("last node is not suppose"),
-            ProfilerNode::Suppose(suppose) => {
-                suppose.end_cycle = cycle;
-                suppose.first_unproven = first_unproven;
+            ProfilerNode::Helper(_) => unreachable!("last node is not hypothesis"),
+            ProfilerNode::Hypothesis(hypothesis) => {
+                hypothesis.end_cycle = cycle;
+                hypothesis.first_unproven = first_unproven;
             }
         }
 

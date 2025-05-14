@@ -6,18 +6,18 @@ use utils::VecDisplay;
 use super::{ApplyRule, SharedRule};
 
 #[derive(Debug)]
-pub struct Suppose {
+pub struct Hypothesis {
     pub requirements: Vec<Rc<Term>>,
     pub resolution:   TermProps,
     pub params:       ParamsMapping,
 }
 
-pub enum SupposesIterator {
+pub enum HypothesisIterator {
     Empty,
-    Iter(std::vec::IntoIter<Suppose>),
+    Iter(std::vec::IntoIter<Hypothesis>),
 }
 
-impl Suppose {
+impl Hypothesis {
     #[inline]
     pub fn rule(&self) -> Option<SharedRule> {
         self.resolution.rule.clone()
@@ -29,9 +29,9 @@ impl Suppose {
     }
 }
 
-impl SupposesIterator {
+impl HypothesisIterator {
     pub fn new(rule: SharedRule, term: TermProps, purpose: &TermProps) -> Self {
-        let supposes = match rule.apply(&term, purpose) {
+        let hypothesis = match rule.apply(&term, purpose) {
             Ok(x) => x,
             Err(e) => {
                 trace!(target: "rule_selection", "rule {rule} not applied to term {term}: {e:?}" );
@@ -39,7 +39,7 @@ impl SupposesIterator {
             }
         };
 
-        Self::Iter(supposes.into_iter())
+        Self::Iter(hypothesis.into_iter())
     }
 
     pub fn empty() -> Self {
@@ -47,8 +47,8 @@ impl SupposesIterator {
     }
 }
 
-impl Iterator for SupposesIterator {
-    type Item = Suppose;
+impl Iterator for HypothesisIterator {
+    type Item = Hypothesis;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
@@ -58,7 +58,7 @@ impl Iterator for SupposesIterator {
     }
 }
 
-impl fmt::Display for Suppose {
+impl fmt::Display for Hypothesis {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

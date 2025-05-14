@@ -1,7 +1,7 @@
 use std::{fs::File, io::prelude::*, path::Path, rc::Rc};
 
 use crate::{
-    rule::{SharedRule, Suppose},
+    rule::{Hypothesis, SharedRule},
     task::{Solver, Task},
     term::{Term, TermProps},
 };
@@ -103,15 +103,15 @@ impl Tracer for FileDumpTracer {
             .expect(WRITE_ERROR_TEXT);
     }
 
-    fn on_new_suppose(
+    fn on_new_hypothesis(
         &mut self,
         _parent: Rc<Term>,
         rule: SharedRule,
-        suppose: &Suppose,
+        hypothesis: &Hypothesis,
         _cycle: usize,
     ) {
         self.file
-            .write_all(format!("{}|> {} {}\n", self.idention(), rule, suppose).as_bytes())
+            .write_all(format!("{}|> {} {}\n", self.idention(), rule, hypothesis).as_bytes())
             .expect(WRITE_ERROR_TEXT);
     }
 }

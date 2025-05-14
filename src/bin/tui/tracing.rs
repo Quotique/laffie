@@ -73,10 +73,10 @@ impl Tracing {
                 ),
                 Span::from(format!(" {} {}", profiler.value().cycles(), total_cycles)),
             ]),
-            ProfilerNode::Suppose(suppose) => Line::from(vec![
+            ProfilerNode::Hypothesis(hypothesis) => Line::from(vec![
                 Span::styled(
-                    suppose.term.clone(),
-                    if suppose.first_unproven == suppose.requirements.len() {
+                    hypothesis.term.clone(),
+                    if hypothesis.first_unproven == hypothesis.requirements.len() {
                         default_style
                     } else {
                         not_proved_style
@@ -119,7 +119,7 @@ impl Tracing {
 
             let text = match node.task.get(selected.unwrap()).unwrap().value() {
                 ProfilerNode::Helper(task) => Self::task_lines(task),
-                ProfilerNode::Suppose(suppose) => Self::term_lines(suppose),
+                ProfilerNode::Hypothesis(hypothesis) => Self::term_lines(hypothesis),
             };
             frame.render_widget(
                 List::new(text.iter().cloned())
@@ -168,26 +168,26 @@ impl Tracing {
         ]
     }
 
-    fn term_lines(suppose: &TermProfileInfo) -> Vec<Line> {
+    fn term_lines(hypothesis: &TermProfileInfo) -> Vec<Line> {
         let highlighted = Style::new().fg(Color::LightBlue).bold();
         let mut result = vec![
             Line::from(vec![
                 Span::styled("Parent: ", highlighted),
-                Span::from(&suppose.parent),
+                Span::from(&hypothesis.parent),
             ]),
             Line::from(vec![
                 Span::styled("Term: ", highlighted),
-                Span::from(&suppose.term),
+                Span::from(&hypothesis.term),
             ]),
             Line::default(),
             Line::from(vec![
                 Span::styled("Rule: ", highlighted),
-                Span::from(&suppose.rule),
+                Span::from(&hypothesis.rule),
             ]),
             Line::from(Span::styled("Params:", highlighted)),
         ];
         result.append(
-            &mut suppose
+            &mut hypothesis
                 .params
                 .iter()
                 .map(|(param, value)| Line::from(vec![Span::raw(format!("  {param} = {value}"))]))
@@ -197,12 +197,12 @@ impl Tracing {
             Line::default(),
             Line::from(Span::styled("Requirements:", highlighted)),
         ]);
-        let first_unproven = suppose.first_unproven;
+        let first_unproven = hypothesis.first_unproven;
         let proven = Style::new().fg(Color::Green).bold();
         let unproven = Style::new().fg(Color::Red).bold();
         let skiped = Style::new().fg(Color::Gray).bold();
         result.append(
-            &mut suppose
+            &mut hypothesis
                 .requirements
                 .iter()
                 .enumerate()
@@ -220,7 +220,7 @@ impl Tracing {
             Line::default(),
             Line::from(vec![
                 Span::styled("Cycles: ", highlighted),
-                Span::from(suppose.cycles().to_string()),
+                Span::from(hypothesis.cycles().to_string()),
             ]),
         ]);
         result

@@ -15,7 +15,7 @@ use super::{
     Task,
 };
 use crate::{
-    rule::{Rule, RuleAttr, RulesEngine, SharedRule, Suppose, SupposesIterator},
+    rule::{Hypothesis, HypothesisIterator, Rule, RuleAttr, RulesEngine, SharedRule},
     symbol::{normalize, Symbol, SymbolNode},
     term::{swap_node, NodeMapping, Term, TermProps},
     NormalizationLevel, RuleId,
@@ -197,19 +197,19 @@ impl Solver {
                 }
             }
 
-            if let Some(mut suppose) = self.is_answer(&self.terms[index]) {
-                if self.suppose_proof(&mut suppose).is_some() {
-                    trace!("Resolution: {}", suppose.resolution);
-                    if self.terms[index] == suppose.resolution {
+            if let Some(mut hypothesis) = self.is_answer(&self.terms[index]) {
+                if self.hypothesis_proof(&mut hypothesis).is_some() {
+                    trace!("Resolution: {}", hypothesis.resolution);
+                    if self.terms[index] == hypothesis.resolution {
                         trace!("Equivalence");
                         self.answer = Some(index);
                     } else {
                         // TODO: return index
-                        let _ = self.add_main(suppose.resolution.clone());
+                        let _ = self.add_main(hypothesis.resolution.clone());
                         self.answer = Some(
                             self.terms
                                 .iter()
-                                .find(|x| x.term == suppose.resolution.term)
+                                .find(|x| x.term == hypothesis.resolution.term)
                                 .unwrap()
                                 .id,
                         );
@@ -233,13 +233,13 @@ impl Solver {
             if !self.purpose.is_transform() {
                 let mut added = false;
                 for rule in self.suggest_rules(index, |_| true, None) {
-                    match SupposesIterator::new(
+                    match HypothesisIterator::new(
                         rule.clone(),
                         self.terms[index].clone(),
                         &self.task.purpose,
                     )
-                    .filter(|suppose| !self.main_index.contains_key(&suppose.resolution.term))
-                    .filter_map(|mut suppose| self.suppose_proof(&mut suppose))
+                    .filter(|hypothesis| !self.main_index.contains_key(&hypothesis.resolution.term))
+                    .filter_map(|mut hypothesis| self.hypothesis_proof(&mut hypothesis))
                     .next()
                     {
                         Some(s) => {
@@ -321,35 +321,35 @@ impl Solver {
         suggested_rules
     }
 
-    fn suppose_proof(&self, suppose: &mut Suppose) -> Option<TermProps> {
-        if let (Some(index), Some(rule)) = (suppose.parent_idx(), suppose.rule()) {
-            trace!(target: "rule_selection", "new suppose {suppose}, rule {rule}, term: {}", self.terms[index]);
-            self.tracer.on_new_suppose(
+    fn hypothesis_proof(&self, hypothesis: &mut Hypothesis) -> Option<TermProps> {
+        if let (Some(index), Some(rule)) = (hypothesis.parent_idx(), hypothesis.rule()) {
+            trace!(target: "rule_selection", "new hypothesis {hypothesis}, rule {rule}, term: {}", self.terms[index]);
+            self.tracer.on_new_hypothesis(
                 self.terms[index].term.clone(),
                 rule.clone(),
-                suppose,
+                hypothesis,
                 *self.cycles.borrow(),
             );
         }
 
         let mut proof_res = 0;
-        for (num, req) in suppose.requirements.iter().enumerate() {
+        for (num, req) in hypothesis.requirements.iter().enumerate() {
             if self.proof(req).is_none() {
-                trace!(target: "rule_selection", "term {} rejected, requirement not proven {req}", suppose.resolution);
+                trace!(target: "rule_selection", "term {} rejected, requirement not proven {req}", hypothesis.resolution);
                 break;
             }
             proof_res = num + 1;
         }
 
-        if suppose.parent_idx().is_some() && suppose.rule().is_some() {
+        if hypothesis.parent_idx().is_some() && hypothesis.rule().is_some() {
             self.tracer
-                .on_suppose_finish(suppose, *self.cycles.borrow(), proof_res);
+                .on_hypothesis_finish(hypothesis, *self.cycles.borrow(), proof_res);
         }
 
-        if proof_res == suppose.requirements.len() {
-            suppose.resolution.requirements = suppose.requirements.clone();
-            trace!(target: "rule_selection", "suppose {suppose} proven, resolution {} applied", suppose.resolution);
-            Some(suppose.resolution.clone())
+        if proof_res == hypothesis.requirements.len() {
+            hypothesis.resolution.requirements = hypothesis.requirements.clone();
+            trace!(target: "rule_selection", "hypothesis {hypothesis} proven, resolution {} applied", hypothesis.resolution);
+            Some(hypothesis.resolution.clone())
         } else {
             None
         }
@@ -499,15 +499,15 @@ impl Solver {
                         |rule| rule.contains_attribute(&RuleAttr::Equivalence),
                         Some(&purpose),
                     ) {
-                        match SupposesIterator::new(
+                        match HypothesisIterator::new(
                             rule.clone(),
                             self.terms[index].clone(),
                             &purpose,
                         )
-                        .filter(|suppose| {
-                            !self.purpose_index.contains_key(&suppose.resolution.term)
+                        .filter(|hypothesis| {
+                            !self.purpose_index.contains_key(&hypothesis.resolution.term)
                         })
-                        .filter_map(|mut suppose| self.suppose_proof(&mut suppose))
+                        .filter_map(|mut hypothesis| self.hypothesis_proof(&mut hypothesis))
                         .next()
                         {
                             Some(s) => {
@@ -533,15 +533,15 @@ impl Solver {
 
                     let mut added = false;
                     for rule in self.suggest_rules(index, |_| true, None) {
-                        match SupposesIterator::new(
+                        match HypothesisIterator::new(
                             rule.clone(),
                             self.terms[index].clone(),
                             &self.task.purpose,
                         )
-                        .filter(|suppose| {
-                            !self.purpose_index.contains_key(&suppose.resolution.term)
+                        .filter(|hypothesis| {
+                            !self.purpose_index.contains_key(&hypothesis.resolution.term)
                         })
-                        .filter_map(|mut suppose| self.suppose_proof(&mut suppose))
+                        .filter_map(|mut hypothesis| self.hypothesis_proof(&mut hypothesis))
                         .next()
                         {
                             Some(s) => {
@@ -565,7 +565,7 @@ impl Solver {
         }
     }
 
-    fn is_answer(&self, term: &TermProps) -> Option<Suppose> {
+    fn is_answer(&self, term: &TermProps) -> Option<Hypothesis> {
         let term_root = term.term.root();
 
         if !self.purpose.is_transform() &&
@@ -578,7 +578,7 @@ impl Solver {
             if let Some(parent) = term.parent {
                 resolution = resolution.with_parent(parent);
             }
-            return Some(Suppose {
+            return Some(Hypothesis {
                 requirements: vec![],
                 resolution,
                 params: Default::default(),
@@ -599,7 +599,7 @@ impl Solver {
                         term_root.back().unwrap().deep_clone() /
                         tr(Symbol::with_func_symbol("known"));
 
-                    return Some(Suppose {
+                    return Some(Hypothesis {
                         requirements: vec![Rc::new(Term::from(is_known))],
                         resolution:   term.clone(),
                         params:       Default::default(),
@@ -610,14 +610,14 @@ impl Solver {
             Purpose::Proof(_) => {
                 for i in self.purpose_index.values() {
                     if term_root == self.terms[*i].term.root() {
-                        return Some(Suppose {
+                        return Some(Hypothesis {
                             requirements: vec![],
                             resolution:   term.clone(),
                             params:       Default::default(),
                         });
                     }
                     if self.terms[*i].term.root().check_truth().is_true() {
-                        return Some(Suppose {
+                        return Some(Hypothesis {
                             requirements: vec![],
                             resolution:   self.terms[*i].clone().without_parents(),
                             params:       Default::default(),
@@ -629,7 +629,7 @@ impl Solver {
             Purpose::Transform(_) => {
                 if let Some(index) = self.pick_purpose_term() {
                     if self.terms[index].weight > MAX_LEVEL {
-                        return Some(Suppose {
+                        return Some(Hypothesis {
                             requirements: vec![],
                             resolution:   self
                                 .terms

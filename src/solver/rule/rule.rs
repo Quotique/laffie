@@ -6,8 +6,8 @@ use multimap::MultiMap;
 use utils::VecDisplay;
 
 use super::{
+    hypothesis::Hypothesis,
     rule_attribute::{RuleAttr, RuleAttrValue},
-    suppose::Suppose,
 };
 use crate::{
     symbol::{FuncSymbol, SymbolNode},
@@ -147,7 +147,7 @@ pub trait ApplyRule {
         &self,
         arg: &TermProps,
         purpose: &TermProps,
-    ) -> Result<Vec<Suppose>, RuleDeclineReason>;
+    ) -> Result<Vec<Hypothesis>, RuleDeclineReason>;
 }
 
 impl ApplyRule for SharedRule {
@@ -155,7 +155,7 @@ impl ApplyRule for SharedRule {
         &self,
         arg: &TermProps,
         purpose: &TermProps,
-    ) -> Result<Vec<Suppose>, RuleDeclineReason> {
+    ) -> Result<Vec<Hypothesis>, RuleDeclineReason> {
         self.is_term_suitable(arg)?;
         let mut mapping = self.purpose_mapping(purpose)?;
         if mapping.is_empty() {
@@ -194,7 +194,7 @@ impl ApplyRule for SharedRule {
                     .with_parent(arg.id);
                 resolution.blocked_rules.extend(self.block.iter().cloned());
 
-                let suppose = Suppose {
+                let hypothesis = Hypothesis {
                     requirements: self
                         .requirements
                         .iter()
@@ -203,8 +203,8 @@ impl ApplyRule for SharedRule {
                     resolution,
                     params: i,
                 };
-                trace!(target: "rule_selection", "New suppose: {}", suppose);
-                result.push(suppose);
+                trace!(target: "rule_selection", "New hypothesis: {}", hypothesis);
+                result.push(hypothesis);
             }
         }
 
@@ -287,21 +287,21 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.weight = 1;
-        let suppose = rule.apply(&term, &purpose);
-        assert!(suppose.is_ok());
-        let mut suppose = suppose.unwrap();
-        suppose.sort_by_key(|x| x.requirements[0].to_string());
+        let hypothesis = rule.apply(&term, &purpose);
+        assert!(hypothesis.is_ok());
+        let mut hypothesis = hypothesis.unwrap();
+        hypothesis.sort_by_key(|x| x.requirements[0].to_string());
 
-        assert_eq!(suppose.len(), 2);
-        assert_eq!(suppose[0].requirements.len(), 1);
-        assert_eq!(*suppose[0].requirements[0], term_with_vars("2 != 0"));
+        assert_eq!(hypothesis.len(), 2);
+        assert_eq!(hypothesis[0].requirements.len(), 1);
+        assert_eq!(*hypothesis[0].requirements[0], term_with_vars("2 != 0"));
         assert_eq!(
-            *suppose[0].resolution.term,
+            *hypothesis[0].resolution.term,
             term_with_vars("x == -2").normalize(NormalizationLevel::max())
         );
-        assert_eq!(suppose[1].requirements.len(), 1);
-        assert_eq!(*suppose[1].requirements[0], term_with_vars("x != 0"));
-        assert_eq!(*suppose[1].resolution.term, term_with_vars("2 == -x"));
+        assert_eq!(hypothesis[1].requirements.len(), 1);
+        assert_eq!(*hypothesis[1].requirements[0], term_with_vars("x != 0"));
+        assert_eq!(*hypothesis[1].resolution.term, term_with_vars("2 == -x"));
     }
 
     #[test]
@@ -312,12 +312,12 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.weight = 1;
-        let suppose = rule.apply(&term, &purpose);
-        assert!(suppose.is_ok());
-        let suppose = suppose.unwrap();
-        assert_eq!(suppose.len(), 1);
-        assert_eq!(suppose[0].requirements.len(), 0);
-        assert_eq!(*suppose[0].resolution.term, term_with_vars("x + 2 == 0"));
+        let hypothesis = rule.apply(&term, &purpose);
+        assert!(hypothesis.is_ok());
+        let hypothesis = hypothesis.unwrap();
+        assert_eq!(hypothesis.len(), 1);
+        assert_eq!(hypothesis[0].requirements.len(), 0);
+        assert_eq!(*hypothesis[0].resolution.term, term_with_vars("x + 2 == 0"));
     }
 
     #[test]
@@ -337,10 +337,10 @@ pub mod tests {
         let purpose = TermProps::from(Rc::new(term_with_vars(r#"transform(a)"#)));
         term.weight = 0;
 
-        let suppose = rule.apply(&term, &purpose);
-        assert!(suppose.is_ok());
-        let suppose = suppose.unwrap();
-        assert_eq!(suppose.len(), 3);
+        let hypothesis = rule.apply(&term, &purpose);
+        assert!(hypothesis.is_ok());
+        let hypothesis = hypothesis.unwrap();
+        assert_eq!(hypothesis.len(), 3);
     }
 
     #[test]
@@ -365,10 +365,10 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.weight = 1;
-        let suppose = rule.apply(&term, &purpose).unwrap();
-        assert_eq!(suppose[0].requirements.len(), 0);
+        let hypothesis = rule.apply(&term, &purpose).unwrap();
+        assert_eq!(hypothesis[0].requirements.len(), 0);
         assert_eq!(
-            *suppose[0].resolution.term,
+            *hypothesis[0].resolution.term,
             term_with_vars("2 == 0 && x + 1 != 0")
         );
     }
@@ -388,9 +388,9 @@ pub mod tests {
         let purpose = TermProps::from(Rc::new(term_with_vars(r#"find(a+2)"#)));
         term.weight = 0;
 
-        let suppose = rule.apply(&term, &purpose);
-        assert!(suppose.is_ok());
-        let suppose = suppose.unwrap();
-        assert_eq!(suppose.len(), 1);
+        let hypothesis = rule.apply(&term, &purpose);
+        assert!(hypothesis.is_ok());
+        let hypothesis = hypothesis.unwrap();
+        assert_eq!(hypothesis.len(), 1);
     }
 }
