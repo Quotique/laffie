@@ -51,4 +51,8 @@ impl TasksCache {
             warn!("attempt to update status for unknown purpose {}", purpose);
         }
     }
+
+    pub fn clear(&self) {
+        self.tasks.write().clear();
+    }
 }

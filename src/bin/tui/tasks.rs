@@ -483,6 +483,7 @@ impl Tasks {
             solved_delta -= 1;
         };
 
+        self.tasks[*task_idx].task.solver.clear();
         let _ = self.tasks[*task_idx].task.solver.solve();
         self.tasks[*task_idx].task.is_solved = true;
 

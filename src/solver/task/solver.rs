@@ -106,6 +106,26 @@ impl Solver {
         result
     }
 
+    pub fn clear(&mut self) {
+        self.cache.clear();
+        self.main_index.clear();
+        self.purpose_index.clear();
+        self.terms.clear();
+
+        let conditions = self.task.conditions.clone();
+        for i in conditions.into_iter() {
+            let _ = self.add_main(i);
+        }
+        let (_, mut purpose) = (*self.task.purpose.term).clone().destruct();
+        let _ = self.add_purpose(TermProps::from(Rc::new(Term::from(
+            purpose.pop_front().unwrap(),
+        ))));
+
+        self.local_rules.clear();
+        *self.cycles.borrow_mut() = 0;
+        self.answer = None;
+    }
+
     pub fn replace_rules(&mut self, rules: Arc<RulesEngine>) {
         self.rules_engine = rules;
     }

@@ -3,7 +3,7 @@ symbol ^ {
 }
 
 rule {
-    attr level(4),purpose(find(x)),one(a),one(b),zero(c),block(move_left);
+    attr level(4),purpose(find(x)),one(a),one(b),zero(b),zero(c),block(move_left);
 
     a * x^2 + b * x + c == 0 => 
         (((b^2 - 4*a*c) as D) < 0 && x in empty_set) || 
