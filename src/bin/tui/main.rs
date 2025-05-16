@@ -23,7 +23,7 @@ use settings::Settings;
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Sets a custom config file
-    #[clap(short, long, default_value = "./config/cli.yaml")]
+    #[clap(short, long, default_value = "./config/tui.yaml")]
     config: PathBuf,
 
     /// Specify symbols path
