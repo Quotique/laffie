@@ -117,7 +117,8 @@ impl ParamsMapping {
                 {
                     // TODO: priority mapping
                     // not even trying to map subsets twice
-                    for parts in target.subsets(pattern.degree()) {
+                    for (num, parts) in target.subsets(pattern.degree()).enumerate() {
+                        ensure!(num < 1025, "Subsets of operation is too large");
                         let mut loc_result = vec![params.clone()];
                         params_map_arguments(&parts, pattern, &mut loc_result).expect("must match");
                         result.append(&mut loc_result);
