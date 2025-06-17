@@ -4,18 +4,22 @@ use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, F
 use serde::{de, Deserialize as _};
 use serde_derive::Deserialize;
 use slog::{o, Drain, Level, Record};
-use slog_async::Async;
+use slog_async::{Async, OverflowStrategy};
 
 use super::{
     filter::Filter,
     format::{print_msg_header, system_time_write},
 };
 
+const DEFAULT_CHANNEL_SIZE: usize = 100 * 1024 * 1024;
+
 #[derive(Debug, Deserialize)]
 pub struct ConfLevel(#[serde(deserialize_with = "deserialize_level")] pub Level);
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    #[serde(default = "default_channel_size")]
+    pub channel_size:      usize,
     pub filename:          String,
     pub level:             ConfLevel,
     pub num_files:         usize,
@@ -34,6 +38,10 @@ where
             &"[Error, Warn, Into, Debug, Trace]",
         )
     })
+}
+
+fn default_channel_size() -> usize {
+    DEFAULT_CHANNEL_SIZE
 }
 
 impl Config {
@@ -57,7 +65,11 @@ impl Config {
             .fuse();
 
         let guard = slog_scope::set_global_logger(slog::Logger::root(
-            Async::new(drain).chan_size(1024 * 1024).build().fuse(),
+            Async::new(drain)
+                .chan_size(self.channel_size)
+                .overflow_strategy(OverflowStrategy::Block)
+                .build()
+                .fuse(),
             o!(),
         ));
         slog_stdlog::init().unwrap();
