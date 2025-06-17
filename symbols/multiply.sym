@@ -3,15 +3,9 @@ symbol * {
 }
 
 rule {
-    attr replace,level(2),purpose(transform(x));
+    attr replace,level(2),purpose(transform(x)),id(brackets_disclosure);
 
     (a + b)*c <=> a*c + b*c;
-}
-
-rule {
-    attr replace,level(4),purpose(transform(x));
-
-    a*c + b*c + d <=> (a+b)*c + d;
 }
 
 rule {

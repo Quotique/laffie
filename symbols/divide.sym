@@ -56,3 +56,25 @@ rule {
 
     a/b == 0 => a == 0 && b != 0;
 }
+
+rule {
+    attr level(0),purpose(proof(a/b <= 0));
+
+    a/b <= 0 <=> a*b <= 0;
+
+    b != 0;
+}
+
+rule {
+    attr level(0),purpose(proof(a/b > 0));
+
+    a/b >= 0 <=> a*b >= 0;
+
+    b != 0;
+}
+
+rule {
+    attr level(0),purpose(proof(a/b > 0));
+
+    a/b > 0 <=> a*b > 0;
+}

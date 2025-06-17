@@ -15,3 +15,9 @@ task {
 
     x == 1;
 }
+
+task {
+    purpose proof( ((-sqrt(2944)+10)/(-18)) is known );
+
+    x == 1;
+}

@@ -51,6 +51,12 @@ rule {
 }
 
 rule {
+    attr replace,level(1),purpose(transform(x));
+
+    (-a)^2 <=> a^2;
+}
+
+rule {
     attr replace,level(3),purpose(find(x)),one(a);
 
     a*x^2 == b => ( a*b >= 0 && x in set( sqrt(b/a), -sqrt(b/a) ) ) || 

@@ -10,3 +10,10 @@ rule {
     a is known,
     b is known;
 }
+
+rule {
+    attr level(3),purpose(find(x)),one(n),block(brackets_disclosure);
+
+    a*x^n + b*x^n + c <=> (a+b)*x^n + c;
+}
+

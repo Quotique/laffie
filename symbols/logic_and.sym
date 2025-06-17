@@ -5,17 +5,97 @@ symbol && {
 rule {
     attr level(2),purpose(transform(x)),replace;
 
-    a && b <=> b;
+    a == c && b <=> b;
 
-    a is true;
+    a == c;
 }
 
 rule {
     attr level(2),purpose(transform(x)),replace;
 
-    a && b <=> a;
+    a != c && b <=> b;
 
-    a is false;
+    a != c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a >= c && b <=> b;
+
+    a >= c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a <= c && b <=> b;
+
+    a <= c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a > c && b <=> b;
+
+    a > c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a < c && b <=> b;
+
+    a < c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a == c && b <=> a == c;
+
+    a != c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a != c && b <=> a != c;
+
+    a == c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a <= c && b <=> a <= c;
+
+    a > c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a >= c && b <=> a >= c;
+
+    a < c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a < c && b <=> a < c;
+
+    a >= c;
+}
+
+rule {
+    attr level(2),purpose(transform(x)),replace;
+
+    a > c && b <=> a > c;
+
+    a <= c;
 }
 
 rule {
@@ -23,7 +103,8 @@ rule {
 
     a == b && c =>  a == b && replace(a == b, c);
 
-    a is variable;
+    a is variable,
+    b is known;
 }
 
 rule {

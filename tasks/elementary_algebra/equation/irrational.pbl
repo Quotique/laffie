@@ -1,5 +1,75 @@
 task {
     purpose find(x);
+    text "Решить уравнение sqrt(x + 3) == sqrt(5 - x);";
+
+    sqrt(x + 3) == sqrt(5-x);
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(1-x) == x+1";
+
+    sqrt(1 - x) == x + 1;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(x + 11) == x - 1";
+
+    sqrt(x + 11) == x - 1;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(x^2 + x + 4) == 4";
+
+    sqrt(x^2 + x + 4) == 4;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(2*x + 1) - sqrt(x) == 1"; 
+
+    sqrt(2*x + 1) - sqrt(x) == 1;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(5 - x) - sqrt(5 + x) == 2"; 
+
+    sqrt(5 - x) - sqrt(5 + x) == 2;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(x - 2) + sqrt(x + 6) == 4"; 
+
+    sqrt(x - 2) + sqrt(x + 6) == 4;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(2*x + 5) - sqrt(x+6) == 1"; 
+
+    sqrt(2*x + 5) - sqrt(x+6) == 1;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(15 - x) + sqrt(3 - x) == 6"; 
+
+    sqrt(15 - x) + sqrt(3 - x) == 6;
+}
+
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(5*x - 3) - sqrt(2*x - 1) == sqrt(3*x - 2)"; 
+
+    sqrt(5*x - 3) - sqrt(2*x - 1) == sqrt(3*x - 2);
+}
+
+task {
+    purpose find(x);
     text "Решить уравнение sqrt(5+2*x) = 5-x";
 
     sqrt(5+2*x) == 5-x;

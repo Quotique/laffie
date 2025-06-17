@@ -1,0 +1,27 @@
+task {
+    purpose find(x);
+    text "Решить уравнение sqrt(x) == 2";
+    answer x == 4;
+
+    sqrt(x) == 2;
+}
+
+task {
+    purpose find(x);
+    text "Найти x";
+    answer x in empty_set;
+
+    (-sqrt(29)+5)/(-2) <= 0 && x == (sqrt(29)-19)/(-2) || x in empty_set;
+}
+
+task {
+    purpose proof( (-sqrt(29)+5)/(-2) > 0 );
+
+	x == 2;
+}
+
+task {
+    purpose proof( !((-sqrt(29)+5)/(-2) <= 0) );
+
+	x == 2;
+}
