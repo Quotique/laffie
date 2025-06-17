@@ -198,8 +198,9 @@ impl Solver {
             let level = self.terms[index].weight;
             trace!(
                 target: "subtask",
-                "[{}] Level: {} -> {}",
+                "[{}]({}) Level: {} -> {}",
                 self.task.subtask_level,
+                self.current_cycles(),
                 level, self.terms[index]
             );
             if level > MAX_LEVEL {
@@ -266,6 +267,7 @@ impl Solver {
                             trace!("{} => {}", self.terms[index], s);
                             self.add_main(s)?;
                             added = true;
+                            break;
                         }
                         None => {
                             self.terms[index].applied_rules.insert(rule.id);
@@ -474,6 +476,15 @@ impl Solver {
                 self.cache
                     .update_status(&task, TaskStatus::Solved(solution.clone()));
                 Some(solution)
+            }
+            Err(SolverError::MaxSubtaskLevelExceed) => {
+                trace!(
+                    "Can't proof {}: {}",
+                    task,
+                    SolverError::MaxSubtaskLevelExceed
+                );
+                self.cache.remove(&task);
+                None
             }
             Err(e) => {
                 trace!("Can't proof {}: {}", task, e);

@@ -2,9 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 
 use parking_lot::RwLock;
 
-use crate::term::Term;
-
-use super::solver::Solver;
+use crate::{task::Solver, term::Term};
 
 #[derive(Clone)]
 pub enum TaskStatus {
@@ -38,6 +36,10 @@ impl TasksCache {
         }
         self.tasks.write().insert(purpose, TaskStatus::InProgress);
         true
+    }
+
+    pub fn remove(&self, purpose: &Term) -> Option<TaskStatus> {
+        self.tasks.write().remove(purpose)
     }
 
     pub fn status(&self, purpose: &Term) -> Option<TaskStatus> {
