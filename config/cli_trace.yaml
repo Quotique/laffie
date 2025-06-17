@@ -1,0 +1,11 @@
+logger:
+  filename: "logs/cli.log"
+  level: "Trace"
+  num_files: 10
+  file_rotate_bytes: 1000000000
+  target_levels:
+    sled: "Warn"
+
+symbols_dir: "symbols"
+tasks_dir: "tasks"
+
