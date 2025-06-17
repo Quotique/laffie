@@ -37,7 +37,11 @@ pub enum Tab {
 }
 
 impl Status {
-    pub fn try_new(symbols_dir: impl AsRef<Path>, tasks_dir: impl AsRef<Path>) -> io::Result<Self> {
+    pub fn try_new(
+        exec_deadline: usize,
+        symbols_dir: impl AsRef<Path>,
+        tasks_dir: impl AsRef<Path>,
+    ) -> io::Result<Self> {
         let parser = DirectoryParser::new(symbols_dir.as_ref(), tasks_dir.as_ref());
 
         let rules = parser.load_rules().map(Arc::new)?;
@@ -50,7 +54,7 @@ impl Status {
             tasks_path: tasks_dir.as_ref().into(),
 
             rules: Rules::new(rules.clone()),
-            tasks: Tasks::new(rules, tasks),
+            tasks: Tasks::new(exec_deadline, rules, tasks),
 
             popup: None,
         })
@@ -237,7 +241,7 @@ pub fn draw_scrollbar(frame: &mut Frame, area: Rect, len: usize, pos: usize) {
             .begin_symbol(Some("↑"))
             .end_symbol(Some("↓")),
         area.inner(Margin {
-            vertical:   1,
+            vertical: 1,
             horizontal: 0,
         }),
         &mut scrollbar_state,

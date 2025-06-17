@@ -45,6 +45,7 @@ struct Args {
 
 fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
     let mut status = interface::Status::try_new(
+        args.exec_deadline,
         args.symbols.clone().unwrap_or("symbols".into()),
         args.tasks.clone().unwrap_or("tasks".into()),
     )?;

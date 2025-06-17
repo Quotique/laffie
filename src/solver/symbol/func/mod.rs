@@ -63,7 +63,7 @@ impl FuncSymbol {
         FuncSymbolBuilder::default()
     }
 
-    pub fn register(self) -> Arc<FuncSymbol> {
+    pub fn register(self) -> Arc<Self> {
         container::add_symbol_impl(&mut container::all_func_symbols().write(), self)
     }
 
@@ -74,7 +74,7 @@ impl FuncSymbol {
             .cloned()
     }
 
-    pub fn add_with_name(symbols: &mut HashMap<CompactString, Arc<FuncSymbol>>, name: &str) {
+    pub fn add_with_name(symbols: &mut HashMap<CompactString, Arc<Self>>, name: &str) {
         container::add_symbol_impl(symbols, FuncSymbol::builder().name(name).build());
     }
 
@@ -124,6 +124,7 @@ impl PartialOrd for FuncSymbol {
         Some(self.name.cmp(&other.name))
     }
 }
+
 impl Ord for FuncSymbol {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.name.cmp(&other.name)

@@ -10,7 +10,7 @@ use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, Solver, Task, EXECUTION_DEADLINE_DEFAULT},
+    task::{DumperConfig, Solver, Task},
     CompactString,
 };
 use utils::VecDisplay;
@@ -31,7 +31,8 @@ pub struct Tasks {
     tasks_index:      Tree<TasksNode>,
     tasks_tree_state: TreeState<Option<NodeId>>,
 
-    focused_pane: usize,
+    exec_deadline: usize,
+    focused_pane:  usize,
 }
 
 enum TasksNode {
@@ -63,12 +64,17 @@ impl TasksNode {
 
 impl Tasks {
     #[inline]
-    pub fn new(rules: Arc<RulesEngine>, arg: impl IntoIterator<Item = Task>) -> Self {
+    pub fn new(
+        exec_deadline: usize,
+        rules: Arc<RulesEngine>,
+        arg: impl IntoIterator<Item = Task>,
+    ) -> Self {
         let mut result = Self {
-            tasks:            Default::default(),
-            tasks_index:      Tree::new(TasksNode::new_directory("Tasks".into())),
+            tasks: Default::default(),
+            tasks_index: Tree::new(TasksNode::new_directory("Tasks".into())),
             tasks_tree_state: Default::default(),
-            focused_pane:     0,
+            exec_deadline,
+            focused_pane: 0,
         };
 
         for task in arg.into_iter() {
@@ -227,26 +233,26 @@ impl Tasks {
         let items = [self.tree(&self.tasks_index.root())];
 
         let widget = TuiTree::new(&items)
-                 .expect("all item identifiers are unique")
-                 .block(
-                     Block::bordered()
-                         .title("Tasks")
-                         .border_style(self.pane_style(0))
-                         //.title_bottom(format!("{:?}", &mut self.tree_state)),
-                 )
-                 .experimental_scrollbar(Some(
-                     Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                         .begin_symbol(None)
-                         .track_symbol(None)
-                         .end_symbol(None),
-                 ))
-                 .highlight_style(
-                     Style::new()
-                         .fg(Color::Black)
-                         .bg(Color::LightGreen)
-                         .add_modifier(Modifier::BOLD),
-                 )
-                 .highlight_symbol(">");
+            .expect("all item identifiers are unique")
+            .block(
+                Block::bordered()
+                    .title("Tasks")
+                    .border_style(self.pane_style(0))
+                    //.title_bottom(format!("{:?}", &mut self.tree_state)),
+            )
+            .experimental_scrollbar(Some(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(None)
+                    .track_symbol(None)
+                    .end_symbol(None),
+            ))
+            .highlight_style(
+                Style::new()
+                    .fg(Color::Black)
+                    .bg(Color::LightGreen)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(">");
         frame.render_stateful_widget(widget, area, &mut self.tasks_tree_state);
     }
 
@@ -264,14 +270,14 @@ impl Tasks {
                     .unwrap()
                     .display_impl(&mut renderer)
                     .unwrap();
-                let lines = if tracing.task.is_solved {
-                    format!("Conditions:\n{}\n\nSolution", tracing.task.solver.task)
-                        .split('\n')
-                        .map(|x| Line::from(Span::from(x.to_owned())))
-                        .chain(renderer.output)
-                        .collect()
+                let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.task.solver.task)
+                    .split('\n')
+                    .map(|x| Line::from(Span::from(x.to_owned())))
+                    .collect();
+                if tracing.task.is_solved {
+                    lines.append(&mut renderer.output);
                 } else {
-                    vec![Line::from(Span::from("Press s to solve".to_owned()))]
+                    lines.push(Line::from(Span::from("Press s to solve".to_owned())));
                 };
                 frame.render_stateful_widget(
                     List::new(lines.iter().cloned())
@@ -365,7 +371,7 @@ impl Tasks {
                     use_profiler: true,
                 }
                 .build(),
-                EXECUTION_DEADLINE_DEFAULT,
+                self.exec_deadline,
                 Default::default(),
             ),
             is_solved:  false,
