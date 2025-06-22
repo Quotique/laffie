@@ -4,7 +4,6 @@
 extern crate log;
 
 pub mod rule;
-pub mod symbol;
 pub mod task;
 pub mod term;
 

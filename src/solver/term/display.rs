@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::symbol::{FuncSymbol, Symbol, SymbolAttr};
+use crate::term::{FuncSymbol, Symbol, SymbolAttr};
 
 use super::SymbolNode;
 

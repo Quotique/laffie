@@ -10,7 +10,7 @@ use eyre::{bail, ensure, Result};
 use num::Zero;
 use utils::VecDisplay;
 
-use crate::symbol::{swap_node, Param, ParamsMap, Placeholder, Symbol, SymbolAttr, SymbolNodeMut};
+use crate::term::{swap_node, Param, ParamsMap, Placeholder, Symbol, SymbolAttr, SymbolNodeMut};
 
 use super::{index::NodePosition, SymbolNode, Term};
 

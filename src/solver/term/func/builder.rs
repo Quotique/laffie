@@ -3,8 +3,8 @@ use std::str::FromStr;
 use crate::CompactString;
 
 use super::{
-    BoxedComparator, Calculator, CalculatorSignature, FuncSymbol, Ordering, SymbolAttr,
-    SymbolAttrValue, SymbolNode, TruthChecker, TruthResult,
+    Calculator, CalculatorSignature, Comparator, FuncSymbol, Ordering, SymbolAttr, SymbolAttrValue,
+    SymbolNode, TruthChecker, TruthResult,
 };
 
 #[derive(Default)]
@@ -43,7 +43,7 @@ impl FuncSymbolBuilder {
         self
     }
 
-    pub fn with_ordering(mut self, ordering: BoxedComparator) -> Self {
+    pub fn with_ordering(mut self, ordering: Box<Comparator>) -> Self {
         self.sym.arg_order = Some(Ordering(ordering));
         self
     }

@@ -15,8 +15,7 @@ use super::{
 };
 use crate::{
     rule::{Hypothesis, HypothesisIterator, Rule, RuleAttr, RulesEngine, SharedRule},
-    symbol::{normalize, swap_node, SymbolNodeMut},
-    term::{Term, TermProps},
+    term::{normalize, swap_node, SymbolNodeMut, Term, TermProps},
     NormalizationLevel, RuleId,
 };
 

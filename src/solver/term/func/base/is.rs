@@ -1,4 +1,4 @@
-use crate::symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, TruthResult};
+use crate::term::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, TruthResult};
 
 pub fn symbol() -> FuncSymbol {
     FuncSymbol::builder()

@@ -2,7 +2,7 @@ use bigdecimal::BigDecimal as Decimal;
 use num::Integer;
 
 use crate::{
-    symbol::{FuncSymbol, Symbol, SymbolNodeMut},
+    term::{FuncSymbol, Symbol, SymbolNodeMut},
     NormalizationLevel,
 };
 

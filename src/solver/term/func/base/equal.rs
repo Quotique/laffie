@@ -1,4 +1,4 @@
-use crate::symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue, SymbolNode, TruthResult};
+use crate::term::{FuncSymbol, SymbolAttr, SymbolAttrValue, SymbolNode, TruthResult};
 
 use super::compare_numbers;
 

@@ -2,7 +2,7 @@ use std::{str::FromStr, sync::Arc};
 
 use solver::{
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
-    symbol::FuncSymbol,
+    term::FuncSymbol,
     CompactString,
 };
 

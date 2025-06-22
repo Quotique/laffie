@@ -3,7 +3,7 @@ use std::{cmp::Ordering, rc::Rc};
 #[cfg(test)]
 use crate::term::term_with_params;
 use crate::{
-    symbol::{func::SymbolAttr, Symbol, SymbolNode, SymbolNodeMut},
+    term::{func::SymbolAttr, Symbol, SymbolNode, SymbolNodeMut},
     NormalizationLevel,
 };
 

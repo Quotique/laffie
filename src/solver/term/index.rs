@@ -2,9 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use bincode::{Decode, Encode};
 
-use crate::symbol::Symbol;
-
-use super::Term;
+use super::{Symbol, Term};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[derive(Decode, Encode)]

@@ -2,10 +2,9 @@ use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive, Zero};
 use num::traits::Pow;
 
 use crate::{
-    symbol::{
-        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut,
+    term::{
+        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut, Term,
     },
-    term::Term,
     NormalizationLevel,
 };
 
@@ -76,7 +75,7 @@ pub fn power_argument(root: SymbolNode) -> SymbolNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::symbol::func::base::calculator_check;
+    use crate::term::func::base::calculator_check;
 
     #[test]
     fn calculator_test() {

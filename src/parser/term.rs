@@ -3,8 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use trees::tr;
 
 use solver::{
-    symbol::{FuncSymbol, Param, Placeholder, Symbol, SymbolTree, Variable},
-    term::{NodePosition, Term},
+    term::{FuncSymbol, NodePosition, Param, Placeholder, Symbol, SymbolTree, Term, Variable},
     Decimal,
 };
 
@@ -129,7 +128,7 @@ impl<'a> TermParser<'a> {
 mod tests {
     use trees::tr;
 
-    use solver::symbol::Symbol;
+    use solver::term::Symbol;
 
     use crate::lang;
 

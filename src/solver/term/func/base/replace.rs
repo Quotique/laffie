@@ -1,6 +1,5 @@
 use crate::{
-    symbol::{swap_node, FuncSymbol, SymbolNodeMut, VariablesMap},
-    term::Term,
+    term::{swap_node, FuncSymbol, SymbolNodeMut, Term, VariablesMap},
     NormalizationLevel,
 };
 

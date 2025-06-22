@@ -3,10 +3,9 @@ use std::cmp::Ordering;
 use bigdecimal::{BigDecimal as Decimal, Zero};
 
 use crate::{
-    symbol::{
-        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut,
+    term::{
+        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut, Term,
     },
-    term::Term,
     NormalizationLevel,
 };
 
@@ -273,7 +272,7 @@ fn ordering(left: SymbolNode, right: SymbolNode) -> Ordering {
 
 #[cfg(test)]
 mod tests {
-    use crate::{symbol::func::base::calculator_check, term::term_with_vars};
+    use crate::term::{func::base::calculator_check, term_with_vars};
 
     use super::*;
 

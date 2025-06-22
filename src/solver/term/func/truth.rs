@@ -1,4 +1,4 @@
-use crate::symbol::SymbolNode;
+use crate::term::SymbolNode;
 
 pub struct TruthChecker(pub Box<dyn Fn(SymbolNode) -> TruthResult + Sync + Send>);
 

@@ -1,5 +1,5 @@
 use crate::{
-    symbol::{swap_node, FuncSymbol, Symbol, SymbolNode, SymbolNodeMut, TruthResult},
+    term::{swap_node, FuncSymbol, Symbol, SymbolNode, SymbolNodeMut, TruthResult},
     NormalizationLevel,
 };
 

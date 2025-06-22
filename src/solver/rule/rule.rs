@@ -10,8 +10,7 @@ use super::{
     rule_attribute::{RuleAttr, RuleAttrValue},
 };
 use crate::{
-    symbol::{FuncSymbol, SymbolNode, SymbolNodeMut},
-    term::{NodePosition, ParamsMapping, Term, TermProps},
+    term::{FuncSymbol, NodePosition, ParamsMapping, SymbolNode, SymbolNodeMut, Term, TermProps},
     NormalizationLevel, RuleId,
 };
 

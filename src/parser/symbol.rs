@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use solver::symbol::{FuncSymbol, SymbolAttr, SymbolAttrValue};
+use solver::term::{FuncSymbol, SymbolAttr, SymbolAttrValue};
 
 use super::{Node, ParserError};
 

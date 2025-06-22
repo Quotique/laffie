@@ -6,7 +6,7 @@ use std::{
 
 use trees::Tree;
 
-use solver::{rule::RulesEngine, symbol::FuncSymbol, task::Task};
+use solver::{rule::RulesEngine, task::Task, term::FuncSymbol};
 use utils::VecDisplay;
 
 use crate::{lang, FuncSymbolParser, NodeData, RuleParser, TaskParser};

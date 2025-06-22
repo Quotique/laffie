@@ -2,9 +2,13 @@
 
 mod codec;
 mod display;
+mod func;
 mod index;
 mod mapping;
+mod node;
+mod node_mut;
 mod props;
+mod symbol_enum;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -14,19 +18,23 @@ use std::{
     sync::Arc,
 };
 
-use trees::tr;
+use trees::{tr, Tree};
 
-use crate::{
-    symbol::{
-        replace, swap_node, FuncSymbol, Param, Symbol, SymbolNode, SymbolNodeMut, SymbolTree,
-    },
-    CompactString, Decimal, NormalizationLevel,
-};
+use crate::{CompactString, Decimal, NormalizationLevel};
 
 pub use display::display_string;
 pub use index::NodePosition;
 pub use mapping::ParamsMapping;
 pub use props::TermProps;
+
+pub use func::{
+    base::normalize, FuncSymbol, SymbolAttr, SymbolAttrValue, TruthChecker, TruthResult,
+};
+pub use node::SymbolNode;
+pub use node_mut::{replace, swap_node, ParamsMap, SymbolNodeMut, VariablesMap};
+pub use symbol_enum::{Param, Placeholder, Symbol, Variable};
+
+pub type SymbolTree = Tree<Symbol>;
 
 #[derive(Clone, Eq)]
 pub struct Term {
@@ -37,7 +45,7 @@ pub struct Term {
 
 impl Term {
     pub fn new(tree: SymbolTree, binds: HashMap<Param, NodePosition>) -> Self {
-        Term { tree, binds }
+        Self { tree, binds }
     }
 
     pub fn func(symbol: impl AsRef<str>) -> Self {
@@ -70,7 +78,7 @@ impl Term {
     }
 
     pub fn normalize(mut self, level: NormalizationLevel) -> Self {
-        crate::symbol::normalize(&mut self.root_mut(), level);
+        normalize(&mut self.root_mut(), level);
         self
     }
 
@@ -189,9 +197,27 @@ mod tests {
         str::FromStr,
     };
 
-    use crate::{symbol::Placeholder, term::term_with_params};
+    use crate::term::{term_with_params, Placeholder};
 
     use super::*;
+
+    #[test]
+    fn unification_test() {
+        let test =
+            term_with_params("2*x*x + x + 3*x + 4 + 2 == 0").normalize(NormalizationLevel::max());
+        let test_norm =
+            term_with_params("2*x^2 + 4*x + 6 == 0").normalize(NormalizationLevel::max());
+        assert_eq!(test, test_norm);
+    }
+
+    #[test]
+    fn unification_with_minus_test() {
+        let test =
+            term_with_params("x^2 + (-5)*x - x + 5 == 0").normalize(NormalizationLevel::max());
+        let test_norm =
+            term_with_params("x^2 + (-6)*x + 5 == 0").normalize(NormalizationLevel::max());
+        assert_eq!(test, test_norm);
+    }
 
     #[test]
     fn binds_test() {

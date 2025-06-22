@@ -5,8 +5,7 @@ use num::integer::gcd;
 use num_bigint::ToBigInt;
 
 use crate::{
-    symbol::{swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNodeMut},
-    term::Term,
+    term::{swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNodeMut, Term},
     NormalizationLevel,
 };
 
@@ -116,7 +115,7 @@ fn impl_divide(num: &Decimal, den: &Decimal) -> Option<Decimal> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::symbol::func::base::calculator_check;
+    use crate::term::func::base::calculator_check;
 
     #[test]
     fn derive_test() {

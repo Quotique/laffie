@@ -12,7 +12,10 @@ use super::{
     rule::{Rule, SharedRule},
     rule_attribute::{RuleAttr, RuleAttrValue},
 };
-use crate::{symbol::FuncSymbol, term::TermProps, CompactString, RuleId};
+use crate::{
+    term::{FuncSymbol, TermProps},
+    CompactString, RuleId,
+};
 
 // TODO: move to correct place
 type Level = usize;

@@ -3,8 +3,7 @@ use std::{collections::HashMap, convert::From, fmt, sync::Arc};
 use multimap::MultiMap;
 
 use crate::{
-    symbol::{FuncSymbol, SymbolNode},
-    term::{NodePosition, Term},
+    term::{FuncSymbol, NodePosition, SymbolNode, Term},
     NormalizationLevel, RuleId,
 };
 

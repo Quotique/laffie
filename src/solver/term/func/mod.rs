@@ -7,17 +7,16 @@ use std::{cmp, collections::HashMap, fmt, hash, str::FromStr, sync::Arc};
 
 use parking_lot::RwLock;
 
+use super::{SymbolNode, SymbolNodeMut};
 use crate::{CompactString, NormalizationLevel};
-
-use super::node::{SymbolNode, SymbolNodeMut};
 
 pub use builder::FuncSymbolBuilder;
 pub use truth::{TruthChecker, TruthResult};
 
-type BoxedComparator = Box<dyn Fn(SymbolNode, SymbolNode) -> std::cmp::Ordering + Send + Sync>;
+type Comparator = dyn Fn(SymbolNode, SymbolNode) -> std::cmp::Ordering + Send + Sync;
 type CalculatorSignature = dyn Fn(&mut SymbolNodeMut, NormalizationLevel) -> bool + Send + Sync;
 
-pub struct Ordering(BoxedComparator);
+pub struct Ordering(Box<Comparator>);
 pub struct Calculator(Box<CalculatorSignature>);
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

@@ -5,117 +5,26 @@ use std::{
 };
 
 use derive_more::{Debug, Display, From};
-use trees::{Node, Tree};
+use trees::Node;
 
 use utils::SubsetIterator;
 
 use crate::{
-    symbol::{Param, Symbol, TruthResult, Variable},
-    term::Term,
+    term::{Param, Symbol, Term, TruthResult, Variable},
     NormalizationLevel,
 };
 
-use super::FuncSymbol;
+use super::{FuncSymbol, SymbolNode};
 
 pub type ParamsMap = HashMap<Param, Term>;
 pub type VariablesMap = HashMap<Variable, Term>;
 
-#[derive(Clone, Copy)]
-#[derive(PartialEq, Eq)]
-#[derive(Debug, Display, From)]
-pub struct SymbolNode<'a>(&'a Node<Symbol>);
-
 #[derive(Debug, Display, From)]
 pub struct SymbolNodeMut<'a>(&'a mut Node<Symbol>);
 
-pub type SymbolTree = Tree<Symbol>;
-
-impl<'a> SymbolNode<'a> {
-    pub fn degree(&self) -> usize {
-        self.0.degree()
-    }
-
-    pub fn data(&self) -> &Symbol {
-        self.0.data()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = Self> {
-        self.0.iter().map(Self)
-    }
-
-    pub fn front(&self) -> Option<Self> {
-        self.0.front().map(SymbolNode)
-    }
-
-    pub fn back(&self) -> Option<Self> {
-        self.0.back().map(SymbolNode)
-    }
-
-    pub fn deep_clone(&self) -> Term {
-        self.0.deep_clone().into()
-    }
-
-    #[allow(clippy::mutable_key_type)]
-    pub fn symbols(&self) -> HashSet<Arc<FuncSymbol>> {
-        self.0
-            .bfs()
-            .iter
-            .filter_map(|x| x.data.func_symbol())
-            .collect()
-    }
-
-    pub fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Term> + '_> {
-        Box::new(SubsetIterator::new(self.0.degree(), count).map(move |i| {
-            let s = self.0.data().func_symbol().unwrap();
-            let mut parts = vec![Term::from(Symbol::FuncSymbol(s.clone())); count];
-            for (id, child) in self.iter().enumerate() {
-                parts[i.as_vec()[id]]
-                    .root_mut()
-                    .push_back(child.deep_clone());
-            }
-
-            for p in parts.iter_mut() {
-                if p.root().degree() == 1 {
-                    let mut child = p.root_mut().pop_front().unwrap();
-                    swap_node(&mut p.root_mut(), &mut child.root_mut());
-                }
-            }
-            let mut result = Term::from(Symbol::FuncSymbol(s.clone()));
-            for p in parts.into_iter() {
-                result.root_mut().push_back(p);
-            }
-            result
-        }))
-    }
-
-    pub fn check_truth(&self) -> TruthResult {
-        self.0
-            .data()
-            .func_symbol()
-            .map(|x| x.check_truth(*self))
-            .unwrap_or(TruthResult::Unknown)
-    }
-}
-
 impl<'a> SymbolNodeMut<'a> {
-    pub fn detach(&mut self) -> Term {
-        self.0.detach().into()
-    }
-
-    pub fn degree(&self) -> usize {
-        self.0.degree()
-    }
-
-    pub fn data(&self) -> &Symbol {
-        self.0.data()
-    }
-
-    pub fn data_mut(&mut self) -> &mut Symbol {
-        self.0.data_mut()
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = SymbolNode> {
-        self.0.iter().map(SymbolNode)
+        self.0.iter().map(SymbolNode::from)
     }
 
     pub fn iter_mut<'b>(&'b mut self) -> impl Iterator<Item = SymbolNodeMut<'b>> + 'b {
@@ -123,11 +32,11 @@ impl<'a> SymbolNodeMut<'a> {
     }
 
     pub fn front(&self) -> Option<SymbolNode> {
-        self.0.front().map(SymbolNode)
+        self.0.front().map(SymbolNode::from)
     }
 
     pub fn back(&self) -> Option<SymbolNode> {
-        self.0.back().map(SymbolNode)
+        self.0.back().map(SymbolNode::from)
     }
 
     pub fn front_mut<'b>(&'b mut self) -> Option<SymbolNodeMut<'b>> {
@@ -163,11 +72,9 @@ impl<'a> SymbolNodeMut<'a> {
         self.0.push_back(term.tree);
         self
     }
+}
 
-    pub fn deep_clone(&self) -> Term {
-        self.0.deep_clone().into()
-    }
-
+impl<'a> SymbolNodeMut<'a> {
     #[allow(clippy::mutable_key_type)]
     pub fn symbols(&self) -> HashSet<Arc<FuncSymbol>> {
         self.0
@@ -177,6 +84,28 @@ impl<'a> SymbolNodeMut<'a> {
             .collect()
     }
 
+    pub fn deep_clone(&self) -> Term {
+        self.0.deep_clone().into()
+    }
+
+    pub fn detach(&mut self) -> Term {
+        self.0.detach().into()
+    }
+
+    pub fn degree(&self) -> usize {
+        self.0.degree()
+    }
+
+    pub fn data(&self) -> &Symbol {
+        self.0.data()
+    }
+
+    pub fn data_mut(&mut self) -> &mut Symbol {
+        self.0.data_mut()
+    }
+}
+
+impl<'a> SymbolNodeMut<'a> {
     pub fn apply_variable_map(&mut self, variables: &VariablesMap) {
         if let Some(mut v) = self
             .0
@@ -236,14 +165,14 @@ impl<'a> SymbolNodeMut<'a> {
     }
 
     pub fn check_truth(&self) -> TruthResult {
-        let node = SymbolNode(self.0);
+        let node = SymbolNode::from(self.0 as &Node<_>);
         node.check_truth()
     }
 }
 
 impl<'a, 'b> PartialEq<SymbolNode<'a>> for SymbolNodeMut<'b> {
     fn eq(&self, other: &SymbolNode) -> bool {
-        (*self.0).eq(other.0)
+        SymbolNode::from(self.0 as &Node<_>).eq(other)
     }
 }
 

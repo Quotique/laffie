@@ -98,7 +98,7 @@ impl<'a> TaskParser<'a> {
 mod tests {
     use trees::tr;
 
-    use solver::symbol::Symbol;
+    use solver::term::Symbol;
 
     use crate::lang;
 
