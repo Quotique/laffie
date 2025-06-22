@@ -5,7 +5,6 @@ mod display;
 mod index;
 mod mapping;
 mod props;
-mod utils;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -15,22 +14,24 @@ use std::{
     sync::Arc,
 };
 
-use trees::{tr, Node};
+use trees::tr;
 
 use crate::{
-    symbol::{FuncSymbol, Param, Symbol, SymbolNode, SymbolTree},
-    NormalizationLevel,
+    symbol::{
+        replace, swap_node, FuncSymbol, Param, Symbol, SymbolNode, SymbolNodeMut, SymbolTree,
+    },
+    CompactString, Decimal, NormalizationLevel,
 };
 
 pub use display::display_string;
 pub use index::NodePosition;
 pub use mapping::ParamsMapping;
 pub use props::TermProps;
-pub use utils::{replace, swap_node, NodeMapping, VariablesMap};
 
 #[derive(Clone, Eq)]
 pub struct Term {
     pub(super) tree: SymbolTree,
+    // TODO: fix binds in node operations
     pub binds:       HashMap<Param, NodePosition>,
 }
 
@@ -39,22 +40,37 @@ impl Term {
         Term { tree, binds }
     }
 
+    pub fn func(symbol: impl AsRef<str>) -> Self {
+        Self::from(Symbol::with_func_symbol(symbol.as_ref()))
+    }
+
+    pub fn number(num: impl Into<Decimal>) -> Self {
+        Self::from(Symbol::Number(num.into()))
+    }
+
+    pub fn variable(var: impl Into<CompactString>) -> Self {
+        Self::from(Symbol::Variable(var.into().into()))
+    }
+
+    pub fn param(param: impl Into<CompactString>) -> Self {
+        Self::from(Symbol::Param(param.into().into()))
+    }
+
+    pub fn with_child(mut self, child: Self) -> Self {
+        self.root_mut().push_back(child);
+        self
+    }
+
     pub fn one() -> Self {
-        Self {
-            tree:  tr(Symbol::Number(1.into())),
-            binds: Default::default(),
-        }
+        Self::number(1)
     }
 
     pub fn zero() -> Self {
-        Self {
-            tree:  tr(Symbol::Number(0.into())),
-            binds: Default::default(),
-        }
+        Self::number(0)
     }
 
     pub fn normalize(mut self, level: NormalizationLevel) -> Self {
-        crate::symbol::normalize(&mut self.tree.root_mut(), level);
+        crate::symbol::normalize(&mut self.root_mut(), level);
         self
     }
 
@@ -68,16 +84,24 @@ impl Term {
             .collect()
     }
 
-    pub fn root(&self) -> &trees::Node<Symbol> {
-        self.tree.root()
-    }
-
     pub fn replace(&mut self, src: &Self, dst: &Self) {
-        replace(self.root_mut().get_mut(), src.root(), dst.root())
+        replace(&mut self.root_mut(), src.root(), dst.root())
     }
 
-    pub fn root_mut(&mut self) -> std::pin::Pin<&mut trees::Node<Symbol>> {
-        self.tree.root_mut()
+    pub fn data(&self) -> &Symbol {
+        self.tree.data()
+    }
+
+    pub fn data_mut(&mut self) -> &mut Symbol {
+        self.tree.root_mut().get_mut().data_mut()
+    }
+
+    pub fn root(&self) -> SymbolNode {
+        self.tree.root().into()
+    }
+
+    pub fn root_mut(&mut self) -> SymbolNodeMut {
+        self.tree.root_mut().get_mut().into()
     }
 
     pub fn destruct(mut self) -> (SymbolTree, trees::Forest<Symbol>) {
@@ -87,12 +111,12 @@ impl Term {
 
     pub fn apply_map(&self, params: &ParamsMapping) -> Self {
         let mut result = self.clone();
-        params.apply(&mut result.tree.root_mut());
+        params.apply(&mut result.root_mut());
         result
     }
 
-    pub fn swap_node(&mut self, node: &mut Node<Symbol>) {
-        swap_node(&mut self.tree.root_mut(), node)
+    pub fn swap_node(&mut self, node: &mut SymbolNodeMut) {
+        swap_node(&mut self.root_mut(), node)
     }
 }
 
@@ -108,6 +132,12 @@ impl PartialEq for Term {
     }
 }
 
+impl From<Symbol> for Term {
+    fn from(value: Symbol) -> Self {
+        Self::from(tr(value))
+    }
+}
+
 impl From<SymbolTree> for Term {
     fn from(source: SymbolTree) -> Self {
         Self {
@@ -119,13 +149,13 @@ impl From<SymbolTree> for Term {
 
 impl fmt::Debug for Term {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", display_string(self.tree.root()))
+        write!(f, "{}", display_string(self.root()))
     }
 }
 
 impl fmt::Display for Term {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", display_string(self.tree.root()))
+        write!(f, "{}", display_string(self.root()))
     }
 }
 
@@ -192,7 +222,7 @@ mod tests {
                 .unwrap()
                 .data()
                 .placeholder(),
-            Some(&Placeholder::from(1))
+            Some(Placeholder::from(1))
         );
     }
 

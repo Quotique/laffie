@@ -1,11 +1,12 @@
 use std::{cmp::Ordering, collections::HashMap};
 
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
-use trees::{tr, Tree};
 
 use crate::{
-    symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
-    term::swap_node,
+    symbol::{
+        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut,
+    },
+    term::Term,
     NormalizationLevel,
 };
 
@@ -22,7 +23,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn multiply(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
+pub fn multiply(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("*") {
         return false;
     }
@@ -34,7 +35,7 @@ pub fn multiply(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
                 .iter()
                 .any(|x| x.data().is_number_value(&Decimal::zero()))
             {
-                swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
+                swap_node(root, &mut Term::zero().root_mut());
                 return true;
             }
             let result = root.iter_mut().fold(false, |acc, mut x| {
@@ -53,23 +54,24 @@ pub fn multiply(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
         }
         _ => {
             let (constant, result) = fold_constant(root);
-            let (powers, result) = root.iter_mut().fold(
-                (HashMap::<Tree<Symbol>, Tree<Symbol>>::new(), result),
-                |acc, mut x| {
-                    let power = extract_power(&mut x);
-                    let (mut powers, mut result) = acc;
-                    powers
-                        .entry(x.detach())
-                        .and_modify(|p| {
-                            let mut new_pow =
-                                tr(Symbol::with_func_symbol("+")) / p.clone() / power.clone();
-                            swap_node(&mut p.root_mut(), &mut new_pow.root_mut());
-                            result = true;
-                        })
-                        .or_insert(power);
-                    (powers, result)
-                },
-            );
+            let (powers, result) =
+                root.iter_mut()
+                    .fold((HashMap::<Term, Term>::new(), result), |acc, mut x| {
+                        let power = extract_power(&mut x);
+                        let (mut powers, mut result) = acc;
+                        powers
+                            .entry(x.detach())
+                            .and_modify(|p| {
+                                let mut new_pow = Term::func("+")
+                                    .with_child(p.clone())
+                                    .with_child(power.clone());
+
+                                swap_node(&mut p.root_mut(), &mut new_pow.root_mut());
+                                result = true;
+                            })
+                            .or_insert(power);
+                        (powers, result)
+                    });
             #[cfg(test)]
             let powers = {
                 let mut powers: Vec<_> = powers.into_iter().collect();
@@ -88,19 +90,19 @@ pub fn multiply(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     }
 }
 
-fn attach_constant(root: &mut SymbolNode, constant: Decimal) -> bool {
+fn attach_constant(root: &mut SymbolNodeMut, constant: Decimal) -> bool {
     if constant == Decimal::zero() {
-        swap_node(root, &mut tr(Symbol::Number(0.into())).root_mut());
+        swap_node(root, &mut Term::zero().root_mut());
         true
     } else if constant != Decimal::one() {
-        root.push_front(tr(Symbol::Number(constant)));
+        root.push_front(Term::number(constant));
         false
     } else {
         false
     }
 }
 
-fn fold_constant(root: &mut SymbolNode) -> (Decimal, bool) {
+fn fold_constant(root: &mut SymbolNodeMut) -> (Decimal, bool) {
     root.iter_mut()
         .enumerate()
         .fold((Decimal::from(1), false), |acc, (num, mut x)| {
@@ -114,7 +116,7 @@ fn fold_constant(root: &mut SymbolNode) -> (Decimal, bool) {
         })
 }
 
-fn remove_unused_mul(root: &mut SymbolNode) -> bool {
+fn remove_unused_mul(root: &mut SymbolNodeMut) -> bool {
     match root.degree() {
         0 => {
             *root.data_mut() = Symbol::Number(Decimal::from(1));
@@ -129,19 +131,19 @@ fn remove_unused_mul(root: &mut SymbolNode) -> bool {
     }
 }
 
-fn merge_power(root: Tree<Symbol>, pow: Tree<Symbol>) -> Tree<Symbol> {
-    if pow == tr(Symbol::Number(Decimal::from(1))) {
+fn merge_power(root: Term, pow: Term) -> Term {
+    if pow == Term::one() {
         return root;
     }
 
-    if pow == tr(Symbol::Number(Decimal::from(0))) {
-        return tr(Symbol::Number(Decimal::from(1)));
+    if pow == Term::zero() {
+        return Term::one();
     }
 
-    tr(Symbol::with_func_symbol("^")) / root / pow
+    Term::func("^").with_child(root).with_child(pow)
 }
 
-fn extract_power(root: &mut SymbolNode) -> Tree<Symbol> {
+fn extract_power(root: &mut SymbolNodeMut) -> Term {
     if root.data().is_symbol_name("^") {
         let power = root.pop_back().unwrap();
         let mut arg = root.pop_front().unwrap();
@@ -150,11 +152,11 @@ fn extract_power(root: &mut SymbolNode) -> Tree<Symbol> {
         swap_node(root, &mut arg.root_mut());
         power
     } else {
-        tr(Symbol::Number(Decimal::from(1)))
+        Term::one()
     }
 }
 
-fn ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {
+fn ordering(left: SymbolNode, right: SymbolNode) -> Ordering {
     // Number < Param < Variable < Symbol < Placeholder
     let pa_left = power_argument(left);
     let pa_right = power_argument(right);

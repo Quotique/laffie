@@ -1,11 +1,15 @@
 pub mod codec;
 mod func;
+mod node;
 mod symbol_enum;
 
 pub use func::{
     base::normalize, FuncSymbol, SymbolAttr, SymbolAttrValue, TruthChecker, TruthResult,
 };
-pub use symbol_enum::{Param, Placeholder, Symbol, SymbolNode, SymbolTree, Variable};
+pub use node::{
+    replace, swap_node, ParamsMap, SymbolNode, SymbolNodeMut, SymbolTree, VariablesMap,
+};
+pub use symbol_enum::{Param, Placeholder, Symbol, Variable};
 
 #[cfg(test)]
 mod tests {

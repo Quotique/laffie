@@ -64,11 +64,7 @@ impl ParserError {
             ),
         );
 
-        let first_line = if self.loc.row > LINES_AROUND {
-            self.loc.row - LINES_AROUND
-        } else {
-            0
-        };
+        let first_line = self.loc.row.saturating_sub(LINES_AROUND);
         let last_line = std::cmp::min(lines.len(), self.loc.row + LINES_AROUND);
 
         format!(

@@ -1,8 +1,6 @@
-use trees::Tree;
-
 use crate::{
-    symbol::{FuncSymbol, Symbol, SymbolNode},
-    term::{swap_node, NodeMapping, VariablesMap},
+    symbol::{swap_node, FuncSymbol, SymbolNodeMut, VariablesMap},
+    term::Term,
     NormalizationLevel,
 };
 
@@ -13,13 +11,14 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn replace(root: &mut SymbolNode, _: NormalizationLevel) -> bool {
+pub fn replace(root: &mut SymbolNodeMut, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }
-    if root.bfs().iter.any(|x| x.data.param().is_some()) {
-        return false;
-    }
+    // TODO: ?
+    // if root.bfs().iter.any(|x| x.data.param().is_some()) {
+    //     return false;
+    // }
 
     let map = root
         .pop_front()
@@ -36,16 +35,16 @@ pub fn replace(root: &mut SymbolNode, _: NormalizationLevel) -> bool {
     true
 }
 
-fn into_variable_map(mut state: Tree<Symbol>) -> VariablesMap {
+fn into_variable_map(mut state: Term) -> VariablesMap {
     let mut result = VariablesMap::default();
 
-    if !state.data().is_symbol_name("==") || state.degree() != 2 {
+    if !state.data().is_symbol_name("==") || state.root().degree() != 2 {
         return result;
     }
-    let var = state.front().expect("must be");
+    let var = state.root().front().expect("must be");
 
     if let Some(v) = var.data().variable() {
-        result.insert(v.clone(), state.pop_back().unwrap());
+        result.insert(v.clone(), state.root_mut().pop_back().unwrap());
     }
     result
 }

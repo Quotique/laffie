@@ -1,11 +1,12 @@
 use std::cmp::Ordering;
 
 use bigdecimal::{BigDecimal as Decimal, Zero};
-use trees::{tr, Tree};
 
 use crate::{
-    symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
-    term::swap_node,
+    symbol::{
+        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut,
+    },
+    term::Term,
     NormalizationLevel,
 };
 
@@ -22,7 +23,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn plus(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
+pub fn plus(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("+") || root.degree() < 2 {
         return false;
     }
@@ -103,7 +104,7 @@ pub fn plus(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     result
 }
 
-fn remove_unused_plus(root: &mut SymbolNode) -> bool {
+fn remove_unused_plus(root: &mut SymbolNodeMut) -> bool {
     if root.degree() == 0 {
         *root.data_mut() = Symbol::Number(Decimal::from(0));
         true
@@ -116,36 +117,36 @@ fn remove_unused_plus(root: &mut SymbolNode) -> bool {
     }
 }
 
-fn attach_constant(root: &mut SymbolNode, constant: Decimal) {
+fn attach_constant(root: &mut SymbolNodeMut, constant: Decimal) {
     if !constant.is_zero() {
-        root.push_back(tr(Symbol::Number(constant)))
+        root.push_back(Term::number(constant));
     }
 }
 
-fn merge_mul_const(mut root: Tree<Symbol>, d: Decimal) -> Tree<Symbol> {
+fn merge_mul_const(mut root: Term, d: Decimal) -> Term {
     if d == Decimal::from(1) {
         return root;
     } else if d == Decimal::from(0) {
-        return tr(Symbol::Number(Decimal::from(0)));
+        return Term::zero();
     }
-    let constant = tr(Symbol::Number(d));
+    let constant = Term::number(d);
 
     if root.data().is_number_value(&Decimal::from(1)) {
         return constant;
     }
 
     if root.data().is_symbol_name("*") {
-        root.push_front(constant);
+        root.root_mut().push_front(constant);
         root
     } else {
-        tr(Symbol::with_func_symbol("*")) / constant / root
+        Term::func("*").with_child(constant).with_child(root)
     }
 }
 
-fn extract_mul_const(root: &mut SymbolNode) -> Decimal {
+fn extract_mul_const(root: &mut SymbolNodeMut) -> Decimal {
     if let Some(d) = root.data().number() {
         let result = d.clone();
-        swap_node(root, &mut tr(Symbol::Number(1.into())).root_mut());
+        swap_node(root, &mut Term::one().root_mut());
         return result;
     }
 
@@ -185,7 +186,7 @@ fn extract_mul_const(root: &mut SymbolNode) -> Decimal {
     constant
 }
 
-fn cummulative_power(root: &SymbolNode) -> Decimal {
+fn cummulative_power(root: SymbolNode) -> Decimal {
     if root.data().is_symbol_name("^") {
         if let Some(v) = root.back().unwrap().data().number() {
             v.clone()
@@ -215,7 +216,7 @@ fn cummulative_power(root: &SymbolNode) -> Decimal {
     }
 }
 
-fn mean_arg(root: &SymbolNode) -> &SymbolNode {
+fn mean_arg(root: SymbolNode) -> SymbolNode {
     let pa = if root.data().is_symbol_name("*") {
         // find first non-number argument and omit power
         // last number argument in non-number not found
@@ -225,7 +226,7 @@ fn mean_arg(root: &SymbolNode) -> &SymbolNode {
         power_argument(
             root.iter()
                 .find(|x| {
-                    let pa = power_argument(x);
+                    let pa = power_argument(*x);
                     if pa.data().number().is_some() {
                         return false;
                     }
@@ -240,7 +241,7 @@ fn mean_arg(root: &SymbolNode) -> &SymbolNode {
     pa
 }
 
-fn ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {
+fn ordering(left: SymbolNode, right: SymbolNode) -> Ordering {
     match cummulative_power(left).cmp(&cummulative_power(right)) {
         Ordering::Equal => {}
         Ordering::Less => return Ordering::Greater,

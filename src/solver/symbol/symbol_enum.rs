@@ -1,7 +1,6 @@
 use std::{fmt, hash::Hash, sync::Arc};
 
 use derive_more::{AsRef, Display, From, FromStr, Into};
-use trees::{Node, Tree};
 
 use crate::{CompactString, Decimal, Signed};
 
@@ -18,9 +17,6 @@ pub struct Variable(CompactString);
 #[derive(Clone, Copy, Debug, Display)]
 #[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
 pub struct Placeholder(u64);
-
-pub type SymbolNode = Node<Symbol>;
-pub type SymbolTree = Tree<Symbol>;
 
 /// Term tree element
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -106,9 +102,9 @@ impl Symbol {
     /// Get the contents of a placeholder
     ///
     /// returns None if the content is non a placeholder
-    pub fn placeholder(&self) -> Option<&Placeholder> {
+    pub fn placeholder(&self) -> Option<Placeholder> {
         if let Symbol::Placeholder(p) = &self {
-            return Some(p);
+            return Some(*p);
         }
         None
     }

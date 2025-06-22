@@ -1,6 +1,5 @@
 use crate::{
-    symbol::{FuncSymbol, Symbol, SymbolNode, TruthResult},
-    term::{swap_node, NodeMapping},
+    symbol::{swap_node, FuncSymbol, Symbol, SymbolNode, SymbolNodeMut, TruthResult},
     NormalizationLevel,
 };
 
@@ -12,7 +11,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-fn not_replace(root: &mut SymbolNode, _: NormalizationLevel) -> bool {
+fn not_replace(root: &mut SymbolNodeMut, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("!") || root.degree() != 1 {
         return false;
     }
@@ -40,7 +39,7 @@ fn not_replace(root: &mut SymbolNode, _: NormalizationLevel) -> bool {
     }
 }
 
-pub fn is_not(root: &SymbolNode) -> TruthResult {
+pub fn is_not(root: SymbolNode) -> TruthResult {
     if !root.data().is_symbol_name("!") {
         return TruthResult::Unknown;
     }

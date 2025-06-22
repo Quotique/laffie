@@ -7,7 +7,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn symbolic_eq(root: &SymbolNode) -> TruthResult {
+pub fn symbolic_eq(root: SymbolNode) -> TruthResult {
     if !root.data().is_symbol_name("symbolic_eq") {
         return TruthResult::Unknown;
     }

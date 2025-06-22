@@ -9,7 +9,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn more_or_equal(root: &SymbolNode) -> TruthResult {
+pub fn more_or_equal(root: SymbolNode) -> TruthResult {
     if !root.data().is_symbol_name(">=") {
         return TruthResult::Unknown;
     }

@@ -9,7 +9,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn less(root: &SymbolNode) -> TruthResult {
+pub fn less(root: SymbolNode) -> TruthResult {
     if !root.data().is_symbol_name("<") {
         return TruthResult::Unknown;
     }

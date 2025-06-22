@@ -9,13 +9,13 @@ use parking_lot::RwLock;
 
 use crate::{CompactString, NormalizationLevel};
 
-use super::symbol_enum::SymbolNode;
+use super::node::{SymbolNode, SymbolNodeMut};
 
 pub use builder::FuncSymbolBuilder;
 pub use truth::{TruthChecker, TruthResult};
 
-type BoxedComparator = Box<dyn Fn(&SymbolNode, &SymbolNode) -> std::cmp::Ordering + Send + Sync>;
-type CalculatorSignature = dyn Fn(&mut SymbolNode, NormalizationLevel) -> bool + Send + Sync;
+type BoxedComparator = Box<dyn Fn(SymbolNode, SymbolNode) -> std::cmp::Ordering + Send + Sync>;
+type CalculatorSignature = dyn Fn(&mut SymbolNodeMut, NormalizationLevel) -> bool + Send + Sync;
 
 pub struct Ordering(BoxedComparator);
 pub struct Calculator(Box<CalculatorSignature>);
@@ -89,7 +89,7 @@ impl FuncSymbol {
         None
     }
 
-    pub fn check_truth(&self, node: &SymbolNode) -> TruthResult {
+    pub fn check_truth(&self, node: SymbolNode) -> TruthResult {
         if let Some(c) = self.truth_checker.as_ref() {
             c.0(node)
         } else {
@@ -97,7 +97,7 @@ impl FuncSymbol {
         }
     }
 
-    pub fn evaluate(&self, node: &mut SymbolNode, level: NormalizationLevel) -> bool {
+    pub fn evaluate(&self, node: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
         if let Some(c) = self.calculator.as_ref() {
             c.0(node, level)
         } else {
@@ -105,7 +105,7 @@ impl FuncSymbol {
         }
     }
 
-    pub fn arg_order(&self, left: &SymbolNode, right: &SymbolNode) -> Option<std::cmp::Ordering> {
+    pub fn arg_order(&self, left: SymbolNode, right: SymbolNode) -> Option<std::cmp::Ordering> {
         self.arg_order.as_ref().as_ref().map(|o| o.0(left, right))
     }
 }

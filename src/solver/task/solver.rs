@@ -3,7 +3,6 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 use bincode::{Decode, Encode};
 use derive_more::Display;
 use itertools::Itertools;
-use trees::tr;
 
 use utils::VecDisplay;
 
@@ -16,8 +15,8 @@ use super::{
 };
 use crate::{
     rule::{Hypothesis, HypothesisIterator, Rule, RuleAttr, RulesEngine, SharedRule},
-    symbol::{normalize, Symbol, SymbolNode},
-    term::{swap_node, NodeMapping, Term, TermProps},
+    symbol::{normalize, swap_node, SymbolNodeMut},
+    term::{Term, TermProps},
     NormalizationLevel, RuleId,
 };
 
@@ -384,7 +383,7 @@ impl Solver {
         // TODO: normalization level
         normalize(&mut clone.root_mut(), NormalizationLevel::max());
 
-        let proof_purpose = Rc::new(Term::from(tr(Symbol::with_func_symbol("proof")) / clone));
+        let proof_purpose = Rc::new(Term::func("proof").with_child(clone));
 
         if term.root().check_truth().is_true() {
             return Some(proof_purpose);
@@ -413,15 +412,13 @@ impl Solver {
             (false, self.terms[index].term.root().deep_clone())
         };
 
-        let task = Rc::new(Term::from(
-            tr(Symbol::with_func_symbol("transform")) / to_transform,
-        ));
+        let task = Rc::new(Term::func("transform").with_child(to_transform));
 
         let subtask_solver = self.solve_subtask(task.clone())?;
 
         let mut answer = subtask_solver.answer().unwrap().as_ref().clone();
         if answer_wrap {
-            let mut tmp = tr(Symbol::with_func_symbol("answer"));
+            let mut tmp = Term::func("answer");
             swap_node(&mut answer.root_mut(), &mut tmp.root_mut());
             answer.root_mut().push_back(tmp);
         }
@@ -447,7 +444,7 @@ impl Solver {
             None => {}
         }
 
-        self.cache.add(Term::from(task.root().deep_clone()));
+        self.cache.add(task.root().deep_clone());
 
         let subtask = TaskBuilder::default()
             .with_purpose(TermProps::from(task.clone()))
@@ -520,10 +517,9 @@ impl Solver {
                         self.terms[index].simplified = true;
                     }
 
-                    let purpose = TermProps::from(Rc::new(Term::from(
-                        tr(Symbol::with_func_symbol("proof")) /
-                            self.terms[index].term.root().deep_clone(),
-                    )));
+                    let purpose = TermProps::from(Rc::new(
+                        Term::func("proof").with_child(self.terms[index].term.root().deep_clone()),
+                    ));
                     let mut added = false;
                     for rule in self.suggest_rules(
                         index,
@@ -603,9 +599,9 @@ impl Solver {
             term_root.data().is_symbol_name("answer") &&
             term_root.degree() == 1
         {
-            let mut resolution = TermProps::from(Rc::from(Term::from(
+            let mut resolution = TermProps::from(Rc::from(
                 (*term.term).clone().root_mut().pop_front().unwrap(),
-            )));
+            ));
             if let Some(parent) = term.parent {
                 resolution = resolution.with_parent(parent);
             }
@@ -626,12 +622,12 @@ impl Solver {
                 }
 
                 if term_root.front().unwrap() == x.term.root() {
-                    let is_known = tr(Symbol::with_func_symbol("is")) /
-                        term_root.back().unwrap().deep_clone() /
-                        tr(Symbol::with_func_symbol("known"));
+                    let is_known = Term::func("is")
+                        .with_child(term_root.back().unwrap().deep_clone())
+                        .with_child(Term::func("known"));
 
                     return Some(Hypothesis {
-                        requirements: vec![Rc::new(Term::from(is_known))],
+                        requirements: vec![Rc::new(is_known)],
                         resolution:   term.clone(),
                         params:       Default::default(),
                     });
@@ -680,7 +676,7 @@ impl Solver {
     }
 }
 
-fn is_replace(root: &mut SymbolNode) {
+fn is_replace(root: &mut SymbolNodeMut) {
     if !root.data().is_symbol_name("is") || root.degree() != 2 {
         return;
     }
@@ -698,8 +694,7 @@ fn is_replace(root: &mut SymbolNode) {
         }
         Some(name) if name == "false" => {
             let child = root.pop_front().unwrap();
-            let mut neg = tr(Symbol::with_func_symbol("!")) / child;
-            swap_node(root, &mut neg.root_mut());
+            swap_node(root, &mut Term::func("!").with_child(child).root_mut());
         }
         _ => {}
     }

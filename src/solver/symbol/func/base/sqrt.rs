@@ -2,7 +2,7 @@ use bigdecimal::BigDecimal as Decimal;
 use num::Integer;
 
 use crate::{
-    symbol::{FuncSymbol, Symbol, SymbolNode},
+    symbol::{FuncSymbol, Symbol, SymbolNodeMut},
     NormalizationLevel,
 };
 
@@ -13,7 +13,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn sqrt(root: &mut SymbolNode, _: NormalizationLevel) -> bool {
+pub fn sqrt(root: &mut SymbolNodeMut, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("sqrt") {
         return false;
     }

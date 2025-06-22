@@ -1,10 +1,11 @@
 use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive, Zero};
 use num::traits::Pow;
-use trees::tr;
 
 use crate::{
-    symbol::{FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode},
-    term::{swap_node, NodeMapping},
+    symbol::{
+        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut,
+    },
+    term::Term,
     NormalizationLevel,
 };
 
@@ -16,7 +17,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn power(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
+pub fn power(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("^") {
         return false;
     }
@@ -33,14 +34,13 @@ pub fn power(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
             if let Some(e) = d2.to_i8() {
                 let (m, exp) = d1.as_bigint_and_exponent();
                 let result = Decimal::new(m.pow(e.unsigned_abs()), exp * (e.abs() as i64));
-                let mut result = tr(Symbol::Number(result));
+                let mut result = Term::number(result);
                 while root.pop_front().is_some() {}
                 if e >= 0 {
                     swap_node(root, &mut result.root_mut());
                 } else {
                     *root.data_mut() = Symbol::with_func_symbol("/");
-                    root.push_back(tr(Symbol::Number(Decimal::one())));
-                    root.push_back(result);
+                    root.push_back(Term::one()).push_back(result);
                     root.evaluate(level);
                 }
                 true
@@ -49,11 +49,11 @@ pub fn power(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
             }
         }
         (Some(arg), _) if arg.is_one() => {
-            swap_node(root, &mut tr(Symbol::Number(1.into())).root_mut());
+            swap_node(root, &mut Term::one().root_mut());
             true
         }
         (_, Some(pow)) if pow.is_zero() => {
-            swap_node(root, &mut tr(Symbol::Number(1.into())).root_mut());
+            swap_node(root, &mut Term::one().root_mut());
             true
         }
         (_, Some(pow)) if pow.is_one() => {
@@ -65,7 +65,7 @@ pub fn power(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     }
 }
 
-pub fn power_argument(root: &SymbolNode) -> &SymbolNode {
+pub fn power_argument(root: SymbolNode) -> SymbolNode {
     if root.data().is_symbol_name("^") {
         root.front().unwrap()
     } else {

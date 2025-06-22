@@ -3,8 +3,8 @@ use std::{collections::HashMap, convert::From, fmt, sync::Arc};
 use multimap::MultiMap;
 
 use crate::{
-    symbol::FuncSymbol,
-    term::{NodeMapping, NodePosition, Term},
+    symbol::{FuncSymbol, SymbolNode},
+    term::{NodePosition, Term},
     NormalizationLevel, RuleId,
 };
 
@@ -151,7 +151,7 @@ impl RuleBuilder {
             let binds: HashMap<_, _> = term
                 .binds
                 .iter()
-                .map(|(param, pos)| (param.clone(), term[pos].deep_clone()))
+                .map(|(param, pos)| (param.clone(), SymbolNode::from(&term[pos]).deep_clone()))
                 .collect();
 
             // TODO: normalization level

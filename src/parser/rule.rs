@@ -169,11 +169,9 @@ impl<'a> RuleParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use trees::tr;
-
     use solver::{
         rule::{RuleAttr, RuleAttrValue},
-        symbol::Symbol,
+        term::Term,
     };
 
     use crate::lang;
@@ -198,28 +196,29 @@ mod tests {
 
         assert_eq!(
             rule.pattern_node().deep_clone(),
-            (tr(Symbol::with_func_symbol("==")) /
-                (tr(Symbol::with_func_symbol("+")) /
-                    tr(Symbol::Param("a".parse().unwrap())) /
-                    tr(Symbol::Param("x".parse().unwrap()))) /
-                tr(Symbol::Number(0.into())))
+            Term::func("==")
+                .with_child(
+                    Term::func("+")
+                        .with_child(Term::param("a"))
+                        .with_child(Term::param("x"))
+                )
+                .with_child(Term::number(0))
         );
 
         assert_eq!(
             rule.replace_node().deep_clone(),
-            (tr(Symbol::with_func_symbol("==")) /
-                tr(Symbol::Param("x".parse().unwrap())) /
-                (tr(Symbol::with_func_symbol("*")) /
-                    tr(Symbol::Number((-1).into())) /
-                    tr(Symbol::Param("a".parse().unwrap()))))
+            Term::func("==").with_child(Term::param("x")).with_child(
+                Term::func("*")
+                    .with_child(Term::number(-1))
+                    .with_child(Term::param("a"))
+            )
         );
         assert_eq!(rule.requirements.len(), 1);
         assert_eq!(
             rule.requirements[0],
-            (tr(Symbol::with_func_symbol("!=")) /
-                tr(Symbol::Param("a".parse().unwrap())) /
-                tr(Symbol::Number(0.into())))
-            .into()
+            Term::func("!=")
+                .with_child(Term::param("a"))
+                .with_child(Term::number(0))
         );
 
         assert_eq!(rule.attrs.len(), 2);
@@ -250,31 +249,28 @@ mod tests {
 
         assert_eq!(
             rule.pattern_node().deep_clone(),
-            (tr(Symbol::with_func_symbol("is")) /
-                (tr(Symbol::with_func_symbol("/")) /
-                    tr(Symbol::Param("a".parse().unwrap())) /
-                    tr(Symbol::Param("b".parse().unwrap()))) /
-                tr(Symbol::with_func_symbol("known")))
+            Term::func("is")
+                .with_child(
+                    Term::func("/")
+                        .with_child(Term::param("a"))
+                        .with_child(Term::param("b"))
+                )
+                .with_child(Term::func("known"))
         );
 
-        assert_eq!(
-            rule.replace_node().deep_clone(),
-            (tr(Symbol::with_func_symbol("true")))
-        );
+        assert_eq!(rule.replace_node().deep_clone(), Term::func("true"));
         assert_eq!(rule.requirements.len(), 2);
         assert_eq!(
             rule.requirements[0],
-            (tr(Symbol::with_func_symbol("is")) /
-                tr(Symbol::Param("a".parse().unwrap())) /
-                tr(Symbol::with_func_symbol("known")))
-            .into()
+            Term::func("is")
+                .with_child(Term::param("a"))
+                .with_child(Term::func("known"))
         );
         assert_eq!(
             rule.requirements[1],
-            (tr(Symbol::with_func_symbol("is")) /
-                tr(Symbol::Param("b".parse().unwrap())) /
-                tr(Symbol::with_func_symbol("known")))
-            .into()
+            Term::func("is")
+                .with_child(Term::param("b"))
+                .with_child(Term::func("known"))
         );
 
         assert_eq!(rule.attrs.len(), 3);

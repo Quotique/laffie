@@ -1,32 +1,27 @@
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, VecDeque},
     fmt,
     iter::{FromIterator, Iterator},
 };
 
 use bigdecimal::BigDecimal;
 use eyre::{bail, ensure, Result};
-use trees::tr;
 
 use num::Zero;
 use utils::VecDisplay;
 
-use crate::symbol::{Param, Placeholder, Symbol, SymbolAttr};
+use crate::symbol::{swap_node, Param, ParamsMap, Placeholder, Symbol, SymbolAttr, SymbolNodeMut};
 
-use super::{
-    index::NodePosition,
-    utils::{swap_node, NodeMapping},
-    SymbolNode, SymbolTree,
-};
+use super::{index::NodePosition, SymbolNode, Term};
 
 #[derive(Debug, Clone, Default)]
 pub struct ParamsMapping {
-    params:       BTreeMap<Param, SymbolTree>,
-    placeholders: BTreeMap<Placeholder, Vec<SymbolTree>>,
+    params:       BTreeMap<Param, Term>,
+    placeholders: BTreeMap<Placeholder, Vec<Term>>,
 }
 
-impl From<HashMap<Param, SymbolTree>> for ParamsMapping {
-    fn from(params: HashMap<Param, SymbolTree>) -> Self {
+impl From<ParamsMap> for ParamsMapping {
+    fn from(params: ParamsMap) -> Self {
         Self {
             params:       BTreeMap::from_iter(params),
             placeholders: Default::default(),
@@ -36,25 +31,25 @@ impl From<HashMap<Param, SymbolTree>> for ParamsMapping {
 
 impl ParamsMapping {
     #[inline]
-    pub fn params(&self) -> impl Iterator<Item = (&Param, &SymbolTree)> {
+    pub fn params(&self) -> impl Iterator<Item = (&Param, &Term)> {
         self.params.iter()
     }
 
     #[inline]
-    pub fn try_map(target: &SymbolNode, pattern: &SymbolNode) -> Result<Vec<ParamsMapping>> {
+    pub fn try_map(target: SymbolNode, pattern: SymbolNode) -> Result<Vec<ParamsMapping>> {
         Self::try_map_with_params(target, pattern, Default::default())
     }
 
     pub fn subtree_map(
-        target: &SymbolNode,
-        pattern: &SymbolNode,
+        target: SymbolNode,
+        pattern: SymbolNode,
     ) -> Vec<(Vec<ParamsMapping>, NodePosition)> {
         Self::subtree_map_extend(target, pattern, Default::default())
     }
 
     pub fn subtree_map_extend(
-        target: &SymbolNode,
-        pattern: &SymbolNode,
+        target: SymbolNode,
+        pattern: SymbolNode,
         params: ParamsMapping,
     ) -> Vec<(Vec<ParamsMapping>, NodePosition)> {
         let mut result = vec![];
@@ -75,7 +70,7 @@ impl ParamsMapping {
         result
     }
 
-    pub fn apply<'a>(&self, node: &'a mut SymbolNode) -> &'a mut SymbolNode {
+    pub fn apply<'a, 'b>(&self, node: &'b mut SymbolNodeMut<'a>) -> &'b mut SymbolNodeMut<'a> {
         match node.data().clone() {
             Symbol::Param(p) => {
                 if let Some(p) = self.params.get(&p) {
@@ -87,7 +82,7 @@ impl ParamsMapping {
                     let mut p = p.clone();
                     swap_node(node, &mut p[0].root_mut());
                     for i in p.into_iter().skip(1).rev() {
-                        node.insert_next_sib(i);
+                        node.insert_after(i);
                     }
                 }
             }
@@ -101,8 +96,8 @@ impl ParamsMapping {
     }
 
     pub fn try_map_with_params(
-        target: &SymbolNode,
-        pattern: &SymbolNode,
+        target: SymbolNode,
+        pattern: SymbolNode,
         mut params: ParamsMapping,
     ) -> Result<Vec<ParamsMapping>> {
         trace!(target: "pattern_match", "Pattern: {pattern}, traget: {target}, mapping: {params:?}");
@@ -120,7 +115,8 @@ impl ParamsMapping {
                     for (num, parts) in target.subsets(pattern.degree()).enumerate() {
                         ensure!(num < 1025, "Subsets of operation is too large");
                         let mut loc_result = vec![params.clone()];
-                        params_map_arguments(&parts, pattern, &mut loc_result).expect("must match");
+                        params_map_arguments(parts.root(), pattern, &mut loc_result)
+                            .expect("must match");
                         result.append(&mut loc_result);
                     }
                 } else {
@@ -138,10 +134,10 @@ impl ParamsMapping {
                         &target.data()
                     );
                 }
-                let mul_num = tr(Symbol::FuncSymbol(mul.clone())) /
-                    tr(Symbol::Number((-1).into())) /
-                    tr(Symbol::Number(neg.abs()));
-                return Self::try_map_with_params(&mul_num, pattern, params);
+                let mul_num = Term::func("*")
+                    .with_child(Term::number(-1))
+                    .with_child(Term::number(neg.abs()));
+                return Self::try_map_with_params(mul_num.root(), pattern, params);
             }
             (Symbol::FuncSymbol(p_id), _) => {
                 bail!(
@@ -152,7 +148,7 @@ impl ParamsMapping {
             (Symbol::Param(p), _) => {
                 if params.params.contains_key(p) {
                     let node = params.params.get(p).unwrap();
-                    let _ = ParamsMapping::try_map(target, node)?;
+                    let _ = ParamsMapping::try_map(target, node.root())?;
                 } else {
                     params.params.insert(p.clone(), target.deep_clone());
                 }
@@ -192,8 +188,8 @@ impl ParamsMapping {
 }
 
 fn params_map_arguments(
-    target: &SymbolNode,
-    pattern: &SymbolNode,
+    target: SymbolNode,
+    pattern: SymbolNode,
     result: &mut Vec<ParamsMapping>,
 ) -> Result<()> {
     let placeholder = pattern
@@ -245,7 +241,7 @@ fn params_map_arguments(
             .collect();
 
         for i in result.iter_mut() {
-            i.placeholders.insert(*ph, mapping.clone());
+            i.placeholders.insert(ph, mapping.clone());
         }
     }
 
@@ -295,7 +291,7 @@ mod tests {
         let maps = ParamsMapping::try_map(term.root(), pattern.root())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 5, b: *( (-1) x ) }, { a: x, b: (-5) }]");
+        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 5, b: -x }, { a: x, b: -5 }]");
     }
 
     #[test]
@@ -328,7 +324,7 @@ mod tests {
         let maps = ParamsMapping::try_map(term.root(), pattern.root())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: *( 2 ^( x 2 ) ), b: +( x (-1) ) }]");
+        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 2*x^2, b: x-1 }]");
     }
 
     #[test]

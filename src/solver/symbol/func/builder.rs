@@ -37,7 +37,7 @@ impl FuncSymbolBuilder {
 
     pub fn with_truth_checker(
         mut self,
-        truth_checker: Box<dyn Fn(&SymbolNode) -> TruthResult + Send + Sync>,
+        truth_checker: Box<dyn Fn(SymbolNode) -> TruthResult + Send + Sync>,
     ) -> Self {
         self.sym.truth_checker = Some(TruthChecker(truth_checker));
         self

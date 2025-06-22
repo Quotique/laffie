@@ -1,12 +1,9 @@
 use std::{cmp::Ordering, rc::Rc};
 
-use trees::Node;
-
 #[cfg(test)]
 use crate::term::term_with_params;
 use crate::{
-    symbol::{func::SymbolAttr, Symbol, SymbolNode},
-    term::NodeMapping,
+    symbol::{func::SymbolAttr, Symbol, SymbolNode, SymbolNodeMut},
     NormalizationLevel,
 };
 
@@ -30,7 +27,7 @@ pub mod symbolic_eq;
 
 pub const MAX_DEC_CONVERSION_EXP: i64 = 6;
 
-fn associative_nesting_remove(root: &mut Node<Symbol>) -> bool {
+fn associative_nesting_remove(root: &mut SymbolNodeMut) -> bool {
     let mut result = false;
     if let Some(symbol) = &root.data().func_symbol() {
         if symbol.attrs.read().contains_key(&SymbolAttr::Associative) {
@@ -39,7 +36,7 @@ fn associative_nesting_remove(root: &mut Node<Symbol>) -> bool {
                 let mut child = root.pop_front().unwrap();
                 if let Some(child_symbol) = &child.data().func_symbol() {
                     if child_symbol == symbol {
-                        while let Some(node) = child.pop_front() {
+                        while let Some(node) = child.root_mut().pop_front() {
                             root.push_back(node);
                         }
                         result = true;
@@ -53,7 +50,7 @@ fn associative_nesting_remove(root: &mut Node<Symbol>) -> bool {
     result
 }
 
-fn default_ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {
+fn default_ordering(left: SymbolNode, right: SymbolNode) -> Ordering {
     // Symbol < Param < Varible < Number < Placeholder
     match (left.data(), right.data()) {
         (Symbol::FuncSymbol(id_l), Symbol::FuncSymbol(id_r)) => id_l.cmp(id_r),
@@ -77,7 +74,7 @@ fn default_ordering(left: &SymbolNode, right: &SymbolNode) -> Ordering {
     }
 }
 
-fn commutative_reorder(root: &mut Node<Symbol>) -> bool {
+fn commutative_reorder(root: &mut SymbolNodeMut) -> bool {
     let mut result = false;
     if let Some(symbol) = &root.data().func_symbol() {
         if symbol.attrs.read().contains_key(&SymbolAttr::Commutative) {
@@ -117,7 +114,7 @@ fn commutative_reorder(root: &mut Node<Symbol>) -> bool {
     result
 }
 
-pub fn normalize(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
+pub fn normalize(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     let mut result = false;
     for mut i in root.iter_mut() {
         result |= normalize(&mut i, level);
@@ -132,7 +129,7 @@ pub fn normalize(root: &mut SymbolNode, level: NormalizationLevel) -> bool {
     result
 }
 
-fn compare_numbers(left: &SymbolNode, right: &SymbolNode) -> Option<Ordering> {
+fn compare_numbers(left: SymbolNode, right: SymbolNode) -> Option<Ordering> {
     let left_num = left.data().number()?;
     let right_num = right.data().number()?;
 
@@ -143,7 +140,7 @@ fn compare_numbers(left: &SymbolNode, right: &SymbolNode) -> Option<Ordering> {
 pub fn calculator_check(
     src: &'static str,
     res: &'static str,
-    f: impl Fn(&mut SymbolNode, NormalizationLevel) -> bool,
+    f: impl Fn(&mut SymbolNodeMut, NormalizationLevel) -> bool,
     level: NormalizationLevel,
 ) {
     let mut s = term_with_params(src);
@@ -158,21 +155,24 @@ pub fn calculator_check(
 
 #[cfg(test)]
 mod operations_tests {
-    use bigdecimal::{BigDecimal as Decimal, Num};
-    use trees::tr;
+    use crate::term::Term;
 
     use super::*;
 
     #[test]
     fn associative_nesting_remove_test() {
         // (1+2)+(1+2) -> 1+2+1+2
-        let mut test_tree = tr(Symbol::with_func_symbol("+")) /
-            (tr(Symbol::with_func_symbol("+")) /
-                tr(Symbol::with_number(1)) /
-                tr(Symbol::with_number(2))) /
-            (tr(Symbol::with_func_symbol("+")) /
-                tr(Symbol::with_number(1)) /
-                tr(Symbol::with_number(2)));
+        let mut test_tree = Term::func("+")
+            .with_child(
+                Term::func("+")
+                    .with_child(Term::number(1))
+                    .with_child(Term::number(2)),
+            )
+            .with_child(
+                Term::func("+")
+                    .with_child(Term::number(1))
+                    .with_child(Term::number(2)),
+            );
         assert!(associative_nesting_remove(&mut test_tree.root_mut()));
         assert_eq!(test_tree.root().degree(), 4);
     }
@@ -180,183 +180,194 @@ mod operations_tests {
     #[test]
     fn evaluate_plus_test() {
         // 1+2+5 -> 8
-        let mut test_tree1 = tr(Symbol::with_func_symbol("+")) /
-            tr(Symbol::with_number(1)) /
-            tr(Symbol::with_number(2)) /
-            tr(Symbol::with_number(5));
+        let mut test_tree1 = Term::func("+")
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
+
         assert!(test_tree1.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree1, tr(Symbol::Number(Decimal::from(8))));
+        assert_eq!(test_tree1, Term::number(8));
 
         // x+1+2+5 -> x+8
-        let mut test_tree1 = tr(Symbol::with_func_symbol("+")) /
-            tr(Symbol::Variable("x".parse().unwrap())) /
-            tr(Symbol::with_number(1)) /
-            tr(Symbol::with_number(2)) /
-            tr(Symbol::with_number(5));
+        let mut test_tree1 = Term::func("+")
+            .with_child(Term::variable("x"))
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
+
         assert!(test_tree1.root_mut().evaluate(NormalizationLevel::max()));
         commutative_reorder(&mut test_tree1.root_mut());
         assert_eq!(
             test_tree1,
-            tr(Symbol::with_func_symbol("+")) /
-                tr(Symbol::Variable("x".parse().unwrap())) /
-                tr(Symbol::with_number(8))
+            Term::func("+")
+                .with_child(Term::variable("x"))
+                .with_child(Term::number(8))
         );
     }
 
     #[test]
     fn evaluate_multiply_test() {
         // 1*2*5 -> 10
-        let mut test_tree = tr(Symbol::with_func_symbol("*")) /
-            tr(Symbol::with_number(1)) /
-            tr(Symbol::with_number(2)) /
-            tr(Symbol::with_number(5));
+        let mut test_tree = Term::func("*")
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree, tr(Symbol::Number(Decimal::from(10))));
+        assert_eq!(test_tree, Term::number(10));
 
         // x*1*2*5 -> 10*x
-        let mut test_tree = tr(Symbol::with_func_symbol("*")) /
-            tr(Symbol::Variable("x".parse().unwrap())) /
-            tr(Symbol::with_number(1)) /
-            tr(Symbol::with_number(2)) /
-            tr(Symbol::with_number(5));
+        let mut test_tree = Term::func("*")
+            .with_child(Term::variable("x"))
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
+
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         commutative_reorder(&mut test_tree.root_mut());
         assert_eq!(
             test_tree,
-            tr(Symbol::with_func_symbol("*")) /
-                tr(Symbol::with_number(10)) /
-                tr(Symbol::Variable("x".parse().unwrap()))
+            Term::func("*")
+                .with_child(Term::number(10))
+                .with_child(Term::variable("x"))
         );
 
         // x*1 -> x
-        let mut test_tree = tr(Symbol::with_func_symbol("*")) /
-            tr(Symbol::Variable("x".parse().unwrap())) /
-            tr(Symbol::with_number(1));
+        let mut test_tree = Term::func("*")
+            .with_child(Term::variable("x"))
+            .with_child(Term::number(1));
+
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree, tr(Symbol::Variable("x".parse().unwrap())));
+        assert_eq!(test_tree, Term::variable("x"));
     }
 
     #[test]
     fn evaluate_divide_test() {
         // 10 / 2 -> 5
-        let mut test_tree = tr(Symbol::with_func_symbol("/")) /
-            tr(Symbol::with_number(10)) /
-            tr(Symbol::with_number(2));
+        let mut test_tree = Term::func("/")
+            .with_child(Term::number(10))
+            .with_child(Term::number(2));
+
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree, tr(Symbol::with_number(5)));
+        assert_eq!(test_tree, Term::number(5));
 
         // x / 2 -> x / 2
-        let mut test_tree = tr(Symbol::with_func_symbol("/")) /
-            tr(Symbol::Variable("x".parse().unwrap())) /
-            tr(Symbol::with_number(2));
+        let mut test_tree = Term::func("/")
+            .with_child(Term::variable("x"))
+            .with_child(Term::number(2));
+
         assert!(!test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            tr(Symbol::with_func_symbol("/")) /
-                tr(Symbol::Variable("x".parse().unwrap())) /
-                tr(Symbol::with_number(2))
+            Term::func("/")
+                .with_child(Term::variable("x"))
+                .with_child(Term::number(2))
         );
 
         // 2 / 5 -> 0.4
-        let mut test_tree = tr(Symbol::with_func_symbol("/")) /
-            tr(Symbol::with_number(2)) /
-            tr(Symbol::with_number(5));
+        let mut test_tree = Term::func("/")
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(
-            test_tree,
-            tr(Symbol::Number(Decimal::from_str_radix("0.4", 10).unwrap()))
-        );
+        assert_eq!(test_tree, Term::number((4, 1)));
 
         // 30 / 45 -> 2/3
-        let mut test_tree = tr(Symbol::with_func_symbol("/")) /
-            tr(Symbol::with_number(30)) /
-            tr(Symbol::with_number(45));
+        let mut test_tree = Term::func("/")
+            .with_child(Term::number(30))
+            .with_child(Term::number(45));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            tr(Symbol::with_func_symbol("/")) /
-                tr(Symbol::with_number(2)) /
-                tr(Symbol::with_number(3))
+            Term::func("/")
+                .with_child(Term::number(2))
+                .with_child(Term::number(3))
         );
 
         // 30 / 4.5 -> 20/3
-        let mut test_tree = tr(Symbol::with_func_symbol("/")) /
-            tr(Symbol::with_number(30)) /
-            tr(Symbol::with_number((45, 1)));
+        let mut test_tree = Term::func("/")
+            .with_child(Term::number(30))
+            .with_child(Term::number((45, 1)));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            tr(Symbol::with_func_symbol("/")) /
-                tr(Symbol::with_number(20)) /
-                tr(Symbol::with_number(3))
+            Term::func("/")
+                .with_child(Term::number(20))
+                .with_child(Term::number(3))
         );
     }
 
     #[test]
     fn evaluate_power_test() {
         // 2 ^ 2 -> 4
-        let mut test_tree = tr(Symbol::with_func_symbol("^")) /
-            tr(Symbol::with_number(2)) /
-            tr(Symbol::with_number(2));
+        let mut test_tree = Term::func("^")
+            .with_child(Term::number(2))
+            .with_child(Term::number(2));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree, tr(Symbol::with_number(4)));
+        assert_eq!(test_tree, Term::number(4));
 
         // 2 ^ (-2) -> 0.25
-        let mut test_tree = tr(Symbol::with_func_symbol("^")) /
-            tr(Symbol::with_number(2)) /
-            tr(Symbol::with_number(-2));
+        let mut test_tree = Term::func("^")
+            .with_child(Term::number(2))
+            .with_child(Term::number(-2));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree, tr(Symbol::with_number((25, 2))));
+        assert_eq!(test_tree, Term::number((25, 2)));
 
         // 0.5 ^ (-2) -> 4
-        let mut test_tree = tr(Symbol::with_func_symbol("^")) /
-            tr(Symbol::with_number((5, 1))) /
-            tr(Symbol::with_number(-2));
+        let mut test_tree = Term::func("^")
+            .with_child(Term::number((5, 1)))
+            .with_child(Term::number(-2));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        assert_eq!(test_tree, tr(Symbol::with_number(4)));
+        assert_eq!(test_tree, Term::number(4));
 
         // 3 ^ (-2) -> 1/9
-        let mut test_tree = tr(Symbol::with_func_symbol("^")) /
-            tr(Symbol::with_number(3)) /
-            tr(Symbol::with_number(-2));
+        let mut test_tree = Term::func("^")
+            .with_child(Term::number(3))
+            .with_child(Term::number(-2));
         assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            tr(Symbol::with_func_symbol("/")) /
-                tr(Symbol::with_number(1)) /
-                tr(Symbol::with_number(9))
+            Term::func("/")
+                .with_child(Term::number(1))
+                .with_child(Term::number(9))
         );
     }
 
     #[test]
     fn commutative_reorder_test() {
         // 1+2+5+(2*x)+x+(2+3) -> (2+3)+(2*x)+x+1+2+5
-        let mut test_tree = tr(Symbol::with_func_symbol("+")) /
-            tr(Symbol::with_number(1)) /
-            tr(Symbol::with_number(2)) /
-            tr(Symbol::with_number(5)) /
-            (tr(Symbol::with_func_symbol("*")) /
-                tr(Symbol::with_number(2)) /
-                tr(Symbol::Variable("x".parse().unwrap()))) /
-            tr(Symbol::Variable("x".parse().unwrap())) /
-            (tr(Symbol::with_func_symbol("+")) /
-                tr(Symbol::with_number(2)) /
-                tr(Symbol::with_number(3)));
+        let mut test_tree = Term::func("+")
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5))
+            .with_child(
+                Term::func("*")
+                    .with_child(Term::number(2))
+                    .with_child(Term::variable("x")),
+            )
+            .with_child(Term::variable("x"))
+            .with_child(
+                Term::func("+")
+                    .with_child(Term::number(2))
+                    .with_child(Term::number(3)),
+            );
 
-        assert!(commutative_reorder(test_tree.root_mut().get_mut()));
+        assert!(commutative_reorder(&mut test_tree.root_mut()));
         assert_eq!(
             test_tree,
-            tr(Symbol::with_func_symbol("+")) /
-                (tr(Symbol::with_func_symbol("+")) /
-                    tr(Symbol::with_number(2)) /
-                    tr(Symbol::with_number(3))) /
-                (tr(Symbol::with_func_symbol("*")) /
-                    tr(Symbol::with_number(2)) /
-                    tr(Symbol::Variable("x".parse().unwrap()))) /
-                tr(Symbol::Variable("x".parse().unwrap())) /
-                tr(Symbol::with_number(1)) /
-                tr(Symbol::with_number(2)) /
-                tr(Symbol::with_number(5))
+            Term::func("+")
+                .with_child(
+                    Term::func("+")
+                        .with_child(Term::number(2))
+                        .with_child(Term::number(3))
+                )
+                .with_child(
+                    Term::func("*")
+                        .with_child(Term::number(2))
+                        .with_child(Term::variable("x"))
+                )
+                .with_child(Term::variable("x"))
+                .with_child(Term::number(1))
+                .with_child(Term::number(2))
+                .with_child(Term::number(5))
         );
     }
 }

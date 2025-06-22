@@ -12,7 +12,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn is(root: &SymbolNode) -> TruthResult {
+pub fn is(root: SymbolNode) -> TruthResult {
     if !root.data().is_symbol_name("is") {
         return TruthResult::Unknown;
     }

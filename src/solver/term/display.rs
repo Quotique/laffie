@@ -4,7 +4,7 @@ use crate::symbol::{FuncSymbol, Symbol, SymbolAttr};
 
 use super::SymbolNode;
 
-pub fn display_string(node: &SymbolNode) -> String {
+pub fn display_string(node: SymbolNode) -> String {
     let mul_sym_str = FuncSymbol::by_name("*")
         .map(|x| x.to_string())
         .unwrap_or("*".to_owned());
@@ -18,7 +18,7 @@ pub fn display_string(node: &SymbolNode) -> String {
     .replace("+-", "-")
 }
 
-fn symbol_display(symbol: Arc<FuncSymbol>, node: &SymbolNode) -> String {
+fn symbol_display(symbol: Arc<FuncSymbol>, node: SymbolNode) -> String {
     match symbol.display_weight() {
         Some(weight) if node.degree() < 2 => format!(
             "{}{}",
@@ -50,7 +50,7 @@ fn symbol_display(symbol: Arc<FuncSymbol>, node: &SymbolNode) -> String {
     }
 }
 
-fn argument_display(parent_weight: u64, node: &SymbolNode, is_associative: bool) -> String {
+fn argument_display(parent_weight: u64, node: SymbolNode, is_associative: bool) -> String {
     if let Some(symbol) = node.data().func_symbol() {
         if let Some(weight) = symbol.display_weight() {
             if weight > parent_weight || (weight == parent_weight && !is_associative) {
@@ -61,7 +61,7 @@ fn argument_display(parent_weight: u64, node: &SymbolNode, is_associative: bool)
     display_string(node)
 }
 
-fn prefix_symbol_display(symbol: Arc<FuncSymbol>, node: &SymbolNode) -> String {
+fn prefix_symbol_display(symbol: Arc<FuncSymbol>, node: SymbolNode) -> String {
     if node.degree() > 0 {
         format!(
             "{}({})",

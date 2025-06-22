@@ -10,7 +10,7 @@ use super::{
     rule_attribute::{RuleAttr, RuleAttrValue},
 };
 use crate::{
-    symbol::{FuncSymbol, SymbolNode},
+    symbol::{FuncSymbol, SymbolNode, SymbolNodeMut},
     term::{NodePosition, ParamsMapping, Term, TermProps},
     NormalizationLevel, RuleId,
 };
@@ -132,13 +132,13 @@ impl Rule {
     }
 
     #[inline]
-    pub fn pattern_node(&self) -> &SymbolNode {
-        &self.term[&self.pattern]
+    pub fn pattern_node(&self) -> SymbolNode {
+        SymbolNode::from(&self.term[&self.pattern])
     }
 
     #[inline]
-    pub fn replace_node(&self) -> &SymbolNode {
-        &self.term[&self.replace]
+    pub fn replace_node(&self) -> SymbolNode {
+        SymbolNode::from(&self.term[&self.replace])
     }
 }
 
@@ -183,11 +183,11 @@ impl ApplyRule for SharedRule {
         let mut result = vec![];
         for (maps, pos) in maps.into_iter() {
             for i in maps.into_iter() {
-                let replace = Term::from(self.replace_node().deep_clone());
+                let replace = self.replace_node().deep_clone();
 
                 let mut replace = replace.apply_map(&self.binds).apply_map(&i);
                 let mut src = (*arg.term).clone();
-                replace.swap_node(&mut src[&pos]);
+                replace.swap_node(&mut SymbolNodeMut::from(&mut src[&pos]));
                 src = src.normalize(self.norm_level());
                 let mut resolution = TermProps::from(Rc::new(src))
                     .with_rule(self.clone())

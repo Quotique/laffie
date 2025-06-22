@@ -110,7 +110,7 @@ impl<'de, Context> BorrowDecode<'de, Context> for Symbol {
 pub fn encode_node<E: bincode::enc::Encoder>(
     parent_no: isize,
     last_no: &mut isize,
-    node: &SymbolNode,
+    node: SymbolNode,
     encoder: &mut E,
 ) -> core::result::Result<(), bincode::error::EncodeError> {
     Encode::encode(&parent_no, encoder)?;
