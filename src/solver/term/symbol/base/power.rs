@@ -1,17 +1,21 @@
+use std::collections::HashMap;
+
 use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive, Zero};
 use num::traits::Pow;
 
+use super::SymbolProgram;
 use crate::{
-    term::{FuncSymbol, Subterm, SubtermMut, Symbol, SymbolAttr, SymbolAttrValue, Term},
+    term::{Subterm, SubtermMut, SymbolAttr, SymbolAttrValue, Term, TermNode},
     NormalizationLevel,
 };
 
-pub fn symbol() -> FuncSymbol {
-    FuncSymbol::builder()
-        .name("^")
-        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(100))
-        .with_calculator(Box::new(power))
-        .build()
+pub fn symbol() -> SymbolProgram {
+    SymbolProgram {
+        name: "^".into(),
+        attrs: HashMap::from([(SymbolAttr::Infix, SymbolAttrValue::UInt(100))]),
+        calculator: Box::new(power),
+        ..Default::default()
+    }
 }
 
 pub fn power(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
@@ -36,7 +40,7 @@ pub fn power(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
                 if e >= 0 {
                     root.swap(&mut result.as_subterm_mut());
                 } else {
-                    *root.data_mut() = Symbol::with_func_symbol("/");
+                    *root.data_mut() = TermNode::with_symbol("/");
                     root.push_last_arg(Term::one()).push_last_arg(result);
                     root.evaluate(level);
                 }
@@ -73,7 +77,7 @@ pub fn power_argument(root: Subterm) -> Subterm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term::func::base::calculator_check;
+    use crate::term::symbol::base::calculator_check;
 
     #[test]
     fn calculator_test() {

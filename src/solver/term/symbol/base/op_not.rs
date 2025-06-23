@@ -1,14 +1,16 @@
+use super::SymbolProgram;
 use crate::{
-    term::{FuncSymbol, Subterm, SubtermMut, Symbol, TruthResult},
+    term::{Subterm, SubtermMut, TermNode, Truth},
     NormalizationLevel,
 };
 
-pub fn symbol() -> FuncSymbol {
-    FuncSymbol::builder()
-        .name("!")
-        .with_truth_checker(Box::new(is_not))
-        .with_calculator(Box::new(not_replace))
-        .build()
+pub fn symbol() -> SymbolProgram {
+    SymbolProgram {
+        name: "!".into(),
+        calculator: Box::new(not_replace),
+        truth_checker: Box::new(is_not),
+        ..Default::default()
+    }
 }
 
 fn not_replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
@@ -16,37 +18,31 @@ fn not_replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
         return false;
     }
 
-    match root
-        .first_arg()
-        .unwrap()
-        .data()
-        .func_symbol()
-        .map(|x| x.name.clone())
-    {
+    match root.first_arg().unwrap().data().symbol() {
         Some(name) if name == "==" => {
             let mut child = root.pop_first_arg().unwrap();
             root.swap(&mut child.as_subterm_mut());
-            *root.data_mut() = Symbol::with_func_symbol("!=");
+            *root.data_mut() = TermNode::with_symbol("!=");
             true
         }
         Some(name) if name == "!=" => {
             let mut child = root.pop_first_arg().unwrap();
             root.swap(&mut child.as_subterm_mut());
-            *root.data_mut() = Symbol::with_func_symbol("==");
+            *root.data_mut() = TermNode::with_symbol("==");
             true
         }
         _ => false,
     }
 }
 
-pub fn is_not(root: Subterm) -> TruthResult {
+pub fn is_not(root: Subterm) -> Truth {
     if !root.data().is_symbol_name("!") {
-        return TruthResult::Unknown;
+        return Truth::Unknown;
     }
 
     if let Some(child) = root.first_arg() {
         return child.truth().reverse();
     }
 
-    TruthResult::Unknown
+    Truth::Unknown
 }

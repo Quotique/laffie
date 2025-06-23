@@ -1,7 +1,8 @@
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
     iter::Iterator,
-    sync::Arc,
+    rc::Rc,
 };
 
 use derive_more::{Debug, Display, From};
@@ -9,13 +10,13 @@ use trees::Node;
 
 use utils::SubsetIterator;
 
-use super::{FuncSymbol, ParamsMapping, Subterm, Symbol, Term, TruthResult, Variable};
+use super::{ParamsMapping, Subterm, Symbol, Term, TermNode, Truth, Variable};
 use crate::NormalizationLevel;
 
 pub type VariablesMap = HashMap<Variable, Term>;
 
 #[derive(Debug, Display, From)]
-pub struct SubtermMut<'a>(&'a mut Node<Symbol>);
+pub struct SubtermMut<'a>(&'a mut Node<TermNode>);
 
 impl<'a> SubtermMut<'a> {
     #[inline]
@@ -82,13 +83,8 @@ impl<'a> SubtermMut<'a> {
 }
 
 impl<'a> SubtermMut<'a> {
-    #[allow(clippy::mutable_key_type)]
-    pub fn symbols(&self) -> HashSet<Arc<FuncSymbol>> {
-        self.0
-            .bfs()
-            .iter
-            .filter_map(|x| x.data.func_symbol())
-            .collect()
+    pub fn symbols(&self) -> HashSet<Symbol> {
+        self.0.bfs().iter.filter_map(|x| x.data.symbol()).collect()
     }
 
     #[inline]
@@ -107,12 +103,12 @@ impl<'a> SubtermMut<'a> {
     }
 
     #[inline]
-    pub fn data(&self) -> &Symbol {
+    pub fn data(&self) -> &TermNode {
         self.0.data()
     }
 
     #[inline]
-    pub fn data_mut(&mut self) -> &mut Symbol {
+    pub fn data_mut(&mut self) -> &mut TermNode {
         self.0.data_mut()
     }
 }
@@ -120,12 +116,12 @@ impl<'a> SubtermMut<'a> {
 impl<'a> SubtermMut<'a> {
     pub fn apply_param_map(&mut self, params: &ParamsMapping) -> &mut Self {
         match self.data().clone() {
-            Symbol::Param(p) => {
+            TermNode::Param(p) => {
                 if let Some(p) = params.params.get(&p) {
                     self.swap(&mut p.clone().as_subterm_mut());
                 }
             }
-            Symbol::Placeholder(p) => {
+            TermNode::Placeholder(p) => {
                 if let Some(p) = params.placeholders.get(&p) {
                     let mut p = p.clone();
                     self.swap(&mut p[0].as_subterm_mut());
@@ -161,8 +157,8 @@ impl<'a> SubtermMut<'a> {
 
     pub fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Term> + '_> {
         Box::new(SubsetIterator::new(self.0.degree(), count).map(move |i| {
-            let s = self.0.data().func_symbol().unwrap();
-            let mut parts = vec![Term::from(Symbol::FuncSymbol(s.clone())); count];
+            let s = self.0.data().symbol().unwrap();
+            let mut parts = vec![Term::from(TermNode::Symbol(s.clone())); count];
             for (id, child) in self.iter().enumerate() {
                 parts[i.as_vec()[id]]
                     .as_subterm_mut()
@@ -175,7 +171,7 @@ impl<'a> SubtermMut<'a> {
                     p.as_subterm_mut().swap(&mut child.as_subterm_mut());
                 }
             }
-            let mut result = Term::from(Symbol::FuncSymbol(s.clone()));
+            let mut result = Term::from(TermNode::Symbol(s.clone()));
             for p in parts.into_iter() {
                 result.as_subterm_mut().push_last_arg(p);
             }
@@ -187,13 +183,13 @@ impl<'a> SubtermMut<'a> {
     pub fn evaluate(&mut self, level: NormalizationLevel) -> bool {
         self.0
             .data()
-            .func_symbol()
+            .symbol()
             .map(|x| x.evaluate(self, level))
             .unwrap_or(false)
     }
 
     #[inline]
-    pub fn truth(&self) -> TruthResult {
+    pub fn truth(&self) -> Truth {
         Subterm::from(self.0 as &Node<_>).truth()
     }
 
@@ -221,6 +217,69 @@ impl<'a> SubtermMut<'a> {
             }
         });
     }
+
+    fn associative_nesting_remove(&mut self) -> bool {
+        let mut result = false;
+        if let Some(symbol) = self.data().symbol() {
+            if !symbol.is_associative() {
+                return result;
+            }
+            let root_degree = self.degree();
+            for _ in 0..root_degree {
+                let mut child = self.pop_first_arg().unwrap();
+                if let Some(child_symbol) = &child.data().symbol() {
+                    if *child_symbol == symbol {
+                        while let Some(node) = child.as_subterm_mut().pop_first_arg() {
+                            self.push_last_arg(node);
+                        }
+                        result = true;
+                        continue;
+                    }
+                }
+                self.push_last_arg(child);
+            }
+        }
+        result
+    }
+
+    pub fn commutative_reorder(&mut self) -> bool {
+        if let Some(symbol) = self.data().symbol() {
+            if !symbol.is_commutative() {
+                return false;
+            }
+            if !self
+                .iter()
+                .is_sorted_by(|l, r| symbol.arg_order(*l, *r) != Ordering::Greater)
+            {
+                let mut to_sort = vec![];
+                while let Some(t) = self.pop_first_arg() {
+                    to_sort.push(Rc::new(t));
+                }
+
+                to_sort.sort_by(|x, y| symbol.arg_order(x.as_subterm(), y.as_subterm()));
+
+                while let Some(t) = to_sort.pop() {
+                    self.push_first_arg(Rc::try_unwrap(t).unwrap());
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn normalize(&mut self, level: NormalizationLevel) -> bool {
+        let mut result = false;
+        for mut i in self.iter_mut() {
+            result |= i.normalize(level);
+        }
+
+        result |= self.associative_nesting_remove();
+        result |= self.evaluate(level);
+        if level > NormalizationLevel(0) {
+            result |= self.commutative_reorder();
+        }
+        result
+    }
 }
 
 impl<'a, 'b> PartialEq<Subterm<'a>> for SubtermMut<'b> {
@@ -243,5 +302,252 @@ mod tests {
             .as_subterm_mut()
             .replace(test_pattern.as_subterm(), test_replace.as_subterm());
         assert_eq!(test_state, term_with_params("a/c"));
+    }
+}
+
+#[cfg(test)]
+mod operations_tests {
+    use crate::term::Term;
+
+    use super::*;
+
+    #[test]
+    fn associative_nesting_remove_test() {
+        // (1+2)+(1+2) -> 1+2+1+2
+        let mut test_tree = Term::func("+")
+            .with_child(
+                Term::func("+")
+                    .with_child(Term::number(1))
+                    .with_child(Term::number(2)),
+            )
+            .with_child(
+                Term::func("+")
+                    .with_child(Term::number(1))
+                    .with_child(Term::number(2)),
+            );
+        assert!(test_tree.as_subterm_mut().associative_nesting_remove());
+        assert_eq!(test_tree.as_subterm().degree(), 4);
+    }
+
+    #[test]
+    fn evaluate_plus_test() {
+        // 1+2+5 -> 8
+        let mut test_tree1 = Term::func("+")
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
+
+        assert!(test_tree1
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(test_tree1, Term::number(8));
+
+        // x+1+2+5 -> x+8
+        let mut test_tree1 = Term::func("+")
+            .with_child(Term::variable("x"))
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
+
+        assert!(test_tree1
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        test_tree1.as_subterm_mut().commutative_reorder();
+        assert_eq!(
+            test_tree1,
+            Term::func("+")
+                .with_child(Term::variable("x"))
+                .with_child(Term::number(8))
+        );
+    }
+
+    #[test]
+    fn evaluate_multiply_test() {
+        // 1*2*5 -> 10
+        let mut test_tree = Term::func("*")
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(test_tree, Term::number(10));
+
+        // x*1*2*5 -> 10*x
+        let mut test_tree = Term::func("*")
+            .with_child(Term::variable("x"))
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
+
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        test_tree.as_subterm_mut().commutative_reorder();
+        assert_eq!(
+            test_tree,
+            Term::func("*")
+                .with_child(Term::number(10))
+                .with_child(Term::variable("x"))
+        );
+
+        // x*1 -> x
+        let mut test_tree = Term::func("*")
+            .with_child(Term::variable("x"))
+            .with_child(Term::number(1));
+
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(test_tree, Term::variable("x"));
+    }
+
+    #[test]
+    fn evaluate_divide_test() {
+        // 10 / 2 -> 5
+        let mut test_tree = Term::func("/")
+            .with_child(Term::number(10))
+            .with_child(Term::number(2));
+
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(test_tree, Term::number(5));
+
+        // x / 2 -> x / 2
+        let mut test_tree = Term::func("/")
+            .with_child(Term::variable("x"))
+            .with_child(Term::number(2));
+
+        assert!(!test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(
+            test_tree,
+            Term::func("/")
+                .with_child(Term::variable("x"))
+                .with_child(Term::number(2))
+        );
+
+        // 2 / 5 -> 0.4
+        let mut test_tree = Term::func("/")
+            .with_child(Term::number(2))
+            .with_child(Term::number(5));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(test_tree, Term::number((4, 1)));
+
+        // 30 / 45 -> 2/3
+        let mut test_tree = Term::func("/")
+            .with_child(Term::number(30))
+            .with_child(Term::number(45));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(
+            test_tree,
+            Term::func("/")
+                .with_child(Term::number(2))
+                .with_child(Term::number(3))
+        );
+
+        // 30 / 4.5 -> 20/3
+        let mut test_tree = Term::func("/")
+            .with_child(Term::number(30))
+            .with_child(Term::number((45, 1)));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(
+            test_tree,
+            Term::func("/")
+                .with_child(Term::number(20))
+                .with_child(Term::number(3))
+        );
+    }
+
+    #[test]
+    fn evaluate_power_test() {
+        // 2 ^ 2 -> 4
+        let mut test_tree = Term::func("^")
+            .with_child(Term::number(2))
+            .with_child(Term::number(2));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(test_tree, Term::number(4));
+
+        // 2 ^ (-2) -> 0.25
+        let mut test_tree = Term::func("^")
+            .with_child(Term::number(2))
+            .with_child(Term::number(-2));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(test_tree, Term::number((25, 2)));
+
+        // 0.5 ^ (-2) -> 4
+        let mut test_tree = Term::func("^")
+            .with_child(Term::number((5, 1)))
+            .with_child(Term::number(-2));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(test_tree, Term::number(4));
+
+        // 3 ^ (-2) -> 1/9
+        let mut test_tree = Term::func("^")
+            .with_child(Term::number(3))
+            .with_child(Term::number(-2));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        assert_eq!(
+            test_tree,
+            Term::func("/")
+                .with_child(Term::number(1))
+                .with_child(Term::number(9))
+        );
+    }
+
+    #[test]
+    fn commutative_reorder_test() {
+        // 1+2+5+(2*x)+x+(2+3) -> (2+3)+(2*x)+x+1+2+5
+        let mut test_tree = Term::func("+")
+            .with_child(Term::number(1))
+            .with_child(Term::number(2))
+            .with_child(Term::number(5))
+            .with_child(
+                Term::func("*")
+                    .with_child(Term::number(2))
+                    .with_child(Term::variable("x")),
+            )
+            .with_child(Term::variable("x"))
+            .with_child(
+                Term::func("+")
+                    .with_child(Term::number(2))
+                    .with_child(Term::number(3)),
+            );
+
+        assert!(test_tree.as_subterm_mut().commutative_reorder());
+        assert_eq!(
+            test_tree,
+            Term::func("+")
+                .with_child(
+                    Term::func("+")
+                        .with_child(Term::number(2))
+                        .with_child(Term::number(3))
+                )
+                .with_child(
+                    Term::func("*")
+                        .with_child(Term::number(2))
+                        .with_child(Term::variable("x"))
+                )
+                .with_child(Term::variable("x"))
+                .with_child(Term::number(1))
+                .with_child(Term::number(2))
+                .with_child(Term::number(5))
+        );
     }
 }

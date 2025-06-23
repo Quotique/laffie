@@ -1,8 +1,8 @@
-use std::{fmt, hash::Hash, sync::Arc};
+use std::{cmp::Ordering, fmt, hash::Hash};
 
 use derive_more::{AsRef, Display, From, FromStr, Into};
 
-use super::func::FuncSymbol;
+use super::symbol::Symbol;
 use crate::{CompactString, Decimal, Signed};
 
 #[derive(Clone, Debug, Display)]
@@ -19,9 +19,9 @@ pub struct Placeholder(u64);
 
 /// Term tree element
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Symbol {
+pub enum TermNode {
     /// Functional (operation) symbol
-    FuncSymbol(Arc<FuncSymbol>),
+    Symbol(Symbol),
     /// Named parameter. Can be replaced during the unification procedure
     Param(Param),
     /// Variable symbol
@@ -32,19 +32,19 @@ pub enum Symbol {
     Placeholder(Placeholder),
 }
 
-impl Symbol {
+impl TermNode {
     /// Get function symbol by name
     ///
     /// returns None if the specified symbol name is not found in the database
     #[inline]
-    pub fn with_func_symbol_opt(name: &str) -> Option<Self> {
-        FuncSymbol::by_name(name).map(Self::FuncSymbol)
+    pub fn with_symbol_opt(name: &str) -> Option<Self> {
+        Symbol::by_name(name).map(Self::Symbol)
     }
 
     /// Same as with_func_symbol_opt(arg).unwrap()
     #[inline]
-    pub fn with_func_symbol(name: &str) -> Self {
-        Self::with_func_symbol_opt(name).unwrap()
+    pub fn with_symbol(name: &str) -> Self {
+        Self::with_symbol_opt(name).unwrap()
     }
 
     /// Create a constant symbol
@@ -57,8 +57,8 @@ impl Symbol {
     ///
     /// returns None if the content is non a functional symbol
     #[inline]
-    pub fn func_symbol(&self) -> Option<Arc<FuncSymbol>> {
-        if let Symbol::FuncSymbol(s) = self {
+    pub fn symbol(&self) -> Option<Symbol> {
+        if let TermNode::Symbol(s) = self {
             return Some(s.clone());
         }
         None
@@ -69,7 +69,7 @@ impl Symbol {
     /// returns None if the content is non a variable symbol
     #[inline]
     pub fn variable(&self) -> Option<&Variable> {
-        if let Symbol::Variable(v) = &self {
+        if let TermNode::Variable(v) = &self {
             return Some(v);
         }
         None
@@ -80,7 +80,7 @@ impl Symbol {
     /// returns None if the content is non a parameter
     #[inline]
     pub fn param(&self) -> Option<&Param> {
-        if let Symbol::Param(p) = &self {
+        if let TermNode::Param(p) = &self {
             return Some(p);
         }
         None
@@ -91,7 +91,7 @@ impl Symbol {
     /// returns None if the content is non a constant
     #[inline]
     pub fn number(&self) -> Option<&Decimal> {
-        if let Symbol::Number(d) = &self {
+        if let TermNode::Number(d) = &self {
             return Some(d);
         }
         None
@@ -102,7 +102,7 @@ impl Symbol {
     ///
     /// returns None if the content is non a placeholder
     pub fn placeholder(&self) -> Option<Placeholder> {
-        if let Symbol::Placeholder(p) = &self {
+        if let TermNode::Placeholder(p) = &self {
             return Some(*p);
         }
         None
@@ -111,8 +111,8 @@ impl Symbol {
     #[inline]
     /// Check if content is symbol with the name
     pub fn is_symbol_name(&self, name: &str) -> bool {
-        if let Symbol::FuncSymbol(s) = self {
-            return s.name == name;
+        if let TermNode::Symbol(s) = self {
+            return s == name;
         }
 
         false
@@ -121,29 +121,61 @@ impl Symbol {
     #[inline]
     /// Check if content is constant with the value
     pub fn is_number_value(&self, value: &Decimal) -> bool {
-        if let Symbol::Number(num) = &self {
+        if let TermNode::Number(num) = &self {
             return num == value;
         }
         false
     }
 }
 
-impl fmt::Display for Symbol {
+impl Ord for TermNode {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // Symbol < Param < Varible < Number < Placeholder
+        match (self, other) {
+            (TermNode::Symbol(id_l), TermNode::Symbol(id_r)) => id_l.cmp(id_r),
+            (TermNode::Symbol(_), _) => Ordering::Less,
+
+            (TermNode::Param(id_l), TermNode::Param(id_r)) => id_l.cmp(id_r),
+            (TermNode::Param(_), TermNode::Symbol(_)) => Ordering::Greater,
+            (TermNode::Param(_), _) => Ordering::Less,
+
+            (TermNode::Variable(id_l), TermNode::Variable(id_r)) => id_l.cmp(id_r),
+            (TermNode::Variable(_), TermNode::Number(_)) => Ordering::Less,
+            (TermNode::Variable(_), TermNode::Placeholder(_)) => Ordering::Less,
+            (TermNode::Variable(_), _) => Ordering::Greater,
+
+            (TermNode::Number(d1), TermNode::Number(d2)) => d1.cmp(d2),
+            (TermNode::Number(_), TermNode::Placeholder(_)) => Ordering::Less,
+            (TermNode::Number(_), _) => Ordering::Greater,
+
+            (TermNode::Placeholder(_), TermNode::Placeholder(_)) => Ordering::Equal,
+            (TermNode::Placeholder(_), _) => Ordering::Greater,
+        }
+    }
+}
+
+impl PartialOrd for TermNode {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl fmt::Display for TermNode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Symbol::FuncSymbol(s) => {
-                write!(f, "{}", s.name)
+            TermNode::Symbol(s) => {
+                write!(f, "{}", s)
             }
-            Symbol::Param(id) => write!(f, "{id}"),
-            Symbol::Number(value) => {
+            TermNode::Param(id) => write!(f, "{id}"),
+            TermNode::Number(value) => {
                 if value.is_negative() {
                     write!(f, "({value})")
                 } else {
                     write!(f, "{value}")
                 }
             }
-            Symbol::Variable(id) => write!(f, "{id}"),
-            Symbol::Placeholder(_) => write!(f, ".."),
+            TermNode::Variable(id) => write!(f, "{id}"),
+            TermNode::Placeholder(_) => write!(f, ".."),
         }
     }
 }

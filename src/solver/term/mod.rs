@@ -1,22 +1,20 @@
 //#![warn(missing_docs)]
 
 mod codec;
-mod func;
 mod index;
 mod props;
 mod subterm;
 mod subterm_mut;
-mod symbol_enum;
+mod symbol;
+mod term_node;
 mod term_tree;
 
-pub use func::{
-    base::normalize, FuncSymbol, SymbolAttr, SymbolAttrValue, TruthChecker, TruthResult,
-};
 pub use index::NodePosition;
 pub use props::TermProps;
 pub use subterm::{ParamsMapping, Subterm};
 pub use subterm_mut::{SubtermMut, VariablesMap};
-pub use symbol_enum::{Param, Placeholder, Symbol, Variable};
+pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
+pub use term_node::{Param, Placeholder, TermNode, Variable};
 pub use term_tree::{SymbolTree, Term};
 
 #[cfg(test)]

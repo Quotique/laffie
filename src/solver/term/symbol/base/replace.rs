@@ -1,13 +1,15 @@
+use super::SymbolProgram;
 use crate::{
-    term::{FuncSymbol, SubtermMut, Term, VariablesMap},
+    term::{SubtermMut, Term, VariablesMap},
     NormalizationLevel,
 };
 
-pub fn symbol() -> FuncSymbol {
-    FuncSymbol::builder()
-        .name("replace")
-        .with_calculator(Box::new(replace))
-        .build()
+pub fn symbol() -> SymbolProgram {
+    SymbolProgram {
+        name: "replace".into(),
+        calculator: Box::new(replace),
+        ..Default::default()
+    }
 }
 
 pub fn replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
@@ -55,8 +57,8 @@ mod tests {
     #[test]
     fn replace_test() {
         insta::assert_debug_snapshot!(
-            term_with_vars(r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#)
+          term_with_vars(r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#)
                 .normalize(NormalizationLevel::max()),
-            @"!=(264, 0)");
+            @"264!=0");
     }
 }

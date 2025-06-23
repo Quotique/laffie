@@ -1,8 +1,8 @@
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
 
 use solver::{
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
-    term::FuncSymbol,
+    term::Symbol,
     CompactString,
 };
 
@@ -12,7 +12,7 @@ use super::{term::TermParser, Node, Tree};
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
-    func_symbol: Arc<FuncSymbol>,
+    func_symbol: Symbol,
 }
 
 impl<'a> RuleParser<'a> {
@@ -23,7 +23,7 @@ impl<'a> RuleParser<'a> {
         }
     }
 
-    pub fn with_func_symbol(mut self, func_symbol: Arc<FuncSymbol>) -> Self {
+    pub fn with_func_symbol(mut self, func_symbol: Symbol) -> Self {
         self.func_symbol = func_symbol;
         self
     }

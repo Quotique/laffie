@@ -15,7 +15,7 @@ mod term;
 pub type CompactString = smartstring::alias::String;
 
 pub use self::{
-    dir_loader::DirectoryParser, error::ParserError, rule::RuleParser, symbol::FuncSymbolParser,
+    dir_loader::DirectoryParser, error::ParserError, rule::RuleParser, symbol::SymbolParser,
     task::TaskParser, term::TermParser,
 };
 

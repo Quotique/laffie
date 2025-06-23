@@ -1,22 +1,22 @@
-use std::cmp::max;
+use std::{cmp::max, collections::HashMap};
 
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use num::integer::gcd;
 use num_bigint::ToBigInt;
 
+use super::{SymbolProgram, MAX_DEC_CONVERSION_EXP};
 use crate::{
-    term::{FuncSymbol, SubtermMut, Symbol, SymbolAttr, SymbolAttrValue, Term},
+    term::{SubtermMut, SymbolAttr, SymbolAttrValue, Term, TermNode},
     NormalizationLevel,
 };
 
-use super::MAX_DEC_CONVERSION_EXP;
-
-pub fn symbol() -> FuncSymbol {
-    FuncSymbol::builder()
-        .name("/")
-        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(200))
-        .with_calculator(Box::new(divide))
-        .build()
+pub fn symbol() -> SymbolProgram {
+    SymbolProgram {
+        name: "/".into(),
+        attrs: HashMap::from([(SymbolAttr::Infix, SymbolAttrValue::UInt(200))]),
+        calculator: Box::new(divide),
+        ..Default::default()
+    }
 }
 
 pub fn divide(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
@@ -27,7 +27,7 @@ pub fn divide(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     match level {
         NormalizationLevel(0) => false,
         NormalizationLevel(1) => {
-            if let Symbol::Number(d) = &root.last_arg().unwrap().data() {
+            if let TermNode::Number(d) = &root.last_arg().unwrap().data() {
                 if d.is_one() {
                     let mut child = root.pop_first_arg().unwrap();
                     root.swap(&mut child.as_subterm_mut());
@@ -56,7 +56,7 @@ pub fn divide(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
                         root.first_arg_mut()
                             .unwrap()
                             .swap(&mut Term::number(sign * num.abs()).as_subterm_mut());
-                        *root.last_arg_mut().unwrap().data_mut() = Symbol::Number(den.abs());
+                        *root.last_arg_mut().unwrap().data_mut() = TermNode::Number(den.abs());
                         true
                     } else {
                         false
@@ -114,7 +114,7 @@ fn impl_divide(num: &Decimal, den: &Decimal) -> Option<Decimal> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term::func::base::calculator_check;
+    use crate::term::symbol::base::calculator_check;
 
     #[test]
     fn derive_test() {

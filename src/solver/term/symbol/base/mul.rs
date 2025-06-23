@@ -3,21 +3,24 @@ use std::{cmp::Ordering, collections::HashMap};
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
 
 use crate::{
-    term::{FuncSymbol, Subterm, SubtermMut, Symbol, SymbolAttr, SymbolAttrValue, Term},
+    term::{Subterm, SubtermMut, SymbolAttr, SymbolAttrValue, Term, TermNode},
     NormalizationLevel,
 };
 
-use super::{plus::plus, power::power_argument};
+use super::{plus::plus, power::power_argument, SymbolProgram};
 
-pub fn symbol() -> FuncSymbol {
-    FuncSymbol::builder()
-        .name("*")
-        .with_attr(SymbolAttr::Associative, SymbolAttrValue::None)
-        .with_attr(SymbolAttr::Commutative, SymbolAttrValue::None)
-        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(200))
-        .with_calculator(Box::new(multiply))
-        .with_ordering(Box::new(ordering))
-        .build()
+pub fn symbol() -> SymbolProgram {
+    SymbolProgram {
+        name: "*".into(),
+        attrs: HashMap::from([
+            (SymbolAttr::Associative, SymbolAttrValue::None),
+            (SymbolAttr::Commutative, SymbolAttrValue::None),
+            (SymbolAttr::Infix, SymbolAttrValue::UInt(200)),
+        ]),
+        calculator: Box::new(multiply),
+        arg_cmp: Box::new(ordering),
+        ..Default::default()
+    }
 }
 
 pub fn multiply(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
@@ -115,7 +118,7 @@ fn fold_constant(root: &mut SubtermMut) -> (Decimal, bool) {
 fn remove_unused_mul(root: &mut SubtermMut) -> bool {
     match root.degree() {
         0 => {
-            *root.data_mut() = Symbol::Number(Decimal::from(1));
+            *root.data_mut() = TermNode::Number(Decimal::from(1));
             true
         }
         1 => {
@@ -165,31 +168,31 @@ fn ordering(left: Subterm, right: Subterm) -> Ordering {
     }
 
     match (pa_left.data(), pa_right.data()) {
-        (Symbol::Number(left), Symbol::Number(right)) => left.cmp(right),
-        (Symbol::Number(_), _) => Ordering::Less,
+        (TermNode::Number(left), TermNode::Number(right)) => left.cmp(right),
+        (TermNode::Number(_), _) => Ordering::Less,
 
-        (Symbol::Param(left), Symbol::Param(right)) => left.cmp(right),
-        (Symbol::Param(_), Symbol::Number(_)) => Ordering::Greater,
-        (Symbol::Param(_), _) => Ordering::Less,
+        (TermNode::Param(left), TermNode::Param(right)) => left.cmp(right),
+        (TermNode::Param(_), TermNode::Number(_)) => Ordering::Greater,
+        (TermNode::Param(_), _) => Ordering::Less,
 
-        (Symbol::Variable(left), Symbol::Variable(right)) => left.cmp(right),
-        (Symbol::Variable(_), Symbol::FuncSymbol(_)) => Ordering::Less,
-        (Symbol::Variable(_), Symbol::Placeholder(_)) => Ordering::Less,
-        (Symbol::Variable(_), _) => Ordering::Greater,
+        (TermNode::Variable(left), TermNode::Variable(right)) => left.cmp(right),
+        (TermNode::Variable(_), TermNode::Symbol(_)) => Ordering::Less,
+        (TermNode::Variable(_), TermNode::Placeholder(_)) => Ordering::Less,
+        (TermNode::Variable(_), _) => Ordering::Greater,
 
-        (Symbol::FuncSymbol(left), Symbol::FuncSymbol(right)) => left.cmp(right),
-        (Symbol::FuncSymbol(_), Symbol::Placeholder(_)) => Ordering::Less,
-        (Symbol::FuncSymbol(_), _) => Ordering::Greater,
+        (TermNode::Symbol(left), TermNode::Symbol(right)) => left.cmp(right),
+        (TermNode::Symbol(_), TermNode::Placeholder(_)) => Ordering::Less,
+        (TermNode::Symbol(_), _) => Ordering::Greater,
 
-        (Symbol::Placeholder(_), Symbol::Placeholder(_)) => Ordering::Equal,
-        (Symbol::Placeholder(_), _) => Ordering::Greater,
+        (TermNode::Placeholder(_), TermNode::Placeholder(_)) => Ordering::Equal,
+        (TermNode::Placeholder(_), _) => Ordering::Greater,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term::func::base::calculator_check;
+    use crate::term::symbol::base::calculator_check;
 
     #[test]
     fn calculator_test() {

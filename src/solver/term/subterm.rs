@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     fmt,
     iter::Iterator,
-    sync::Arc,
 };
 
 use bigdecimal::BigDecimal;
@@ -14,7 +13,7 @@ use trees::Node;
 
 use utils::{SubsetIterator, VecDisplay};
 
-use super::{index::NodePosition, FuncSymbol, Param, Placeholder, Symbol, Term, TruthResult};
+use super::{index::NodePosition, Param, Placeholder, Symbol, Term, TermNode, Truth};
 
 #[derive(Debug, Clone, Default)]
 pub struct ParamsMapping {
@@ -25,7 +24,7 @@ pub struct ParamsMapping {
 #[derive(Clone, Copy)]
 #[derive(PartialEq, Eq)]
 #[derive(Debug, From)]
-pub struct Subterm<'a>(&'a Node<Symbol>);
+pub struct Subterm<'a>(&'a Node<TermNode>);
 
 impl<'a> Subterm<'a> {
     #[inline]
@@ -34,7 +33,7 @@ impl<'a> Subterm<'a> {
     }
 
     #[inline]
-    pub fn data(&self) -> &Symbol {
+    pub fn data(&self) -> &TermNode {
         self.0.data()
     }
 
@@ -63,20 +62,15 @@ impl<'a> Subterm<'a> {
         self.0.deep_clone().into()
     }
 
-    #[allow(clippy::mutable_key_type)]
     #[inline]
-    pub fn symbols(&self) -> HashSet<Arc<FuncSymbol>> {
-        self.0
-            .bfs()
-            .iter
-            .filter_map(|x| x.data.func_symbol())
-            .collect()
+    pub fn symbols(&self) -> HashSet<Symbol> {
+        self.0.bfs().iter.filter_map(|x| x.data.symbol()).collect()
     }
 
     pub fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Term> + '_> {
         Box::new(SubsetIterator::new(self.0.degree(), count).map(move |i| {
-            let s = self.0.data().func_symbol().unwrap();
-            let mut parts = vec![Term::from(Symbol::FuncSymbol(s.clone())); count];
+            let s = self.0.data().symbol().unwrap();
+            let mut parts = vec![Term::from(TermNode::Symbol(s.clone())); count];
             for (id, child) in self.iter().enumerate() {
                 parts[i.as_vec()[id]]
                     .as_subterm_mut()
@@ -89,7 +83,7 @@ impl<'a> Subterm<'a> {
                     p.as_subterm_mut().swap(&mut child.as_subterm_mut());
                 }
             }
-            let mut result = Term::from(Symbol::FuncSymbol(s.clone()));
+            let mut result = Term::from(TermNode::Symbol(s.clone()));
             for p in parts.into_iter() {
                 result.as_subterm_mut().push_last_arg(p);
             }
@@ -98,28 +92,28 @@ impl<'a> Subterm<'a> {
     }
 
     #[inline]
-    pub fn truth(&self) -> TruthResult {
+    pub fn truth(&self) -> Truth {
         self.0
             .data()
-            .func_symbol()
+            .symbol()
             .map(|x| x.check_truth(*self))
-            .unwrap_or(TruthResult::Unknown)
+            .unwrap_or(Truth::Unknown)
     }
 
     fn parentheses(&self) -> bool {
         let parent_weight = self
             .parent()
-            .and_then(|x| x.data().func_symbol())
+            .and_then(|x| x.data().symbol())
             .and_then(|x| x.display_weight())
             .unwrap_or(u64::MAX);
         let parent_associative = self
             .parent()
-            .and_then(|x| x.data().func_symbol())
+            .and_then(|x| x.data().symbol())
             .map(|x| x.is_associative())
             .unwrap_or(false);
         let weight = self
             .data()
-            .func_symbol()
+            .symbol()
             .and_then(|x| x.display_weight())
             .unwrap_or(u64::MIN);
         weight > parent_weight || (weight == parent_weight && !parent_associative)
@@ -168,7 +162,7 @@ impl<'a> Subterm<'a> {
         trace!(target: "pattern_match", "Pattern: {pattern}, traget: {self}, mapping: {params:?}");
 
         match (&pattern.data(), &self.data()) {
-            (Symbol::FuncSymbol(sym), Symbol::FuncSymbol(t_sym)) => {
+            (TermNode::Symbol(sym), TermNode::Symbol(t_sym)) => {
                 ensure!(sym == t_sym, "Expect symbol {sym}, found: {t_sym}");
                 let mut result = vec![];
 
@@ -193,8 +187,8 @@ impl<'a> Subterm<'a> {
                 Ok(result)
             }
             // try map (-1)*param on (-number)
-            (Symbol::FuncSymbol(mul), Symbol::Number(neg))
-                if mul.name == "*" && neg < &BigDecimal::zero() =>
+            (TermNode::Symbol(mul), TermNode::Number(neg))
+                if mul == "*" && neg < &BigDecimal::zero() =>
             {
                 Term::func("*")
                     .with_child(Term::number(-1))
@@ -202,10 +196,10 @@ impl<'a> Subterm<'a> {
                     .as_subterm()
                     .try_match_extend(pattern, params)
             }
-            (Symbol::FuncSymbol(p_id), _) => {
+            (TermNode::Symbol(p_id), _) => {
                 bail!("Expect symbol id: {p_id}, found target: {:?}", &self.data())
             }
-            (Symbol::Param(p), _) => {
+            (TermNode::Param(p), _) => {
                 if params.params.contains_key(p) {
                     let node = params.params.get(p).unwrap();
                     let _ = self.try_match(node.as_subterm())?;
@@ -214,21 +208,23 @@ impl<'a> Subterm<'a> {
                 }
                 Ok(vec![params])
             }
-            (Symbol::Number(value), Symbol::Number(other_value)) if value == other_value => {
+            (TermNode::Number(value), TermNode::Number(other_value)) if value == other_value => {
                 Ok(vec![params])
             }
-            (Symbol::Number(value), Symbol::Number(other_value)) => {
+            (TermNode::Number(value), TermNode::Number(other_value)) => {
                 bail!("Expect Number {value}, found {other_value}",)
             }
-            (Symbol::Number(_), _) => bail!("Expect Number, found: {:?}", self.data()),
-            (Symbol::Variable(value), Symbol::Variable(other_value)) if value == other_value => {
+            (TermNode::Number(_), _) => bail!("Expect Number, found: {:?}", self.data()),
+            (TermNode::Variable(value), TermNode::Variable(other_value))
+                if value == other_value =>
+            {
                 Ok(vec![params])
             }
-            (Symbol::Variable(value), Symbol::Variable(other_value)) => {
+            (TermNode::Variable(value), TermNode::Variable(other_value)) => {
                 bail!("Expect Varible {value}, found {other_value}")
             }
-            (Symbol::Variable(_), _) => bail!("Expect Varible, found: {:?}", self.data()),
-            (Symbol::Placeholder(_), _) => bail!("Mapping placeholder"),
+            (TermNode::Variable(_), _) => bail!("Expect Varible, found: {:?}", self.data()),
+            (TermNode::Placeholder(_), _) => bail!("Mapping placeholder"),
         }
     }
 
@@ -313,12 +309,12 @@ impl<'a> fmt::Display for Subterm<'a> {
             write!(f, "(")?;
         }
 
-        let mul_sym_str = FuncSymbol::by_name("*")
+        let mul_sym_str = Symbol::by_name("*")
             .map(|x| x.to_string())
             .unwrap_or("*".to_owned());
 
         match self.data() {
-            Symbol::FuncSymbol(symbol) => {
+            TermNode::Symbol(symbol) => {
                 let s = match symbol.display_weight() {
                     Some(_) if self.degree() < 2 => format!("{symbol}{}", self.iter().format(", ")),
                     Some(_) => self.iter().join(&symbol.to_string()),
@@ -330,7 +326,7 @@ impl<'a> fmt::Display for Subterm<'a> {
                 .replace("+-", "-");
                 write!(f, "{s}")?
             }
-            Symbol::Number(num) => write!(f, "{num}")?,
+            TermNode::Number(num) => write!(f, "{num}")?,
             _ => write!(f, "{}", self.data())?,
         }
 

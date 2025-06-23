@@ -1,15 +1,18 @@
 use std::{
     fs, io,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use trees::Tree;
 
-use solver::{rule::RulesEngine, task::Task, term::FuncSymbol};
+use solver::{
+    rule::RulesEngine,
+    task::Task,
+    term::{Symbol, SymbolProgram},
+};
 use utils::VecDisplay;
 
-use crate::{lang, FuncSymbolParser, NodeData, RuleParser, TaskParser};
+use crate::{lang, NodeData, RuleParser, SymbolParser, TaskParser};
 
 pub struct DirectoryParser {
     symbols_path: PathBuf,
@@ -30,14 +33,14 @@ impl DirectoryParser {
         self.load_symbols()?;
 
         let mut result = RulesEngine::default();
-        let mut last_sym: Option<Arc<FuncSymbol>> = None;
+        let mut last_sym: Option<Symbol> = None;
 
         Self::load_dir(
             &self.symbols_path,
             &["sym"],
             &mut |path, src, s: &Tree<NodeData>| {
-                if let Ok(sym) = FuncSymbolParser::new(s).parse() {
-                    let sym = FuncSymbol::register(sym);
+                if let Ok(sym) = SymbolParser::new(s).parse() {
+                    let sym = SymbolProgram::register(sym);
                     last_sym.replace(sym);
                 } else if let Ok(rules) = RuleParser::with(s)
                     .with_func_symbol(last_sym.as_ref().unwrap().clone())
@@ -80,7 +83,7 @@ impl DirectoryParser {
             &self.symbols_path,
             &["sym"],
             &mut |_, _, s: &Tree<NodeData>| {
-                let _ = FuncSymbolParser::new(s).parse().map(|s| s.register());
+                let _ = SymbolParser::new(s).parse().map(|s| s.register());
             },
         )
     }

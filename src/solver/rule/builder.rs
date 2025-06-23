@@ -1,9 +1,9 @@
-use std::{collections::BTreeMap, convert::From, fmt, sync::Arc};
+use std::{collections::BTreeMap, convert::From, fmt};
 
 use multimap::MultiMap;
 
 use crate::{
-    term::{FuncSymbol, NodePosition, ParamsMapping, Subterm, Term},
+    term::{NodePosition, ParamsMapping, Subterm, Symbol, Term},
     NormalizationLevel, RuleId,
 };
 
@@ -25,7 +25,7 @@ pub struct RuleBuilder {
     term:         Option<Term>,
     requirements: Vec<Term>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
-    func_symbol:  Arc<FuncSymbol>,
+    func_symbol:  Symbol,
 
     replaces: Vec<(RuleAttr, Term)>,
 }
@@ -54,7 +54,7 @@ impl Default for RuleBuilder {
             term:         None,
             requirements: Default::default(),
             attributes:   Default::default(),
-            func_symbol:  FuncSymbol::by_name("AnySymbol")
+            func_symbol:  Symbol::by_name("AnySymbol")
                 .expect("System symbol AnySymbol is not found"),
             replaces:     Default::default(),
         }
@@ -67,7 +67,7 @@ impl RuleBuilder {
         self
     }
 
-    pub fn with_func_symbol(mut self, func_symbol: Arc<FuncSymbol>) -> Self {
+    pub fn with_func_symbol(mut self, func_symbol: Symbol) -> Self {
         self.func_symbol = func_symbol;
         self
     }
@@ -99,10 +99,10 @@ impl RuleBuilder {
         let root_sym = term
             .as_subterm()
             .data()
-            .func_symbol()
+            .symbol()
             .ok_or(RuleBuilderError::BadTermRoot)?;
 
-        match root_sym.name.as_str() {
+        match root_sym.as_str() {
             "=>" => {}
             "<=>" | "==" => {
                 self.attributes

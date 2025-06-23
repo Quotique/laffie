@@ -1,7 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
     iter::once,
-    sync::Arc,
 };
 
 use itertools::Itertools;
@@ -13,15 +12,14 @@ use super::{
     rule_attribute::{RuleAttr, RuleAttrValue},
 };
 use crate::{
-    term::{FuncSymbol, TermProps},
+    term::{Symbol, TermProps},
     CompactString, RuleId,
 };
 
 // TODO: move to correct place
 type Level = usize;
 
-#[allow(clippy::mutable_key_type)]
-type LevelRules = HashMap<Arc<FuncSymbol>, Vec<SharedRule>>;
+type LevelRules = HashMap<Symbol, Vec<SharedRule>>;
 
 #[derive(Default)]
 pub struct RulesEngine {
@@ -55,11 +53,9 @@ impl RulesEngine {
     pub fn suggest_rules(&self, term: &TermProps, purpose: &TermProps) -> Vec<SharedRule> {
         assert!(self.rule_queue.is_empty());
 
-        #[allow(clippy::mutable_key_type)]
         let empty_level = LevelRules::new();
-        #[allow(clippy::mutable_key_type)]
         let level = self.all_rules.get(&term.weight).unwrap_or(&empty_level);
-        let result: Vec<_> = once(&FuncSymbol::by_name("AnySymbol").unwrap())
+        let result: Vec<_> = once(&Symbol::by_name("AnySymbol").unwrap())
             .chain(term.func_symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())

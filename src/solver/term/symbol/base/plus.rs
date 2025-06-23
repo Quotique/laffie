@@ -1,23 +1,25 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::HashMap};
 
 use bigdecimal::{BigDecimal as Decimal, Zero};
 
+use super::{power::power_argument, SymbolProgram};
 use crate::{
-    term::{FuncSymbol, Subterm, SubtermMut, Symbol, SymbolAttr, SymbolAttrValue, Term},
+    term::{Subterm, SubtermMut, SymbolAttr, SymbolAttrValue, Term, TermNode},
     NormalizationLevel,
 };
 
-use super::power::power_argument;
-
-pub fn symbol() -> FuncSymbol {
-    FuncSymbol::builder()
-        .name("+")
-        .with_attr(SymbolAttr::Associative, SymbolAttrValue::None)
-        .with_attr(SymbolAttr::Commutative, SymbolAttrValue::None)
-        .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(300))
-        .with_calculator(Box::new(plus))
-        .with_ordering(Box::new(ordering))
-        .build()
+pub fn symbol() -> SymbolProgram {
+    SymbolProgram {
+        name: "+".into(),
+        attrs: HashMap::from([
+            (SymbolAttr::Associative, SymbolAttrValue::None),
+            (SymbolAttr::Commutative, SymbolAttrValue::None),
+            (SymbolAttr::Infix, SymbolAttrValue::UInt(300)),
+        ]),
+        calculator: Box::new(plus),
+        arg_cmp: Box::new(ordering),
+        ..Default::default()
+    }
 }
 
 pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
@@ -88,7 +90,7 @@ pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     }
 
     if root.degree() == 0 {
-        *root.data_mut() = Symbol::Number(Decimal::from(0));
+        *root.data_mut() = TermNode::Number(Decimal::from(0));
         result = true;
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
@@ -96,14 +98,14 @@ pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
         result = true;
     }
 
-    result |= super::commutative_reorder(root);
+    result |= root.commutative_reorder();
 
     result
 }
 
 fn remove_unused_plus(root: &mut SubtermMut) -> bool {
     if root.degree() == 0 {
-        *root.data_mut() = Symbol::Number(Decimal::from(0));
+        *root.data_mut() = TermNode::Number(Decimal::from(0));
         true
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
@@ -175,7 +177,7 @@ fn extract_mul_const(root: &mut SubtermMut) -> Decimal {
     // });
 
     if root.degree() == 0 {
-        *root.data_mut() = Symbol::Number(Decimal::from(1));
+        *root.data_mut() = TermNode::Number(Decimal::from(1));
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
         root.swap(&mut child.as_subterm_mut());
@@ -194,15 +196,15 @@ fn cummulative_power(root: Subterm) -> Decimal {
         let mut result = Decimal::from(0);
         for i in root.iter() {
             match i.data() {
-                Symbol::Number(_) | Symbol::Placeholder(_) => {}
-                Symbol::FuncSymbol(_) if i.data().is_symbol_name("^") => {
+                TermNode::Number(_) | TermNode::Placeholder(_) => {}
+                TermNode::Symbol(_) if i.data().is_symbol_name("^") => {
                     result += if let Some(v) = i.last_arg().unwrap().data().number() {
                         v.clone()
                     } else {
                         Decimal::from(1)
                     };
                 }
-                Symbol::FuncSymbol(_) | Symbol::Variable(_) | Symbol::Param(_) => {
+                TermNode::Symbol(_) | TermNode::Variable(_) | TermNode::Param(_) => {
                     result += Decimal::from(1);
                 }
             }
@@ -247,30 +249,30 @@ fn ordering(left: Subterm, right: Subterm) -> Ordering {
 
     // Symbol < Param < Variable < Number < Placeholder
     match (mean_arg(left).data(), mean_arg(right).data()) {
-        (Symbol::FuncSymbol(left), Symbol::FuncSymbol(right)) => left.cmp(right),
-        (Symbol::FuncSymbol(_), _) => Ordering::Less,
+        (TermNode::Symbol(left), TermNode::Symbol(right)) => left.cmp(right),
+        (TermNode::Symbol(_), _) => Ordering::Less,
 
-        (Symbol::Param(left), Symbol::Param(right)) => left.cmp(right),
-        (Symbol::Param(_), Symbol::FuncSymbol(_)) => Ordering::Greater,
-        (Symbol::Param(_), _) => Ordering::Less,
+        (TermNode::Param(left), TermNode::Param(right)) => left.cmp(right),
+        (TermNode::Param(_), TermNode::Symbol(_)) => Ordering::Greater,
+        (TermNode::Param(_), _) => Ordering::Less,
 
-        (Symbol::Variable(left), Symbol::Variable(right)) => left.cmp(right),
-        (Symbol::Variable(_), Symbol::Number(_)) => Ordering::Less,
-        (Symbol::Variable(_), Symbol::Placeholder(_)) => Ordering::Less,
-        (Symbol::Variable(_), _) => Ordering::Greater,
+        (TermNode::Variable(left), TermNode::Variable(right)) => left.cmp(right),
+        (TermNode::Variable(_), TermNode::Number(_)) => Ordering::Less,
+        (TermNode::Variable(_), TermNode::Placeholder(_)) => Ordering::Less,
+        (TermNode::Variable(_), _) => Ordering::Greater,
 
-        (Symbol::Number(left), Symbol::Number(right)) => left.cmp(right),
-        (Symbol::Number(_), Symbol::Placeholder(_)) => Ordering::Less,
-        (Symbol::Number(_), _) => Ordering::Greater,
+        (TermNode::Number(left), TermNode::Number(right)) => left.cmp(right),
+        (TermNode::Number(_), TermNode::Placeholder(_)) => Ordering::Less,
+        (TermNode::Number(_), _) => Ordering::Greater,
 
-        (Symbol::Placeholder(_), Symbol::Placeholder(_)) => Ordering::Equal,
-        (Symbol::Placeholder(_), _) => Ordering::Greater,
+        (TermNode::Placeholder(_), TermNode::Placeholder(_)) => Ordering::Equal,
+        (TermNode::Placeholder(_), _) => Ordering::Greater,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::term::{func::base::calculator_check, term_with_vars};
+    use crate::term::{symbol::base::calculator_check, term_with_vars};
 
     use super::*;
 

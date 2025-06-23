@@ -1,19 +1,19 @@
 use std::str::FromStr;
 
-use solver::term::{FuncSymbol, SymbolAttr, SymbolAttrValue};
+use solver::term::{SymbolAttr, SymbolAttrValue, SymbolProgram};
 
 use super::{Node, ParserError};
 
-pub struct FuncSymbolParser<'a> {
+pub struct SymbolParser<'a> {
     ast: &'a Node,
 }
 
-impl<'a> FuncSymbolParser<'a> {
+impl<'a> SymbolParser<'a> {
     pub fn new(syntax_tree: &'a Node) -> Self {
         Self { ast: syntax_tree }
     }
 
-    pub fn parse(self) -> Result<FuncSymbol, ParserError> {
+    pub fn parse(self) -> Result<SymbolProgram, ParserError> {
         if self.ast.data().symbol != "Declare" {
             return Err(ParserError {
                 loc: self.ast.data().location.clone(),
@@ -21,7 +21,7 @@ impl<'a> FuncSymbolParser<'a> {
             });
         }
 
-        let mut builder = FuncSymbol::builder();
+        let mut builder = SymbolProgram::builder();
 
         for sym_child in self.ast.iter() {
             if sym_child.data().symbol == "Symbol" {
@@ -83,13 +83,11 @@ pub mod tests {
         let test_str = "symbol + { attr infix(10) }";
         let states = lang::symbol(test_str).unwrap();
 
-        let sym = FuncSymbolParser::new(&states).parse().unwrap();
+        let sym = SymbolParser::new(&states).parse().unwrap();
+        assert_eq!(sym.name, "+");
         assert_eq!(
-            sym,
-            FuncSymbol::builder()
-                .name("+")
-                .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(10))
-                .build()
+            sym.attrs.get(&SymbolAttr::Infix),
+            Some(&SymbolAttrValue::UInt(10))
         );
     }
 }

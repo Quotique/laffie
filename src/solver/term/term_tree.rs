@@ -3,17 +3,14 @@ use std::{
     convert::From,
     fmt,
     hash::Hash,
-    sync::Arc,
 };
 
 use trees::{tr, Tree};
 
-use super::{
-    normalize, FuncSymbol, NodePosition, Param, ParamsMapping, Subterm, SubtermMut, Symbol,
-};
+use super::{NodePosition, Param, ParamsMapping, Subterm, SubtermMut, Symbol, TermNode};
 use crate::{CompactString, Decimal, NormalizationLevel};
 
-pub type SymbolTree = Tree<Symbol>;
+pub type SymbolTree = Tree<TermNode>;
 
 #[derive(Clone, Eq)]
 pub struct Term {
@@ -30,22 +27,22 @@ impl Term {
 
     #[inline]
     pub fn func(symbol: impl AsRef<str>) -> Self {
-        Self::from(Symbol::with_func_symbol(symbol.as_ref()))
+        Self::from(TermNode::with_symbol(symbol.as_ref()))
     }
 
     #[inline]
     pub fn number(num: impl Into<Decimal>) -> Self {
-        Self::from(Symbol::Number(num.into()))
+        Self::from(TermNode::Number(num.into()))
     }
 
     #[inline]
     pub fn variable(var: impl Into<CompactString>) -> Self {
-        Self::from(Symbol::Variable(var.into().into()))
+        Self::from(TermNode::Variable(var.into().into()))
     }
 
     #[inline]
     pub fn param(param: impl Into<CompactString>) -> Self {
-        Self::from(Symbol::Param(param.into().into()))
+        Self::from(TermNode::Param(param.into().into()))
     }
 
     #[inline]
@@ -68,17 +65,16 @@ impl Term {
 impl Term {
     #[inline]
     pub fn normalize(mut self, level: NormalizationLevel) -> Self {
-        normalize(&mut self.as_subterm_mut(), level);
+        self.as_subterm_mut().normalize(level);
         self
     }
 
-    #[allow(clippy::mutable_key_type)]
-    pub fn func_symbols(&self) -> HashSet<Arc<FuncSymbol>> {
+    pub fn func_symbols(&self) -> HashSet<Symbol> {
         self.tree
             .root()
             .bfs()
             .iter
-            .filter_map(|x| x.data.func_symbol())
+            .filter_map(|x| x.data.symbol())
             .collect()
     }
 
@@ -89,12 +85,12 @@ impl Term {
     }
 
     #[inline]
-    pub fn data(&self) -> &Symbol {
+    pub fn data(&self) -> &TermNode {
         self.tree.data()
     }
 
     #[inline]
-    pub fn data_mut(&mut self) -> &mut Symbol {
+    pub fn data_mut(&mut self) -> &mut TermNode {
         self.tree.root_mut().get_mut().data_mut()
     }
 
@@ -109,7 +105,7 @@ impl Term {
     }
 
     #[inline]
-    pub fn destruct(mut self) -> (SymbolTree, trees::Forest<Symbol>) {
+    pub fn destruct(mut self) -> (SymbolTree, trees::Forest<TermNode>) {
         let childs = self.tree.abandon();
         (self.tree, childs)
     }
@@ -138,8 +134,8 @@ impl PartialEq for Term {
     }
 }
 
-impl From<Symbol> for Term {
-    fn from(value: Symbol) -> Self {
+impl From<TermNode> for Term {
+    fn from(value: TermNode) -> Self {
         Self::from(tr(value))
     }
 }

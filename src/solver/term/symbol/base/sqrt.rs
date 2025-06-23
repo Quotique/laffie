@@ -1,16 +1,18 @@
 use bigdecimal::BigDecimal as Decimal;
 use num::Integer;
 
+use super::SymbolProgram;
 use crate::{
-    term::{FuncSymbol, SubtermMut, Symbol},
+    term::{SubtermMut, TermNode},
     NormalizationLevel,
 };
 
-pub fn symbol() -> FuncSymbol {
-    FuncSymbol::builder()
-        .name("sqrt")
-        .with_calculator(Box::new(sqrt))
-        .build()
+pub fn symbol() -> SymbolProgram {
+    SymbolProgram {
+        name: "sqrt".into(),
+        calculator: Box::new(sqrt),
+        ..Default::default()
+    }
 }
 
 pub fn sqrt(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
@@ -23,7 +25,7 @@ pub fn sqrt(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
     }
 
     let last = root.pop_last_arg().unwrap();
-    if let Symbol::Number(d) = &last.data() {
+    if let TermNode::Number(d) = &last.data() {
         if d >= &Decimal::from(0) {
             let (mut m, mut e) = d.as_bigint_and_exponent();
             if e.is_odd() {
@@ -32,7 +34,7 @@ pub fn sqrt(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
             }
             let r = m.sqrt();
             if m == &r * &r {
-                *root.data_mut() = Symbol::Number(Decimal::new(r, e / 2));
+                *root.data_mut() = TermNode::Number(Decimal::new(r, e / 2));
                 return true;
             }
         }

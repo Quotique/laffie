@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     rule::{Hypothesis, HypothesisIterator, Rule, RuleAttr, RulesEngine, SharedRule},
-    term::{normalize, SubtermMut, Term, TermProps},
+    term::{SubtermMut, Term, TermProps},
     NormalizationLevel, RuleId,
 };
 
@@ -380,7 +380,7 @@ impl Solver {
         let mut clone = term.as_subterm().to_term();
         is_replace(&mut clone.as_subterm_mut());
         // TODO: normalization level
-        normalize(&mut clone.as_subterm_mut(), NormalizationLevel::max());
+        clone.as_subterm_mut().normalize(NormalizationLevel::max());
 
         let proof_purpose = Rc::new(Term::func("proof").with_child(clone));
 
@@ -692,13 +692,7 @@ fn is_replace(root: &mut SubtermMut) {
         return;
     }
 
-    match root
-        .last_arg()
-        .unwrap()
-        .data()
-        .func_symbol()
-        .map(|x| x.name.clone())
-    {
+    match root.last_arg().unwrap().data().symbol() {
         Some(name) if name == "true" => {
             let mut child = root.pop_first_arg().unwrap();
             root.swap(&mut child.as_subterm_mut());

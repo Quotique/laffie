@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt, hash::Hash, rc::Rc, sync::Arc};
+use std::{collections::HashSet, fmt, hash::Hash, rc::Rc};
 
 use eyre::Result;
 use multimap::MultiMap;
@@ -10,7 +10,7 @@ use super::{
     rule_attribute::{RuleAttr, RuleAttrValue},
 };
 use crate::{
-    term::{FuncSymbol, NodePosition, ParamsMapping, Subterm, SubtermMut, Term, TermProps},
+    term::{NodePosition, ParamsMapping, Subterm, SubtermMut, Symbol, Term, TermProps},
     NormalizationLevel, RuleId,
 };
 
@@ -28,7 +28,7 @@ pub type SharedRule = Rc<Rule>;
 pub struct Rule {
     pub id:          RuleId,
     pub level:       usize,
-    pub func_symbol: Arc<FuncSymbol>,
+    pub func_symbol: Symbol,
 
     pub attrs: MultiMap<RuleAttr, RuleAttrValue>,
     pub block: Vec<RuleId>,
@@ -40,7 +40,7 @@ pub struct Rule {
 
     pub requirements: Vec<Term>,
 
-    pub pattern_symbols: HashSet<Arc<FuncSymbol>>,
+    pub pattern_symbols: HashSet<Symbol>,
 }
 
 impl PartialEq for Rule {
@@ -103,8 +103,7 @@ impl Rule {
         for s in self.pattern_symbols.iter() {
             if !term.func_symbols.contains(s) {
                 return Err(RuleDeclineReason::ParamsMappingErr(format!(
-                    "symbol: {} not found",
-                    s.name
+                    "symbol: {s} not found"
                 )));
             }
         }

@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use trees::tr;
 
 use solver::{
-    term::{FuncSymbol, NodePosition, Param, Placeholder, Symbol, SymbolTree, Term, Variable},
+    term::{NodePosition, Param, Placeholder, Symbol, SymbolTree, Term, TermNode, Variable},
     Decimal,
 };
 
@@ -83,7 +83,7 @@ impl<'a> TermParser<'a> {
             &node_type,
             last_placeholder_id,
         ));
-        if tree.root().data().func_symbol().is_some() {
+        if tree.root().data().symbol().is_some() {
             for (num, child) in node.iter().enumerate() {
                 tree.push_back(Self::try_parse_impl(
                     child,
@@ -103,21 +103,21 @@ impl<'a> TermParser<'a> {
         Ok(tree)
     }
 
-    fn parse_term(data: &str, node_type: &NodeType, last_placeholder_id: &mut u64) -> Symbol {
+    fn parse_term(data: &str, node_type: &NodeType, last_placeholder_id: &mut u64) -> TermNode {
         if data == ".." {
             *last_placeholder_id += 1;
-            Symbol::Placeholder(Placeholder::from(*last_placeholder_id))
+            TermNode::Placeholder(Placeholder::from(*last_placeholder_id))
         } else if let Ok(value) = Decimal::from_str(data) {
-            Symbol::Number(value)
-        } else if let Some(symbol) = FuncSymbol::by_name(data) {
-            Symbol::FuncSymbol(symbol)
+            TermNode::Number(value)
+        } else if let Some(symbol) = Symbol::by_name(data) {
+            TermNode::Symbol(symbol)
         } else {
             match node_type {
                 NodeType::Rule => {
-                    Symbol::Param(Param::from_str(data).expect("unable to create param"))
+                    TermNode::Param(Param::from_str(data).expect("unable to create param"))
                 }
                 NodeType::Statement => {
-                    Symbol::Variable(Variable::from_str(data).expect("unable to create variable"))
+                    TermNode::Variable(Variable::from_str(data).expect("unable to create variable"))
                 }
             }
         }
@@ -128,7 +128,7 @@ impl<'a> TermParser<'a> {
 mod tests {
     use trees::tr;
 
-    use solver::term::Symbol;
+    use solver::term::TermNode;
 
     use crate::lang;
 
@@ -144,13 +144,13 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            (tr(Symbol::with_func_symbol("==")) /
-                (tr(Symbol::with_func_symbol("+")) /
-                    (tr(Symbol::with_func_symbol("*")) /
-                        tr(Symbol::Param("a".parse().unwrap())) /
-                        tr(Symbol::Param("x".parse().unwrap()))) /
-                    tr(Symbol::Param("b".parse().unwrap()))) /
-                tr(Symbol::Number(0.into())))
+            (tr(TermNode::with_symbol("==")) /
+                (tr(TermNode::with_symbol("+")) /
+                    (tr(TermNode::with_symbol("*")) /
+                        tr(TermNode::Param("a".parse().unwrap())) /
+                        tr(TermNode::Param("x".parse().unwrap()))) /
+                    tr(TermNode::Param("b".parse().unwrap()))) /
+                tr(TermNode::Number(0.into())))
             .into()
         );
     }

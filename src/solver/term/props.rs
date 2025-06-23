@@ -4,10 +4,9 @@ use std::{
     fmt,
     hash::{Hash, Hasher},
     rc::Rc,
-    sync::Arc,
 };
 
-use super::{FuncSymbol, Term};
+use super::{Symbol, Term};
 use crate::{
     rule::{RuleAttr, RuleAttrValue, RuleBuilder, SharedRule},
     RuleId,
@@ -21,7 +20,7 @@ pub struct TermProps {
     pub requirements: Vec<Rc<Term>>,
 
     pub term:         Rc<Term>,
-    pub func_symbols: HashSet<Arc<FuncSymbol>>,
+    pub func_symbols: HashSet<Symbol>,
     as_rule:          Option<SharedRule>,
 
     pub applied_rules: HashSet<RuleId>,

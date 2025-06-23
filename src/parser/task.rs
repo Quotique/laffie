@@ -98,7 +98,7 @@ impl<'a> TaskParser<'a> {
 mod tests {
     use trees::tr;
 
-    use solver::term::Symbol;
+    use solver::term::TermNode;
 
     use crate::lang;
 
@@ -119,13 +119,13 @@ mod tests {
         assert_eq!(task.conditions.len(), 1);
         assert_eq!(
             *task.conditions[0].term,
-            (tr(Symbol::with_func_symbol("==")) /
-                (tr(Symbol::with_func_symbol("+")) /
-                    (tr(Symbol::with_func_symbol("*")) /
-                        tr(Symbol::with_number(2)) /
-                        tr(Symbol::Variable("x".parse().unwrap()))) /
-                    tr(Symbol::Number(5.into()))) /
-                tr(Symbol::Number(0.into())))
+            (tr(TermNode::with_symbol("==")) /
+                (tr(TermNode::with_symbol("+")) /
+                    (tr(TermNode::with_symbol("*")) /
+                        tr(TermNode::with_number(2)) /
+                        tr(TermNode::Variable("x".parse().unwrap()))) /
+                    tr(TermNode::Number(5.into()))) /
+                tr(TermNode::Number(0.into())))
             .into()
         );
     }
