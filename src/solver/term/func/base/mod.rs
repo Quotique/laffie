@@ -3,7 +3,7 @@ use std::{cmp::Ordering, rc::Rc};
 #[cfg(test)]
 use crate::term::term_with_params;
 use crate::{
-    term::{func::SymbolAttr, Symbol, SymbolNode, SymbolNodeMut},
+    term::{func::SymbolAttr, Subterm, SubtermMut, Symbol},
     NormalizationLevel,
 };
 
@@ -27,30 +27,30 @@ pub mod symbolic_eq;
 
 pub const MAX_DEC_CONVERSION_EXP: i64 = 6;
 
-fn associative_nesting_remove(root: &mut SymbolNodeMut) -> bool {
+fn associative_nesting_remove(root: &mut SubtermMut) -> bool {
     let mut result = false;
     if let Some(symbol) = &root.data().func_symbol() {
         if symbol.attrs.read().contains_key(&SymbolAttr::Associative) {
             let root_degree = root.degree();
             for _ in 0..root_degree {
-                let mut child = root.pop_front().unwrap();
+                let mut child = root.pop_first_arg().unwrap();
                 if let Some(child_symbol) = &child.data().func_symbol() {
                     if child_symbol == symbol {
-                        while let Some(node) = child.root_mut().pop_front() {
-                            root.push_back(node);
+                        while let Some(node) = child.as_subterm_mut().pop_first_arg() {
+                            root.push_last_arg(node);
                         }
                         result = true;
                         continue;
                     }
                 }
-                root.push_back(child);
+                root.push_last_arg(child);
             }
         }
     }
     result
 }
 
-fn default_ordering(left: SymbolNode, right: SymbolNode) -> Ordering {
+fn default_ordering(left: Subterm, right: Subterm) -> Ordering {
     // Symbol < Param < Varible < Number < Placeholder
     match (left.data(), right.data()) {
         (Symbol::FuncSymbol(id_l), Symbol::FuncSymbol(id_r)) => id_l.cmp(id_r),
@@ -74,7 +74,7 @@ fn default_ordering(left: SymbolNode, right: SymbolNode) -> Ordering {
     }
 }
 
-fn commutative_reorder(root: &mut SymbolNodeMut) -> bool {
+fn commutative_reorder(root: &mut SubtermMut) -> bool {
     let mut result = false;
     if let Some(symbol) = &root.data().func_symbol() {
         if symbol.attrs.read().contains_key(&SymbolAttr::Commutative) {
@@ -95,18 +95,18 @@ fn commutative_reorder(root: &mut SymbolNodeMut) -> bool {
                 result = true;
                 let mut to_sort = vec![];
 
-                while let Some(t) = root.pop_front() {
+                while let Some(t) = root.pop_first_arg() {
                     to_sort.push(Rc::new(t));
                 }
 
                 to_sort.sort_by(|x, y| {
                     symbol
-                        .arg_order(x.root(), y.root())
-                        .unwrap_or_else(|| default_ordering(x.root(), y.root()))
+                        .arg_order(x.as_subterm(), y.as_subterm())
+                        .unwrap_or_else(|| default_ordering(x.as_subterm(), y.as_subterm()))
                 });
 
                 while let Some(t) = to_sort.pop() {
-                    root.push_front(Rc::try_unwrap(t).unwrap());
+                    root.push_first_arg(Rc::try_unwrap(t).unwrap());
                 }
             }
         }
@@ -114,7 +114,7 @@ fn commutative_reorder(root: &mut SymbolNodeMut) -> bool {
     result
 }
 
-pub fn normalize(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
+pub fn normalize(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     let mut result = false;
     for mut i in root.iter_mut() {
         result |= normalize(&mut i, level);
@@ -129,7 +129,7 @@ pub fn normalize(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     result
 }
 
-fn compare_numbers(left: SymbolNode, right: SymbolNode) -> Option<Ordering> {
+fn compare_numbers(left: Subterm, right: Subterm) -> Option<Ordering> {
     let left_num = left.data().number()?;
     let right_num = right.data().number()?;
 
@@ -140,13 +140,13 @@ fn compare_numbers(left: SymbolNode, right: SymbolNode) -> Option<Ordering> {
 pub fn calculator_check(
     src: &'static str,
     res: &'static str,
-    f: impl Fn(&mut SymbolNodeMut, NormalizationLevel) -> bool,
+    f: impl Fn(&mut SubtermMut, NormalizationLevel) -> bool,
     level: NormalizationLevel,
 ) {
     let mut s = term_with_params(src);
     let r = term_with_params(res);
     assert_eq!(
-        f(&mut s.root_mut(), level),
+        f(&mut s.as_subterm_mut(), level),
         src != res,
         "{src} {res} l:{level}"
     );
@@ -173,8 +173,8 @@ mod operations_tests {
                     .with_child(Term::number(1))
                     .with_child(Term::number(2)),
             );
-        assert!(associative_nesting_remove(&mut test_tree.root_mut()));
-        assert_eq!(test_tree.root().degree(), 4);
+        assert!(associative_nesting_remove(&mut test_tree.as_subterm_mut()));
+        assert_eq!(test_tree.as_subterm().degree(), 4);
     }
 
     #[test]
@@ -185,7 +185,9 @@ mod operations_tests {
             .with_child(Term::number(2))
             .with_child(Term::number(5));
 
-        assert!(test_tree1.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree1
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree1, Term::number(8));
 
         // x+1+2+5 -> x+8
@@ -195,8 +197,10 @@ mod operations_tests {
             .with_child(Term::number(2))
             .with_child(Term::number(5));
 
-        assert!(test_tree1.root_mut().evaluate(NormalizationLevel::max()));
-        commutative_reorder(&mut test_tree1.root_mut());
+        assert!(test_tree1
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        commutative_reorder(&mut test_tree1.as_subterm_mut());
         assert_eq!(
             test_tree1,
             Term::func("+")
@@ -212,7 +216,9 @@ mod operations_tests {
             .with_child(Term::number(1))
             .with_child(Term::number(2))
             .with_child(Term::number(5));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, Term::number(10));
 
         // x*1*2*5 -> 10*x
@@ -222,8 +228,10 @@ mod operations_tests {
             .with_child(Term::number(2))
             .with_child(Term::number(5));
 
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
-        commutative_reorder(&mut test_tree.root_mut());
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
+        commutative_reorder(&mut test_tree.as_subterm_mut());
         assert_eq!(
             test_tree,
             Term::func("*")
@@ -236,7 +244,9 @@ mod operations_tests {
             .with_child(Term::variable("x"))
             .with_child(Term::number(1));
 
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, Term::variable("x"));
     }
 
@@ -247,7 +257,9 @@ mod operations_tests {
             .with_child(Term::number(10))
             .with_child(Term::number(2));
 
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, Term::number(5));
 
         // x / 2 -> x / 2
@@ -255,7 +267,9 @@ mod operations_tests {
             .with_child(Term::variable("x"))
             .with_child(Term::number(2));
 
-        assert!(!test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(!test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             Term::func("/")
@@ -267,14 +281,18 @@ mod operations_tests {
         let mut test_tree = Term::func("/")
             .with_child(Term::number(2))
             .with_child(Term::number(5));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, Term::number((4, 1)));
 
         // 30 / 45 -> 2/3
         let mut test_tree = Term::func("/")
             .with_child(Term::number(30))
             .with_child(Term::number(45));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             Term::func("/")
@@ -286,7 +304,9 @@ mod operations_tests {
         let mut test_tree = Term::func("/")
             .with_child(Term::number(30))
             .with_child(Term::number((45, 1)));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             Term::func("/")
@@ -301,28 +321,36 @@ mod operations_tests {
         let mut test_tree = Term::func("^")
             .with_child(Term::number(2))
             .with_child(Term::number(2));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, Term::number(4));
 
         // 2 ^ (-2) -> 0.25
         let mut test_tree = Term::func("^")
             .with_child(Term::number(2))
             .with_child(Term::number(-2));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, Term::number((25, 2)));
 
         // 0.5 ^ (-2) -> 4
         let mut test_tree = Term::func("^")
             .with_child(Term::number((5, 1)))
             .with_child(Term::number(-2));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(test_tree, Term::number(4));
 
         // 3 ^ (-2) -> 1/9
         let mut test_tree = Term::func("^")
             .with_child(Term::number(3))
             .with_child(Term::number(-2));
-        assert!(test_tree.root_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree
+            .as_subterm_mut()
+            .evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
             Term::func("/")
@@ -350,7 +378,7 @@ mod operations_tests {
                     .with_child(Term::number(3)),
             );
 
-        assert!(commutative_reorder(&mut test_tree.root_mut()));
+        assert!(commutative_reorder(&mut test_tree.as_subterm_mut()));
         assert_eq!(
             test_tree,
             Term::func("+")

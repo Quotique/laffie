@@ -1,4 +1,4 @@
-use crate::term::{FuncSymbol, SymbolAttr, SymbolAttrValue, SymbolNode, TruthResult};
+use crate::term::{FuncSymbol, Subterm, SymbolAttr, SymbolAttrValue, TruthResult};
 
 use super::compare_numbers;
 
@@ -10,12 +10,12 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn equal(root: SymbolNode) -> TruthResult {
+pub fn equal(root: Subterm) -> TruthResult {
     if !root.data().is_symbol_name("==") {
         return TruthResult::Unknown;
     }
 
-    match compare_numbers(root.front().unwrap(), root.back().unwrap()) {
+    match compare_numbers(root.first_arg().unwrap(), root.last_arg().unwrap()) {
         Some(std::cmp::Ordering::Equal) => TruthResult::True,
         Some(_) => TruthResult::False,
         _ => TruthResult::Unknown,

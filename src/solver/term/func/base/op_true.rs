@@ -1,4 +1,4 @@
-use crate::term::{FuncSymbol, SymbolNode, TruthResult};
+use crate::term::{FuncSymbol, Subterm, TruthResult};
 
 pub fn symbol() -> FuncSymbol {
     FuncSymbol::builder()
@@ -7,7 +7,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn is_true(root: SymbolNode) -> TruthResult {
+pub fn is_true(root: Subterm) -> TruthResult {
     if !root.data().is_symbol_name("true") {
         return TruthResult::Unknown;
     }

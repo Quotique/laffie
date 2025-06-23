@@ -1,5 +1,5 @@
 use crate::{
-    term::{swap_node, FuncSymbol, SymbolNodeMut, Term, VariablesMap},
+    term::{FuncSymbol, SubtermMut, Term, VariablesMap},
     NormalizationLevel,
 };
 
@@ -10,7 +10,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn replace(root: &mut SymbolNodeMut, _: NormalizationLevel) -> bool {
+pub fn replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }
@@ -20,30 +20,30 @@ pub fn replace(root: &mut SymbolNodeMut, _: NormalizationLevel) -> bool {
     // }
 
     let map = root
-        .pop_front()
+        .pop_first_arg()
         .expect("replace must have a first argument");
     let map = into_variable_map(map);
 
     let mut term = root
-        .pop_front()
+        .pop_first_arg()
         .expect("replace must have a second argument");
 
-    term.root_mut().apply_variable_map(&map);
+    term.as_subterm_mut().apply_variable_map(&map);
 
-    swap_node(root, &mut term.root_mut());
+    root.swap(&mut term.as_subterm_mut());
     true
 }
 
 fn into_variable_map(mut state: Term) -> VariablesMap {
     let mut result = VariablesMap::default();
 
-    if !state.data().is_symbol_name("==") || state.root().degree() != 2 {
+    if !state.data().is_symbol_name("==") || state.as_subterm().degree() != 2 {
         return result;
     }
-    let var = state.root().front().expect("must be");
+    let var = state.as_subterm().first_arg().expect("must be");
 
     if let Some(v) = var.data().variable() {
-        result.insert(v.clone(), state.root_mut().pop_back().unwrap());
+        result.insert(v.clone(), state.as_subterm_mut().pop_last_arg().unwrap());
     }
     result
 }

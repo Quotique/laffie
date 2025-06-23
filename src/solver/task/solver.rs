@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     rule::{Hypothesis, HypothesisIterator, Rule, RuleAttr, RulesEngine, SharedRule},
-    term::{normalize, swap_node, SymbolNodeMut, Term, TermProps},
+    term::{normalize, SubtermMut, Term, TermProps},
     NormalizationLevel, RuleId,
 };
 
@@ -377,14 +377,14 @@ impl Solver {
 
     // Returns proof purpose (is a key for tasks cache)
     fn proof(&self, term: &Term) -> Option<Rc<Term>> {
-        let mut clone = term.root().deep_clone();
-        is_replace(&mut clone.root_mut());
+        let mut clone = term.as_subterm().to_term();
+        is_replace(&mut clone.as_subterm_mut());
         // TODO: normalization level
-        normalize(&mut clone.root_mut(), NormalizationLevel::max());
+        normalize(&mut clone.as_subterm_mut(), NormalizationLevel::max());
 
         let proof_purpose = Rc::new(Term::func("proof").with_child(clone));
 
-        if term.root().check_truth().is_true() {
+        if term.as_subterm().truth().is_true() {
             return Some(proof_purpose);
         }
         self.solve_subtask(proof_purpose.clone())
@@ -399,16 +399,21 @@ impl Solver {
 
         let (answer_wrap, to_transform) = if self.terms[index]
             .term
-            .root()
+            .as_subterm()
             .data()
             .is_symbol_name("answer")
         {
             (
                 true,
-                self.terms[index].term.root().front().unwrap().deep_clone(),
+                self.terms[index]
+                    .term
+                    .as_subterm()
+                    .first_arg()
+                    .unwrap()
+                    .to_term(),
             )
         } else {
-            (false, self.terms[index].term.root().deep_clone())
+            (false, self.terms[index].term.as_subterm().to_term())
         };
 
         let task = Rc::new(Term::func("transform").with_child(to_transform));
@@ -418,8 +423,8 @@ impl Solver {
         let mut answer = subtask_solver.answer().unwrap().as_ref().clone();
         if answer_wrap {
             let mut tmp = Term::func("answer");
-            swap_node(&mut answer.root_mut(), &mut tmp.root_mut());
-            answer.root_mut().push_back(tmp);
+            answer.as_subterm_mut().swap(&mut tmp.as_subterm_mut());
+            answer.as_subterm_mut().push_last_arg(tmp);
         }
 
         if *self.terms[index].term == answer {
@@ -443,7 +448,7 @@ impl Solver {
             None => {}
         }
 
-        self.cache.add(task.root().deep_clone());
+        self.cache.add(task.as_subterm().to_term());
 
         let subtask = TaskBuilder::default()
             .with_purpose(TermProps::from(task.clone()))
@@ -451,7 +456,9 @@ impl Solver {
             .with_conditions(
                 self.terms
                     .iter()
-                    .filter(|x| !(x.is_purpose || x.term.root().data().is_symbol_name("answer")))
+                    .filter(|x| {
+                        !(x.is_purpose || x.term.as_subterm().data().is_symbol_name("answer"))
+                    })
                     .cloned(),
             )
             .with_level(self.task.subtask_level + 1)
@@ -517,7 +524,8 @@ impl Solver {
                     }
 
                     let purpose = TermProps::from(Rc::new(
-                        Term::func("proof").with_child(self.terms[index].term.root().deep_clone()),
+                        Term::func("proof")
+                            .with_child(self.terms[index].term.as_subterm().to_term()),
                     ));
                     let mut added = false;
                     for rule in self.suggest_rules(
@@ -592,14 +600,18 @@ impl Solver {
     }
 
     fn is_answer(&self, term: &TermProps) -> Option<Hypothesis> {
-        let term_root = term.term.root();
+        let term_root = term.term.as_subterm();
 
         if !self.purpose.is_transform() &&
             term_root.data().is_symbol_name("answer") &&
             term_root.degree() == 1
         {
             let mut resolution = TermProps::from(Rc::from(
-                (*term.term).clone().root_mut().pop_front().unwrap(),
+                (*term.term)
+                    .clone()
+                    .as_subterm_mut()
+                    .pop_first_arg()
+                    .unwrap(),
             ));
             if let Some(parent) = term.parent {
                 resolution = resolution.with_parent(parent);
@@ -620,9 +632,9 @@ impl Solver {
                     return None;
                 }
 
-                if term_root.front().unwrap() == x.term.root() {
+                if term_root.first_arg().unwrap() == x.term.as_subterm() {
                     let is_known = Term::func("is")
-                        .with_child(term_root.back().unwrap().deep_clone())
+                        .with_child(term_root.last_arg().unwrap().to_term())
                         .with_child(Term::func("known"));
 
                     return Some(Hypothesis {
@@ -635,14 +647,14 @@ impl Solver {
             }
             Purpose::Proof(_) => {
                 for i in self.purpose_index.values() {
-                    if term_root == self.terms[*i].term.root() {
+                    if term_root == self.terms[*i].term.as_subterm() {
                         return Some(Hypothesis {
                             requirements: vec![],
                             resolution:   term.clone(),
                             params:       Default::default(),
                         });
                     }
-                    if self.terms[*i].term.root().check_truth().is_true() {
+                    if self.terms[*i].term.as_subterm().truth().is_true() {
                         return Some(Hypothesis {
                             requirements: vec![],
                             resolution:   self.terms[*i].clone().without_parents(),
@@ -675,25 +687,25 @@ impl Solver {
     }
 }
 
-fn is_replace(root: &mut SymbolNodeMut) {
+fn is_replace(root: &mut SubtermMut) {
     if !root.data().is_symbol_name("is") || root.degree() != 2 {
         return;
     }
 
     match root
-        .back()
+        .last_arg()
         .unwrap()
         .data()
         .func_symbol()
         .map(|x| x.name.clone())
     {
         Some(name) if name == "true" => {
-            let mut child = root.pop_front().unwrap();
-            swap_node(root, &mut child.root_mut());
+            let mut child = root.pop_first_arg().unwrap();
+            root.swap(&mut child.as_subterm_mut());
         }
         Some(name) if name == "false" => {
-            let child = root.pop_front().unwrap();
-            swap_node(root, &mut Term::func("!").with_child(child).root_mut());
+            let child = root.pop_first_arg().unwrap();
+            root.swap(&mut Term::func("!").with_child(child).as_subterm_mut());
         }
         _ => {}
     }

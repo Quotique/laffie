@@ -3,9 +3,7 @@ use std::{cmp::Ordering, collections::HashMap};
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
 
 use crate::{
-    term::{
-        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut, Term,
-    },
+    term::{FuncSymbol, Subterm, SubtermMut, Symbol, SymbolAttr, SymbolAttrValue, Term},
     NormalizationLevel,
 };
 
@@ -22,7 +20,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn multiply(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
+pub fn multiply(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("*") {
         return false;
     }
@@ -34,7 +32,7 @@ pub fn multiply(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
                 .iter()
                 .any(|x| x.data().is_number_value(&Decimal::zero()))
             {
-                swap_node(root, &mut Term::zero().root_mut());
+                root.swap(&mut Term::zero().as_subterm_mut());
                 return true;
             }
             let result = root.iter_mut().fold(false, |acc, mut x| {
@@ -64,8 +62,7 @@ pub fn multiply(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
                                 let mut new_pow = Term::func("+")
                                     .with_child(p.clone())
                                     .with_child(power.clone());
-
-                                swap_node(&mut p.root_mut(), &mut new_pow.root_mut());
+                                p.as_subterm_mut().swap(&mut new_pow.as_subterm_mut());
                                 result = true;
                             })
                             .or_insert(power);
@@ -74,14 +71,14 @@ pub fn multiply(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
             #[cfg(test)]
             let powers = {
                 let mut powers: Vec<_> = powers.into_iter().collect();
-                powers.sort_by(|x, y| ordering(x.0.root(), y.0.root()));
+                powers.sort_by(|x, y| ordering(x.0.as_subterm(), y.0.as_subterm()));
                 powers
             };
             for (elem, mut pow) in powers.into_iter() {
-                plus(&mut pow.root_mut(), level);
+                plus(&mut pow.as_subterm_mut(), level);
                 let arg = merge_power(elem, pow);
                 if !arg.data().is_number_value(&Decimal::from(1)) {
-                    root.push_back(arg);
+                    root.push_last_arg(arg);
                 }
             }
             attach_constant(root, constant) || remove_unused_mul(root) || result
@@ -89,19 +86,19 @@ pub fn multiply(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     }
 }
 
-fn attach_constant(root: &mut SymbolNodeMut, constant: Decimal) -> bool {
+fn attach_constant(root: &mut SubtermMut, constant: Decimal) -> bool {
     if constant == Decimal::zero() {
-        swap_node(root, &mut Term::zero().root_mut());
+        root.swap(&mut Term::zero().as_subterm_mut());
         true
     } else if constant != Decimal::one() {
-        root.push_front(Term::number(constant));
+        root.push_first_arg(Term::number(constant));
         false
     } else {
         false
     }
 }
 
-fn fold_constant(root: &mut SymbolNodeMut) -> (Decimal, bool) {
+fn fold_constant(root: &mut SubtermMut) -> (Decimal, bool) {
     root.iter_mut()
         .enumerate()
         .fold((Decimal::from(1), false), |acc, (num, mut x)| {
@@ -115,15 +112,15 @@ fn fold_constant(root: &mut SymbolNodeMut) -> (Decimal, bool) {
         })
 }
 
-fn remove_unused_mul(root: &mut SymbolNodeMut) -> bool {
+fn remove_unused_mul(root: &mut SubtermMut) -> bool {
     match root.degree() {
         0 => {
             *root.data_mut() = Symbol::Number(Decimal::from(1));
             true
         }
         1 => {
-            let mut child = root.pop_front().unwrap();
-            swap_node(root, &mut child.root_mut());
+            let mut child = root.pop_first_arg().unwrap();
+            root.swap(&mut child.as_subterm_mut());
             true
         }
         _ => false,
@@ -142,20 +139,20 @@ fn merge_power(root: Term, pow: Term) -> Term {
     Term::func("^").with_child(root).with_child(pow)
 }
 
-fn extract_power(root: &mut SymbolNodeMut) -> Term {
+fn extract_power(root: &mut SubtermMut) -> Term {
     if root.data().is_symbol_name("^") {
-        let power = root.pop_back().unwrap();
-        let mut arg = root.pop_front().unwrap();
+        let power = root.pop_last_arg().unwrap();
+        let mut arg = root.pop_first_arg().unwrap();
         assert_eq!(root.degree(), 0);
 
-        swap_node(root, &mut arg.root_mut());
+        root.swap(&mut arg.as_subterm_mut());
         power
     } else {
         Term::one()
     }
 }
 
-fn ordering(left: SymbolNode, right: SymbolNode) -> Ordering {
+fn ordering(left: Subterm, right: Subterm) -> Ordering {
     // Number < Param < Variable < Symbol < Placeholder
     let pa_left = power_argument(left);
     let pa_right = power_argument(right);

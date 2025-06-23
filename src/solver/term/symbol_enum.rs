@@ -2,9 +2,8 @@ use std::{fmt, hash::Hash, sync::Arc};
 
 use derive_more::{AsRef, Display, From, FromStr, Into};
 
-use crate::{CompactString, Decimal, Signed};
-
 use super::func::FuncSymbol;
+use crate::{CompactString, Decimal, Signed};
 
 #[derive(Clone, Debug, Display)]
 #[derive(PartialEq, Eq, Hash, AsRef, From, FromStr, Into, Ord, PartialOrd)]

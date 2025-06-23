@@ -2,9 +2,7 @@ use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive, Zero};
 use num::traits::Pow;
 
 use crate::{
-    term::{
-        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut, Term,
-    },
+    term::{FuncSymbol, Subterm, SubtermMut, Symbol, SymbolAttr, SymbolAttrValue, Term},
     NormalizationLevel,
 };
 
@@ -16,7 +14,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn power(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
+pub fn power(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("^") {
         return false;
     }
@@ -26,20 +24,20 @@ pub fn power(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     }
 
     match (
-        root.front().unwrap().data().number(),
-        root.back().unwrap().data().number(),
+        root.first_arg().unwrap().data().number(),
+        root.last_arg().unwrap().data().number(),
     ) {
         (Some(d1), Some(d2)) if level > 1.into() => {
             if let Some(e) = d2.to_i8() {
                 let (m, exp) = d1.as_bigint_and_exponent();
                 let result = Decimal::new(m.pow(e.unsigned_abs()), exp * (e.abs() as i64));
                 let mut result = Term::number(result);
-                while root.pop_front().is_some() {}
+                while root.pop_first_arg().is_some() {}
                 if e >= 0 {
-                    swap_node(root, &mut result.root_mut());
+                    root.swap(&mut result.as_subterm_mut());
                 } else {
                     *root.data_mut() = Symbol::with_func_symbol("/");
-                    root.push_back(Term::one()).push_back(result);
+                    root.push_last_arg(Term::one()).push_last_arg(result);
                     root.evaluate(level);
                 }
                 true
@@ -48,25 +46,25 @@ pub fn power(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
             }
         }
         (Some(arg), _) if arg.is_one() => {
-            swap_node(root, &mut Term::one().root_mut());
+            root.swap(&mut Term::one().as_subterm_mut());
             true
         }
         (_, Some(pow)) if pow.is_zero() => {
-            swap_node(root, &mut Term::one().root_mut());
+            root.swap(&mut Term::one().as_subterm_mut());
             true
         }
         (_, Some(pow)) if pow.is_one() => {
-            let mut arg = root.pop_front().unwrap();
-            swap_node(root, &mut arg.root_mut());
+            let mut arg = root.pop_first_arg().unwrap();
+            root.swap(&mut arg.as_subterm_mut());
             true
         }
         _ => false,
     }
 }
 
-pub fn power_argument(root: SymbolNode) -> SymbolNode {
+pub fn power_argument(root: Subterm) -> Subterm {
     if root.data().is_symbol_name("^") {
-        root.front().unwrap()
+        root.first_arg().unwrap()
     } else {
         root
     }

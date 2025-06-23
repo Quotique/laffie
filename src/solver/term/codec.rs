@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use bincode::{BorrowDecode, Decode, Encode};
 
-use super::{Symbol, SymbolNode, SymbolTree, Term};
+use super::{Subterm, Symbol, SymbolTree, Term};
 use crate::{CompactString, Decimal};
 
 use trees::tr;
@@ -111,7 +111,7 @@ impl<'de, Context> BorrowDecode<'de, Context> for Symbol {
 pub fn encode_node<E: bincode::enc::Encoder>(
     parent_no: isize,
     last_no: &mut isize,
-    node: SymbolNode,
+    node: Subterm,
     encoder: &mut E,
 ) -> core::result::Result<(), bincode::error::EncodeError> {
     Encode::encode(&parent_no, encoder)?;
@@ -201,7 +201,7 @@ impl Encode for Term {
         encoder: &mut E,
     ) -> core::result::Result<(), bincode::error::EncodeError> {
         let mut last_no = -1;
-        encode_node(-1, &mut last_no, self.root(), encoder)?;
+        encode_node(-1, &mut last_no, self.as_subterm(), encoder)?;
         Encode::encode(&-2, encoder)?;
         assert!(self.binds.is_empty(), "binds encode is not supported");
         Ok(())

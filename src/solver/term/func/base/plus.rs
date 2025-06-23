@@ -3,9 +3,7 @@ use std::cmp::Ordering;
 use bigdecimal::{BigDecimal as Decimal, Zero};
 
 use crate::{
-    term::{
-        swap_node, FuncSymbol, Symbol, SymbolAttr, SymbolAttrValue, SymbolNode, SymbolNodeMut, Term,
-    },
+    term::{FuncSymbol, Subterm, SubtermMut, Symbol, SymbolAttr, SymbolAttrValue, Term},
     NormalizationLevel,
 };
 
@@ -22,7 +20,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn plus(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
+pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("+") || root.degree() < 2 {
         return false;
     }
@@ -65,12 +63,12 @@ pub fn plus(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     let mut constant_mapping = indexmap::IndexMap::new();
 
     let mut children: Vec<_> = vec![];
-    while let Some(child) = root.pop_front() {
+    while let Some(child) = root.pop_first_arg() {
         children.push(child);
     }
 
     for mut child in children {
-        let num_const = extract_mul_const(&mut child.root_mut());
+        let num_const = extract_mul_const(&mut child.as_subterm_mut());
         constant_mapping
             .entry(child)
             .and_modify(|e| {
@@ -83,7 +81,7 @@ pub fn plus(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     for (mul, dec) in constant_mapping.into_iter() {
         let arg = merge_mul_const(mul, dec);
         if !arg.data().is_number_value(&Decimal::from(0)) {
-            root.push_back(arg);
+            root.push_last_arg(arg);
         } else {
             result = true;
         }
@@ -93,8 +91,8 @@ pub fn plus(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
         *root.data_mut() = Symbol::Number(Decimal::from(0));
         result = true;
     } else if root.degree() == 1 {
-        let mut child = root.pop_front().unwrap();
-        swap_node(root, &mut child.root_mut());
+        let mut child = root.pop_first_arg().unwrap();
+        root.swap(&mut child.as_subterm_mut());
         result = true;
     }
 
@@ -103,22 +101,22 @@ pub fn plus(root: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
     result
 }
 
-fn remove_unused_plus(root: &mut SymbolNodeMut) -> bool {
+fn remove_unused_plus(root: &mut SubtermMut) -> bool {
     if root.degree() == 0 {
         *root.data_mut() = Symbol::Number(Decimal::from(0));
         true
     } else if root.degree() == 1 {
-        let mut child = root.pop_front().unwrap();
-        swap_node(root, &mut child.root_mut());
+        let mut child = root.pop_first_arg().unwrap();
+        root.swap(&mut child.as_subterm_mut());
         true
     } else {
         false
     }
 }
 
-fn attach_constant(root: &mut SymbolNodeMut, constant: Decimal) {
+fn attach_constant(root: &mut SubtermMut, constant: Decimal) {
     if !constant.is_zero() {
-        root.push_back(Term::number(constant));
+        root.push_last_arg(Term::number(constant));
     }
 }
 
@@ -135,17 +133,17 @@ fn merge_mul_const(mut root: Term, d: Decimal) -> Term {
     }
 
     if root.data().is_symbol_name("*") {
-        root.root_mut().push_front(constant);
+        root.as_subterm_mut().push_first_arg(constant);
         root
     } else {
         Term::func("*").with_child(constant).with_child(root)
     }
 }
 
-fn extract_mul_const(root: &mut SymbolNodeMut) -> Decimal {
+fn extract_mul_const(root: &mut SubtermMut) -> Decimal {
     if let Some(d) = root.data().number() {
         let result = d.clone();
-        swap_node(root, &mut Term::one().root_mut());
+        root.swap(&mut Term::one().as_subterm_mut());
         return result;
     }
 
@@ -155,7 +153,7 @@ fn extract_mul_const(root: &mut SymbolNodeMut) -> Decimal {
     }
 
     let mut children = vec![];
-    while let Some(child) = root.pop_front() {
+    while let Some(child) = root.pop_first_arg() {
         if let Some(d) = child.data().number() {
             constant *= d;
         } else {
@@ -163,7 +161,7 @@ fn extract_mul_const(root: &mut SymbolNodeMut) -> Decimal {
         }
     }
     while let Some(child) = children.pop() {
-        root.push_front(child);
+        root.push_first_arg(child);
     }
     // Possible bug in Tree detach: degree stay 2 after detach
     // constant = root.iter_mut().fold(constant, |prev, mut x| {
@@ -179,15 +177,15 @@ fn extract_mul_const(root: &mut SymbolNodeMut) -> Decimal {
     if root.degree() == 0 {
         *root.data_mut() = Symbol::Number(Decimal::from(1));
     } else if root.degree() == 1 {
-        let mut child = root.pop_front().unwrap();
-        swap_node(root, &mut child.root_mut());
+        let mut child = root.pop_first_arg().unwrap();
+        root.swap(&mut child.as_subterm_mut());
     }
     constant
 }
 
-fn cummulative_power(root: SymbolNode) -> Decimal {
+fn cummulative_power(root: Subterm) -> Decimal {
     if root.data().is_symbol_name("^") {
-        if let Some(v) = root.back().unwrap().data().number() {
+        if let Some(v) = root.last_arg().unwrap().data().number() {
             v.clone()
         } else {
             Decimal::from(1)
@@ -198,7 +196,7 @@ fn cummulative_power(root: SymbolNode) -> Decimal {
             match i.data() {
                 Symbol::Number(_) | Symbol::Placeholder(_) => {}
                 Symbol::FuncSymbol(_) if i.data().is_symbol_name("^") => {
-                    result += if let Some(v) = i.back().unwrap().data().number() {
+                    result += if let Some(v) = i.last_arg().unwrap().data().number() {
                         v.clone()
                     } else {
                         Decimal::from(1)
@@ -215,7 +213,7 @@ fn cummulative_power(root: SymbolNode) -> Decimal {
     }
 }
 
-fn mean_arg(root: SymbolNode) -> SymbolNode {
+fn mean_arg(root: Subterm) -> Subterm {
     let pa = if root.data().is_symbol_name("*") {
         // find first non-number argument and omit power
         // last number argument in non-number not found
@@ -231,7 +229,7 @@ fn mean_arg(root: SymbolNode) -> SymbolNode {
                     }
                     true
                 })
-                .unwrap_or_else(|| root.back().unwrap()),
+                .unwrap_or_else(|| root.last_arg().unwrap()),
         )
     } else {
         power_argument(root)
@@ -240,7 +238,7 @@ fn mean_arg(root: SymbolNode) -> SymbolNode {
     pa
 }
 
-fn ordering(left: SymbolNode, right: SymbolNode) -> Ordering {
+fn ordering(left: Subterm, right: Subterm) -> Ordering {
     match cummulative_power(left).cmp(&cummulative_power(right)) {
         Ordering::Equal => {}
         Ordering::Less => return Ordering::Greater,
@@ -279,16 +277,16 @@ mod tests {
     #[test]
     fn mean_arg_test() {
         let state = term_with_vars("4*x^4");
-        assert_eq!(mean_arg(state.root()).to_string(), "x".to_owned());
+        assert_eq!(mean_arg(state.as_subterm()).to_string(), "x".to_owned());
 
         let state = term_with_vars("4");
-        assert_eq!(mean_arg(state.root()).to_string(), "4".to_owned());
+        assert_eq!(mean_arg(state.as_subterm()).to_string(), "4".to_owned());
 
         let state = term_with_vars("(-1)*y");
-        assert_eq!(mean_arg(state.root()).to_string(), "y".to_owned());
+        assert_eq!(mean_arg(state.as_subterm()).to_string(), "y".to_owned());
 
         let state = term_with_vars("-y");
-        assert_eq!(mean_arg(state.root()).to_string(), "y".to_owned());
+        assert_eq!(mean_arg(state.as_subterm()).to_string(), "y".to_owned());
     }
 
     #[test]

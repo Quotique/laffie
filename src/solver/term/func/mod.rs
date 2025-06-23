@@ -7,14 +7,14 @@ use std::{cmp, collections::HashMap, fmt, hash, str::FromStr, sync::Arc};
 
 use parking_lot::RwLock;
 
-use super::{SymbolNode, SymbolNodeMut};
+use super::{Subterm, SubtermMut};
 use crate::{CompactString, NormalizationLevel};
 
 pub use builder::FuncSymbolBuilder;
 pub use truth::{TruthChecker, TruthResult};
 
-type Comparator = dyn Fn(SymbolNode, SymbolNode) -> std::cmp::Ordering + Send + Sync;
-type CalculatorSignature = dyn Fn(&mut SymbolNodeMut, NormalizationLevel) -> bool + Send + Sync;
+type Comparator = dyn Fn(Subterm, Subterm) -> std::cmp::Ordering + Send + Sync;
+type CalculatorSignature = dyn Fn(&mut SubtermMut, NormalizationLevel) -> bool + Send + Sync;
 
 pub struct Ordering(Box<Comparator>);
 pub struct Calculator(Box<CalculatorSignature>);
@@ -58,14 +58,17 @@ impl fmt::Debug for FuncSymbol {
 }
 
 impl FuncSymbol {
+    #[inline]
     pub fn builder() -> FuncSymbolBuilder {
         FuncSymbolBuilder::default()
     }
 
+    #[inline]
     pub fn register(self) -> Arc<Self> {
         container::add_symbol_impl(&mut container::all_func_symbols().write(), self)
     }
 
+    #[inline]
     pub fn by_name(name: &str) -> Option<Arc<Self>> {
         container::all_func_symbols()
             .read()
@@ -73,12 +76,24 @@ impl FuncSymbol {
             .cloned()
     }
 
+    #[inline]
     pub fn add_with_name(symbols: &mut HashMap<CompactString, Arc<Self>>, name: &str) {
         container::add_symbol_impl(symbols, FuncSymbol::builder().name(name).build());
     }
 
+    #[inline]
     pub fn extend_attrs(&self, attrs: impl IntoIterator<Item = (SymbolAttr, SymbolAttrValue)>) {
         self.attrs.write().extend(attrs)
+    }
+
+    #[inline]
+    pub fn is_associative(&self) -> bool {
+        self.attrs.read().contains_key(&SymbolAttr::Associative)
+    }
+
+    #[inline]
+    pub fn is_commutative(&self) -> bool {
+        self.attrs.read().contains_key(&SymbolAttr::Commutative)
     }
 
     pub fn display_weight(&self) -> Option<u64> {
@@ -88,7 +103,7 @@ impl FuncSymbol {
         None
     }
 
-    pub fn check_truth(&self, node: SymbolNode) -> TruthResult {
+    pub fn check_truth(&self, node: Subterm) -> TruthResult {
         if let Some(c) = self.truth_checker.as_ref() {
             c.0(node)
         } else {
@@ -96,7 +111,7 @@ impl FuncSymbol {
         }
     }
 
-    pub fn evaluate(&self, node: &mut SymbolNodeMut, level: NormalizationLevel) -> bool {
+    pub fn evaluate(&self, node: &mut SubtermMut, level: NormalizationLevel) -> bool {
         if let Some(c) = self.calculator.as_ref() {
             c.0(node, level)
         } else {
@@ -104,7 +119,8 @@ impl FuncSymbol {
         }
     }
 
-    pub fn arg_order(&self, left: SymbolNode, right: SymbolNode) -> Option<std::cmp::Ordering> {
+    #[inline]
+    pub fn arg_order(&self, left: Subterm, right: Subterm) -> Option<std::cmp::Ordering> {
         self.arg_order.as_ref().as_ref().map(|o| o.0(left, right))
     }
 }
@@ -112,9 +128,10 @@ impl FuncSymbol {
 impl fmt::Display for FuncSymbol {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(SymbolAttrValue::UStr(s)) = self.attrs.read().get(&SymbolAttr::Display) {
-            return write!(f, "{s}");
+            write!(f, "{s}")
+        } else {
+            write!(f, "{}", self.name)
         }
-        write!(f, "{}", self.name)
     }
 }
 

@@ -1,9 +1,9 @@
-use std::{collections::HashMap, convert::From, fmt, sync::Arc};
+use std::{collections::BTreeMap, convert::From, fmt, sync::Arc};
 
 use multimap::MultiMap;
 
 use crate::{
-    term::{FuncSymbol, NodePosition, SymbolNode, Term},
+    term::{FuncSymbol, NodePosition, ParamsMapping, Subterm, Term},
     NormalizationLevel, RuleId,
 };
 
@@ -97,7 +97,7 @@ impl RuleBuilder {
         let term = self.term.take().ok_or(RuleBuilderError::BadTermRoot)?;
 
         let root_sym = term
-            .root()
+            .as_subterm()
             .data()
             .func_symbol()
             .ok_or(RuleBuilderError::BadTermRoot)?;
@@ -111,7 +111,7 @@ impl RuleBuilder {
             _ => return Err(RuleBuilderError::BadTermRoot),
         }
 
-        if term.root().degree() != 2 {
+        if term.as_subterm().degree() != 2 {
             return Err(RuleBuilderError::WrongArgsCount);
         }
 
@@ -147,10 +147,10 @@ impl RuleBuilder {
                     }
                 }
             }
-            let binds: HashMap<_, _> = term
+            let binds: BTreeMap<_, _> = term
                 .binds
                 .iter()
-                .map(|(param, pos)| (param.clone(), SymbolNode::from(&term[pos]).deep_clone()))
+                .map(|(param, pos)| (param.clone(), Subterm::from(&term[pos]).to_term()))
                 .collect();
 
             // TODO: normalization level
@@ -162,11 +162,14 @@ impl RuleBuilder {
                 func_symbol: self.func_symbol.clone(),
                 attrs: attrs.clone(),
                 block: Default::default(),
-                pattern_symbols: term.root().front().unwrap().symbols(),
+                pattern_symbols: term.as_subterm().first_arg().unwrap().symbols(),
                 term,
                 pattern: NodePosition::default().child(0),
                 replace: NodePosition::default().child(1),
-                binds: binds.into(),
+                binds: ParamsMapping {
+                    params:       binds,
+                    placeholders: Default::default(),
+                },
                 requirements: reqs,
             });
         }

@@ -2,7 +2,7 @@ use bigdecimal::BigDecimal as Decimal;
 use num::Integer;
 
 use crate::{
-    term::{FuncSymbol, Symbol, SymbolNodeMut},
+    term::{FuncSymbol, SubtermMut, Symbol},
     NormalizationLevel,
 };
 
@@ -13,7 +13,7 @@ pub fn symbol() -> FuncSymbol {
         .build()
 }
 
-pub fn sqrt(root: &mut SymbolNodeMut, _: NormalizationLevel) -> bool {
+pub fn sqrt(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("sqrt") {
         return false;
     }
@@ -22,7 +22,7 @@ pub fn sqrt(root: &mut SymbolNodeMut, _: NormalizationLevel) -> bool {
         panic!("'sqrt' is unary operator!");
     }
 
-    let last = root.pop_back().unwrap();
+    let last = root.pop_last_arg().unwrap();
     if let Symbol::Number(d) = &last.data() {
         if d >= &Decimal::from(0) {
             let (mut m, mut e) = d.as_bigint_and_exponent();
@@ -37,7 +37,7 @@ pub fn sqrt(root: &mut SymbolNodeMut, _: NormalizationLevel) -> bool {
             }
         }
     }
-    root.push_back(last);
+    root.push_last_arg(last);
 
     false
 }

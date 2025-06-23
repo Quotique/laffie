@@ -3,8 +3,8 @@ use std::str::FromStr;
 use crate::CompactString;
 
 use super::{
-    Calculator, CalculatorSignature, Comparator, FuncSymbol, Ordering, SymbolAttr, SymbolAttrValue,
-    SymbolNode, TruthChecker, TruthResult,
+    Calculator, CalculatorSignature, Comparator, FuncSymbol, Ordering, Subterm, SymbolAttr,
+    SymbolAttrValue, TruthChecker, TruthResult,
 };
 
 #[derive(Default)]
@@ -37,7 +37,7 @@ impl FuncSymbolBuilder {
 
     pub fn with_truth_checker(
         mut self,
-        truth_checker: Box<dyn Fn(SymbolNode) -> TruthResult + Send + Sync>,
+        truth_checker: Box<dyn Fn(Subterm) -> TruthResult + Send + Sync>,
     ) -> Self {
         self.sym.truth_checker = Some(TruthChecker(truth_checker));
         self

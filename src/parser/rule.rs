@@ -195,7 +195,7 @@ mod tests {
         let rule = rules.pop().unwrap();
 
         assert_eq!(
-            rule.pattern_node().deep_clone(),
+            rule.pattern_node().to_term(),
             Term::func("==")
                 .with_child(
                     Term::func("+")
@@ -206,7 +206,7 @@ mod tests {
         );
 
         assert_eq!(
-            rule.replace_node().deep_clone(),
+            rule.replace_node().to_term(),
             Term::func("==").with_child(Term::param("x")).with_child(
                 Term::func("*")
                     .with_child(Term::number(-1))
@@ -248,7 +248,7 @@ mod tests {
         let rule = rules.pop().unwrap();
 
         assert_eq!(
-            rule.pattern_node().deep_clone(),
+            rule.pattern_node().to_term(),
             Term::func("is")
                 .with_child(
                     Term::func("/")
@@ -258,7 +258,7 @@ mod tests {
                 .with_child(Term::func("known"))
         );
 
-        assert_eq!(rule.replace_node().deep_clone(), Term::func("true"));
+        assert_eq!(rule.replace_node().to_term(), Term::func("true"));
         assert_eq!(rule.requirements.len(), 2);
         assert_eq!(
             rule.requirements[0],

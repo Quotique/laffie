@@ -10,7 +10,7 @@ use super::{
     rule_attribute::{RuleAttr, RuleAttrValue},
 };
 use crate::{
-    term::{FuncSymbol, NodePosition, ParamsMapping, SymbolNode, SymbolNodeMut, Term, TermProps},
+    term::{FuncSymbol, NodePosition, ParamsMapping, Subterm, SubtermMut, Term, TermProps},
     NormalizationLevel, RuleId,
 };
 
@@ -118,12 +118,16 @@ impl Rule {
     ) -> Result<Vec<ParamsMapping>, RuleDeclineReason> {
         // TODO: multiple purposes
         if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Purpose).next() {
-            return ParamsMapping::try_map(purpose.term.root(), pattern.root()).map_err(|_| {
+            return purpose.term.as_subterm().try_match(pattern.as_subterm()).map_err(|_| {
                 debug!(target: "rule_selection", "no match purpose: {}, required: {}", purpose, pattern);
                 RuleDeclineReason::PurposeMissmatch
             });
         }
-        if (*purpose.term).root().data().is_symbol_name("transform") {
+        if (*purpose.term)
+            .as_subterm()
+            .data()
+            .is_symbol_name("transform")
+        {
             // Only transform rules for transform
             return Err(RuleDeclineReason::PurposeMissmatch);
         }
@@ -131,13 +135,13 @@ impl Rule {
     }
 
     #[inline]
-    pub fn pattern_node(&self) -> SymbolNode {
-        SymbolNode::from(&self.term[&self.pattern])
+    pub fn pattern_node(&self) -> Subterm {
+        Subterm::from(&self.term[&self.pattern])
     }
 
     #[inline]
-    pub fn replace_node(&self) -> SymbolNode {
-        SymbolNode::from(&self.term[&self.replace])
+    pub fn replace_node(&self) -> Subterm {
+        Subterm::from(&self.term[&self.replace])
     }
 }
 
@@ -171,7 +175,9 @@ impl ApplyRule for SharedRule {
         let maps: Vec<_> = mapping
             .into_iter()
             .flat_map(|m| {
-                ParamsMapping::subtree_map_extend(arg.term.root(), self.pattern_node(), m)
+                arg.term
+                    .as_subterm()
+                    .try_subterm_match_extend(self.pattern_node(), m)
                     .into_iter()
             })
             .collect();
@@ -182,11 +188,11 @@ impl ApplyRule for SharedRule {
         let mut result = vec![];
         for (maps, pos) in maps.into_iter() {
             for i in maps.into_iter() {
-                let replace = self.replace_node().deep_clone();
+                let replace = self.replace_node().to_term();
 
                 let mut replace = replace.apply_map(&self.binds).apply_map(&i);
                 let mut src = (*arg.term).clone();
-                replace.swap_node(&mut SymbolNodeMut::from(&mut src[&pos]));
+                replace.swap(&mut SubtermMut::from(&mut src[&pos]));
                 src = src.normalize(self.norm_level());
                 let mut resolution = TermProps::from(Rc::new(src))
                     .with_rule(self.clone())

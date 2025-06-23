@@ -1,6 +1,6 @@
-use crate::term::SymbolNode;
+use crate::term::Subterm;
 
-pub struct TruthChecker(pub Box<dyn Fn(SymbolNode) -> TruthResult + Sync + Send>);
+pub struct TruthChecker(pub Box<dyn Fn(Subterm) -> TruthResult + Sync + Send>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TruthResult {
