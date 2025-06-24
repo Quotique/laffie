@@ -16,10 +16,10 @@ pub fn replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }
-    // TODO: ?
-    // if root.bfs().iter.any(|x| x.data.param().is_some()) {
-    //     return false;
-    // }
+
+    if root.bfs().any(|x| x.param().is_some()) {
+        return false;
+    }
 
     let map = root
         .pop_first_arg()

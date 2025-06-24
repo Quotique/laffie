@@ -29,6 +29,10 @@ impl<'a> SubtermMut<'a> {
         self.0.iter_mut().map(|x| SubtermMut(x.get_mut()))
     }
 
+    pub fn bfs(&self) -> impl Iterator<Item = &TermNode> {
+        self.0.bfs().iter.map(|x| x.data)
+    }
+
     #[inline]
     pub fn first_arg(&self) -> Option<Subterm> {
         self.0.front().map(Subterm::from)
