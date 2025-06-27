@@ -13,7 +13,7 @@ utils = { path = "../utils" }
 
 eyre = { workspace = true }
 log = { workspace = true }
-trees = { workspace = true }
 smartstring = { workspace = true }
 
+trees = "0.4"
 peg = "0.8"

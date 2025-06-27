@@ -5,26 +5,26 @@ use std::{
     hash::Hash,
 };
 
-use trees::{tr, Tree};
+use ego_tree::Tree;
+use indexmap::IndexMap;
 
-use super::{NodePosition, Param, ParamsMapping, Subterm, SubtermMut, Symbol, TermNode};
+use super::{Param, Placeholder, Subterm, SubtermId, SubtermMut, Symbol, TermNode, Variable};
 use crate::{CompactString, Decimal, NormalizationLevel};
 
-pub type SymbolTree = Tree<TermNode>;
+type SymbolTree = Tree<TermNode>;
 
-#[derive(Clone, Eq)]
-pub struct Term {
-    pub(super) tree: SymbolTree,
-    // TODO: fix binds in node operations
-    pub binds:       HashMap<Param, NodePosition>,
+pub type VariablesMap = HashMap<Variable, Term>;
+
+#[derive(Debug, Clone, Default)]
+pub struct ParamsMapping {
+    pub params:       IndexMap<Param, Term>,
+    pub placeholders: IndexMap<Placeholder, Vec<Term>>,
 }
 
-impl Term {
-    #[inline]
-    pub fn new(tree: SymbolTree, binds: HashMap<Param, NodePosition>) -> Self {
-        Self { tree, binds }
-    }
+#[derive(Clone)]
+pub struct Term(SymbolTree);
 
+impl Term {
     #[inline]
     pub fn func(symbol: impl AsRef<str>) -> Self {
         Self::from(TermNode::with_symbol(symbol.as_ref()))
@@ -70,11 +70,10 @@ impl Term {
     }
 
     pub fn func_symbols(&self) -> HashSet<Symbol> {
-        self.tree
+        self.0
             .root()
-            .bfs()
-            .iter
-            .filter_map(|x| x.data.symbol())
+            .descendants()
+            .filter_map(|x| x.value().symbol())
             .collect()
     }
 
@@ -86,28 +85,27 @@ impl Term {
 
     #[inline]
     pub fn data(&self) -> &TermNode {
-        self.tree.data()
+        self.0.root().value()
     }
 
     #[inline]
-    pub fn data_mut(&mut self) -> &mut TermNode {
-        self.tree.root_mut().get_mut().data_mut()
+    pub fn get(&self, id: SubtermId) -> Option<Subterm> {
+        self.0.get(id).map(Subterm::from)
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, id: SubtermId) -> Option<SubtermMut> {
+        self.0.get_mut(id).map(SubtermMut::from)
     }
 
     #[inline]
     pub fn as_subterm(&self) -> Subterm {
-        self.tree.root().into()
+        self.0.root().into()
     }
 
     #[inline]
     pub fn as_subterm_mut(&mut self) -> SubtermMut {
-        self.tree.root_mut().get_mut().into()
-    }
-
-    #[inline]
-    pub fn destruct(mut self) -> (SymbolTree, trees::Forest<TermNode>) {
-        let childs = self.tree.abandon();
-        (self.tree, childs)
+        self.0.root_mut().into()
     }
 
     pub fn apply_map(&self, params: &ParamsMapping) -> Self {
@@ -122,36 +120,49 @@ impl Term {
     }
 }
 
-impl Hash for Term {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.tree.hash(state);
+impl From<Term> for SymbolTree {
+    fn from(value: Term) -> Self {
+        value.0
     }
 }
 
+impl FromIterator<(Param, Term)> for ParamsMapping {
+    fn from_iter<I: IntoIterator<Item = (Param, Term)>>(iter: I) -> Self {
+        ParamsMapping {
+            params:       FromIterator::from_iter(iter),
+            placeholders: Default::default(),
+        }
+    }
+}
+
+impl Hash for Term {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_subterm().hash(state);
+    }
+}
+
+impl Eq for Term {}
 impl PartialEq for Term {
     fn eq(&self, other: &Term) -> bool {
-        self.tree.eq(&other.tree)
+        self.as_subterm().eq(&other.as_subterm())
     }
 }
 
 impl From<TermNode> for Term {
     fn from(value: TermNode) -> Self {
-        Self::from(tr(value))
+        Self::from(Tree::new(value))
     }
 }
 
 impl From<SymbolTree> for Term {
     fn from(source: SymbolTree) -> Self {
-        Self {
-            tree:  source,
-            binds: Default::default(),
-        }
+        Self(source)
     }
 }
 
 impl fmt::Debug for Term {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.as_subterm())
+        write!(f, "{}", self.0)
     }
 }
 
@@ -167,7 +178,6 @@ mod tests {
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
         rc::Rc,
-        str::FromStr,
     };
 
     use crate::term::{term_with_params, Placeholder};
@@ -190,19 +200,6 @@ mod tests {
         let test_norm =
             term_with_params("x^2 + (-6)*x + 5 == 0").normalize(NormalizationLevel::max());
         assert_eq!(test, test_norm);
-    }
-
-    #[test]
-    fn binds_test() {
-        let test = "set(a, b) as S is known <=> true";
-
-        let term = term_with_params(test);
-
-        insta::assert_debug_snapshot!(term, @"set(a, b) is known ⟺  true");
-        assert_eq!(
-            term.binds.get(&Param::from_str("S").unwrap()),
-            Some(NodePosition::root().child(0).child(0)).as_ref()
-        );
     }
 
     #[test]

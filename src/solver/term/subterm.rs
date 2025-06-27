@@ -1,40 +1,38 @@
 use std::{
-    collections::{BTreeMap, HashSet, VecDeque},
-    fmt,
+    collections::{HashSet, VecDeque},
+    fmt, hash,
     iter::Iterator,
 };
 
 use bigdecimal::BigDecimal;
 use derive_more::{Debug, From};
+use ego_tree::{iter::Edge, NodeMut, NodeRef};
 use eyre::{bail, ensure, Result};
 use itertools::Itertools;
 use num::Zero;
-use trees::Node;
 
 use utils::{SubsetIterator, VecDisplay};
 
-use super::{index::NodePosition, Param, Placeholder, Symbol, Term, TermNode, Truth};
-
-#[derive(Debug, Clone, Default)]
-pub struct ParamsMapping {
-    pub params:       BTreeMap<Param, Term>,
-    pub placeholders: BTreeMap<Placeholder, Vec<Term>>,
-}
+use super::{ParamsMapping, SubtermId, Symbol, Term, TermNode, Truth};
 
 #[derive(Clone, Copy)]
-#[derive(PartialEq, Eq)]
 #[derive(Debug, From)]
-pub struct Subterm<'a>(&'a Node<TermNode>);
+pub struct Subterm<'a>(NodeRef<'a, TermNode>);
 
 impl<'a> Subterm<'a> {
     #[inline]
+    pub fn id(&self) -> SubtermId {
+        self.0.id()
+    }
+
+    #[inline]
     pub fn degree(&self) -> usize {
-        self.0.degree()
+        self.0.children().count()
     }
 
     #[inline]
     pub fn data(&self) -> &TermNode {
-        self.0.data()
+        self.0.value()
     }
 
     #[inline]
@@ -44,17 +42,22 @@ impl<'a> Subterm<'a> {
 
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = Self> {
-        self.0.iter().map(Self)
+        self.0.children().map(Self)
+    }
+
+    #[inline]
+    pub fn descendants(&self) -> impl Iterator<Item = Self> {
+        self.0.descendants().map(Self)
     }
 
     #[inline]
     pub fn first_arg(&self) -> Option<Self> {
-        self.0.front().map(Subterm)
+        self.0.first_child().map(Subterm)
     }
 
     #[inline]
     pub fn last_arg(&self) -> Option<Self> {
-        self.0.back().map(Subterm)
+        self.0.last_child().map(Subterm)
     }
 
     #[inline]
@@ -64,12 +67,15 @@ impl<'a> Subterm<'a> {
 
     #[inline]
     pub fn symbols(&self) -> HashSet<Symbol> {
-        self.0.bfs().iter.filter_map(|x| x.data.symbol()).collect()
+        self.0
+            .descendants()
+            .filter_map(|x| x.value().symbol())
+            .collect()
     }
 
     pub fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Term> + '_> {
-        Box::new(SubsetIterator::new(self.0.degree(), count).map(move |i| {
-            let s = self.0.data().symbol().unwrap();
+        Box::new(SubsetIterator::new(self.degree(), count).map(move |i| {
+            let s = self.data().symbol().unwrap();
             let mut parts = vec![Term::from(TermNode::Symbol(s.clone())); count];
             for (id, child) in self.iter().enumerate() {
                 parts[i.as_vec()[id]]
@@ -93,8 +99,7 @@ impl<'a> Subterm<'a> {
 
     #[inline]
     pub fn truth(&self) -> Truth {
-        self.0
-            .data()
+        self.data()
             .symbol()
             .map(|x| x.check_truth(*self))
             .unwrap_or(Truth::Unknown)
@@ -126,7 +131,7 @@ impl<'a> Subterm<'a> {
         self.try_match_extend(pattern, Default::default())
     }
 
-    pub fn try_subterm_match(&self, pattern: Subterm) -> Vec<(Vec<ParamsMapping>, NodePosition)> {
+    pub fn try_subterm_match(&self, pattern: Subterm) -> Vec<(Vec<ParamsMapping>, SubtermId)> {
         self.try_subterm_match_extend(pattern, Default::default())
     }
 
@@ -134,21 +139,21 @@ impl<'a> Subterm<'a> {
         &self,
         pattern: Subterm,
         params: ParamsMapping,
-    ) -> Vec<(Vec<ParamsMapping>, NodePosition)> {
+    ) -> Vec<(Vec<ParamsMapping>, SubtermId)> {
         let mut result = vec![];
         let mut queue = VecDeque::new();
-        queue.push_back((*self, NodePosition::root()));
+        queue.push_back((*self, self.id()));
 
         while let Some((node, pos)) = queue.pop_front() {
             if let Ok(mapping) = node
                 .try_match_extend(pattern, params.clone())
                 .map_err(|_| trace!(target: "pattern_match", "No match for {pattern} to {node}"))
             {
-                result.push((mapping, pos.clone()));
+                result.push((mapping, pos));
             }
 
-            for (num, i) in node.iter().enumerate() {
-                queue.push_back((i, pos.clone().child(num)));
+            for i in node.iter() {
+                queue.push_back((i, i.id()));
             }
         }
         result
@@ -282,6 +287,46 @@ impl<'a> Subterm<'a> {
         }
 
         Ok(())
+    }
+}
+
+impl<'a> hash::Hash for Subterm<'a> {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        for i in self.0.traverse() {
+            match i {
+                Edge::Open(node) => {
+                    1.hash(state);
+                    node.value().hash(state);
+                }
+                Edge::Close(node) => {
+                    2.hash(state);
+                    node.value().hash(state);
+                }
+            }
+        }
+    }
+}
+
+impl<'a> Eq for Subterm<'a> {}
+impl<'a> PartialEq for Subterm<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        for (l, r) in self.0.traverse().zip(other.0.traverse()) {
+            match (l, r) {
+                (Edge::Open(l), Edge::Open(r)) | (Edge::Close(l), Edge::Close(r)) => {
+                    if l.value() != r.value() {
+                        return false;
+                    }
+                }
+                _ => return false,
+            }
+        }
+        true
+    }
+}
+
+impl<'a> From<NodeMut<'a, TermNode>> for Subterm<'a> {
+    fn from(value: NodeMut<'a, TermNode>) -> Self {
+        Self(NodeRef::from(value))
     }
 }
 
@@ -442,7 +487,7 @@ mod tests {
 
         let mut test = term_with_params("a + 1");
         test.as_subterm_mut().apply_param_map(&maps[0]);
-        insta::assert_debug_snapshot!(test, @"2*x^2+1");
+        insta::assert_snapshot!(test, @"2*x^2+1");
     }
 
     #[test]

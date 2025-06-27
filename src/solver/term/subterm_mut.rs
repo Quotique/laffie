@@ -1,119 +1,135 @@
-use std::{
-    cmp::Ordering,
-    collections::{HashMap, HashSet},
-    iter::Iterator,
-    rc::Rc,
-};
+use std::{cmp::Ordering, collections::HashSet, iter::Iterator, rc::Rc};
 
-use derive_more::{Debug, Display, From};
-use trees::Node;
+use derive_more::{Debug, From};
+use ego_tree::NodeMut;
 
 use utils::SubsetIterator;
 
-use super::{ParamsMapping, Subterm, Symbol, Term, TermNode, Truth, Variable};
+use super::{ParamsMapping, Subterm, Symbol, Term, TermNode, Truth, VariablesMap};
 use crate::NormalizationLevel;
 
-pub type VariablesMap = HashMap<Variable, Term>;
-
-#[derive(Debug, Display, From)]
-pub struct SubtermMut<'a>(&'a mut Node<TermNode>);
+#[derive(Debug, From)]
+pub struct SubtermMut<'a>(NodeMut<'a, TermNode>);
 
 impl<'a> SubtermMut<'a> {
     #[inline]
+    pub fn as_ref(&self) -> Subterm {
+        Subterm::from(self.0.as_ref())
+    }
+
+    #[inline]
     pub fn iter(&self) -> impl Iterator<Item = Subterm> {
-        self.0.iter().map(Subterm::from)
+        self.0.as_ref().children().map(Subterm::from)
     }
 
     #[inline]
     pub fn iter_mut<'b>(&'b mut self) -> impl Iterator<Item = SubtermMut<'b>> + 'b {
-        self.0.iter_mut().map(|x| SubtermMut(x.get_mut()))
+        self.0.children_mut().map(SubtermMut)
     }
 
-    pub fn bfs(&self) -> impl Iterator<Item = &TermNode> {
-        self.0.bfs().iter.map(|x| x.data)
+    pub fn values(&self) -> impl Iterator<Item = &TermNode> {
+        self.0.as_ref().descendants().map(|x| x.value())
     }
 
     #[inline]
     pub fn first_arg(&self) -> Option<Subterm> {
-        self.0.front().map(Subterm::from)
+        self.0.as_ref().first_child().map(Subterm::from)
     }
 
     #[inline]
     pub fn last_arg(&self) -> Option<Subterm> {
-        self.0.back().map(Subterm::from)
+        self.0.as_ref().last_child().map(Subterm::from)
     }
 
     #[inline]
     pub fn first_arg_mut<'b>(&'b mut self) -> Option<SubtermMut<'b>> {
-        self.0.front_mut().map(|x| SubtermMut(x.get_mut()))
+        self.0.first_child().map(SubtermMut)
     }
 
     #[inline]
     pub fn last_arg_mut<'b>(&'b mut self) -> Option<SubtermMut<'b>> {
-        self.0.back_mut().map(|x| SubtermMut(x.get_mut()))
+        self.0.last_child().map(SubtermMut)
     }
 
     #[inline]
     pub fn insert_after(&mut self, term: Term) {
-        self.0.insert_next_sib(term.tree);
+        let inserted_id = self.0.tree().extend_tree(term.into()).id();
+        self.0.insert_id_after(inserted_id);
     }
 
     #[inline]
     pub fn insert_before(&mut self, term: Term) {
-        self.0.insert_prev_sib(term.tree);
+        let inserted_id = self.0.tree().extend_tree(term.into()).id();
+        self.0.insert_id_before(inserted_id);
     }
 
     #[inline]
     pub fn pop_first_arg(&mut self) -> Option<Term> {
-        self.0.pop_front().map(Term::from)
+        let first = self.0.first_child();
+        first.map(|mut x| {
+            x.detach();
+            Term::from(x.as_ref().deep_clone())
+        })
     }
 
     #[inline]
     pub fn pop_last_arg(&mut self) -> Option<Term> {
-        self.0.pop_back().map(Term::from)
+        let last = self.0.last_child();
+        last.map(|mut x| {
+            x.detach();
+            Term::from(x.as_ref().deep_clone())
+        })
     }
 
     #[inline]
     pub fn push_first_arg(&mut self, term: Term) -> &mut Self {
-        self.0.push_front(term.tree);
+        let inserted_id = self.0.tree().extend_tree(term.into()).id();
+        self.0.prepend_id(inserted_id);
         self
     }
 
     #[inline]
     pub fn push_last_arg(&mut self, term: Term) -> &mut Self {
-        self.0.push_back(term.tree);
+        let inserted_id = self.0.tree().extend_tree(term.into()).id();
+        self.0.append_id(inserted_id);
         self
     }
 }
 
 impl<'a> SubtermMut<'a> {
     pub fn symbols(&self) -> HashSet<Symbol> {
-        self.0.bfs().iter.filter_map(|x| x.data.symbol()).collect()
+        self.0
+            .as_ref()
+            .descendants()
+            .filter_map(|x| x.value().symbol())
+            .collect()
     }
 
     #[inline]
     pub fn to_term(&self) -> Term {
-        self.0.deep_clone().into()
+        self.0.as_ref().deep_clone().into()
     }
 
     #[inline]
     pub fn detach(&mut self) -> Term {
-        self.0.detach().into()
+        self.0.detach();
+        // TODO: no clone version
+        Term::from(self.0.as_ref().deep_clone())
     }
 
     #[inline]
     pub fn degree(&self) -> usize {
-        self.0.degree()
+        self.0.as_ref().children().count()
     }
 
     #[inline]
     pub fn data(&self) -> &TermNode {
-        self.0.data()
+        self.0.as_ref().value()
     }
 
     #[inline]
     pub fn data_mut(&mut self) -> &mut TermNode {
-        self.0.data_mut()
+        self.0.value()
     }
 }
 
@@ -145,7 +161,6 @@ impl<'a> SubtermMut<'a> {
 
     pub fn apply_variable_map(&mut self, variables: &VariablesMap) {
         if let Some(mut v) = self
-            .0
             .data()
             .variable()
             .and_then(|x| variables.get(x))
@@ -160,8 +175,8 @@ impl<'a> SubtermMut<'a> {
     }
 
     pub fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Term> + '_> {
-        Box::new(SubsetIterator::new(self.0.degree(), count).map(move |i| {
-            let s = self.0.data().symbol().unwrap();
+        Box::new(SubsetIterator::new(self.degree(), count).map(move |i| {
+            let s = self.data().symbol().unwrap();
             let mut parts = vec![Term::from(TermNode::Symbol(s.clone())); count];
             for (id, child) in self.iter().enumerate() {
                 parts[i.as_vec()[id]]
@@ -185,8 +200,7 @@ impl<'a> SubtermMut<'a> {
 
     #[inline]
     pub fn evaluate(&mut self, level: NormalizationLevel) -> bool {
-        self.0
-            .data()
+        self.data()
             .symbol()
             .map(|x| x.evaluate(self, level))
             .unwrap_or(false)
@@ -194,15 +208,16 @@ impl<'a> SubtermMut<'a> {
 
     #[inline]
     pub fn truth(&self) -> Truth {
-        Subterm::from(self.0 as &Node<_>).truth()
+        Subterm::from(self.0.as_ref()).truth()
     }
 
+    // TODO: fast swap with first arg
     pub fn swap(&mut self, other: &mut SubtermMut) {
         std::mem::swap(self.data_mut(), other.data_mut());
         let self_degree = self.degree();
 
-        while let Some(t) = self.0.pop_front() {
-            other.0.push_back(t);
+        while let Some(t) = self.pop_first_arg() {
+            other.push_last_arg(t);
         }
         while other.degree() > self_degree {
             if let Some(t) = other.pop_first_arg() {
@@ -288,7 +303,7 @@ impl<'a> SubtermMut<'a> {
 
 impl<'a, 'b> PartialEq<Subterm<'a>> for SubtermMut<'b> {
     fn eq(&self, other: &Subterm) -> bool {
-        Subterm::from(self.0 as &Node<_>).eq(other)
+        self.as_ref().eq(other)
     }
 }
 

@@ -1,97 +1,55 @@
 use std::{collections::HashMap, str::FromStr};
 
-use trees::tr;
-
 use solver::{
-    term::{NodePosition, Param, Placeholder, Symbol, SymbolTree, Term, TermNode, Variable},
+    term::{Param, ParamsMapping, Placeholder, Symbol, Term, TermNode, Variable},
     Decimal,
 };
 
 use crate::{Node, ParserError};
 
-#[derive(Clone, Copy)]
-enum NodeType {
-    Statement,
-    Rule,
+#[derive(Default)]
+pub struct TermParser {
+    params:              HashMap<Param, Term>,
+    with_var:            bool,
+    last_placeholder_id: u64,
 }
 
-pub struct TermParser<'a> {
-    ast:      &'a Node,
-    with_var: bool,
-}
-
-impl<'a> TermParser<'a> {
-    pub fn new(syntax_tree: &'a Node) -> Self {
-        Self {
-            ast:      syntax_tree,
-            with_var: false,
-        }
-    }
-
+impl TermParser {
     pub fn with_variables(mut self) -> Self {
         self.with_var = true;
         self
     }
 
-    pub fn parse(self) -> Result<Term, ParserError> {
-        let mut positions_map = Default::default();
-        let tree = if self.with_var {
-            Self::try_parse_impl(
-                self.ast,
-                NodeType::Statement,
-                Default::default(),
-                &mut positions_map,
-                &mut 0,
-            )?
-        } else {
-            Self::try_parse_impl(
-                self.ast,
-                NodeType::Rule,
-                Default::default(),
-                &mut positions_map,
-                &mut 0,
-            )?
-        };
-        Ok(Term::new(tree, positions_map).normalize(0.into()))
+    pub fn with_params(mut self, params: HashMap<Param, Term>) -> Self {
+        self.params = params;
+        self
     }
 
-    fn try_parse_impl(
-        mut node: &Node,
-        node_type: NodeType,
-        node_position: NodePosition,
-        positions_map: &mut HashMap<Param, NodePosition>,
-        last_placeholder_id: &mut u64,
-    ) -> Result<SymbolTree, ParserError> {
-        while node.data().symbol == "as" {
-            let param = Param::from_str(&node.back().unwrap().data().symbol)
-                .expect("unable to create param");
-            if positions_map
-                .insert(param.clone(), node_position.clone())
-                .is_some()
-            {
-                return Err(ParserError {
-                    loc: node.data().location.clone(),
-                    msg: format!("Multiple definition of param {param}"),
-                });
-            }
+    pub fn try_parse(&mut self, node: &Node) -> Result<Term, ParserError> {
+        let mut tree = self.try_parse_node(node)?;
 
+        tree.as_subterm_mut()
+            .apply_param_map(&ParamsMapping::from_iter(self.params.clone()));
+        Ok(tree.normalize(0.into()))
+    }
+
+    fn try_parse_node(&mut self, mut node: &Node) -> Result<Term, ParserError> {
+        let mut params = vec![];
+        while node.data().symbol == "as" {
+            params.push(
+                Param::from_str(&node.back().unwrap().data().symbol)
+                    .expect("unable to create param"),
+            );
             node = node.front().unwrap();
         }
 
-        let mut tree = tr(Self::parse_term(
-            node.data().symbol.as_str(),
-            &node_type,
-            last_placeholder_id,
-        ));
-        if tree.root().data().symbol().is_some() {
-            for (num, child) in node.iter().enumerate() {
-                tree.push_back(Self::try_parse_impl(
-                    child,
-                    node_type,
-                    node_position.clone().child(num),
-                    positions_map,
-                    last_placeholder_id,
-                )?);
+        let value = self.parse_term(node.data().symbol.as_str());
+        let mut tree = Term::from(value);
+
+        if tree.as_subterm().data().symbol().is_some() {
+            for child in node.iter() {
+                let arg = self.try_parse_node(child)?;
+                tree.as_subterm_mut().push_last_arg(arg);
             }
         } else if node.degree() != 0 {
             return Err(ParserError {
@@ -99,37 +57,36 @@ impl<'a> TermParser<'a> {
                 msg: format!("Node {} can't contains children!", &node.data().symbol),
             });
         }
+        for p in params {
+            if self.params.insert(p.clone(), tree.clone()).is_some() {
+                return Err(ParserError {
+                    loc: node.data().location.clone(),
+                    msg: format!("Multiple definition of param {p}"),
+                });
+            }
+        }
 
         Ok(tree)
     }
 
-    fn parse_term(data: &str, node_type: &NodeType, last_placeholder_id: &mut u64) -> TermNode {
+    fn parse_term(&mut self, data: &str) -> TermNode {
         if data == ".." {
-            *last_placeholder_id += 1;
-            TermNode::Placeholder(Placeholder::from(*last_placeholder_id))
+            self.last_placeholder_id += 1;
+            TermNode::Placeholder(Placeholder::from(self.last_placeholder_id))
         } else if let Ok(value) = Decimal::from_str(data) {
             TermNode::Number(value)
         } else if let Some(symbol) = Symbol::by_name(data) {
             TermNode::Symbol(symbol)
+        } else if self.with_var {
+            TermNode::Variable(Variable::from_str(data).expect("unable to create variable"))
         } else {
-            match node_type {
-                NodeType::Rule => {
-                    TermNode::Param(Param::from_str(data).expect("unable to create param"))
-                }
-                NodeType::Statement => {
-                    TermNode::Variable(Variable::from_str(data).expect("unable to create variable"))
-                }
-            }
+            TermNode::Param(Param::from_str(data).expect("unable to create param"))
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use trees::tr;
-
-    use solver::term::TermNode;
-
     use crate::lang;
 
     use super::*;
@@ -140,18 +97,49 @@ mod tests {
         let states = lang::terms(test).unwrap();
         assert_eq!(states.len(), 1);
 
-        let result = TermParser::new(&states[0]).parse();
+        let result = TermParser::default().try_parse(&states[0]);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            (tr(TermNode::with_symbol("==")) /
-                (tr(TermNode::with_symbol("+")) /
-                    (tr(TermNode::with_symbol("*")) /
-                        tr(TermNode::Param("a".parse().unwrap())) /
-                        tr(TermNode::Param("x".parse().unwrap()))) /
-                    tr(TermNode::Param("b".parse().unwrap()))) /
-                tr(TermNode::Number(0.into())))
-            .into()
+            Term::func("==")
+                .with_child(
+                    Term::func("+")
+                        .with_child(
+                            Term::func("*")
+                                .with_child(Term::param("a"))
+                                .with_child(Term::param("x"))
+                        )
+                        .with_child(Term::param("b"))
+                )
+                .with_child(Term::number(0))
+        );
+    }
+
+    #[test]
+    fn binds_test() {
+        let test = "set(5, x as S) is known <=> set(S) is known";
+        let states = lang::terms(test).unwrap();
+        assert_eq!(states.len(), 1);
+
+        let result = TermParser::default().try_parse(&states[0]);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Term::func("<=>")
+                .with_child(
+                    Term::func("is")
+                        .with_child(
+                            Term::func("set")
+                                .with_child(Term::number(5))
+                                .with_child(Term::param("x"))
+                        )
+                        .with_child(Term::func("known"))
+                )
+                .with_child(
+                    Term::func("is")
+                        .with_child(Term::func("set").with_child(Term::param("x")))
+                        .with_child(Term::func("known"))
+                )
         );
     }
 }

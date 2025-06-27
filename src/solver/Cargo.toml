@@ -15,14 +15,13 @@ log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 smartstring = { workspace = true }
-trees = { workspace = true }
 
-ego-tree = "0.10"
+ego-tree = { git = "https://github.com/Quotique/ego-tree.git" }
 
 bigdecimal = "0.4"
 bincode = "2.0"
 derive_more = { version = "2.0", features = ["full"] }
-indexmap = "2.0"
+indexmap = "2.10"
 itertools = "0.14"
 multimap = { git = "https://github.com/Quotique/multimap.git" }
 num = "0.4"
@@ -32,4 +31,4 @@ parking_lot = "0.12"
 [dev-dependencies]
 parser = { path = "../parser" }
 
-insta = "1.42"
+insta = "1.43"

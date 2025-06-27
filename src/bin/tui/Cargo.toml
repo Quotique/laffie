@@ -18,9 +18,8 @@ utils = { path = "../../utils" }
 log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
-trees = { workspace = true }
 
-ego-tree = "0.10"
+ego-tree = {git = "https://github.com/Quotique/ego-tree.git"}
 
 clap = { version = "4.5", features = ["derive"] }
 colored = "3"

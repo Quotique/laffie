@@ -17,7 +17,7 @@ pub fn replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
         return false;
     }
 
-    if root.bfs().any(|x| x.param().is_some()) {
+    if root.values().any(|x| x.param().is_some()) {
         return false;
     }
 
@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn replace_test() {
-        insta::assert_debug_snapshot!(
+        insta::assert_snapshot!(
           term_with_vars(r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#)
                 .normalize(NormalizationLevel::max()),
             @"264!=0");

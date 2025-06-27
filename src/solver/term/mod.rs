@@ -1,7 +1,7 @@
 //#![warn(missing_docs)]
 
 mod codec;
-mod index;
+// mod index;
 mod props;
 mod subterm;
 mod subterm_mut;
@@ -9,18 +9,19 @@ mod symbol;
 mod term_node;
 mod term_tree;
 
-pub use index::NodePosition;
+pub use ego_tree::NodeId as SubtermId;
+
 pub use props::TermProps;
-pub use subterm::{ParamsMapping, Subterm};
-pub use subterm_mut::{SubtermMut, VariablesMap};
+pub use subterm::Subterm;
+pub use subterm_mut::SubtermMut;
 pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
 pub use term_node::{Param, Placeholder, TermNode, Variable};
-pub use term_tree::{SymbolTree, Term};
+pub use term_tree::{ParamsMapping, Term, VariablesMap};
 
 #[cfg(test)]
 pub fn term_with_params(text: &'static str) -> Term {
     let states = parser::lang::terms(text).unwrap();
-    let term = parser::TermParser::new(&states[0]).parse().unwrap();
+    let term = parser::TermParser::default().try_parse(&states[0]).unwrap();
 
     unsafe { std::mem::transmute::<_, Term>(term) }
 }
@@ -30,9 +31,9 @@ pub fn term_with_vars(text: &'static str) -> Term {
     let states = parser::lang::terms(text)
         .map_err(|e| println!("parsing error {text}: {e}"))
         .unwrap();
-    let term = parser::TermParser::new(&states[0])
+    let term = parser::TermParser::default()
         .with_variables()
-        .parse()
+        .try_parse(&states[0])
         .unwrap();
 
     unsafe { std::mem::transmute::<_, Term>(term) }

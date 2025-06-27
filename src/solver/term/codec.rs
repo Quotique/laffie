@@ -1,11 +1,9 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use bincode::{BorrowDecode, Decode, Encode};
 
-use super::{Subterm, SymbolTree, Term, TermNode};
+use super::{SubtermId, Term, TermNode};
 use crate::{CompactString, Decimal};
-
-use trees::tr;
 
 impl Encode for TermNode {
     fn encode<E: bincode::enc::Encoder>(
@@ -108,56 +106,36 @@ impl<'de, Context> BorrowDecode<'de, Context> for TermNode {
     }
 }
 
-pub fn encode_node<E: bincode::enc::Encoder>(
-    parent_no: isize,
-    last_no: &mut isize,
-    node: Subterm,
-    encoder: &mut E,
-) -> core::result::Result<(), bincode::error::EncodeError> {
-    Encode::encode(&parent_no, encoder)?;
-    Encode::encode(node.data(), encoder)?;
-
-    *last_no += 1;
-    let node_no = *last_no;
-
-    for i in node.iter() {
-        encode_node(node_no, last_no, i, encoder)?;
-    }
-
-    Ok(())
-}
-
 impl<'de, Context> BorrowDecode<'de, Context> for Term {
     fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
-        let mut tree_vec: Vec<(isize, SymbolTree)> = vec![];
-        loop {
-            let parent_no: isize = BorrowDecode::borrow_decode(decoder)?;
+        let parent_no: isize = Decode::decode(decoder)?;
+        assert!(parent_no == -1, "root element must be first");
+        let data: TermNode = Decode::decode(decoder)?;
+        let mut term = Term::from(data);
+        let mut id_map: HashMap<isize, SubtermId> =
+            FromIterator::from_iter(vec![(0, term.as_subterm().id())]);
+
+        for num in 1.. {
+            let parent_no: isize = Decode::decode(decoder)?;
             if parent_no == -2 {
                 break;
             }
+            let parent_id = *id_map.get(&parent_no).expect("parent must be first");
 
-            let data: TermNode = BorrowDecode::borrow_decode(decoder)?;
-            tree_vec.push((parent_no, tr(data)));
+            let data: TermNode = Decode::decode(decoder)?;
+            id_map.insert(
+                num,
+                term.get_mut(parent_id)
+                    .unwrap()
+                    .push_last_arg(Term::from(data))
+                    .last_arg()
+                    .unwrap()
+                    .id(),
+            );
         }
-
-        let mut term_node = None;
-        while let Some((parent_no, node)) = tree_vec.pop() {
-            if parent_no == -1 {
-                assert!(tree_vec.is_empty(), "root element is not last");
-                term_node = Some(node);
-            } else {
-                tree_vec[parent_no as usize].1.push_front(node);
-            }
-        }
-        let tree = term_node.take().unwrap();
-
-        Ok(Term {
-            tree,
-            // TODO: encode/decode for binds
-            binds: Default::default(),
-        })
+        Ok(term)
     }
 }
 
@@ -165,33 +143,32 @@ impl<Context> Decode<Context> for Term {
     fn decode<D: bincode::de::Decoder>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
-        let mut tree_vec: Vec<(isize, SymbolTree)> = vec![];
-        loop {
+        let parent_no: isize = Decode::decode(decoder)?;
+        assert!(parent_no == -1, "root element must be first");
+        let data: TermNode = Decode::decode(decoder)?;
+        let mut term = Term::from(data);
+        let mut id_map: HashMap<isize, SubtermId> =
+            FromIterator::from_iter(vec![(0, term.as_subterm().id())]);
+
+        for num in 1.. {
             let parent_no: isize = Decode::decode(decoder)?;
             if parent_no == -2 {
                 break;
             }
+            let parent_id = *id_map.get(&parent_no).expect("parent must be first");
 
             let data: TermNode = Decode::decode(decoder)?;
-            tree_vec.push((parent_no, tr(data)));
+            id_map.insert(
+                num,
+                term.get_mut(parent_id)
+                    .unwrap()
+                    .push_last_arg(Term::from(data))
+                    .last_arg()
+                    .unwrap()
+                    .id(),
+            );
         }
-
-        let mut term_node = None;
-        while let Some((parent_no, node)) = tree_vec.pop() {
-            if parent_no == -1 {
-                assert!(tree_vec.is_empty(), "root element is not last");
-                term_node = Some(node);
-            } else {
-                tree_vec[parent_no as usize].1.push_front(node);
-            }
-        }
-        let tree = term_node.take().unwrap();
-
-        Ok(Term {
-            tree,
-            // TODO: encode/decode for binds
-            binds: Default::default(),
-        })
+        Ok(term)
     }
 }
 
@@ -200,10 +177,25 @@ impl Encode for Term {
         &self,
         encoder: &mut E,
     ) -> core::result::Result<(), bincode::error::EncodeError> {
-        let mut last_no = -1;
-        encode_node(-1, &mut last_no, self.as_subterm(), encoder)?;
+        let mut last_id = 0;
+        let mut id_map = HashMap::<SubtermId, isize>::default();
+
+        for node in self.as_subterm().descendants() {
+            if id_map.contains_key(&node.id()) {
+                continue;
+            }
+            id_map.insert(node.id(), last_id);
+            Encode::encode(
+                &node
+                    .parent()
+                    .map(|x| *id_map.get(&x.id()).expect("parent must be before"))
+                    .unwrap_or(-1),
+                encoder,
+            )?;
+            Encode::encode(node.data(), encoder)?;
+            last_id += 1;
+        }
         Encode::encode(&-2, encoder)?;
-        assert!(self.binds.is_empty(), "binds encode is not supported");
         Ok(())
     }
 }

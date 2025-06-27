@@ -1,9 +1,9 @@
-use std::{collections::BTreeMap, convert::From, fmt};
+use std::{convert::From, fmt};
 
 use multimap::MultiMap;
 
 use crate::{
-    term::{NodePosition, ParamsMapping, Subterm, Symbol, Term},
+    term::{Symbol, Term},
     NormalizationLevel, RuleId,
 };
 
@@ -147,12 +147,6 @@ impl RuleBuilder {
                     }
                 }
             }
-            let binds: BTreeMap<_, _> = term
-                .binds
-                .iter()
-                .map(|(param, pos)| (param.clone(), Subterm::from(&term[pos]).to_term()))
-                .collect();
-
             // TODO: normalization level
             term = term.normalize(NormalizationLevel::from(1));
 
@@ -163,13 +157,9 @@ impl RuleBuilder {
                 attrs: attrs.clone(),
                 block: Default::default(),
                 pattern_symbols: term.as_subterm().first_arg().unwrap().symbols(),
+                pattern: term.as_subterm().first_arg().unwrap().id(),
+                replace: term.as_subterm().last_arg().unwrap().id(),
                 term,
-                pattern: NodePosition::default().child(0),
-                replace: NodePosition::default().child(1),
-                binds: ParamsMapping {
-                    params:       binds,
-                    placeholders: Default::default(),
-                },
                 requirements: reqs,
             });
         }

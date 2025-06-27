@@ -10,7 +10,7 @@ use super::{
     rule_attribute::{RuleAttr, RuleAttrValue},
 };
 use crate::{
-    term::{NodePosition, ParamsMapping, Subterm, SubtermMut, Symbol, Term, TermProps},
+    term::{ParamsMapping, Subterm, SubtermId, Symbol, Term, TermProps},
     NormalizationLevel, RuleId,
 };
 
@@ -34,9 +34,8 @@ pub struct Rule {
     pub block: Vec<RuleId>,
 
     pub term:    Term,
-    pub pattern: NodePosition,
-    pub replace: NodePosition,
-    pub binds:   ParamsMapping,
+    pub pattern: SubtermId,
+    pub replace: SubtermId,
 
     pub requirements: Vec<Term>,
 
@@ -135,12 +134,12 @@ impl Rule {
 
     #[inline]
     pub fn pattern_node(&self) -> Subterm {
-        Subterm::from(&self.term[&self.pattern])
+        self.term.get(self.pattern).unwrap()
     }
 
     #[inline]
     pub fn replace_node(&self) -> Subterm {
-        Subterm::from(&self.term[&self.replace])
+        self.term.get(self.replace).unwrap()
     }
 }
 
@@ -189,9 +188,9 @@ impl ApplyRule for SharedRule {
             for i in maps.into_iter() {
                 let replace = self.replace_node().to_term();
 
-                let mut replace = replace.apply_map(&self.binds).apply_map(&i);
+                let mut replace = replace.apply_map(&i);
                 let mut src = (*arg.term).clone();
-                replace.swap(&mut SubtermMut::from(&mut src[&pos]));
+                replace.swap(&mut src.get_mut(pos).unwrap());
                 src = src.normalize(self.norm_level());
                 let mut resolution = TermProps::from(Rc::new(src))
                     .with_rule(self.clone())
@@ -202,7 +201,7 @@ impl ApplyRule for SharedRule {
                     requirements: self
                         .requirements
                         .iter()
-                        .map(|r| Rc::new(r.apply_map(&self.binds).apply_map(&i)))
+                        .map(|r| Rc::new(r.apply_map(&i)))
                         .collect(),
                     resolution,
                     params: i,

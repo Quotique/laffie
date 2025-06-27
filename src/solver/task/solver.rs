@@ -62,17 +62,15 @@ impl Solver {
         cache: Arc<TasksCache>,
     ) -> Solver {
         let purpose = Purpose::try_from((*task.purpose.term).clone()).unwrap();
-
-        let (root, mut childs) = (*task.purpose.term).clone().destruct();
-
+        let root = &task.purpose.term;
         let terms = if root.data().is_symbol_name("find") ||
             root.data().is_symbol_name("proof") ||
             root.data().is_symbol_name("transform")
         {
-            if childs.degree() != 1 {
+            if root.as_subterm().degree() != 1 {
                 panic!("wrong arg count");
             }
-            TermProps::from(Rc::new(Term::from(childs.pop_front().unwrap())))
+            TermProps::from(Rc::new(root.as_subterm().first_arg().unwrap().to_term()))
         } else {
             panic!("unexpected word {}", root);
         };
@@ -114,10 +112,16 @@ impl Solver {
         for i in conditions.into_iter() {
             let _ = self.add_main(i);
         }
-        let (_, mut purpose) = (*self.task.purpose.term).clone().destruct();
-        let _ = self.add_purpose(TermProps::from(Rc::new(Term::from(
-            purpose.pop_front().unwrap(),
-        ))));
+
+        let _ = self.add_purpose(TermProps::from(Rc::new(
+            self.task
+                .purpose
+                .term
+                .as_subterm()
+                .first_arg()
+                .unwrap()
+                .to_term(),
+        )));
 
         self.local_rules.clear();
         *self.cycles.borrow_mut() = 0;

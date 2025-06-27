@@ -36,20 +36,22 @@ impl<'a> RuleParser<'a> {
             });
         }
         let mut builder = RuleBuilder::default();
+        let mut parser = TermParser::default();
 
         for child in self.syntax_tree.iter() {
             match child.data().symbol.as_str() {
                 "=>" | "<=>" => {
-                    builder = builder
-                        .with_term(TermParser::new(child).parse()?)
-                        .map_err(|e| ParserError {
-                            loc: child.data().location.clone(),
-                            msg: e.to_string(),
-                        })?;
+                    builder =
+                        builder
+                            .with_term(parser.try_parse(child)?)
+                            .map_err(|e| ParserError {
+                                loc: child.data().location.clone(),
+                                msg: e.to_string(),
+                            })?;
                 }
                 "Predicates" => {
                     for req in child.iter() {
-                        builder = builder.with_require(TermParser::new(req).parse()?)
+                        builder = builder.with_require(parser.try_parse(req)?)
                     }
                 }
                 "Attributes" => {
@@ -108,7 +110,7 @@ impl<'a> RuleParser<'a> {
                     });
                 }
 
-                let purpose = TermParser::new(attr.front().unwrap()).parse()?;
+                let purpose = TermParser::default().try_parse(attr.front().unwrap())?;
                 Ok((
                     RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
                     RuleAttrValue::Target(purpose),

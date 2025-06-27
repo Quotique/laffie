@@ -41,12 +41,12 @@ impl<'a> TaskParser<'a> {
                 "Purpose" => {
                     builder = builder
                         .with_purpose(TermProps::from(Rc::new(
-                            TermParser::new(child.front().ok_or_else(|| ParserError {
-                                loc: child.data().location.clone(),
-                                msg: "must have one argument".to_owned(),
-                            })?)
-                            .with_variables()
-                            .parse()?,
+                            TermParser::default().with_variables().try_parse(
+                                child.front().ok_or_else(|| ParserError {
+                                    loc: child.data().location.clone(),
+                                    msg: "must have one argument".to_owned(),
+                                })?,
+                            )?,
                         )))
                         .map_err(|e| ParserError {
                             loc: child.data().location.clone(),
@@ -69,18 +69,18 @@ impl<'a> TaskParser<'a> {
                 "Answer" => {
                     for i in child.iter() {
                         builder = builder.with_answer(
-                            TermParser::new(i)
+                            TermParser::default()
                                 .with_variables()
-                                .parse()?
+                                .try_parse(i)?
                                 .normalize(NormalizationLevel::max()),
                         )
                     }
                 }
                 _ => {
                     builder = builder.with_condition(TermProps::from(Rc::new(
-                        TermParser::new(child)
+                        TermParser::default()
                             .with_variables()
-                            .parse()?
+                            .try_parse(child)?
                             .normalize(NormalizationLevel::max()),
                     )));
                 }
@@ -96,9 +96,7 @@ impl<'a> TaskParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use trees::tr;
-
-    use solver::term::TermNode;
+    use solver::term::Term;
 
     use crate::lang;
 
@@ -117,16 +115,20 @@ mod tests {
 
         let task = result.unwrap();
         assert_eq!(task.conditions.len(), 1);
+        println!("{:?}", task.conditions[0].term);
         assert_eq!(
             *task.conditions[0].term,
-            (tr(TermNode::with_symbol("==")) /
-                (tr(TermNode::with_symbol("+")) /
-                    (tr(TermNode::with_symbol("*")) /
-                        tr(TermNode::with_number(2)) /
-                        tr(TermNode::Variable("x".parse().unwrap()))) /
-                    tr(TermNode::Number(5.into()))) /
-                tr(TermNode::Number(0.into())))
-            .into()
+            Term::func("==")
+                .with_child(
+                    Term::func("+")
+                        .with_child(
+                            Term::func("*")
+                                .with_child(Term::number(2))
+                                .with_child(Term::variable("x"))
+                        )
+                        .with_child(Term::number(5))
+                )
+                .with_child(Term::number(0))
         );
     }
 }

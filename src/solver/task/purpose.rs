@@ -38,35 +38,35 @@ impl fmt::Display for Purpose {
 impl TryFrom<Term> for Purpose {
     type Error = SemanticError;
 
-    fn try_from(value: Term) -> Result<Self, Self::Error> {
-        let (root, mut childs) = value.destruct();
+    fn try_from(mut value: Term) -> Result<Self, Self::Error> {
+        let mut root = value.as_subterm_mut();
 
         if root.data().is_symbol_name("find") {
-            if childs.degree() != 1 {
+            if root.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(String::default()));
             }
-            Ok(Self::Find(TermProps::from(Rc::new(Term::from(
-                childs.pop_front().unwrap(),
-            )))))
+            Ok(Self::Find(TermProps::from(Rc::new(
+                root.pop_first_arg().unwrap(),
+            ))))
         } else if root.data().is_symbol_name("proof") {
-            if childs.degree() != 1 {
+            if root.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(String::default()));
             }
             // TODO: error Processing
-            Ok(Self::Proof(TermProps::from(Rc::new(Term::from(
-                childs.pop_front().unwrap(),
-            )))))
+            Ok(Self::Proof(TermProps::from(Rc::new(
+                root.pop_first_arg().unwrap(),
+            ))))
         } else if root.data().is_symbol_name("transform") {
-            if childs.degree() != 1 {
+            if root.degree() != 1 {
                 return Err(SemanticError::WorngArgCount(String::default()));
             }
 
             // TODO: error Processing
-            Ok(Self::Transform(TermProps::from(Rc::new(Term::from(
-                childs.pop_front().unwrap(),
-            )))))
+            Ok(Self::Transform(TermProps::from(Rc::new(
+                root.pop_first_arg().unwrap(),
+            ))))
         } else {
-            Err(SemanticError::UnexpectedWord(root.to_string()))
+            Err(SemanticError::UnexpectedWord(value.to_string()))
         }
     }
 }
