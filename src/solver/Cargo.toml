@@ -23,7 +23,7 @@ bincode = "2.0"
 derive_more = { version = "2.0", features = ["full"] }
 indexmap = "2.10"
 itertools = "0.14"
-multimap = { git = "https://github.com/Quotique/multimap.git" }
+multimap = "0.10"
 num = "0.4"
 num-bigint = "0.4"
 parking_lot = "0.12"

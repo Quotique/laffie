@@ -1366,8 +1366,9 @@ dependencies = [
 
 [[package]]
 name = "multimap"
-version = "0.8.4"
-source = "git+https://github.com/Quotique/multimap.git#84b90af07f6005185369e895c0a8127e8313838c"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 dependencies = [
  "serde",
 ]

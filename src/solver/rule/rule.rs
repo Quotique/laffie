@@ -71,16 +71,16 @@ impl fmt::Display for Rule {
 
 impl Rule {
     pub fn attribute(&self, attr: &RuleAttr) -> impl Iterator<Item = &RuleAttrValue> {
-        self.attrs.iter_key(attr)
+        static EMPTY_VEC: Vec<RuleAttrValue> = Vec::new();
+        self.attrs.get_vec(attr).unwrap_or(&EMPTY_VEC).iter()
     }
 
     pub fn contains_attribute(&self, attr: &RuleAttr) -> bool {
-        self.attrs.iter_key(attr).next().is_some()
+        self.attrs.get(attr).is_some()
     }
 
     pub fn norm_level(&self) -> NormalizationLevel {
-        self.attrs
-            .iter_key(&RuleAttr::Normalize)
+        self.attribute(&RuleAttr::Normalize)
             .filter_map(RuleAttrValue::uint)
             .max()
             .map_or(NormalizationLevel::max(), NormalizationLevel)
