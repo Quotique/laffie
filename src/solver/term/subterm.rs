@@ -240,7 +240,7 @@ impl<'a> Subterm<'a> {
                 bail!("Expect Varible {value}, found {other_value}")
             }
             (TermNode::Variable(_), _) => bail!("Expect Varible, found: {:?}", self.data()),
-            (TermNode::Placeholder(_), _) => bail!("Mapping placeholder"),
+            (TermNode::ArgList(_), _) => bail!("Mapping placeholder"),
         }
     }
 
@@ -293,7 +293,7 @@ impl<'a> Subterm<'a> {
                 .collect();
 
             for i in result.iter_mut() {
-                i.placeholders.insert(ph, mapping.clone());
+                i.arglists.insert(ph, mapping.clone());
             }
         }
 
@@ -310,7 +310,7 @@ impl fmt::Display for ParamsMapping {
                 .iter()
                 .map(|(x, y)| format!("{x}: {y}"))
                 .chain(
-                    self.placeholders
+                    self.arglists
                         .iter()
                         .map(|(x, y)| format!("..{}: {}", x, VecDisplay(y)))
                 )

@@ -69,7 +69,7 @@ peg::parser! {
             Token::new(&format!("-{}", n.root().data().symbol), p)
         }
 
-        rule placeholder() -> Tree<Token> = p:position!() ".." { Token::new("..", p) }
+        rule arg_list() -> Tree<Token> = p:position!() ".." { Token::new("..", p) }
 
         rule attrs() -> Vec<Tree<Token>> = _ keyword("attr") _ a:commasep(<term()>) { a }
 
@@ -209,7 +209,7 @@ peg::parser! {
             n:number() p:position!() e:eval() { Token::new("*", p) /n /e }
             / "(" _ b:or() _ ")" { b }
             / e:eval() { e }
-            / p:placeholder() { p }
+            / p:arg_list() { p }
             / n:number() p:position!() i:char_first_ident() { Token::new("*", p) /n /i }
             / n:number() { n }
             / i:ident() { i }
@@ -352,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn placeholder_test() {
+    fn arglist_test() {
         terms_test(
             "set(..) as S is Known",
             vec![

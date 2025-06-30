@@ -177,15 +177,15 @@ fn ordering(left: Subterm, right: Subterm) -> Ordering {
 
         (TermNode::Variable(left), TermNode::Variable(right)) => left.cmp(right),
         (TermNode::Variable(_), TermNode::Symbol(_)) => Ordering::Less,
-        (TermNode::Variable(_), TermNode::Placeholder(_)) => Ordering::Less,
+        (TermNode::Variable(_), TermNode::ArgList(_)) => Ordering::Less,
         (TermNode::Variable(_), _) => Ordering::Greater,
 
         (TermNode::Symbol(left), TermNode::Symbol(right)) => left.cmp(right),
-        (TermNode::Symbol(_), TermNode::Placeholder(_)) => Ordering::Less,
+        (TermNode::Symbol(_), TermNode::ArgList(_)) => Ordering::Less,
         (TermNode::Symbol(_), _) => Ordering::Greater,
 
-        (TermNode::Placeholder(_), TermNode::Placeholder(_)) => Ordering::Equal,
-        (TermNode::Placeholder(_), _) => Ordering::Greater,
+        (TermNode::ArgList(_), TermNode::ArgList(_)) => Ordering::Equal,
+        (TermNode::ArgList(_), _) => Ordering::Greater,
     }
 }
 

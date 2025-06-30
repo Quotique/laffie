@@ -15,7 +15,7 @@ pub struct Variable(CompactString);
 
 #[derive(Clone, Copy, Debug, Display)]
 #[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
-pub struct Placeholder(u64);
+pub struct ArgList(u64);
 
 /// Term tree element
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -28,8 +28,8 @@ pub enum TermNode {
     Variable(Variable),
     /// Rational constant
     Number(Decimal),
-    /// Link to another subtree
-    Placeholder(Placeholder),
+    /// Can be replaced with list of terms
+    ArgList(ArgList),
 }
 
 impl TermNode {
@@ -101,8 +101,8 @@ impl TermNode {
     /// Get the contents of a placeholder
     ///
     /// returns None if the content is non a placeholder
-    pub fn placeholder(&self) -> Option<Placeholder> {
-        if let TermNode::Placeholder(p) = &self {
+    pub fn placeholder(&self) -> Option<ArgList> {
+        if let TermNode::ArgList(p) = &self {
             return Some(*p);
         }
         None
@@ -141,15 +141,15 @@ impl Ord for TermNode {
 
             (TermNode::Variable(id_l), TermNode::Variable(id_r)) => id_l.cmp(id_r),
             (TermNode::Variable(_), TermNode::Number(_)) => Ordering::Less,
-            (TermNode::Variable(_), TermNode::Placeholder(_)) => Ordering::Less,
+            (TermNode::Variable(_), TermNode::ArgList(_)) => Ordering::Less,
             (TermNode::Variable(_), _) => Ordering::Greater,
 
             (TermNode::Number(d1), TermNode::Number(d2)) => d1.cmp(d2),
-            (TermNode::Number(_), TermNode::Placeholder(_)) => Ordering::Less,
+            (TermNode::Number(_), TermNode::ArgList(_)) => Ordering::Less,
             (TermNode::Number(_), _) => Ordering::Greater,
 
-            (TermNode::Placeholder(_), TermNode::Placeholder(_)) => Ordering::Equal,
-            (TermNode::Placeholder(_), _) => Ordering::Greater,
+            (TermNode::ArgList(_), TermNode::ArgList(_)) => Ordering::Equal,
+            (TermNode::ArgList(_), _) => Ordering::Greater,
         }
     }
 }
@@ -175,7 +175,7 @@ impl fmt::Display for TermNode {
                 }
             }
             TermNode::Variable(id) => write!(f, "{id}"),
-            TermNode::Placeholder(_) => write!(f, ".."),
+            TermNode::ArgList(_) => write!(f, ".."),
         }
     }
 }

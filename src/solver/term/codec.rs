@@ -30,7 +30,7 @@ impl Encode for TermNode {
                 Encode::encode(&4i8, encoder)?;
                 Encode::encode(&d.to_string().as_str(), encoder)?;
             }
-            TermNode::Placeholder(p) => {
+            TermNode::ArgList(p) => {
                 Encode::encode(&5i8, encoder)?;
                 Encode::encode(&u64::from(*p), encoder)?;
             }
@@ -66,7 +66,7 @@ impl<Context> Decode<Context> for TermNode {
             }
             5 => {
                 let p: u64 = Decode::decode(decoder)?;
-                TermNode::Placeholder(p.into())
+                TermNode::ArgList(p.into())
             }
             _ => unreachable!(),
         };
@@ -101,7 +101,7 @@ impl<'de, Context> BorrowDecode<'de, Context> for TermNode {
             }
             5 => {
                 let p: u64 = BorrowDecode::borrow_decode(decoder)?;
-                TermNode::Placeholder(p.into())
+                TermNode::ArgList(p.into())
             }
             _ => unreachable!(),
         };
@@ -204,7 +204,7 @@ mod tests {
             TermNode::Param(CompactString::from("a").into()),
             TermNode::Variable(CompactString::from("x").into()),
             TermNode::Number(Decimal::from(100)),
-            TermNode::Placeholder(10.into()),
+            TermNode::ArgList(10.into()),
         ] {
             let config = config::standard();
 

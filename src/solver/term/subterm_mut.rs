@@ -123,8 +123,8 @@ impl<'a> SubtermMut<'a> {
                     self.swap(&mut p.clone().as_subterm_mut());
                 }
             }
-            TermNode::Placeholder(p) => {
-                if let Some(p) = params.placeholders.get(&p) {
+            TermNode::ArgList(p) => {
+                if let Some(p) = params.arglists.get(&p) {
                     let mut p = p.clone();
                     self.swap(&mut p[0].as_subterm_mut());
                     for i in p.into_iter().skip(1).rev() {

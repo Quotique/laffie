@@ -8,7 +8,7 @@ use derive_more::From;
 use indexmap::IndexMap;
 use trees::Tree;
 
-use super::{Param, Placeholder, Subterm, SubtermMut, Symbol, TermNode, Variable};
+use super::{ArgList, Param, Subterm, SubtermMut, Symbol, TermNode, Variable};
 use crate::{CompactString, Decimal, NormalizationLevel};
 
 type SymbolTree = Tree<TermNode>;
@@ -20,8 +20,8 @@ pub struct SubtermId(pub Vec<usize>);
 
 #[derive(Debug, Clone, Default)]
 pub struct ParamsMapping {
-    pub params:       IndexMap<Param, Term>,
-    pub placeholders: IndexMap<Placeholder, Vec<Term>>,
+    pub params:   IndexMap<Param, Term>,
+    pub arglists: IndexMap<ArgList, Vec<Term>>,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -143,8 +143,8 @@ impl From<Term> for SymbolTree {
 impl FromIterator<(Param, Term)> for ParamsMapping {
     fn from_iter<I: IntoIterator<Item = (Param, Term)>>(iter: I) -> Self {
         ParamsMapping {
-            params:       FromIterator::from_iter(iter),
-            placeholders: Default::default(),
+            params:   FromIterator::from_iter(iter),
+            arglists: Default::default(),
         }
     }
 }
@@ -181,7 +181,7 @@ mod tests {
         rc::Rc,
     };
 
-    use crate::term::{term_with_params, Placeholder};
+    use crate::term::{term_with_params, ArgList};
 
     use super::*;
 
@@ -219,7 +219,7 @@ mod tests {
                 .unwrap()
                 .data()
                 .placeholder(),
-            Some(Placeholder::from(1))
+            Some(ArgList::from(1))
         );
     }
 

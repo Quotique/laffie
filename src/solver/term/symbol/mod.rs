@@ -28,6 +28,7 @@ impl Symbol {
             .map(|x| Symbol(x.name.clone()))
     }
 
+    #[inline]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }

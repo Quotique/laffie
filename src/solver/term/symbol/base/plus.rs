@@ -196,7 +196,7 @@ fn cummulative_power(root: Subterm) -> Decimal {
         let mut result = Decimal::from(0);
         for i in root.iter() {
             match i.data() {
-                TermNode::Number(_) | TermNode::Placeholder(_) => {}
+                TermNode::Number(_) | TermNode::ArgList(_) => {}
                 TermNode::Symbol(_) if i.data().is_symbol_name("^") => {
                     result += if let Some(v) = i.last_arg().unwrap().data().number() {
                         v.clone()
@@ -258,15 +258,15 @@ fn ordering(left: Subterm, right: Subterm) -> Ordering {
 
         (TermNode::Variable(left), TermNode::Variable(right)) => left.cmp(right),
         (TermNode::Variable(_), TermNode::Number(_)) => Ordering::Less,
-        (TermNode::Variable(_), TermNode::Placeholder(_)) => Ordering::Less,
+        (TermNode::Variable(_), TermNode::ArgList(_)) => Ordering::Less,
         (TermNode::Variable(_), _) => Ordering::Greater,
 
         (TermNode::Number(left), TermNode::Number(right)) => left.cmp(right),
-        (TermNode::Number(_), TermNode::Placeholder(_)) => Ordering::Less,
+        (TermNode::Number(_), TermNode::ArgList(_)) => Ordering::Less,
         (TermNode::Number(_), _) => Ordering::Greater,
 
-        (TermNode::Placeholder(_), TermNode::Placeholder(_)) => Ordering::Equal,
-        (TermNode::Placeholder(_), _) => Ordering::Greater,
+        (TermNode::ArgList(_), TermNode::ArgList(_)) => Ordering::Equal,
+        (TermNode::ArgList(_), _) => Ordering::Greater,
     }
 }
 

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use solver::{
-    term::{Param, ParamsMapping, Placeholder, Symbol, Term, TermNode, Variable},
+    term::{ArgList, Param, ParamsMapping, Symbol, Term, TermNode, Variable},
     Decimal,
 };
 
@@ -9,9 +9,9 @@ use crate::{Node, ParserError};
 
 #[derive(Default)]
 pub struct TermParser {
-    params:              HashMap<Param, Term>,
-    with_var:            bool,
-    last_placeholder_id: u64,
+    params:          HashMap<Param, Term>,
+    with_var:        bool,
+    last_arglist_id: u64,
 }
 
 impl TermParser {
@@ -71,8 +71,8 @@ impl TermParser {
 
     fn parse_term(&mut self, data: &str) -> TermNode {
         if data == ".." {
-            self.last_placeholder_id += 1;
-            TermNode::Placeholder(Placeholder::from(self.last_placeholder_id))
+            self.last_arglist_id += 1;
+            TermNode::ArgList(ArgList::from(self.last_arglist_id))
         } else if let Ok(value) = Decimal::from_str(data) {
             TermNode::Number(value)
         } else if let Some(symbol) = Symbol::by_name(data) {

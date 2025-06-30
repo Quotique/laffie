@@ -12,7 +12,7 @@ pub use props::TermProps;
 pub use subterm::Subterm;
 pub use subterm_mut::SubtermMut;
 pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
-pub use term_node::{Param, Placeholder, TermNode, Variable};
+pub use term_node::{ArgList, Param, TermNode, Variable};
 pub use term_tree::{ParamsMapping, SubtermId, Term, VariablesMap};
 
 #[cfg(test)]
