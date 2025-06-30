@@ -21,19 +21,26 @@ impl<'a> SymbolParser<'a> {
             });
         }
 
-        let mut builder = SymbolProgram::builder();
+        let mut symbol_program = SymbolProgram::default();
 
         for sym_child in self.ast.iter() {
             if sym_child.data().symbol == "Symbol" {
-                builder = builder.name(sym_child.front().unwrap().data().symbol.clone());
+                symbol_program.name = sym_child.front().unwrap().data().symbol.clone();
             } else if sym_child.data().symbol == "Attrs" {
                 for attr in sym_child.iter() {
                     let a = Self::parse_attr(attr)?;
-                    builder = builder.with_attr(a.0, a.1);
+                    symbol_program.attrs.insert(a.0, a.1);
                 }
             }
         }
-        Ok(builder.build())
+        if symbol_program.name.is_empty() {
+            Err(ParserError {
+                loc: self.ast.data().location.clone(),
+                msg: "symbol name is mandatory".into(),
+            })
+        } else {
+            Ok(symbol_program)
+        }
     }
 
     fn parse_attr(data: &Node) -> Result<(SymbolAttr, SymbolAttrValue), ParserError> {
@@ -57,10 +64,7 @@ impl<'a> SymbolParser<'a> {
                         msg: "display(s) argument is required!".to_owned(),
                     })?
                     .data();
-                Ok((
-                    SymbolAttr::Display,
-                    SymbolAttrValue::UStr(s.symbol.clone().into()),
-                ))
+                Ok((SymbolAttr::Display, SymbolAttrValue::UStr(s.symbol.clone())))
             }
             "associative" => Ok((SymbolAttr::Associative, SymbolAttrValue::None)),
             "commutative" => Ok((SymbolAttr::Commutative, SymbolAttrValue::None)),

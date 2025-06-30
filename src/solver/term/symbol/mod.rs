@@ -1,5 +1,4 @@
 pub mod base;
-mod builder;
 mod container;
 mod program;
 
@@ -7,10 +6,7 @@ use std::fmt;
 
 use parking_lot::{lock_api::MappedRwLockReadGuard, RawRwLock, RwLockReadGuard};
 
-pub use builder::FuncSymbolBuilder;
-pub use program::{
-    Calculator, Comparator, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth, TruthChecker,
-};
+pub use program::{SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
 
 use crate::{
     term::{Subterm, SubtermMut},

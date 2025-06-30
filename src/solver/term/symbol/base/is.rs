@@ -8,10 +8,7 @@ pub fn symbol() -> SymbolProgram {
         name: "is".into(),
         attrs: HashMap::from([
             (SymbolAttr::Infix, SymbolAttrValue::UInt(800)),
-            (
-                SymbolAttr::Display,
-                SymbolAttrValue::UStr(" is ".to_owned()),
-            ),
+            (SymbolAttr::Display, SymbolAttrValue::UStr(" is ".into())),
         ]),
         truth_checker: Box::new(is),
         ..Default::default()

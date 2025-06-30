@@ -1,6 +1,6 @@
 use std::{cmp, collections::HashMap, fmt};
 
-use super::{container, FuncSymbolBuilder, Symbol};
+use super::{container, Symbol};
 use crate::{
     term::{Subterm, SubtermMut},
     CompactString, NormalizationLevel,
@@ -29,7 +29,7 @@ pub enum SymbolAttr {
 pub enum SymbolAttrValue {
     None,
     UInt(u64),
-    UStr(String),
+    UStr(CompactString),
 }
 
 pub struct SymbolProgram {
@@ -76,42 +76,23 @@ impl fmt::Debug for SymbolProgram {
 
 impl SymbolProgram {
     #[inline]
-    pub fn builder() -> FuncSymbolBuilder {
-        FuncSymbolBuilder::default()
-    }
-
-    #[inline]
     pub fn register(self) -> Symbol {
         container::add_symbol_impl(&mut container::all_func_symbols().write(), self)
     }
 
     #[inline]
     pub fn add_with_name(symbols: &mut HashMap<CompactString, Self>, name: &str) {
-        container::add_symbol_impl(symbols, SymbolProgram::builder().name(name).build());
+        container::add_symbol_impl(
+            symbols,
+            SymbolProgram {
+                name: name.into(),
+                ..Default::default()
+            },
+        );
     }
 
     #[inline]
     pub fn extend_attrs(&mut self, attrs: impl IntoIterator<Item = (SymbolAttr, SymbolAttrValue)>) {
         self.attrs.extend(attrs)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn by_name_test() {
-        let program = &SymbolProgram::builder()
-            .name("==")
-            .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(500))
-            .with_truth_checker(Box::new(|_| Truth::Unknown))
-            .build();
-        assert_eq!(program.name, "==");
-        assert_eq!(
-            program.attrs.get(&SymbolAttr::Infix),
-            Some(&SymbolAttrValue::UInt(500))
-        )
     }
 }

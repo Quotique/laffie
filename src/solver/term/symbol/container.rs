@@ -2,9 +2,8 @@ use std::{collections::HashMap, sync::OnceLock};
 
 use parking_lot::RwLock;
 
-use crate::CompactString;
-
 use super::{base as ops, Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram};
+use crate::CompactString;
 
 pub(super) fn add_symbol_impl(
     symbols: &mut HashMap<CompactString, SymbolProgram>,
@@ -43,19 +42,25 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
         SymbolProgram::add_with_name(&mut result, "AnySymbol");
         add_symbol_impl(
             &mut result,
-            SymbolProgram::builder()
-                .name("=>")
-                .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(900))
-                .with_attr(SymbolAttr::Display, SymbolAttrValue::UStr(" ⟹  ".into()))
-                .build(),
+            SymbolProgram {
+                name: "=>".into(),
+                attrs: HashMap::from([
+                    (SymbolAttr::Infix, SymbolAttrValue::UInt(900)),
+                    (SymbolAttr::Display, SymbolAttrValue::UStr(" ⟹  ".into())),
+                ]),
+                ..Default::default()
+            },
         );
         add_symbol_impl(
             &mut result,
-            SymbolProgram::builder()
-                .name("<=>")
-                .with_attr(SymbolAttr::Infix, SymbolAttrValue::UInt(900))
-                .with_attr(SymbolAttr::Display, SymbolAttrValue::UStr(" ⟺  ".into()))
-                .build(),
+            SymbolProgram {
+                name: "<=>".into(),
+                attrs: HashMap::from([
+                    (SymbolAttr::Infix, SymbolAttrValue::UInt(900)),
+                    (SymbolAttr::Display, SymbolAttrValue::UStr(" ⟺  ".into())),
+                ]),
+                ..Default::default()
+            },
         );
         SymbolProgram::add_with_name(&mut result, "&&");
         SymbolProgram::add_with_name(&mut result, "||");
