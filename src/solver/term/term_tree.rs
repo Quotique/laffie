@@ -2,18 +2,21 @@ use std::{
     collections::{HashMap, HashSet},
     convert::From,
     fmt,
-    hash::Hash,
 };
 
-use ego_tree::Tree;
+use derive_more::From;
 use indexmap::IndexMap;
+use trees::Tree;
 
-use super::{Param, Placeholder, Subterm, SubtermId, SubtermMut, Symbol, TermNode, Variable};
+use super::{Param, Placeholder, Subterm, SubtermMut, Symbol, TermNode, Variable};
 use crate::{CompactString, Decimal, NormalizationLevel};
 
 type SymbolTree = Tree<TermNode>;
 
 pub type VariablesMap = HashMap<Variable, Term>;
+
+#[derive(Debug, Default, Clone, From, PartialEq, Eq, Hash)]
+pub struct SubtermId(pub Vec<usize>);
 
 #[derive(Debug, Clone, Default)]
 pub struct ParamsMapping {
@@ -21,12 +24,12 @@ pub struct ParamsMapping {
     pub placeholders: IndexMap<Placeholder, Vec<Term>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub struct Term(SymbolTree);
 
 impl Term {
     #[inline]
-    pub fn func(symbol: impl AsRef<str>) -> Self {
+    pub fn symbol(symbol: impl AsRef<str>) -> Self {
         Self::from(TermNode::with_symbol(symbol.as_ref()))
     }
 
@@ -69,11 +72,12 @@ impl Term {
         self
     }
 
-    pub fn func_symbols(&self) -> HashSet<Symbol> {
+    pub fn symbols(&self) -> HashSet<Symbol> {
         self.0
             .root()
-            .descendants()
-            .filter_map(|x| x.value().symbol())
+            .bfs()
+            .iter
+            .filter_map(|x| x.data.symbol())
             .collect()
     }
 
@@ -85,17 +89,27 @@ impl Term {
 
     #[inline]
     pub fn data(&self) -> &TermNode {
-        self.0.root().value()
+        self.0.root().data()
     }
 
     #[inline]
-    pub fn get(&self, id: SubtermId) -> Option<Subterm> {
-        self.0.get(id).map(Subterm::from)
+    pub fn get(&self, id: &SubtermId) -> Option<Subterm> {
+        let mut root = self.0.root();
+        for i in id.0.iter() {
+            root = root.iter().nth(*i)?;
+        }
+        Some(root.into())
     }
 
     #[inline]
-    pub fn get_mut(&mut self, id: SubtermId) -> Option<SubtermMut> {
-        self.0.get_mut(id).map(SubtermMut::from)
+    pub fn get_mut(&mut self, id: &SubtermId) -> Option<SubtermMut> {
+        let mut root = self.0.root_mut().get_mut();
+        for i in id.0.iter() {
+            let next_root = root.iter_mut().nth(*i)?.get_mut();
+            root = next_root;
+        }
+
+        Some(root.into())
     }
 
     #[inline]
@@ -105,7 +119,7 @@ impl Term {
 
     #[inline]
     pub fn as_subterm_mut(&mut self) -> SubtermMut {
-        self.0.root_mut().into()
+        self.0.root_mut().get_mut().into()
     }
 
     pub fn apply_map(&self, params: &ParamsMapping) -> Self {
@@ -132,19 +146,6 @@ impl FromIterator<(Param, Term)> for ParamsMapping {
             params:       FromIterator::from_iter(iter),
             placeholders: Default::default(),
         }
-    }
-}
-
-impl Hash for Term {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.as_subterm().hash(state);
-    }
-}
-
-impl Eq for Term {}
-impl PartialEq for Term {
-    fn eq(&self, other: &Term) -> bool {
-        self.as_subterm().eq(&other.as_subterm())
     }
 }
 

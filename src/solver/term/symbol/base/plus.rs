@@ -138,7 +138,7 @@ fn merge_mul_const(mut root: Term, d: Decimal) -> Term {
         root.as_subterm_mut().push_first_arg(constant);
         root
     } else {
-        Term::func("*").with_child(constant).with_child(root)
+        Term::symbol("*").with_child(constant).with_child(root)
     }
 }
 

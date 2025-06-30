@@ -1,4 +1,7 @@
-use std::{collections::HashMap, str::FromStr};
+use std::{
+    collections::{HashMap, VecDeque},
+    str::FromStr,
+};
 
 use bincode::{BorrowDecode, Decode, Encode};
 
@@ -122,7 +125,7 @@ impl<'de, Context> BorrowDecode<'de, Context> for Term {
             if parent_no == -2 {
                 break;
             }
-            let parent_id = *id_map.get(&parent_no).expect("parent must be first");
+            let parent_id = id_map.get(&parent_no).expect("parent must be first");
 
             let data: TermNode = Decode::decode(decoder)?;
             id_map.insert(
@@ -143,32 +146,31 @@ impl<Context> Decode<Context> for Term {
     fn decode<D: bincode::de::Decoder>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
-        let parent_no: isize = Decode::decode(decoder)?;
-        assert!(parent_no == -1, "root element must be first");
+        let root_degree: usize = Decode::decode(decoder)?;
         let data: TermNode = Decode::decode(decoder)?;
-        let mut term = Term::from(data);
-        let mut id_map: HashMap<isize, SubtermId> =
-            FromIterator::from_iter(vec![(0, term.as_subterm().id())]);
+        let mut root = Term::from(data);
 
-        for num in 1.. {
-            let parent_no: isize = Decode::decode(decoder)?;
-            if parent_no == -2 {
-                break;
+        let mut queue = VecDeque::new();
+        queue.push_back((SubtermId::default(), root_degree));
+
+        while let Some((id, degree)) = queue.pop_front() {
+            for _ in 0..degree {
+                let node_degree: usize = Decode::decode(decoder)?;
+                let data: TermNode = Decode::decode(decoder)?;
+                let node = Term::from(data);
+
+                let mut current = root.get_mut(&id).unwrap();
+                current.push_last_arg(node);
+                if node_degree > 0 {
+                    let mut id = id.clone();
+                    id.0.push(current.degree() - 1);
+                    queue.push_back((id, node_degree));
+                }
             }
-            let parent_id = *id_map.get(&parent_no).expect("parent must be first");
-
-            let data: TermNode = Decode::decode(decoder)?;
-            id_map.insert(
-                num,
-                term.get_mut(parent_id)
-                    .unwrap()
-                    .push_last_arg(Term::from(data))
-                    .last_arg()
-                    .unwrap()
-                    .id(),
-            );
         }
-        Ok(term)
+        let finish: isize = Decode::decode(decoder)?;
+        assert_eq!(finish, -2);
+        Ok(root)
     }
 }
 
@@ -177,23 +179,9 @@ impl Encode for Term {
         &self,
         encoder: &mut E,
     ) -> core::result::Result<(), bincode::error::EncodeError> {
-        let mut last_id = 0;
-        let mut id_map = HashMap::<SubtermId, isize>::default();
-
-        for node in self.as_subterm().descendants() {
-            if id_map.contains_key(&node.id()) {
-                continue;
-            }
-            id_map.insert(node.id(), last_id);
-            Encode::encode(
-                &node
-                    .parent()
-                    .map(|x| *id_map.get(&x.id()).expect("parent must be before"))
-                    .unwrap_or(-1),
-                encoder,
-            )?;
-            Encode::encode(node.data(), encoder)?;
-            last_id += 1;
+        for i in self.as_subterm().bfs() {
+            Encode::encode(&i.size.degree, encoder)?;
+            Encode::encode(i.data, encoder)?;
         }
         Encode::encode(&-2, encoder)?;
         Ok(())

@@ -198,9 +198,9 @@ mod tests {
 
         assert_eq!(
             rule.pattern_node().to_term(),
-            Term::func("==")
+            Term::symbol("==")
                 .with_child(
-                    Term::func("+")
+                    Term::symbol("+")
                         .with_child(Term::param("a"))
                         .with_child(Term::param("x"))
                 )
@@ -209,8 +209,8 @@ mod tests {
 
         assert_eq!(
             rule.replace_node().to_term(),
-            Term::func("==").with_child(Term::param("x")).with_child(
-                Term::func("*")
+            Term::symbol("==").with_child(Term::param("x")).with_child(
+                Term::symbol("*")
                     .with_child(Term::number(-1))
                     .with_child(Term::param("a"))
             )
@@ -218,7 +218,7 @@ mod tests {
         assert_eq!(rule.requirements.len(), 1);
         assert_eq!(
             rule.requirements[0],
-            Term::func("!=")
+            Term::symbol("!=")
                 .with_child(Term::param("a"))
                 .with_child(Term::number(0))
         );
@@ -251,28 +251,28 @@ mod tests {
 
         assert_eq!(
             rule.pattern_node().to_term(),
-            Term::func("is")
+            Term::symbol("is")
                 .with_child(
-                    Term::func("/")
+                    Term::symbol("/")
                         .with_child(Term::param("a"))
                         .with_child(Term::param("b"))
                 )
-                .with_child(Term::func("known"))
+                .with_child(Term::symbol("known"))
         );
 
-        assert_eq!(rule.replace_node().to_term(), Term::func("true"));
+        assert_eq!(rule.replace_node().to_term(), Term::symbol("true"));
         assert_eq!(rule.requirements.len(), 2);
         assert_eq!(
             rule.requirements[0],
-            Term::func("is")
+            Term::symbol("is")
                 .with_child(Term::param("a"))
-                .with_child(Term::func("known"))
+                .with_child(Term::symbol("known"))
         );
         assert_eq!(
             rule.requirements[1],
-            Term::func("is")
+            Term::symbol("is")
                 .with_child(Term::param("b"))
-                .with_child(Term::func("known"))
+                .with_child(Term::symbol("known"))
         );
 
         assert_eq!(rule.attrs.len(), 3);

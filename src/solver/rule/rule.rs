@@ -134,12 +134,12 @@ impl Rule {
 
     #[inline]
     pub fn pattern_node(&self) -> Subterm {
-        self.term.get(self.pattern).unwrap()
+        self.term.get(&self.pattern).unwrap()
     }
 
     #[inline]
     pub fn replace_node(&self) -> Subterm {
-        self.term.get(self.replace).unwrap()
+        self.term.get(&self.replace).unwrap()
     }
 }
 
@@ -190,7 +190,7 @@ impl ApplyRule for SharedRule {
 
                 let mut replace = replace.apply_map(&i);
                 let mut src = (*arg.term).clone();
-                replace.swap(&mut src.get_mut(pos).unwrap());
+                replace.swap(&mut src.get_mut(&pos).unwrap());
                 src = src.normalize(self.norm_level());
                 let mut resolution = TermProps::from(Rc::new(src))
                     .with_rule(self.clone())

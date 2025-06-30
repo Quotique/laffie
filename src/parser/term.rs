@@ -101,11 +101,11 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Term::func("==")
+            Term::symbol("==")
                 .with_child(
-                    Term::func("+")
+                    Term::symbol("+")
                         .with_child(
-                            Term::func("*")
+                            Term::symbol("*")
                                 .with_child(Term::param("a"))
                                 .with_child(Term::param("x"))
                         )
@@ -125,20 +125,20 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Term::func("<=>")
+            Term::symbol("<=>")
                 .with_child(
-                    Term::func("is")
+                    Term::symbol("is")
                         .with_child(
-                            Term::func("set")
+                            Term::symbol("set")
                                 .with_child(Term::number(5))
                                 .with_child(Term::param("x"))
                         )
-                        .with_child(Term::func("known"))
+                        .with_child(Term::symbol("known"))
                 )
                 .with_child(
-                    Term::func("is")
-                        .with_child(Term::func("set").with_child(Term::param("x")))
-                        .with_child(Term::func("known"))
+                    Term::symbol("is")
+                        .with_child(Term::symbol("set").with_child(Term::param("x")))
+                        .with_child(Term::symbol("known"))
                 )
         );
     }

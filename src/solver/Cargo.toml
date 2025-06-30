@@ -15,8 +15,9 @@ log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 smartstring = { workspace = true }
+trees = { workspace = true }
 
-ego-tree = { git = "https://github.com/Quotique/ego-tree.git" }
+ego-tree = "0.10"
 
 bigdecimal = "0.4"
 bincode = "2.0"

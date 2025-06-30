@@ -676,7 +676,8 @@ dependencies = [
 [[package]]
 name = "ego-tree"
 version = "0.10.0"
-source = "git+https://github.com/Quotique/ego-tree.git#99c011216dacb41370b64c7092eaf641d3b343e4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2972feb8dffe7bc8c5463b1dacda1b0dfbed3710e50f977d965429692d74cd8"
 
 [[package]]
 name = "either"
@@ -2370,6 +2371,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "smartstring",
+ "trees",
  "utils",
 ]
 
@@ -2749,8 +2751,7 @@ dependencies = [
 [[package]]
 name = "trees"
 version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0de5f738ceab88e2491a94ddc33c3feeadfa95fedc60363ef110845df12f3878"
+source = "git+https://github.com/Quotique/trees.git#c5e0491e07a5f6829bfcf4af7ffaee1e6f4982aa"
 
 [[package]]
 name = "trim-in-place"

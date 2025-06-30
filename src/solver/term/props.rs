@@ -40,7 +40,7 @@ impl From<Rc<Term>> for TermProps {
             rule:         None,
             requirements: Default::default(),
 
-            func_symbols: value.func_symbols(),
+            func_symbols: value.symbols(),
             term:         value,
             as_rule:      None,
 

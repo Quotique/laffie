@@ -1,38 +1,52 @@
 use std::{
     collections::{HashSet, VecDeque},
-    fmt, hash,
+    fmt,
     iter::Iterator,
 };
 
 use bigdecimal::BigDecimal;
 use derive_more::{Debug, From};
-use ego_tree::{iter::Edge, NodeMut, NodeRef};
 use eyre::{bail, ensure, Result};
 use itertools::Itertools;
 use num::Zero;
+use trees::Node;
 
 use utils::{SubsetIterator, VecDisplay};
 
 use super::{ParamsMapping, SubtermId, Symbol, Term, TermNode, Truth};
 
 #[derive(Clone, Copy)]
+#[derive(PartialEq, Eq)]
 #[derive(Debug, From)]
-pub struct Subterm<'a>(NodeRef<'a, TermNode>);
+pub struct Subterm<'a>(&'a Node<TermNode>);
 
 impl<'a> Subterm<'a> {
     #[inline]
     pub fn id(&self) -> SubtermId {
-        self.0.id()
+        let mut current = *self;
+        let mut path = vec![];
+
+        while let Some(parent) = current.parent() {
+            let id = parent
+                .iter()
+                .find_position(|x| std::ptr::eq(x.0, current.0))
+                .map(|(num, _)| num)
+                .expect("the parent must contains the child");
+            path.push(id);
+            current = parent;
+        }
+        path.reverse();
+        path.into()
     }
 
     #[inline]
     pub fn degree(&self) -> usize {
-        self.0.children().count()
+        self.0.degree()
     }
 
     #[inline]
     pub fn data(&self) -> &TermNode {
-        self.0.value()
+        self.0.data()
     }
 
     #[inline]
@@ -42,22 +56,22 @@ impl<'a> Subterm<'a> {
 
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = Self> {
-        self.0.children().map(Self)
+        self.0.iter().map(Self)
     }
 
     #[inline]
-    pub fn descendants(&self) -> impl Iterator<Item = Self> {
-        self.0.descendants().map(Self)
+    pub fn bfs(&self) -> impl Iterator<Item = trees::bfs::Visit<&TermNode>> {
+        self.0.bfs().iter
     }
 
     #[inline]
     pub fn first_arg(&self) -> Option<Self> {
-        self.0.first_child().map(Subterm)
+        self.0.front().map(Subterm)
     }
 
     #[inline]
     pub fn last_arg(&self) -> Option<Self> {
-        self.0.last_child().map(Subterm)
+        self.0.back().map(Subterm)
     }
 
     #[inline]
@@ -67,10 +81,7 @@ impl<'a> Subterm<'a> {
 
     #[inline]
     pub fn symbols(&self) -> HashSet<Symbol> {
-        self.0
-            .descendants()
-            .filter_map(|x| x.value().symbol())
-            .collect()
+        self.0.bfs().iter.filter_map(|x| x.data.symbol()).collect()
     }
 
     pub fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = Term> + '_> {
@@ -195,7 +206,7 @@ impl<'a> Subterm<'a> {
             (TermNode::Symbol(mul), TermNode::Number(neg))
                 if mul == "*" && neg < &BigDecimal::zero() =>
             {
-                Term::func("*")
+                Term::symbol("*")
                     .with_child(Term::number(-1))
                     .with_child(Term::number(neg.abs()))
                     .as_subterm()
@@ -287,46 +298,6 @@ impl<'a> Subterm<'a> {
         }
 
         Ok(())
-    }
-}
-
-impl<'a> hash::Hash for Subterm<'a> {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        for i in self.0.traverse() {
-            match i {
-                Edge::Open(node) => {
-                    1.hash(state);
-                    node.value().hash(state);
-                }
-                Edge::Close(node) => {
-                    2.hash(state);
-                    node.value().hash(state);
-                }
-            }
-        }
-    }
-}
-
-impl<'a> Eq for Subterm<'a> {}
-impl<'a> PartialEq for Subterm<'a> {
-    fn eq(&self, other: &Self) -> bool {
-        for (l, r) in self.0.traverse().zip(other.0.traverse()) {
-            match (l, r) {
-                (Edge::Open(l), Edge::Open(r)) | (Edge::Close(l), Edge::Close(r)) => {
-                    if l.value() != r.value() {
-                        return false;
-                    }
-                }
-                _ => return false,
-            }
-        }
-        true
-    }
-}
-
-impl<'a> From<NodeMut<'a, TermNode>> for Subterm<'a> {
-    fn from(value: NodeMut<'a, TermNode>) -> Self {
-        Self(NodeRef::from(value))
     }
 }
 

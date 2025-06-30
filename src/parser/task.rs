@@ -118,11 +118,11 @@ mod tests {
         println!("{:?}", task.conditions[0].term);
         assert_eq!(
             *task.conditions[0].term,
-            Term::func("==")
+            Term::symbol("==")
                 .with_child(
-                    Term::func("+")
+                    Term::symbol("+")
                         .with_child(
-                            Term::func("*")
+                            Term::symbol("*")
                                 .with_child(Term::number(2))
                                 .with_child(Term::variable("x"))
                         )

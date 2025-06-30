@@ -386,7 +386,7 @@ impl Solver {
         // TODO: normalization level
         clone.as_subterm_mut().normalize(NormalizationLevel::max());
 
-        let proof_purpose = Rc::new(Term::func("proof").with_child(clone));
+        let proof_purpose = Rc::new(Term::symbol("proof").with_child(clone));
 
         if term.as_subterm().truth().is_true() {
             return Some(proof_purpose);
@@ -420,13 +420,13 @@ impl Solver {
             (false, self.terms[index].term.as_subterm().to_term())
         };
 
-        let task = Rc::new(Term::func("transform").with_child(to_transform));
+        let task = Rc::new(Term::symbol("transform").with_child(to_transform));
 
         let subtask_solver = self.solve_subtask(task.clone())?;
 
         let mut answer = subtask_solver.answer().unwrap().as_ref().clone();
         if answer_wrap {
-            let mut tmp = Term::func("answer");
+            let mut tmp = Term::symbol("answer");
             answer.as_subterm_mut().swap(&mut tmp.as_subterm_mut());
             answer.as_subterm_mut().push_last_arg(tmp);
         }
@@ -528,7 +528,7 @@ impl Solver {
                     }
 
                     let purpose = TermProps::from(Rc::new(
-                        Term::func("proof")
+                        Term::symbol("proof")
                             .with_child(self.terms[index].term.as_subterm().to_term()),
                     ));
                     let mut added = false;
@@ -637,9 +637,9 @@ impl Solver {
                 }
 
                 if term_root.first_arg().unwrap() == x.term.as_subterm() {
-                    let is_known = Term::func("is")
+                    let is_known = Term::symbol("is")
                         .with_child(term_root.last_arg().unwrap().to_term())
-                        .with_child(Term::func("known"));
+                        .with_child(Term::symbol("known"));
 
                     return Some(Hypothesis {
                         requirements: vec![Rc::new(is_known)],
@@ -703,7 +703,7 @@ fn is_replace(root: &mut SubtermMut) {
         }
         Some(name) if name == "false" => {
             let child = root.pop_first_arg().unwrap();
-            root.swap(&mut Term::func("!").with_child(child).as_subterm_mut());
+            root.swap(&mut Term::symbol("!").with_child(child).as_subterm_mut());
         }
         _ => {}
     }

@@ -62,7 +62,7 @@ pub fn multiply(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
                         powers
                             .entry(x.detach())
                             .and_modify(|p| {
-                                let mut new_pow = Term::func("+")
+                                let mut new_pow = Term::symbol("+")
                                     .with_child(p.clone())
                                     .with_child(power.clone());
                                 p.as_subterm_mut().swap(&mut new_pow.as_subterm_mut());
@@ -139,7 +139,7 @@ fn merge_power(root: Term, pow: Term) -> Term {
         return Term::one();
     }
 
-    Term::func("^").with_child(root).with_child(pow)
+    Term::symbol("^").with_child(root).with_child(pow)
 }
 
 fn extract_power(root: &mut SubtermMut) -> Term {

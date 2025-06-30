@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, collections::HashSet, iter::Iterator, rc::Rc};
 
 use derive_more::{Debug, From};
-use ego_tree::NodeMut;
+use trees::Node;
 
 use utils::SubsetIterator;
 
@@ -9,127 +9,109 @@ use super::{ParamsMapping, Subterm, Symbol, Term, TermNode, Truth, VariablesMap}
 use crate::NormalizationLevel;
 
 #[derive(Debug, From)]
-pub struct SubtermMut<'a>(NodeMut<'a, TermNode>);
+pub struct SubtermMut<'a>(&'a mut Node<TermNode>);
 
 impl<'a> SubtermMut<'a> {
     #[inline]
     pub fn as_ref(&self) -> Subterm {
-        Subterm::from(self.0.as_ref())
+        Subterm::from(self.0 as &Node<_>)
     }
 
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = Subterm> {
-        self.0.as_ref().children().map(Subterm::from)
+        self.0.iter().map(Subterm::from)
     }
 
     #[inline]
     pub fn iter_mut<'b>(&'b mut self) -> impl Iterator<Item = SubtermMut<'b>> + 'b {
-        self.0.children_mut().map(SubtermMut)
+        self.0.iter_mut().map(|x| SubtermMut(x.get_mut()))
     }
 
     pub fn values(&self) -> impl Iterator<Item = &TermNode> {
-        self.0.as_ref().descendants().map(|x| x.value())
+        self.0.bfs().iter.map(|x| x.data)
     }
 
     #[inline]
     pub fn first_arg(&self) -> Option<Subterm> {
-        self.0.as_ref().first_child().map(Subterm::from)
+        self.0.front().map(Subterm::from)
     }
 
     #[inline]
     pub fn last_arg(&self) -> Option<Subterm> {
-        self.0.as_ref().last_child().map(Subterm::from)
+        self.0.back().map(Subterm::from)
     }
 
     #[inline]
     pub fn first_arg_mut<'b>(&'b mut self) -> Option<SubtermMut<'b>> {
-        self.0.first_child().map(SubtermMut)
+        self.0.front_mut().map(|x| SubtermMut(x.get_mut()))
     }
 
     #[inline]
     pub fn last_arg_mut<'b>(&'b mut self) -> Option<SubtermMut<'b>> {
-        self.0.last_child().map(SubtermMut)
+        self.0.back_mut().map(|x| SubtermMut(x.get_mut()))
     }
 
     #[inline]
     pub fn insert_after(&mut self, term: Term) {
-        let inserted_id = self.0.tree().extend_tree(term.into()).id();
-        self.0.insert_id_after(inserted_id);
+        self.0.insert_next_sib(term.into());
     }
 
     #[inline]
     pub fn insert_before(&mut self, term: Term) {
-        let inserted_id = self.0.tree().extend_tree(term.into()).id();
-        self.0.insert_id_before(inserted_id);
+        self.0.insert_prev_sib(term.into());
     }
 
     #[inline]
     pub fn pop_first_arg(&mut self) -> Option<Term> {
-        let first = self.0.first_child();
-        first.map(|mut x| {
-            x.detach();
-            Term::from(x.as_ref().deep_clone())
-        })
+        self.0.pop_front().map(Term::from)
     }
 
     #[inline]
     pub fn pop_last_arg(&mut self) -> Option<Term> {
-        let last = self.0.last_child();
-        last.map(|mut x| {
-            x.detach();
-            Term::from(x.as_ref().deep_clone())
-        })
+        self.0.pop_back().map(Term::from)
     }
 
     #[inline]
     pub fn push_first_arg(&mut self, term: Term) -> &mut Self {
-        let inserted_id = self.0.tree().extend_tree(term.into()).id();
-        self.0.prepend_id(inserted_id);
+        self.0.push_front(term.into());
         self
     }
 
     #[inline]
     pub fn push_last_arg(&mut self, term: Term) -> &mut Self {
-        let inserted_id = self.0.tree().extend_tree(term.into()).id();
-        self.0.append_id(inserted_id);
+        self.0.push_back(term.into());
         self
     }
 }
 
 impl<'a> SubtermMut<'a> {
     pub fn symbols(&self) -> HashSet<Symbol> {
-        self.0
-            .as_ref()
-            .descendants()
-            .filter_map(|x| x.value().symbol())
-            .collect()
+        self.0.bfs().iter.filter_map(|x| x.data.symbol()).collect()
     }
 
     #[inline]
     pub fn to_term(&self) -> Term {
-        self.0.as_ref().deep_clone().into()
+        self.0.deep_clone().into()
     }
 
     #[inline]
     pub fn detach(&mut self) -> Term {
-        self.0.detach();
-        // TODO: no clone version
-        Term::from(self.0.as_ref().deep_clone())
+        self.0.detach().into()
     }
 
     #[inline]
     pub fn degree(&self) -> usize {
-        self.0.as_ref().children().count()
+        self.0.degree()
     }
 
     #[inline]
     pub fn data(&self) -> &TermNode {
-        self.0.as_ref().value()
+        self.0.data()
     }
 
     #[inline]
     pub fn data_mut(&mut self) -> &mut TermNode {
-        self.0.value()
+        self.0.data_mut()
     }
 }
 
@@ -208,7 +190,7 @@ impl<'a> SubtermMut<'a> {
 
     #[inline]
     pub fn truth(&self) -> Truth {
-        Subterm::from(self.0.as_ref()).truth()
+        Subterm::from(self.0 as &Node<_>).truth()
     }
 
     // TODO: fast swap with first arg
@@ -333,14 +315,14 @@ mod operations_tests {
     #[test]
     fn associative_nesting_remove_test() {
         // (1+2)+(1+2) -> 1+2+1+2
-        let mut test_tree = Term::func("+")
+        let mut test_tree = Term::symbol("+")
             .with_child(
-                Term::func("+")
+                Term::symbol("+")
                     .with_child(Term::number(1))
                     .with_child(Term::number(2)),
             )
             .with_child(
-                Term::func("+")
+                Term::symbol("+")
                     .with_child(Term::number(1))
                     .with_child(Term::number(2)),
             );
@@ -351,7 +333,7 @@ mod operations_tests {
     #[test]
     fn evaluate_plus_test() {
         // 1+2+5 -> 8
-        let mut test_tree1 = Term::func("+")
+        let mut test_tree1 = Term::symbol("+")
             .with_child(Term::number(1))
             .with_child(Term::number(2))
             .with_child(Term::number(5));
@@ -362,7 +344,7 @@ mod operations_tests {
         assert_eq!(test_tree1, Term::number(8));
 
         // x+1+2+5 -> x+8
-        let mut test_tree1 = Term::func("+")
+        let mut test_tree1 = Term::symbol("+")
             .with_child(Term::variable("x"))
             .with_child(Term::number(1))
             .with_child(Term::number(2))
@@ -374,7 +356,7 @@ mod operations_tests {
         test_tree1.as_subterm_mut().commutative_reorder();
         assert_eq!(
             test_tree1,
-            Term::func("+")
+            Term::symbol("+")
                 .with_child(Term::variable("x"))
                 .with_child(Term::number(8))
         );
@@ -383,7 +365,7 @@ mod operations_tests {
     #[test]
     fn evaluate_multiply_test() {
         // 1*2*5 -> 10
-        let mut test_tree = Term::func("*")
+        let mut test_tree = Term::symbol("*")
             .with_child(Term::number(1))
             .with_child(Term::number(2))
             .with_child(Term::number(5));
@@ -393,7 +375,7 @@ mod operations_tests {
         assert_eq!(test_tree, Term::number(10));
 
         // x*1*2*5 -> 10*x
-        let mut test_tree = Term::func("*")
+        let mut test_tree = Term::symbol("*")
             .with_child(Term::variable("x"))
             .with_child(Term::number(1))
             .with_child(Term::number(2))
@@ -405,13 +387,13 @@ mod operations_tests {
         test_tree.as_subterm_mut().commutative_reorder();
         assert_eq!(
             test_tree,
-            Term::func("*")
+            Term::symbol("*")
                 .with_child(Term::number(10))
                 .with_child(Term::variable("x"))
         );
 
         // x*1 -> x
-        let mut test_tree = Term::func("*")
+        let mut test_tree = Term::symbol("*")
             .with_child(Term::variable("x"))
             .with_child(Term::number(1));
 
@@ -424,7 +406,7 @@ mod operations_tests {
     #[test]
     fn evaluate_divide_test() {
         // 10 / 2 -> 5
-        let mut test_tree = Term::func("/")
+        let mut test_tree = Term::symbol("/")
             .with_child(Term::number(10))
             .with_child(Term::number(2));
 
@@ -434,7 +416,7 @@ mod operations_tests {
         assert_eq!(test_tree, Term::number(5));
 
         // x / 2 -> x / 2
-        let mut test_tree = Term::func("/")
+        let mut test_tree = Term::symbol("/")
             .with_child(Term::variable("x"))
             .with_child(Term::number(2));
 
@@ -443,13 +425,13 @@ mod operations_tests {
             .evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            Term::func("/")
+            Term::symbol("/")
                 .with_child(Term::variable("x"))
                 .with_child(Term::number(2))
         );
 
         // 2 / 5 -> 0.4
-        let mut test_tree = Term::func("/")
+        let mut test_tree = Term::symbol("/")
             .with_child(Term::number(2))
             .with_child(Term::number(5));
         assert!(test_tree
@@ -458,7 +440,7 @@ mod operations_tests {
         assert_eq!(test_tree, Term::number((4, 1)));
 
         // 30 / 45 -> 2/3
-        let mut test_tree = Term::func("/")
+        let mut test_tree = Term::symbol("/")
             .with_child(Term::number(30))
             .with_child(Term::number(45));
         assert!(test_tree
@@ -466,13 +448,13 @@ mod operations_tests {
             .evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            Term::func("/")
+            Term::symbol("/")
                 .with_child(Term::number(2))
                 .with_child(Term::number(3))
         );
 
         // 30 / 4.5 -> 20/3
-        let mut test_tree = Term::func("/")
+        let mut test_tree = Term::symbol("/")
             .with_child(Term::number(30))
             .with_child(Term::number((45, 1)));
         assert!(test_tree
@@ -480,7 +462,7 @@ mod operations_tests {
             .evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            Term::func("/")
+            Term::symbol("/")
                 .with_child(Term::number(20))
                 .with_child(Term::number(3))
         );
@@ -489,7 +471,7 @@ mod operations_tests {
     #[test]
     fn evaluate_power_test() {
         // 2 ^ 2 -> 4
-        let mut test_tree = Term::func("^")
+        let mut test_tree = Term::symbol("^")
             .with_child(Term::number(2))
             .with_child(Term::number(2));
         assert!(test_tree
@@ -498,7 +480,7 @@ mod operations_tests {
         assert_eq!(test_tree, Term::number(4));
 
         // 2 ^ (-2) -> 0.25
-        let mut test_tree = Term::func("^")
+        let mut test_tree = Term::symbol("^")
             .with_child(Term::number(2))
             .with_child(Term::number(-2));
         assert!(test_tree
@@ -507,7 +489,7 @@ mod operations_tests {
         assert_eq!(test_tree, Term::number((25, 2)));
 
         // 0.5 ^ (-2) -> 4
-        let mut test_tree = Term::func("^")
+        let mut test_tree = Term::symbol("^")
             .with_child(Term::number((5, 1)))
             .with_child(Term::number(-2));
         assert!(test_tree
@@ -516,7 +498,7 @@ mod operations_tests {
         assert_eq!(test_tree, Term::number(4));
 
         // 3 ^ (-2) -> 1/9
-        let mut test_tree = Term::func("^")
+        let mut test_tree = Term::symbol("^")
             .with_child(Term::number(3))
             .with_child(Term::number(-2));
         assert!(test_tree
@@ -524,7 +506,7 @@ mod operations_tests {
             .evaluate(NormalizationLevel::max()));
         assert_eq!(
             test_tree,
-            Term::func("/")
+            Term::symbol("/")
                 .with_child(Term::number(1))
                 .with_child(Term::number(9))
         );
@@ -533,18 +515,18 @@ mod operations_tests {
     #[test]
     fn commutative_reorder_test() {
         // 1+2+5+(2*x)+x+(2+3) -> (2+3)+(2*x)+x+1+2+5
-        let mut test_tree = Term::func("+")
+        let mut test_tree = Term::symbol("+")
             .with_child(Term::number(1))
             .with_child(Term::number(2))
             .with_child(Term::number(5))
             .with_child(
-                Term::func("*")
+                Term::symbol("*")
                     .with_child(Term::number(2))
                     .with_child(Term::variable("x")),
             )
             .with_child(Term::variable("x"))
             .with_child(
-                Term::func("+")
+                Term::symbol("+")
                     .with_child(Term::number(2))
                     .with_child(Term::number(3)),
             );
@@ -552,14 +534,14 @@ mod operations_tests {
         assert!(test_tree.as_subterm_mut().commutative_reorder());
         assert_eq!(
             test_tree,
-            Term::func("+")
+            Term::symbol("+")
                 .with_child(
-                    Term::func("+")
+                    Term::symbol("+")
                         .with_child(Term::number(2))
                         .with_child(Term::number(3))
                 )
                 .with_child(
-                    Term::func("*")
+                    Term::symbol("*")
                         .with_child(Term::number(2))
                         .with_child(Term::variable("x"))
                 )

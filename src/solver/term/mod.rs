@@ -1,7 +1,6 @@
 //#![warn(missing_docs)]
 
 mod codec;
-// mod index;
 mod props;
 mod subterm;
 mod subterm_mut;
@@ -9,14 +8,12 @@ mod symbol;
 mod term_node;
 mod term_tree;
 
-pub use ego_tree::NodeId as SubtermId;
-
 pub use props::TermProps;
 pub use subterm::Subterm;
 pub use subterm_mut::SubtermMut;
 pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
 pub use term_node::{Param, Placeholder, TermNode, Variable};
-pub use term_tree::{ParamsMapping, Term, VariablesMap};
+pub use term_tree::{ParamsMapping, SubtermId, Term, VariablesMap};
 
 #[cfg(test)]
 pub fn term_with_params(text: &'static str) -> Term {

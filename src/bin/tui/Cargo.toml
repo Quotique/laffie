@@ -19,7 +19,7 @@ log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 
-ego-tree = {git = "https://github.com/Quotique/ego-tree.git"}
+ego-tree = "0.10"
 
 clap = { version = "4.5", features = ["derive"] }
 colored = "3"
