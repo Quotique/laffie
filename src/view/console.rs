@@ -3,7 +3,7 @@ use std::fmt;
 use colored::*;
 
 use solver::{
-    task::{Purpose, Solver},
+    task::{Purpose, Solution},
     term::{Term, TermProps},
 };
 use utils::VecDisplay;
@@ -37,7 +37,7 @@ impl Renderer for Console<'_, '_> {
         &mut self,
         purpose: &Purpose,
         answer: Option<&Term>,
-        status: &Solver,
+        status: &Solution,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {
             writeln!(

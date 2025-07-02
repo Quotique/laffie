@@ -1,24 +1,24 @@
 mod builder;
 mod cache;
+mod profiler;
 mod purpose;
+mod solution;
 mod solver;
 mod tracing;
 
 use crate::term::{Term, TermProps};
 use std::{fmt, iter::Iterator};
 
-pub use self::{
-    builder::TaskBuilder,
-    cache::TasksCache,
-    purpose::Purpose,
-    solver::{Solver, EXECUTION_DEADLINE_DEFAULT},
-    tracing::{
-        Config as DumperConfig, Profiler, ProfilerNode, SolutionTracer, TaskProfileInfo,
-        TermProfileInfo, Tracer,
-    },
-};
+pub use profiler::{Profiler, ProfilerNode, TaskProfileInfo, TermProfileInfo};
 
-#[derive(Clone)]
+pub use builder::TaskBuilder;
+pub use cache::TasksCache;
+pub use purpose::Purpose;
+pub use solution::Solution;
+pub use solver::{Solver, EXECUTION_DEADLINE_DEFAULT};
+pub use tracing::{Config as DumperConfig, SolutionTracer, Tracer};
+
+#[derive(Debug, Clone)]
 pub struct Task {
     pub id:            u64,
     pub text:          String,

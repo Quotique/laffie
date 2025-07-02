@@ -40,38 +40,29 @@ impl TryFrom<Term> for Purpose {
 
     fn try_from(mut value: Term) -> Result<Self, Self::Error> {
         let mut root = value.as_subterm_mut();
+        if root.degree() != 1 {
+            return Err(SemanticError::WorngArgCount(String::default()));
+        }
+        let term = TermProps::from(Rc::new(root.pop_first_arg().unwrap()));
 
-        if root.data().is_symbol_name("find") {
-            if root.degree() != 1 {
-                return Err(SemanticError::WorngArgCount(String::default()));
-            }
-            Ok(Self::Find(TermProps::from(Rc::new(
-                root.pop_first_arg().unwrap(),
-            ))))
-        } else if root.data().is_symbol_name("proof") {
-            if root.degree() != 1 {
-                return Err(SemanticError::WorngArgCount(String::default()));
-            }
-            // TODO: error Processing
-            Ok(Self::Proof(TermProps::from(Rc::new(
-                root.pop_first_arg().unwrap(),
-            ))))
-        } else if root.data().is_symbol_name("transform") {
-            if root.degree() != 1 {
-                return Err(SemanticError::WorngArgCount(String::default()));
-            }
-
-            // TODO: error Processing
-            Ok(Self::Transform(TermProps::from(Rc::new(
-                root.pop_first_arg().unwrap(),
-            ))))
-        } else {
-            Err(SemanticError::UnexpectedWord(value.to_string()))
+        match root.data().symbol() {
+            Some(x) if x.as_str() == "find" => Ok(Self::Find(term)),
+            Some(x) if x.as_str() == "proof" => Ok(Self::Proof(term)),
+            Some(x) if x.as_str() == "transform" => Ok(Self::Transform(term)),
+            Some(_) | None => Err(SemanticError::UnexpectedWord(value.to_string())),
         }
     }
 }
 
 impl Purpose {
+    pub fn term(&self) -> &TermProps {
+        match self {
+            Purpose::Find(s) => s,
+            Purpose::Proof(s) => s,
+            Purpose::Transform(s) => s,
+        }
+    }
+
     pub fn is_transform(&self) -> bool {
         if let Purpose::Transform(_) = self {
             return true;

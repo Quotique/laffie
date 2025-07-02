@@ -28,28 +28,33 @@ fn task(
     let record = TaskRecord::from(&task);
     let mut record = tasks.get_or_insert(record).map_err(|e| e.to_string())?;
 
-    let mut solution = Solver::new(
-        task,
+    let mut solver = Solver::new(
         engine,
         DumperConfig {
-            sink:         "none".into(),
-            filename:     None,
-            use_profiler: false,
+            sink:     "none".into(),
+            filename: None,
         }
         .build(),
         EXECUTION_DEADLINE_DEFAULT,
-        Default::default(),
     );
 
     user.add_task_id(record.id);
 
     let mut output = Paginator::new(4096);
-    output
-        .write_str(&match solution.solve() {
-            Ok(_) => format!("{} ", "Solution:"),
-            Err(e) => format!("{} {} ", "Solution:", e,),
-        })
-        .map_err(|e| format!("error {e}"))?;
+    let solution = match solver.solve(task) {
+        Ok(solution) => {
+            output
+                .write_str("Solution: ")
+                .map_err(|e| format!("error {e}"))?;
+            solution
+        }
+        Err((solution, e)) => {
+            output
+                .write_str(&format!("Solution: {e} "))
+                .map_err(|e| format!("error {e}"))?;
+            solution
+        }
+    };
 
     View::try_from(&solution)
         .unwrap()

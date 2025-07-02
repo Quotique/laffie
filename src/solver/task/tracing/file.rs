@@ -2,7 +2,7 @@ use std::{fs::File, io::prelude::*, path::Path, rc::Rc};
 
 use crate::{
     rule::{Hypothesis, SharedRule},
-    task::{Solver, Task},
+    task::{Solution, Task},
     term::{Term, TermProps},
 };
 
@@ -52,13 +52,13 @@ impl Tracer for FileDumpTracer {
         self.subtask_start_cycle.push(cycle);
     }
 
-    fn on_subtask_end(&mut self, status: &Solver) {
+    fn on_subtask_end(&mut self, status: &Solution) {
         self.file
             .write_all(
                 format!(
                     "{} [{} cycles] {} Answer: {}\n",
                     self.idention(),
-                    *status.cycles.as_ref().borrow() -
+                    status.cycles -
                         self.subtask_start_cycle
                             .pop()
                             .expect("finished task never starts"),

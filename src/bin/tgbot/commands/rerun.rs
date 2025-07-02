@@ -28,25 +28,31 @@ fn rerun(
         .ok_or_else(|| t!("errors.task_not_found"))?;
 
     let mut solution = Solver::new(
-        record.clone().into(),
         engine,
         DumperConfig {
-            sink:         "none".into(),
-            filename:     None,
-            use_profiler: false,
+            sink:     "none".into(),
+            filename: None,
         }
         .build(),
         EXECUTION_DEADLINE_DEFAULT,
-        Default::default(),
     );
 
+    let result = solution.solve(record.clone().into());
     let mut output = Paginator::new(4096);
-    output
-        .write_str(&match solution.solve() {
-            Ok(_) => format!("{} ", "Solution:"),
-            Err(e) => format!("{} {} ", "Solution:", e,),
-        })
-        .map_err(|e| format!("error {e}"))?;
+    let solution = match result {
+        Ok(solution) => {
+            output
+                .write_str("Solution:")
+                .map_err(|e| format!("error {e}"))?;
+            solution
+        }
+        Err((solution, e)) => {
+            output
+                .write_str(&format!("Solution: {e}"))
+                .map_err(|e| format!("error {e}"))?;
+            solution
+        }
+    };
 
     View::try_from(&solution)
         .unwrap()

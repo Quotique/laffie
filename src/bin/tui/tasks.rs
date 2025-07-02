@@ -10,7 +10,7 @@ use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, Solver, Task},
+    task::{DumperConfig, Solution, Solver, Task},
     CompactString,
 };
 use utils::VecDisplay;
@@ -21,9 +21,10 @@ use crate::tracing::Tracing;
 use super::interface::{border_focus, border_unfocus, default_state, draw_scrollbar};
 
 pub struct TaskStatus {
-    pub solver:     Solver,
-    pub is_solved:  bool,
-    pub scroll_pos: ListState,
+    pub task:         Task,
+    pub rules_engine: Arc<RulesEngine>,
+    pub solution:     Option<Solution>,
+    pub scroll_pos:   ListState,
 }
 
 pub struct Tasks {
@@ -86,7 +87,7 @@ impl Tasks {
 
     pub fn replace_rules(&mut self, rules: Arc<RulesEngine>) {
         for task in self.tasks.iter_mut() {
-            task.task.solver.replace_rules(rules.clone());
+            task.task.rules_engine = rules.clone();
         }
     }
 
@@ -173,11 +174,24 @@ impl Tasks {
     fn tree(&self, tasks_node: &NodeRef<TasksNode>) -> TreeItem<'static, Option<NodeId>> {
         let text = match tasks_node.value() {
             TasksNode::Task(task) => {
-                let task_line_style = if !self.tasks[*task].task.is_solved {
+                let task_line_style = if self.tasks[*task].task.solution.is_some() {
                     Style::new()
-                } else if self.tasks[*task].task.solver.answer.is_none() {
+                } else if self.tasks[*task]
+                    .task
+                    .solution
+                    .as_ref()
+                    .unwrap()
+                    .answer
+                    .is_none()
+                {
                     Style::new().fg(Color::Yellow).bold()
-                } else if !self.tasks[*task].task.solver.validate_answer() {
+                } else if !self.tasks[*task]
+                    .task
+                    .solution
+                    .as_ref()
+                    .unwrap()
+                    .validate_answer()
+                {
                     Style::new().fg(Color::Red).bold()
                 } else {
                     Style::new().fg(Color::Green).bold()
@@ -185,12 +199,19 @@ impl Tasks {
 
                 Line::from(vec![
                     Span::styled(
-                        self.tasks[*task].task.solver.purpose.to_string(),
+                        // TODO: unwrap bug
+                        self.tasks[*task]
+                            .task
+                            .solution
+                            .as_ref()
+                            .unwrap()
+                            .purpose
+                            .to_string(),
                         task_line_style,
                     ),
                     Span::from(" "),
                     Span::styled(
-                        VecDisplay(&self.tasks[*task].task.solver.task.conditions).to_string(),
+                        VecDisplay(&self.tasks[*task].task.task.conditions).to_string(),
                         task_line_style,
                     ),
                 ])
@@ -266,15 +287,15 @@ impl Tasks {
             TasksNode::Task(task_id) => {
                 let tracing = self.tasks.get_mut(*task_id).unwrap();
                 let mut renderer = Tui::default();
-                View::try_from(&tracing.task.solver)
+                View::try_from(tracing.task.solution.as_ref().unwrap())
                     .unwrap()
                     .display_impl(&mut renderer)
                     .unwrap();
-                let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.task.solver.task)
+                let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.task.task)
                     .split('\n')
                     .map(|x| Line::from(Span::from(x.to_owned())))
                     .collect();
-                if tracing.task.is_solved {
+                if tracing.task.solution.is_some() {
                     lines.append(&mut renderer.output);
                 } else {
                     lines.push(Line::from(Span::from("Press s to solve".to_owned())));
@@ -362,23 +383,13 @@ impl Tasks {
 
     fn add_task(&mut self, rules: Arc<RulesEngine>, task: Task) {
         self.tasks.push(Tracing::new(TaskStatus {
-            solver:     Solver::new(
-                task,
-                rules.clone(),
-                DumperConfig {
-                    sink:         "profiler".into(),
-                    filename:     None,
-                    use_profiler: true,
-                }
-                .build(),
-                self.exec_deadline,
-                Default::default(),
-            ),
-            is_solved:  false,
+            task,
+            rules_engine: rules,
+            solution: None,
             scroll_pos: default_state(),
         }));
 
-        let group = self.tasks.last().unwrap().task.solver.task.group.clone();
+        let group = self.tasks.last().unwrap().task.task.group.clone();
         let index = self.tasks.len() - 1;
         let node_id = {
             let mut node = self.find_node(group.as_str());
@@ -479,24 +490,47 @@ impl Tasks {
         let mut not_runned_delta: isize = 0;
 
         // Mark previous task status to remove
-        if !self.tasks[*task_idx].task.is_solved {
+        if self.tasks[*task_idx].task.solution.is_none() {
             not_runned_delta -= 1;
-        } else if self.tasks[*task_idx].task.solver.answer.is_none() {
+        } else if self.tasks[*task_idx]
+            .task
+            .solution
+            .as_ref()
+            .unwrap()
+            .answer
+            .is_none()
+        {
             unsolved_delta -= 1;
-        } else if !self.tasks[*task_idx].task.solver.validate_answer() {
+        } else if !self.tasks[*task_idx]
+            .task
+            .solution
+            .as_ref()
+            .unwrap()
+            .validate_answer()
+        {
             wrong_answer_delta -= 1;
         } else {
             solved_delta -= 1;
         };
-
-        self.tasks[*task_idx].task.solver.clear();
-        let _ = self.tasks[*task_idx].task.solver.solve();
-        self.tasks[*task_idx].task.is_solved = true;
+        let task = &mut self.tasks[*task_idx].task;
+        let mut solver = Solver::new(
+            task.rules_engine.clone(),
+            DumperConfig {
+                sink:     "profiler".into(),
+                filename: None,
+            }
+            .build(),
+            self.exec_deadline,
+        );
+        task.solution = Some(match solver.solve(task.task.clone()) {
+            Ok(solution) => solution,
+            Err((solution, _)) => solution,
+        });
 
         // Add new task status to remove
-        if self.tasks[*task_idx].task.solver.answer.is_none() {
+        if task.solution.as_ref().unwrap().answer.is_none() {
             unsolved_delta += 1;
-        } else if !self.tasks[*task_idx].task.solver.validate_answer() {
+        } else if !task.solution.as_ref().unwrap().validate_answer() {
             wrong_answer_delta += 1;
         } else {
             solved_delta += 1;

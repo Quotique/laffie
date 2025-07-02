@@ -3,7 +3,7 @@ use std::fmt;
 use html_escape::encode_text;
 
 use solver::{
-    task::{Purpose, Solver},
+    task::{Purpose, Solution},
     term::{Term, TermProps},
 };
 
@@ -34,7 +34,7 @@ impl Renderer for Html<'_> {
         &mut self,
         purpose: &Purpose,
         answer: Option<&Term>,
-        status: &Solver,
+        status: &Solution,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {
             self.output.write_str(&format!(

@@ -9,7 +9,7 @@ pub use html::Html;
 pub use tui::Tui;
 
 use solver::{
-    task::{Purpose, Solver},
+    task::{Purpose, Solution},
     term::{Term, TermProps},
 };
 
@@ -22,7 +22,7 @@ pub trait Renderer {
         &mut self,
         purpose: &Purpose,
         answer: Option<&Term>,
-        status: &Solver,
+        status: &Solution,
     ) -> fmt::Result;
 
     fn dump_frame(&mut self, _frame: &[TermProps]) -> fmt::Result {
@@ -31,14 +31,14 @@ pub trait Renderer {
 }
 
 pub struct View<'a> {
-    solution: &'a Solver,
+    solution: &'a Solution,
     rendered: Arc<RefCell<HashSet<Term>>>,
 }
 
-impl<'a> TryFrom<&'a Solver> for View<'a> {
+impl<'a> TryFrom<&'a Solution> for View<'a> {
     type Error = eyre::Error;
 
-    fn try_from(solution: &'a Solver) -> eyre::Result<Self> {
+    fn try_from(solution: &'a Solution) -> eyre::Result<Self> {
         Ok(Self {
             solution,
             rendered: Default::default(),

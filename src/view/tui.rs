@@ -3,7 +3,7 @@ use std::fmt;
 use ratatui::{prelude::*, style::Stylize};
 
 use solver::{
-    task::{Purpose, Solver},
+    task::{Purpose, Solution},
     term::{Term, TermProps},
 };
 use utils::VecDisplay;
@@ -43,7 +43,7 @@ impl Renderer for Tui<'_> {
         &mut self,
         purpose: &Purpose,
         answer: Option<&Term>,
-        status: &Solver,
+        status: &Solution,
     ) -> fmt::Result {
         let answer_style = Style::new().fg(Color::Green).bold();
         let not_solved_style = Style::new().fg(Color::Red).bold().slow_blink();

@@ -148,25 +148,22 @@ fn main() {
 
         println!("{} {}", "Task".bold().green(), p);
         let p_id = p.id;
-        let mut solution = Solver::new(
-            p,
+        let mut solver = Solver::new(
             rules_engine.clone(),
             DumperConfig {
-                sink:         if args.trace {
+                sink:     if args.trace {
                     "file".into()
                 } else {
                     "none".into()
                 },
-                filename:     Some(format!("dumps/{p_id:x}.dump")),
-                use_profiler: false,
+                filename: Some(format!("dumps/{p_id:x}.dump")),
             }
             .build(),
             args.exec_deadline,
-            Default::default(),
         );
 
-        match solution.solve() {
-            Ok(_) => {
+        match solver.solve(p) {
+            Ok(solution) => {
                 stats.entry(record.group.clone()).or_default().solved += 1;
                 println!(
                     "{}\n{}",
@@ -192,7 +189,7 @@ fn main() {
                 //     println!("Cant put record {}", e);
                 // }
             }
-            Err(e) => {
+            Err((solution, e)) => {
                 stats.entry(record.group.clone()).or_default().not_solved += 1;
                 println!(
                     "{} {}\n{}",

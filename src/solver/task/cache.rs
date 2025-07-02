@@ -1,12 +1,12 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, fmt, rc::Rc};
 
 use parking_lot::RwLock;
 
-use crate::{task::Solver, term::Term};
+use crate::{task::Solution, term::Term};
 
 #[derive(Clone)]
 pub enum TaskStatus {
-    Solved(Rc<Solver>),
+    Solved(Rc<Solution>),
     NotSolved,
     InProgress,
 }
@@ -16,8 +16,14 @@ pub struct TasksCache {
     tasks: RwLock<HashMap<Term, TaskStatus>>,
 }
 
+impl fmt::Debug for TasksCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TasksCache")
+    }
+}
+
 impl TaskStatus {
-    pub fn solver(&self) -> Option<Rc<Solver>> {
+    pub fn solver(&self) -> Option<Rc<Solution>> {
         match self {
             TaskStatus::Solved(solution) => Some(solution.clone()),
             _ => None,

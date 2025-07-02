@@ -4,11 +4,9 @@ use ego_tree::{NodeId, Tree};
 
 use crate::{
     rule::{Hypothesis, SharedRule},
-    task::{Solver, Task},
+    task::Task,
     term::Term,
 };
-
-use super::Tracer;
 
 #[derive(Clone, Debug, Default)]
 pub struct TermProfileInfo {
@@ -86,8 +84,8 @@ impl TermProfileInfo {
     }
 }
 
-impl Tracer for Profiler {
-    fn on_new_hypothesis(
+impl Profiler {
+    pub fn on_new_hypothesis(
         &mut self,
         parent: Rc<Term>,
         rule: SharedRule,
@@ -128,7 +126,7 @@ impl Tracer for Profiler {
             .id();
     }
 
-    fn on_subtask_start(&mut self, task: &Task, cycle: usize) {
+    pub fn on_subtask_start(&mut self, task: &Task, cycle: usize) {
         self.current_node = self
             .task
             .get_mut(self.current_node)
@@ -143,11 +141,11 @@ impl Tracer for Profiler {
             .id();
     }
 
-    fn on_subtask_end(&mut self, status: &Solver) {
+    pub fn on_subtask_end(&mut self, cycle: usize, answer: Option<String>) {
         match self.task.get_mut(self.current_node).unwrap().value() {
             ProfilerNode::Helper(task) => {
-                task.end_cycle = *status.cycles.borrow();
-                task.answer = status.answer().map(|x| x.to_string());
+                task.end_cycle = cycle;
+                task.answer = answer;
             }
             ProfilerNode::Hypothesis(_) => unreachable!("last node is not subtask"),
         }
@@ -157,7 +155,7 @@ impl Tracer for Profiler {
         }
     }
 
-    fn on_hypothesis_finish(
+    pub fn on_hypothesis_finish(
         &mut self,
         _hypothesis: &Hypothesis,
         cycle: usize,
