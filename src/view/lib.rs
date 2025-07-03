@@ -62,7 +62,7 @@ impl View<'_> {
                     .solution
                     .terms
                     .iter()
-                    .filter(|x| x.is_purpose)
+                    .filter(|x| x.is_purpose())
                     .enumerate()
                     .find(|(_, x)| x.term.as_ref() == answer)
                     .map(|(id, _)| id);

@@ -127,11 +127,11 @@ impl Solver {
 
             if !solution.purpose.is_transform() {
                 if let Some(simplified) = self.transform(solution, index) {
-                    solution.terms[index].replaced = true;
+                    solution.terms[index].mark_replaced();
                     self.add_main(solution, simplified).unwrap();
                     continue;
                 } else {
-                    solution.terms[index].simplified = true;
+                    solution.terms[index].mark_simplified();
                 }
             }
 
@@ -216,7 +216,7 @@ impl Solver {
         solution: &mut Solution,
         mut term: TermProps,
     ) -> Result<(), SolverError> {
-        term.is_purpose = true;
+        term.mark_purpose();
         if self.purpose_index.contains_key(&term.term) {
             return Ok(());
         }
@@ -338,10 +338,10 @@ impl Solver {
     }
 
     fn transform(&mut self, solution: &mut Solution, index: usize) -> Option<TermProps> {
-        if solution.terms[index].simplified {
+        if solution.terms[index].is_simplified() {
             return None;
         }
-        solution.terms[index].simplified = true;
+        solution.terms[index].mark_simplified();
 
         let (answer_wrap, to_transform) = if solution.terms[index]
             .term
@@ -380,7 +380,7 @@ impl Solver {
         result
             .blocked_rules
             .clone_from(&solution.terms[index].blocked_rules);
-        result.simplified = true;
+        result.mark_simplified();
         result.parent = Some(solution.terms[index].id);
         result.requirements.push(task);
 
@@ -404,7 +404,7 @@ impl Solver {
                     .terms
                     .iter()
                     .filter(|x| {
-                        !(x.is_purpose || x.term.as_subterm().data().is_symbol_name("answer"))
+                        !(x.is_purpose() || x.term.as_subterm().data().is_symbol_name("answer"))
                     })
                     .cloned(),
             )
@@ -450,7 +450,7 @@ impl Solver {
         solution
             .terms
             .iter()
-            .filter(|x| !x.replaced && x.is_purpose)
+            .filter(|x| !x.is_replaced() && x.is_purpose())
             .min_by_key(|x| x.weight)
             .map(|x| x.id)
     }
@@ -465,12 +465,12 @@ impl Solver {
                     }
 
                     if let Some(simplified) = self.transform(solution, index) {
-                        solution.terms[index].replaced = true;
+                        solution.terms[index].mark_replaced();
                         // TODO remove unwrap
                         self.add_purpose(solution, simplified).unwrap();
                         continue;
                     } else {
-                        solution.terms[index].simplified = true;
+                        solution.terms[index].mark_simplified();
                     }
 
                     let purpose = TermProps::from(Rc::new(
@@ -629,7 +629,7 @@ impl Solver {
                                 .terms
                                 .iter()
                                 .rev()
-                                .find(|x| x.is_purpose)
+                                .find(|x| x.is_purpose())
                                 .unwrap()
                                 .clone()
                                 .without_parents(),

@@ -34,7 +34,7 @@ impl Solution {
     pub fn pick_term(&self) -> Option<usize> {
         self.terms
             .iter()
-            .filter(|x| !(x.replaced || x.is_purpose))
+            .filter(|x| !(x.is_replaced() || x.is_purpose()))
             .min_by_key(|x| x.weight)
             .map(|x| x.id)
     }

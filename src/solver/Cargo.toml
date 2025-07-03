@@ -21,6 +21,7 @@ ego-tree = "0.10"
 
 bigdecimal = "0.4"
 bincode = "2.0"
+bitflags = "2.9"
 derive_more = { version = "2.0", features = ["full"] }
 indexmap = "2.10"
 itertools = "0.14"

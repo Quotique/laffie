@@ -6,11 +6,24 @@ use std::{
     rc::Rc,
 };
 
+use bitflags::bitflags;
+
 use super::{Symbol, Term};
 use crate::{
     rule::{RuleAttr, RuleAttrValue, RuleBuilder, SharedRule},
     RuleId,
 };
+
+bitflags! {
+    #[derive(Debug, Default, Clone, Copy)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct TermFlags: u32 {
+        const REPLACED   = 0b0001;
+        const SIMPLIFIED = 0b0010;
+        const PURPOSE    = 0b0100;
+        const NOT_RULE   = 0b1000;
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct TermProps {
@@ -26,10 +39,7 @@ pub struct TermProps {
     pub applied_rules: HashSet<RuleId>,
     pub blocked_rules: HashSet<RuleId>,
     pub weight:        usize,
-    pub replaced:      bool,
-    pub simplified:    bool,
-    not_rule:          bool,
-    pub is_purpose:    bool,
+    flags:             TermFlags,
 }
 
 impl From<Rc<Term>> for TermProps {
@@ -47,10 +57,7 @@ impl From<Rc<Term>> for TermProps {
             applied_rules: HashSet::new(),
             blocked_rules: HashSet::new(),
             weight:        0,
-            replaced:      false,
-            simplified:    false,
-            not_rule:      false,
-            is_purpose:    false,
+            flags:         Default::default(),
         }
     }
 }
@@ -93,8 +100,32 @@ impl TermProps {
         self
     }
 
+    pub fn mark_replaced(&mut self) {
+        self.flags |= TermFlags::REPLACED;
+    }
+
+    pub fn is_replaced(&self) -> bool {
+        self.flags & TermFlags::REPLACED == TermFlags::REPLACED
+    }
+
+    pub fn mark_simplified(&mut self) {
+        self.flags |= TermFlags::SIMPLIFIED;
+    }
+
+    pub fn is_simplified(&self) -> bool {
+        self.flags & TermFlags::SIMPLIFIED == TermFlags::SIMPLIFIED
+    }
+
+    pub fn mark_purpose(&mut self) {
+        self.flags |= TermFlags::PURPOSE;
+    }
+
+    pub fn is_purpose(&self) -> bool {
+        self.flags & TermFlags::PURPOSE == TermFlags::PURPOSE
+    }
+
     pub fn rule(&mut self, id: RuleId, level: u64) -> Option<SharedRule> {
-        if self.not_rule {
+        if self.flags & TermFlags::NOT_RULE == TermFlags::NOT_RULE {
             return None;
         }
 
@@ -122,7 +153,7 @@ impl TermProps {
                 }
             }
         }
-        self.not_rule = true;
+        self.flags |= TermFlags::NOT_RULE;
         None
     }
 }
