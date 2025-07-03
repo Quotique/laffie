@@ -10,7 +10,7 @@ use super::{
     rule_attribute::{RuleAttr, RuleAttrValue},
 };
 use crate::{
-    term::{ParamsMapping, Subterm, SubtermId, Symbol, Term, TermProps},
+    term::{ParamsMapping, Subterm, SubtermId, Symbol, Term, TermFilters},
     NormalizationLevel, RuleId,
 };
 
@@ -90,17 +90,17 @@ impl Rule {
         self.pattern_node() == self.replace_node()
     }
 
-    pub fn is_term_suitable(&self, term: &TermProps) -> Result<(), RuleDeclineReason> {
-        if self.level != term.filters.weight {
+    pub fn is_term_suitable(&self, filters: &TermFilters) -> Result<(), RuleDeclineReason> {
+        if self.level != filters.weight {
             return Err(RuleDeclineReason::LevelMissmatch);
-        } else if term.filters.applied_rules.contains(&self.id) {
+        } else if filters.applied_rules.contains(&self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
-        } else if term.filters.blocked_rules.contains(&self.id) {
+        } else if filters.blocked_rules.contains(&self.id) {
             return Err(RuleDeclineReason::Blocked);
         }
 
         for s in self.pattern_symbols.iter() {
-            if !term.filters.func_symbols.contains(s) {
+            if !filters.func_symbols.contains(s) {
                 return Err(RuleDeclineReason::ParamsMappingErr(format!(
                     "symbol: {s} not found"
                 )));
@@ -110,22 +110,15 @@ impl Rule {
         Ok(())
     }
 
-    pub fn purpose_mapping(
-        &self,
-        purpose: &TermProps,
-    ) -> Result<Vec<ParamsMapping>, RuleDeclineReason> {
+    pub fn purpose_mapping(&self, purpose: &Term) -> Result<Vec<ParamsMapping>, RuleDeclineReason> {
         // TODO: multiple purposes
         if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Purpose).next() {
-            return purpose.term.as_subterm().try_match(pattern.as_subterm()).map_err(|_| {
+            return purpose.as_subterm().try_match(pattern.as_subterm()).map_err(|_| {
                 debug!(target: "rule_selection", "no match purpose: {}, required: {}", purpose, pattern);
                 RuleDeclineReason::PurposeMissmatch
             });
         }
-        if (*purpose.term)
-            .as_subterm()
-            .data()
-            .is_symbol_name("transform")
-        {
+        if purpose.as_subterm().data().is_symbol_name("transform") {
             // Only transform rules for transform
             return Err(RuleDeclineReason::PurposeMissmatch);
         }
@@ -146,35 +139,36 @@ impl Rule {
 pub trait ApplyRule {
     fn apply(
         &self,
-        arg: &TermProps,
-        purpose: &TermProps,
+        term: &Term,
+        term_filters: &TermFilters,
+        purpose: &Term,
     ) -> Result<Vec<Hypothesis>, RuleDeclineReason>;
 }
 
 impl ApplyRule for SharedRule {
     fn apply(
         &self,
-        arg: &TermProps,
-        purpose: &TermProps,
+        term: &Term,
+        term_filters: &TermFilters,
+        purpose: &Term,
     ) -> Result<Vec<Hypothesis>, RuleDeclineReason> {
-        self.is_term_suitable(arg)?;
+        self.is_term_suitable(term_filters)?;
         let mut mapping = self.purpose_mapping(purpose)?;
         if mapping.is_empty() {
             mapping.push(Default::default());
         }
 
-        if arg.filters.applied_rules.contains(&self.id) {
+        if term_filters.applied_rules.contains(&self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
         }
-        if arg.filters.blocked_rules.contains(&self.id) {
+        if term_filters.blocked_rules.contains(&self.id) {
             return Err(RuleDeclineReason::Blocked);
         }
 
         let maps: Vec<_> = mapping
             .into_iter()
             .flat_map(|m| {
-                arg.term
-                    .as_subterm()
+                term.as_subterm()
                     .try_subterm_match_extend(self.pattern_node(), m)
                     .into_iter()
             })
@@ -189,23 +183,14 @@ impl ApplyRule for SharedRule {
                 let replace = self.replace_node().to_term();
 
                 let mut replace = replace.apply_map(&i);
-                let mut src = (*arg.term).clone();
-                replace.swap(&mut src.get_mut(&pos).unwrap());
-                src = src.normalize(self.norm_level());
-                let mut resolution = TermProps::from(Rc::new(src))
-                    .with_rule(self.clone())
-                    .with_parent(arg.inference.id);
-                resolution
-                    .filters
-                    .blocked_rules
-                    .extend(self.block.iter().cloned());
+                let mut resolution = term.clone();
+                replace.swap(&mut resolution.get_mut(&pos).unwrap());
+                resolution = resolution.normalize(self.norm_level());
 
                 let hypothesis = Hypothesis {
-                    requirements: self
-                        .requirements
-                        .iter()
-                        .map(|r| Rc::new(r.apply_map(&i)))
-                        .collect(),
+                    rule: self.clone(),
+                    blocked_rules: self.block.clone(),
+                    requirements: self.requirements.iter().map(|r| r.apply_map(&i)).collect(),
                     resolution,
                     params: i,
                 };
@@ -281,7 +266,7 @@ pub mod tests {
         let purpose = test_purpose();
 
         assert_eq!(
-            rule.apply(&term, &purpose).err(),
+            rule.apply(&term.term, &term.filters, &purpose.term).err(),
             Some(RuleDeclineReason::LevelMissmatch)
         );
     }
@@ -293,21 +278,21 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.filters.weight = 1;
-        let hypothesis = rule.apply(&term, &purpose);
+        let hypothesis = rule.apply(&term.term, &term.filters, &purpose.term);
         assert!(hypothesis.is_ok());
         let mut hypothesis = hypothesis.unwrap();
         hypothesis.sort_by_key(|x| x.requirements[0].to_string());
 
         assert_eq!(hypothesis.len(), 2);
         assert_eq!(hypothesis[0].requirements.len(), 1);
-        assert_eq!(*hypothesis[0].requirements[0], term_with_vars("2 != 0"));
+        assert_eq!(hypothesis[0].requirements[0], term_with_vars("2 != 0"));
         assert_eq!(
-            *hypothesis[0].resolution.term,
+            hypothesis[0].resolution,
             term_with_vars("x == -2").normalize(NormalizationLevel::max())
         );
         assert_eq!(hypothesis[1].requirements.len(), 1);
-        assert_eq!(*hypothesis[1].requirements[0], term_with_vars("x != 0"));
-        assert_eq!(*hypothesis[1].resolution.term, term_with_vars("2 == -x"));
+        assert_eq!(hypothesis[1].requirements[0], term_with_vars("x != 0"));
+        assert_eq!(hypothesis[1].resolution, term_with_vars("2 == -x"));
     }
 
     #[test]
@@ -318,12 +303,12 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.filters.weight = 1;
-        let hypothesis = rule.apply(&term, &purpose);
+        let hypothesis = rule.apply(&term.term, &term.filters, &purpose.term);
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
         assert_eq!(hypothesis.len(), 1);
         assert_eq!(hypothesis[0].requirements.len(), 0);
-        assert_eq!(*hypothesis[0].resolution.term, term_with_vars("x + 2 == 0"));
+        assert_eq!(hypothesis[0].resolution, term_with_vars("x + 2 == 0"));
     }
 
     #[test]
@@ -343,7 +328,7 @@ pub mod tests {
         let purpose = TermProps::from(Rc::new(term_with_vars(r#"transform(a)"#)));
         term.filters.weight = 0;
 
-        let hypothesis = rule.apply(&term, &purpose);
+        let hypothesis = rule.apply(&term.term, &term.filters, &purpose.term);
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
         assert_eq!(hypothesis.len(), 3);
@@ -357,9 +342,9 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.filters.weight = 1;
-        assert!(rule.apply(&term, &purpose).is_ok());
+        assert!(rule.apply(&term.term, &term.filters, &purpose.term).is_ok());
         assert_eq!(
-            rule.apply(&term, &purpose).err(),
+            rule.apply(&term.term, &term.filters, &purpose.term).err(),
             Some(RuleDeclineReason::AlreadyApplied)
         );
     }
@@ -371,10 +356,12 @@ pub mod tests {
         let purpose = test_purpose();
 
         term.filters.weight = 1;
-        let hypothesis = rule.apply(&term, &purpose).unwrap();
+        let hypothesis = rule
+            .apply(&term.term, &term.filters, &purpose.term)
+            .unwrap();
         assert_eq!(hypothesis[0].requirements.len(), 0);
         assert_eq!(
-            *hypothesis[0].resolution.term,
+            hypothesis[0].resolution,
             term_with_vars("2 == 0 && x + 1 != 0")
         );
     }
@@ -394,7 +381,7 @@ pub mod tests {
         let purpose = TermProps::from(Rc::new(term_with_vars(r#"find(a+2)"#)));
         term.filters.weight = 0;
 
-        let hypothesis = rule.apply(&term, &purpose);
+        let hypothesis = rule.apply(&term.term, &term.filters, &purpose.term);
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
         assert_eq!(hypothesis.len(), 1);

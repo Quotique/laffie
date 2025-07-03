@@ -1,15 +1,21 @@
-use std::{fmt, rc::Rc};
+use std::fmt;
 
-use crate::term::{ParamsMapping, Term, TermProps};
+use crate::{
+    term::{ParamsMapping, Term, TermFilters},
+    RuleId,
+};
 use utils::VecDisplay;
 
 use super::{ApplyRule, SharedRule};
 
 #[derive(Debug)]
 pub struct Hypothesis {
-    pub requirements: Vec<Rc<Term>>,
-    pub resolution:   TermProps,
-    pub params:       ParamsMapping,
+    pub rule:       SharedRule,
+    pub resolution: Term,
+
+    pub params:        ParamsMapping,
+    pub requirements:  Vec<Term>,
+    pub blocked_rules: Vec<RuleId>,
 }
 
 pub enum HypothesisIterator {
@@ -19,19 +25,14 @@ pub enum HypothesisIterator {
 
 impl Hypothesis {
     #[inline]
-    pub fn rule(&self) -> Option<SharedRule> {
-        self.resolution.inference.rule.clone()
-    }
-
-    #[inline]
-    pub fn parent_idx(&self) -> Option<usize> {
-        self.resolution.inference.parent
+    pub fn rule(&self) -> SharedRule {
+        self.rule.clone()
     }
 }
 
 impl HypothesisIterator {
-    pub fn new(rule: SharedRule, term: TermProps, purpose: &TermProps) -> Self {
-        let hypothesis = match rule.apply(&term, purpose) {
+    pub fn new(rule: SharedRule, term: &Term, filters: &TermFilters, purpose: &Term) -> Self {
+        let hypothesis = match rule.apply(term, filters, purpose) {
             Ok(x) => x,
             Err(e) => {
                 trace!(target: "rule_selection", "rule {rule} not applied to term {term}: {e:?}" );

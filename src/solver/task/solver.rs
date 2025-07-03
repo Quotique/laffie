@@ -135,32 +135,21 @@ impl Solver {
                 }
             }
 
-            if let Some(mut hypothesis) = self.is_answer(solution, index) {
-                if self.hypothesis_proof(solution, &mut hypothesis).is_some() {
-                    trace!("Resolution: {}", hypothesis.resolution);
-                    if solution.terms[index] == hypothesis.resolution {
-                        trace!("Equivalence");
-                        solution.answer = Some(index);
-                    } else {
-                        // TODO: return index
-                        let _ = self.add_main(solution, hypothesis.resolution.clone());
-                        solution.answer = Some(
-                            solution
-                                .terms
-                                .iter()
-                                .find(|x| x.term == hypothesis.resolution.term)
-                                .unwrap()
-                                .inference
-                                .id,
-                        );
-                    }
-                    trace!(
-                        "Solved {}. Answer: {}",
-                        solution.task.subtask_level,
-                        solution.answer().unwrap()
-                    );
-                    return Ok(solution.answer().unwrap());
+            if let Some(term) = self.is_answer(solution, index) {
+                trace!("Resolution: {}", term);
+                if *solution.terms[index].term == *term.term {
+                    trace!("Equivalence");
+                    solution.answer = Some(index);
+                } else {
+                    let id = self.add_main(solution, term)?;
+                    solution.answer = Some(id);
                 }
+                trace!(
+                    "Solved {}. Answer: {}",
+                    solution.task.subtask_level,
+                    solution.answer().unwrap()
+                );
+                return Ok(solution.answer().unwrap());
             }
             if let Some(r) = solution.terms[index].rule(
                 RuleId::new(0x80_00_00_00_00_00_00_00, self.local_rules.len() as u64 + 1),
@@ -175,11 +164,14 @@ impl Solver {
                 for rule in self.suggest_rules(solution, index, |_| true, None) {
                     match HypothesisIterator::new(
                         rule.clone(),
-                        solution.terms[index].clone(),
-                        &solution.task.purpose,
+                        &solution.terms[index].term,
+                        &solution.terms[index].filters,
+                        &solution.task.purpose.term,
                     )
-                    .filter(|hypothesis| !self.main_index.contains_key(&hypothesis.resolution.term))
-                    .filter_map(|mut hypothesis| self.hypothesis_proof(solution, &mut hypothesis))
+                    .filter(|hypothesis| !self.main_index.contains_key(&hypothesis.resolution))
+                    .filter_map(|hypothesis| {
+                        self.hypothesis_proof(Some(index), solution, hypothesis)
+                    })
                     .next()
                     {
                         Some(s) => {
@@ -202,14 +194,14 @@ impl Solver {
         }
     }
 
-    fn add_main(&mut self, solution: &mut Solution, term: TermProps) -> Result<(), SolverError> {
-        if self.main_index.contains_key(&term.term) {
-            return Ok(());
+    fn add_main(&mut self, solution: &mut Solution, term: TermProps) -> Result<usize, SolverError> {
+        if let Some(id) = self.main_index.get(&term.term) {
+            return Ok(*id);
         }
         let key = term.term.clone();
         let id = self.add_term(solution, term)?;
         self.main_index.insert(key, id);
-        Ok(())
+        Ok(id)
     }
 
     fn add_purpose(
@@ -276,21 +268,27 @@ impl Solver {
 
     fn hypothesis_proof(
         &self,
+        parent_idx: Option<usize>,
         solution: &mut Solution,
-        hypothesis: &mut Hypothesis,
+        hypothesis: Hypothesis,
     ) -> Option<TermProps> {
-        if let (Some(index), Some(rule)) = (hypothesis.parent_idx(), hypothesis.rule()) {
-            trace!(target: "rule_selection", "new hypothesis {hypothesis}, rule {rule}, term: {}", solution.terms[index]);
+        if let Some(index) = parent_idx {
+            trace!(
+                target: "rule_selection",
+                "new hypothesis {hypothesis}, rule {}, term: {}",
+                hypothesis.rule, solution.terms[index]
+            );
+
             self.tracer.on_new_hypothesis(
                 solution.terms[index].term.clone(),
-                rule.clone(),
-                hypothesis,
+                hypothesis.rule.clone(),
+                &hypothesis,
                 solution.current_cycles(),
             );
             solution.profiler.on_new_hypothesis(
                 solution.terms[index].term.clone(),
-                rule.clone(),
-                hypothesis,
+                hypothesis.rule.clone(),
+                &hypothesis,
                 solution.current_cycles(),
             );
         }
@@ -304,20 +302,33 @@ impl Solver {
             proof_res = num + 1;
         }
 
-        if hypothesis.parent_idx().is_some() && hypothesis.rule().is_some() {
+        if parent_idx.is_some() {
             self.tracer
-                .on_hypothesis_finish(hypothesis, solution.current_cycles(), proof_res);
+                .on_hypothesis_finish(&hypothesis, solution.current_cycles(), proof_res);
             solution.profiler.on_hypothesis_finish(
-                hypothesis,
+                &hypothesis,
                 solution.current_cycles(),
                 proof_res,
             );
         }
 
         if proof_res == hypothesis.requirements.len() {
-            hypothesis.resolution.inference.requirements = hypothesis.requirements.clone();
-            trace!(target: "rule_selection", "hypothesis {hypothesis} proven, resolution {} applied", hypothesis.resolution);
-            Some(hypothesis.resolution.clone())
+            trace!(
+                target: "rule_selection",
+                "hypothesis {hypothesis} proven, resolution {} applied",
+                hypothesis.resolution
+            );
+
+            let mut props =
+                TermProps::from(Rc::new(hypothesis.resolution)).with_rule(hypothesis.rule);
+            if let Some(id) = parent_idx {
+                props = props.with_parent(id);
+            }
+            props.filters.blocked_rules = hypothesis.blocked_rules.into_iter().collect();
+            props.inference.requirements =
+                hypothesis.requirements.into_iter().map(Rc::new).collect();
+
+            Some(props)
         } else {
             None
         }
@@ -490,14 +501,15 @@ impl Solver {
                     ) {
                         match HypothesisIterator::new(
                             rule.clone(),
-                            solution.terms[index].clone(),
-                            &purpose,
+                            &solution.terms[index].term,
+                            &solution.terms[index].filters,
+                            &purpose.term,
                         )
                         .filter(|hypothesis| {
-                            !self.purpose_index.contains_key(&hypothesis.resolution.term)
+                            !self.purpose_index.contains_key(&hypothesis.resolution)
                         })
-                        .filter_map(|mut hypothesis| {
-                            self.hypothesis_proof(solution, &mut hypothesis)
+                        .filter_map(|hypothesis| {
+                            self.hypothesis_proof(Some(index), solution, hypothesis)
                         })
                         .next()
                         {
@@ -526,15 +538,12 @@ impl Solver {
                     for rule in self.suggest_rules(solution, index, |_| true, None) {
                         match HypothesisIterator::new(
                             rule.clone(),
-                            solution.terms[index].clone(),
-                            &solution.task.purpose,
+                            &solution.terms[index].term,
+                            &solution.terms[index].filters,
+                            &solution.task.purpose.term,
                         )
-                        .filter(|hypothesis| {
-                            !self.purpose_index.contains_key(&hypothesis.resolution.term)
-                        })
-                        .filter_map(|mut hypothesis| {
-                            self.hypothesis_proof(solution, &mut hypothesis)
-                        })
+                        .filter(|h| !self.purpose_index.contains_key(&h.resolution))
+                        .filter_map(|h| self.hypothesis_proof(Some(index), solution, h))
                         .next()
                         {
                             Some(s) => {
@@ -558,7 +567,7 @@ impl Solver {
         }
     }
 
-    fn is_answer(&self, solution: &mut Solution, index: usize) -> Option<Hypothesis> {
+    fn is_answer(&self, solution: &mut Solution, index: usize) -> Option<TermProps> {
         let term = &solution.terms[index];
         let term_root = term.term.as_subterm();
 
@@ -576,11 +585,7 @@ impl Solver {
             if let Some(parent) = term.inference.parent {
                 resolution = resolution.with_parent(parent);
             }
-            return Some(Hypothesis {
-                requirements: vec![],
-                resolution,
-                params: Default::default(),
-            });
+            return Some(resolution);
         }
 
         match &solution.purpose {
@@ -597,29 +602,19 @@ impl Solver {
                         .with_child(term_root.last_arg().unwrap().to_term())
                         .with_child(Term::symbol("known"));
 
-                    return Some(Hypothesis {
-                        requirements: vec![Rc::new(is_known)],
-                        resolution:   term.clone(),
-                        params:       Default::default(),
-                    });
+                    if self.proof(solution, &is_known).is_some() {
+                        return Some(solution.terms[index].clone());
+                    }
                 }
                 None
             }
             Purpose::Proof(_) => {
                 for i in self.purpose_index.values() {
                     if term_root == solution.terms[*i].term.as_subterm() {
-                        return Some(Hypothesis {
-                            requirements: vec![],
-                            resolution:   term.clone(),
-                            params:       Default::default(),
-                        });
+                        return Some(term.clone());
                     }
                     if solution.terms[*i].term.as_subterm().truth().is_true() {
-                        return Some(Hypothesis {
-                            requirements: vec![],
-                            resolution:   solution.terms[*i].clone().without_parents(),
-                            params:       Default::default(),
-                        });
+                        return Some(solution.terms[*i].clone().without_parents());
                     }
                 }
                 None
@@ -627,9 +622,8 @@ impl Solver {
             Purpose::Transform(_) => {
                 if let Some(index) = self.pick_purpose_term(solution) {
                     if solution.terms[index].filters.weight > MAX_LEVEL {
-                        return Some(Hypothesis {
-                            requirements: vec![],
-                            resolution:   solution
+                        return Some(
+                            solution
                                 .terms
                                 .iter()
                                 .rev()
@@ -637,8 +631,7 @@ impl Solver {
                                 .unwrap()
                                 .clone()
                                 .without_parents(),
-                            params:       Default::default(),
-                        });
+                        );
                     }
                 }
                 None

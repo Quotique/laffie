@@ -63,10 +63,10 @@ impl RulesEngine {
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())
             .filter(|rule| {
-                rule.is_term_suitable(term).map_err(|e| {
+                rule.is_term_suitable(&term.filters).map_err(|e| {
                     trace!(target: "rule_selection", "Rule {} rejected for term {} by reason {:?}", rule, term, e);
                 }).is_ok() &&
-                    rule.purpose_mapping(purpose).map_err(|e| {
+                    rule.purpose_mapping(&purpose.term).map_err(|e| {
                     trace!(target: "rule_selection", "Rule {} rejected for term {} by reason {:?}", rule, term, e);
                 }).is_ok()
             })
