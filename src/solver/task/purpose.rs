@@ -10,6 +10,7 @@ pub enum SemanticError {
     WorngArgCount(String),
 }
 
+#[derive(Clone)]
 pub enum Purpose {
     Find(TermProps),
     Proof(TermProps),

@@ -40,7 +40,16 @@ impl Renderer for Tui<'_> {
             } else {
                 Span::from(format!(
                     " needed: [{}]",
-                    VecDisplay(&term.inference.as_ref().unwrap().requirements)
+                    VecDisplay(
+                        &term
+                            .inference
+                            .as_ref()
+                            .unwrap()
+                            .requirements
+                            .iter()
+                            .map(|x| &x.0)
+                            .collect()
+                    )
                 ))
             },
         ]));

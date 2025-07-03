@@ -98,8 +98,8 @@ impl View<'_> {
                 .map(|x| &x.requirements)
                 .unwrap_or(&vec![])
             {
-                if self.rendered.borrow_mut().insert(r.as_ref().clone()) {
-                    if let Some(solution) = self.solution.cache.status(r).and_then(|x| x.solver()) {
+                if self.rendered.borrow_mut().insert(r.0.as_ref().clone()) {
+                    if let Some(solution) = self.solution.cache.status(&r.0).flatten() {
                         View {
                             solution: &solution,
                             rendered: self.rendered.clone(),

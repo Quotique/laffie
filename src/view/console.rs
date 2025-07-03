@@ -35,7 +35,16 @@ impl Renderer for Console<'_, '_> {
             } else {
                 format!(
                     " needed: [{}]",
-                    VecDisplay(&term.inference.as_ref().unwrap().requirements)
+                    VecDisplay(
+                        &term
+                            .inference
+                            .as_ref()
+                            .unwrap()
+                            .requirements
+                            .iter()
+                            .map(|x| &x.0)
+                            .collect()
+                    )
                 )
             }
         )

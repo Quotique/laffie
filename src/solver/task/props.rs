@@ -5,6 +5,7 @@ use std::{
     rc::Rc,
 };
 
+use super::Solution;
 use crate::{
     rule::{RuleAttr, RuleAttrValue, RuleBuilder, RuleId, SharedRule, TermFilters},
     term::Term,
@@ -20,7 +21,7 @@ pub enum Cause {
 pub struct TermInference {
     pub parent:       usize,
     pub rule:         Cause,
-    pub requirements: Vec<Rc<Term>>,
+    pub requirements: Vec<(Rc<Term>, Option<Rc<Solution>>)>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -47,6 +48,12 @@ impl fmt::Display for Cause {
             Cause::Rule(r) => write!(f, "{r}"),
             Cause::Transform => write!(f, "Transform"),
         }
+    }
+}
+
+impl From<Term> for TermProps {
+    fn from(value: Term) -> Self {
+        Self::from(Rc::new(value))
     }
 }
 

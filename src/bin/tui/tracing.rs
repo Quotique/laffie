@@ -266,7 +266,7 @@ impl Tracing {
                         .map(|x| &x.requirements)
                         .unwrap_or(&empty)
                         .iter()
-                        .map(|x| format!("  {}", x)),
+                        .map(|x| format!("  {}", x.0)),
                 )
             })
             .collect();

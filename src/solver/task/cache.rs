@@ -4,30 +4,14 @@ use parking_lot::RwLock;
 
 use crate::{task::Solution, term::Term};
 
-#[derive(Clone)]
-pub enum TaskStatus {
-    Solved(Rc<Solution>),
-    NotSolved,
-    InProgress,
-}
-
 #[derive(Default)]
 pub struct TasksCache {
-    tasks: RwLock<HashMap<Term, TaskStatus>>,
+    tasks: RwLock<HashMap<Term, Option<Rc<Solution>>>>,
 }
 
 impl fmt::Debug for TasksCache {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "TasksCache")
-    }
-}
-
-impl TaskStatus {
-    pub fn solver(&self) -> Option<Rc<Solution>> {
-        match self {
-            TaskStatus::Solved(solution) => Some(solution.clone()),
-            _ => None,
-        }
     }
 }
 
@@ -40,21 +24,21 @@ impl TasksCache {
         if self.contains(&purpose) {
             return false;
         }
-        self.tasks.write().insert(purpose, TaskStatus::InProgress);
+        self.tasks.write().insert(purpose, None);
         true
     }
 
-    pub fn remove(&self, purpose: &Term) -> Option<TaskStatus> {
-        self.tasks.write().remove(purpose)
+    pub fn remove(&self, purpose: &Term) {
+        self.tasks.write().remove(purpose);
     }
 
-    pub fn status(&self, purpose: &Term) -> Option<TaskStatus> {
+    pub fn status(&self, purpose: &Term) -> Option<Option<Rc<Solution>>> {
         self.tasks.read().get(purpose).cloned()
     }
 
-    pub fn update_status(&self, purpose: &Term, status: TaskStatus) {
+    pub fn update_status(&self, purpose: &Term, solution: Rc<Solution>) {
         if let Some(s) = self.tasks.write().get_mut(purpose) {
-            *s = status;
+            *s = Some(solution);
         } else {
             warn!("attempt to update status for unknown purpose {}", purpose);
         }
