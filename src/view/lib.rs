@@ -62,7 +62,7 @@ impl View<'_> {
                     .solution
                     .terms
                     .iter()
-                    .filter(|x| x.is_purpose())
+                    .filter(|x| x.filters.is_purpose())
                     .enumerate()
                     .find(|(_, x)| x.term.as_ref() == answer)
                     .map(|(id, _)| id);
@@ -83,12 +83,12 @@ impl View<'_> {
     ) -> fmt::Result {
         let mut trace: Vec<usize> = vec![answer_idx];
 
-        while let Some(parent) = frame[*trace.last().unwrap()].parent {
+        while let Some(parent) = frame[*trace.last().unwrap()].inference.parent {
             trace.push(parent);
         }
 
         while let Some(id) = trace.pop() {
-            for r in &frame[id].requirements {
+            for r in &frame[id].inference.requirements {
                 if self.rendered.borrow_mut().insert(r.as_ref().clone()) {
                     if let Some(solution) = self.solution.cache.status(r).and_then(|x| x.solver()) {
                         View {

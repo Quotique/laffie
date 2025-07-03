@@ -20,12 +20,12 @@ pub enum HypothesisIterator {
 impl Hypothesis {
     #[inline]
     pub fn rule(&self) -> Option<SharedRule> {
-        self.resolution.rule.clone()
+        self.resolution.inference.rule.clone()
     }
 
     #[inline]
     pub fn parent_idx(&self) -> Option<usize> {
-        self.resolution.parent
+        self.resolution.inference.parent
     }
 }
 

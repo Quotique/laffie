@@ -91,16 +91,16 @@ impl Rule {
     }
 
     pub fn is_term_suitable(&self, term: &TermProps) -> Result<(), RuleDeclineReason> {
-        if self.level != term.weight {
+        if self.level != term.filters.weight {
             return Err(RuleDeclineReason::LevelMissmatch);
-        } else if term.applied_rules.contains(&self.id) {
+        } else if term.filters.applied_rules.contains(&self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
-        } else if term.blocked_rules.contains(&self.id) {
+        } else if term.filters.blocked_rules.contains(&self.id) {
             return Err(RuleDeclineReason::Blocked);
         }
 
         for s in self.pattern_symbols.iter() {
-            if !term.func_symbols.contains(s) {
+            if !term.filters.func_symbols.contains(s) {
                 return Err(RuleDeclineReason::ParamsMappingErr(format!(
                     "symbol: {s} not found"
                 )));
@@ -163,10 +163,10 @@ impl ApplyRule for SharedRule {
             mapping.push(Default::default());
         }
 
-        if arg.applied_rules.contains(&self.id) {
+        if arg.filters.applied_rules.contains(&self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
         }
-        if arg.blocked_rules.contains(&self.id) {
+        if arg.filters.blocked_rules.contains(&self.id) {
             return Err(RuleDeclineReason::Blocked);
         }
 
@@ -194,8 +194,11 @@ impl ApplyRule for SharedRule {
                 src = src.normalize(self.norm_level());
                 let mut resolution = TermProps::from(Rc::new(src))
                     .with_rule(self.clone())
-                    .with_parent(arg.id);
-                resolution.blocked_rules.extend(self.block.iter().cloned());
+                    .with_parent(arg.inference.id);
+                resolution
+                    .filters
+                    .blocked_rules
+                    .extend(self.block.iter().cloned());
 
                 let hypothesis = Hypothesis {
                     requirements: self
@@ -289,7 +292,7 @@ pub mod tests {
         let mut term = test_term();
         let purpose = test_purpose();
 
-        term.weight = 1;
+        term.filters.weight = 1;
         let hypothesis = rule.apply(&term, &purpose);
         assert!(hypothesis.is_ok());
         let mut hypothesis = hypothesis.unwrap();
@@ -314,7 +317,7 @@ pub mod tests {
         let mut term = test_term_subtree();
         let purpose = test_purpose();
 
-        term.weight = 1;
+        term.filters.weight = 1;
         let hypothesis = rule.apply(&term, &purpose);
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
@@ -338,7 +341,7 @@ pub mod tests {
         let mut term = TermProps::from(Rc::new(term_with_vars(test_term)));
 
         let purpose = TermProps::from(Rc::new(term_with_vars(r#"transform(a)"#)));
-        term.weight = 0;
+        term.filters.weight = 0;
 
         let hypothesis = rule.apply(&term, &purpose);
         assert!(hypothesis.is_ok());
@@ -353,7 +356,7 @@ pub mod tests {
         let mut term = test_term_subtree();
         let purpose = test_purpose();
 
-        term.weight = 1;
+        term.filters.weight = 1;
         assert!(rule.apply(&term, &purpose).is_ok());
         assert_eq!(
             rule.apply(&term, &purpose).err(),
@@ -367,7 +370,7 @@ pub mod tests {
         let mut term = test_term_fraction();
         let purpose = test_purpose();
 
-        term.weight = 1;
+        term.filters.weight = 1;
         let hypothesis = rule.apply(&term, &purpose).unwrap();
         assert_eq!(hypothesis[0].requirements.len(), 0);
         assert_eq!(
@@ -389,7 +392,7 @@ pub mod tests {
         let mut term = TermProps::from(Rc::new(term_with_vars(test_term)));
 
         let purpose = TermProps::from(Rc::new(term_with_vars(r#"find(a+2)"#)));
-        term.weight = 0;
+        term.filters.weight = 0;
 
         let hypothesis = rule.apply(&term, &purpose);
         assert!(hypothesis.is_ok());

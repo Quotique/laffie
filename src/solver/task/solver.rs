@@ -112,7 +112,7 @@ impl Solver {
             let index = solution.pick_term().ok_or(SolverError::NoConditions)?;
             self.tracer.on_term_focus(&solution.terms[index]);
 
-            let level = solution.terms[index].weight;
+            let level = solution.terms[index].filters.weight;
             trace!(
                 target: "subtask",
                 "[{}]({}) Level: {} -> {}",
@@ -127,11 +127,11 @@ impl Solver {
 
             if !solution.purpose.is_transform() {
                 if let Some(simplified) = self.transform(solution, index) {
-                    solution.terms[index].mark_replaced();
+                    solution.terms[index].filters.mark_replaced();
                     self.add_main(solution, simplified).unwrap();
                     continue;
                 } else {
-                    solution.terms[index].mark_simplified();
+                    solution.terms[index].filters.mark_simplified();
                 }
             }
 
@@ -150,6 +150,7 @@ impl Solver {
                                 .iter()
                                 .find(|x| x.term == hypothesis.resolution.term)
                                 .unwrap()
+                                .inference
                                 .id,
                         );
                     }
@@ -188,15 +189,15 @@ impl Solver {
                             break;
                         }
                         None => {
-                            solution.terms[index].applied_rules.insert(rule.id);
+                            solution.terms[index].filters.applied_rules.insert(rule.id);
                         }
                     }
                 }
                 if !added {
-                    solution.terms[index].weight += 1;
+                    solution.terms[index].filters.weight += 1;
                 }
             } else {
-                solution.terms[index].weight += 1;
+                solution.terms[index].filters.weight += 1;
             }
         }
     }
@@ -216,7 +217,7 @@ impl Solver {
         solution: &mut Solution,
         mut term: TermProps,
     ) -> Result<(), SolverError> {
-        term.mark_purpose();
+        term.filters.mark_purpose();
         if self.purpose_index.contains_key(&term.term) {
             return Ok(());
         }
@@ -234,13 +235,14 @@ impl Solver {
         self.tracer.on_new_term(
             &term,
             &term
+                .inference
                 .parent
                 .map(|id| solution.terms[id].clone())
                 .unwrap_or_else(|| TermProps::from(Rc::new(Term::zero()))),
         );
 
         let id = solution.terms.len();
-        term.id = id;
+        term.inference.id = id;
         if solution.terms.len() + 1 > STACK_SIZE {
             return Err(SolverError::StackOverflow);
         }
@@ -313,7 +315,7 @@ impl Solver {
         }
 
         if proof_res == hypothesis.requirements.len() {
-            hypothesis.resolution.requirements = hypothesis.requirements.clone();
+            hypothesis.resolution.inference.requirements = hypothesis.requirements.clone();
             trace!(target: "rule_selection", "hypothesis {hypothesis} proven, resolution {} applied", hypothesis.resolution);
             Some(hypothesis.resolution.clone())
         } else {
@@ -338,10 +340,10 @@ impl Solver {
     }
 
     fn transform(&mut self, solution: &mut Solution, index: usize) -> Option<TermProps> {
-        if solution.terms[index].is_simplified() {
+        if solution.terms[index].filters.is_simplified() {
             return None;
         }
-        solution.terms[index].mark_simplified();
+        solution.terms[index].filters.mark_simplified();
 
         let (answer_wrap, to_transform) = if solution.terms[index]
             .term
@@ -378,11 +380,12 @@ impl Solver {
         }
         let mut result = TermProps::from(Rc::new(answer));
         result
+            .filters
             .blocked_rules
-            .clone_from(&solution.terms[index].blocked_rules);
-        result.mark_simplified();
-        result.parent = Some(solution.terms[index].id);
-        result.requirements.push(task);
+            .clone_from(&solution.terms[index].filters.blocked_rules);
+        result.filters.mark_simplified();
+        result.inference.parent = Some(solution.terms[index].inference.id);
+        result.inference.requirements.push(task);
 
         Some(result)
     }
@@ -404,7 +407,8 @@ impl Solver {
                     .terms
                     .iter()
                     .filter(|x| {
-                        !(x.is_purpose() || x.term.as_subterm().data().is_symbol_name("answer"))
+                        !(x.filters.is_purpose() ||
+                            x.term.as_subterm().data().is_symbol_name("answer"))
                     })
                     .cloned(),
             )
@@ -450,9 +454,9 @@ impl Solver {
         solution
             .terms
             .iter()
-            .filter(|x| !x.is_replaced() && x.is_purpose())
-            .min_by_key(|x| x.weight)
-            .map(|x| x.id)
+            .filter(|x| !x.filters.is_replaced() && x.filters.is_purpose())
+            .min_by_key(|x| x.filters.weight)
+            .map(|x| x.inference.id)
     }
 
     fn prepare_purpose(&mut self, solution: &mut Solution, level: usize) {
@@ -460,17 +464,17 @@ impl Solver {
             Purpose::Find(_) => {}
             Purpose::Proof(_) => {
                 while let Some(index) = self.pick_purpose_term(solution) {
-                    if solution.terms[index].weight > level {
+                    if solution.terms[index].filters.weight > level {
                         return;
                     }
 
                     if let Some(simplified) = self.transform(solution, index) {
-                        solution.terms[index].mark_replaced();
+                        solution.terms[index].filters.mark_replaced();
                         // TODO remove unwrap
                         self.add_purpose(solution, simplified).unwrap();
                         continue;
                     } else {
-                        solution.terms[index].mark_simplified();
+                        solution.terms[index].filters.mark_simplified();
                     }
 
                     let purpose = TermProps::from(Rc::new(
@@ -503,18 +507,18 @@ impl Solver {
                                 added = true;
                             }
                             None => {
-                                solution.terms[index].applied_rules.insert(rule.id);
+                                solution.terms[index].filters.applied_rules.insert(rule.id);
                             }
                         }
                     }
                     if !added {
-                        solution.terms[index].weight += 1;
+                        solution.terms[index].filters.weight += 1;
                     }
                 }
             }
             Purpose::Transform(_) => {
                 while let Some(index) = self.pick_purpose_term(solution) {
-                    if solution.terms[index].weight > level {
+                    if solution.terms[index].filters.weight > level {
                         return;
                     }
 
@@ -536,18 +540,18 @@ impl Solver {
                             Some(s) => {
                                 trace!("{} => {}", solution.terms[index], s);
                                 if self.add_purpose(solution, s).is_ok() {
-                                    solution.terms[index].weight = MAX_LEVEL + 1;
+                                    solution.terms[index].filters.weight = MAX_LEVEL + 1;
                                     break;
                                 }
                                 added = true;
                             }
                             None => {
-                                solution.terms[index].applied_rules.insert(rule.id);
+                                solution.terms[index].filters.applied_rules.insert(rule.id);
                             }
                         }
                     }
                     if !added {
-                        solution.terms[index].weight += 1;
+                        solution.terms[index].filters.weight += 1;
                     }
                 }
             }
@@ -569,7 +573,7 @@ impl Solver {
                     .pop_first_arg()
                     .unwrap(),
             ));
-            if let Some(parent) = term.parent {
+            if let Some(parent) = term.inference.parent {
                 resolution = resolution.with_parent(parent);
             }
             return Some(Hypothesis {
@@ -622,14 +626,14 @@ impl Solver {
             }
             Purpose::Transform(_) => {
                 if let Some(index) = self.pick_purpose_term(solution) {
-                    if solution.terms[index].weight > MAX_LEVEL {
+                    if solution.terms[index].filters.weight > MAX_LEVEL {
                         return Some(Hypothesis {
                             requirements: vec![],
                             resolution:   solution
                                 .terms
                                 .iter()
                                 .rev()
-                                .find(|x| x.is_purpose())
+                                .find(|x| x.filters.is_purpose())
                                 .unwrap()
                                 .clone()
                                 .without_parents(),

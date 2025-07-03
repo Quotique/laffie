@@ -260,7 +260,7 @@ impl Tracing {
             .iter()
             .flat_map(|x| {
                 std::iter::once(x.to_string())
-                    .chain(x.requirements.iter().map(|x| format!("  {}", x)))
+                    .chain(x.inference.requirements.iter().map(|x| format!("  {}", x)))
             })
             .collect();
         frame.render_widget(

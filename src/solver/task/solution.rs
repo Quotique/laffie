@@ -34,9 +34,9 @@ impl Solution {
     pub fn pick_term(&self) -> Option<usize> {
         self.terms
             .iter()
-            .filter(|x| !(x.is_replaced() || x.is_purpose()))
-            .min_by_key(|x| x.weight)
-            .map(|x| x.id)
+            .filter(|x| !(x.filters.is_replaced() || x.filters.is_purpose()))
+            .min_by_key(|x| x.filters.weight)
+            .map(|x| x.inference.id)
     }
 
     #[inline]

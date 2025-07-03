@@ -54,9 +54,12 @@ impl RulesEngine {
         assert!(self.rule_queue.is_empty());
 
         let empty_level = LevelRules::new();
-        let level = self.all_rules.get(&term.weight).unwrap_or(&empty_level);
+        let level = self
+            .all_rules
+            .get(&term.filters.weight)
+            .unwrap_or(&empty_level);
         let result: Vec<_> = once(&Symbol::by_name("AnySymbol").unwrap())
-            .chain(term.func_symbols.iter())
+            .chain(term.filters.func_symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())
             .filter(|rule| {
@@ -72,7 +75,7 @@ impl RulesEngine {
         if !result.is_empty() {
             trace!(
                 "[{}] Suggested rules: [{}]",
-                term.weight,
+                term.filters.weight,
                 VecDisplay(&result)
             );
         }

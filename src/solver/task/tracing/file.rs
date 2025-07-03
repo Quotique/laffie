@@ -81,7 +81,8 @@ impl Tracer for FileDumpTracer {
                     self.idention(),
                     term.term,
                     parent.term,
-                    term.rule
+                    term.inference
+                        .rule
                         .as_ref()
                         .map(|x| x.to_string())
                         .unwrap_or_default()
