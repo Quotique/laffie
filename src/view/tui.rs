@@ -30,12 +30,17 @@ impl Renderer for Tui<'_> {
         self.output.push(Line::from(vec![
             Span::from(format!("{}=> ", "  ".repeat(subtask_level))),
             Span::style(term.term.to_string().into(), term_style),
-            if term.inference.requirements.is_empty() {
+            if term
+                .inference
+                .as_ref()
+                .map(|x| x.requirements.is_empty())
+                .unwrap_or(true)
+            {
                 Span::from("".to_owned())
             } else {
                 Span::from(format!(
                     " needed: [{}]",
-                    VecDisplay(&term.inference.requirements)
+                    VecDisplay(&term.inference.as_ref().unwrap().requirements)
                 ))
             },
         ]));
@@ -87,7 +92,8 @@ impl Renderer for Tui<'_> {
                 .map(|(i, s)| {
                     Line::from(vec![Span::from(format!(
                         "{i} {} {:?}",
-                        s.term, s.inference.parent
+                        s.term,
+                        s.inference.as_ref().map(|x| x.parent)
                     ))])
                 })
                 .collect(),

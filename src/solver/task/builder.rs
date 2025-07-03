@@ -42,13 +42,12 @@ impl TaskBuilder {
     }
 
     pub fn with_condition(mut self, mut condition: TermProps) -> Self {
-        self.term_id_map
-            .insert(condition.inference.id, self.conditions.len());
+        self.term_id_map.insert(condition.id, self.conditions.len());
         condition.filters.weight = 0;
-        condition.inference.id = self.conditions.len();
+        condition.id = self.conditions.len();
 
-        if let Some(parent) = condition.inference.parent {
-            condition.inference.parent = self.term_id_map.get(&parent).cloned();
+        if let Some(inference) = condition.inference.as_mut() {
+            inference.parent = *self.term_id_map.get(&inference.parent).unwrap();
         }
         self.conditions.push(condition);
         self

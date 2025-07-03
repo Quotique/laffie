@@ -10,11 +10,16 @@ use crate::{
     term::Term,
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
+pub enum Cause {
+    Rule(SharedRule),
+    Transform,
+}
+
+#[derive(Debug, Clone)]
 pub struct TermInference {
-    pub id:           usize,
-    pub parent:       Option<usize>,
-    pub rule:         Option<SharedRule>,
+    pub parent:       usize,
+    pub rule:         Cause,
     pub requirements: Vec<Rc<Term>>,
 }
 
@@ -28,16 +33,27 @@ pub enum TermAsRule {
 
 #[derive(Debug, Clone)]
 pub struct TermProps {
+    pub id:        usize,
     pub term:      Rc<Term>,
-    pub inference: TermInference,
+    pub inference: Option<TermInference>,
     pub filters:   TermFilters,
 
     rule: TermAsRule,
 }
 
+impl fmt::Display for Cause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Cause::Rule(r) => write!(f, "{r}"),
+            Cause::Transform => write!(f, "Transform"),
+        }
+    }
+}
+
 impl From<Rc<Term>> for TermProps {
     fn from(value: Rc<Term>) -> Self {
         Self {
+            id:        Default::default(),
             inference: Default::default(),
             filters:   TermFilters::from(value.symbols()),
             term:      value,
@@ -98,24 +114,8 @@ impl TermAsRule {
         Some(SharedRule::new(rule))
     }
 }
+
 impl TermProps {
-    pub fn with_parent(mut self, id: usize) -> Self {
-        if self.inference.parent.replace(id).is_some() {
-            warn!("parent replacement");
-        }
-        self
-    }
-
-    pub fn without_parents(mut self) -> Self {
-        self.inference.parent.take();
-        self
-    }
-
-    pub fn with_rule(mut self, rule: SharedRule) -> Self {
-        self.inference.rule = Some(rule);
-        self
-    }
-
     pub fn rule(&mut self, id: RuleId, level: u64) -> Option<SharedRule> {
         self.rule.get_or_insert(&self.term, id, level).inspect(|r| {
             self.filters.blocked_rules.insert(r.id);

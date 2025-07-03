@@ -255,12 +255,19 @@ impl Tracing {
     }
 
     fn _draw_solution_text(solution: &Solution, pane_style: Style, frame: &mut Frame, area: Rect) {
+        let empty = vec![];
         let solution: Vec<_> = solution
             .terms
             .iter()
             .flat_map(|x| {
-                std::iter::once(x.to_string())
-                    .chain(x.inference.requirements.iter().map(|x| format!("  {}", x)))
+                std::iter::once(x.to_string()).chain(
+                    x.inference
+                        .as_ref()
+                        .map(|x| &x.requirements)
+                        .unwrap_or(&empty)
+                        .iter()
+                        .map(|x| format!("  {}", x)),
+                )
             })
             .collect();
         frame.render_widget(

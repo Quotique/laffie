@@ -6,7 +6,10 @@ use itertools::Itertools;
 
 use utils::VecDisplay;
 
-use super::{cache::TaskStatus, Purpose, Solution, SolutionTracer, Task, TaskBuilder, TermProps};
+use super::{
+    cache::TaskStatus, props::TermInference, Cause, Purpose, Solution, SolutionTracer, Task,
+    TaskBuilder, TermProps,
+};
 use crate::{
     rule::{Hypothesis, HypothesisIterator, Rule, RuleAttr, RuleId, RulesEngine, SharedRule},
     term::{SubtermMut, Term},
@@ -165,10 +168,8 @@ impl Solver {
                         &solution.terms[index].filters,
                         &solution.task.purpose.term,
                     )
-                    .filter(|hypothesis| !self.main_index.contains_key(&hypothesis.resolution))
-                    .filter_map(|hypothesis| {
-                        self.hypothesis_proof(Some(index), solution, hypothesis)
-                    })
+                    .filter(|h| !self.main_index.contains_key(&h.resolution))
+                    .filter_map(|h| self.hypothesis_proof(index, solution, h))
                     .next()
                     {
                         Some(s) => {
@@ -216,22 +217,18 @@ impl Solver {
         Ok(())
     }
 
-    fn add_term(
-        &mut self,
-        solution: &mut Solution,
-        mut term: TermProps,
-    ) -> Result<usize, SolverError> {
+    fn add_term(&self, solution: &mut Solution, mut term: TermProps) -> Result<usize, SolverError> {
         self.tracer.on_new_term(
             &term,
             &term
                 .inference
-                .parent
-                .map(|id| solution.terms[id].clone())
+                .as_ref()
+                .map(|i| solution.terms[i.parent].clone())
                 .unwrap_or_else(|| TermProps::from(Rc::new(Term::zero()))),
         );
 
         let id = solution.terms.len();
-        term.inference.id = id;
+        term.id = id;
         if solution.terms.len() + 1 > STACK_SIZE {
             return Err(SolverError::StackOverflow);
         }
@@ -265,30 +262,28 @@ impl Solver {
 
     fn hypothesis_proof(
         &self,
-        parent_idx: Option<usize>,
+        parent_idx: usize,
         solution: &mut Solution,
         hypothesis: Hypothesis,
     ) -> Option<TermProps> {
-        if let Some(index) = parent_idx {
-            trace!(
-                target: "rule_selection",
-                "new hypothesis {hypothesis}, rule {}, term: {}",
-                hypothesis.rule, solution.terms[index]
-            );
+        trace!(
+            target: "rule_selection",
+            "new hypothesis {hypothesis}, rule {}, term: {}",
+            hypothesis.rule, solution.terms[parent_idx]
+        );
 
-            self.tracer.on_new_hypothesis(
-                solution.terms[index].term.clone(),
-                hypothesis.rule.clone(),
-                &hypothesis,
-                solution.current_cycles(),
-            );
-            solution.profiler.on_new_hypothesis(
-                solution.terms[index].term.clone(),
-                hypothesis.rule.clone(),
-                &hypothesis,
-                solution.current_cycles(),
-            );
-        }
+        self.tracer.on_new_hypothesis(
+            solution.terms[parent_idx].term.clone(),
+            hypothesis.rule.clone(),
+            &hypothesis,
+            solution.current_cycles(),
+        );
+        solution.profiler.on_new_hypothesis(
+            solution.terms[parent_idx].term.clone(),
+            hypothesis.rule.clone(),
+            &hypothesis,
+            solution.current_cycles(),
+        );
 
         let mut proof_res = 0;
         for (num, req) in hypothesis.requirements.iter().enumerate() {
@@ -299,15 +294,11 @@ impl Solver {
             proof_res = num + 1;
         }
 
-        if parent_idx.is_some() {
-            self.tracer
-                .on_hypothesis_finish(&hypothesis, solution.current_cycles(), proof_res);
-            solution.profiler.on_hypothesis_finish(
-                &hypothesis,
-                solution.current_cycles(),
-                proof_res,
-            );
-        }
+        self.tracer
+            .on_hypothesis_finish(&hypothesis, solution.current_cycles(), proof_res);
+        solution
+            .profiler
+            .on_hypothesis_finish(&hypothesis, solution.current_cycles(), proof_res);
 
         if proof_res == hypothesis.requirements.len() {
             trace!(
@@ -316,14 +307,13 @@ impl Solver {
                 hypothesis.resolution
             );
 
-            let mut props =
-                TermProps::from(Rc::new(hypothesis.resolution)).with_rule(hypothesis.rule);
-            if let Some(id) = parent_idx {
-                props = props.with_parent(id);
-            }
+            let mut props = TermProps::from(Rc::new(hypothesis.resolution));
+            props.inference = Some(TermInference {
+                rule:         Cause::Rule(hypothesis.rule),
+                parent:       parent_idx,
+                requirements: hypothesis.requirements.into_iter().map(Rc::new).collect(),
+            });
             props.filters.blocked_rules = hypothesis.blocked_rules.into_iter().collect();
-            props.inference.requirements =
-                hypothesis.requirements.into_iter().map(Rc::new).collect();
 
             Some(props)
         } else {
@@ -392,8 +382,11 @@ impl Solver {
             .blocked_rules
             .clone_from(&solution.terms[index].filters.blocked_rules);
         result.filters.mark_simplified();
-        result.inference.parent = Some(solution.terms[index].inference.id);
-        result.inference.requirements.push(task);
+        result.inference = Some(TermInference {
+            rule:         Cause::Transform,
+            parent:       index,
+            requirements: vec![task],
+        });
 
         Some(result)
     }
@@ -464,7 +457,7 @@ impl Solver {
             .iter()
             .filter(|x| !x.filters.is_replaced() && x.filters.is_purpose())
             .min_by_key(|x| x.filters.weight)
-            .map(|x| x.inference.id)
+            .map(|x| x.id)
     }
 
     fn prepare_purpose(&mut self, solution: &mut Solution, level: usize) {
@@ -502,12 +495,8 @@ impl Solver {
                             &solution.terms[index].filters,
                             &purpose.term,
                         )
-                        .filter(|hypothesis| {
-                            !self.purpose_index.contains_key(&hypothesis.resolution)
-                        })
-                        .filter_map(|hypothesis| {
-                            self.hypothesis_proof(Some(index), solution, hypothesis)
-                        })
+                        .filter(|h| !self.purpose_index.contains_key(&h.resolution))
+                        .filter_map(|hypothesis| self.hypothesis_proof(index, solution, hypothesis))
                         .next()
                         {
                             Some(s) => {
@@ -540,7 +529,7 @@ impl Solver {
                             &solution.task.purpose.term,
                         )
                         .filter(|h| !self.purpose_index.contains_key(&h.resolution))
-                        .filter_map(|h| self.hypothesis_proof(Some(index), solution, h))
+                        .filter_map(|h| self.hypothesis_proof(index, solution, h))
                         .next()
                         {
                             Some(s) => {
@@ -579,8 +568,8 @@ impl Solver {
                     .pop_first_arg()
                     .unwrap(),
             ));
-            if let Some(parent) = term.inference.parent {
-                resolution = resolution.with_parent(parent);
+            if let Some(inference) = &term.inference {
+                resolution.inference = Some(inference.clone());
             }
             return Some(resolution);
         }
@@ -611,7 +600,11 @@ impl Solver {
                         return Some(term.clone());
                     }
                     if solution.terms[*i].term.as_subterm().truth().is_true() {
-                        return Some(solution.terms[*i].clone().without_parents());
+                        return Some({
+                            let mut res = solution.terms[*i].clone();
+                            res.inference.take();
+                            res
+                        });
                     }
                 }
                 None
@@ -619,16 +612,17 @@ impl Solver {
             Purpose::Transform(_) => {
                 if let Some(index) = self.pick_purpose_term(solution) {
                     if solution.terms[index].filters.weight > MAX_LEVEL {
-                        return Some(
-                            solution
+                        return Some({
+                            let mut res = solution
                                 .terms
                                 .iter()
                                 .rev()
                                 .find(|x| x.filters.is_purpose())
                                 .unwrap()
-                                .clone()
-                                .without_parents(),
-                        );
+                                .clone();
+                            res.inference.take();
+                            res
+                        });
                     }
                 }
                 None

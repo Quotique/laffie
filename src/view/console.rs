@@ -25,10 +25,18 @@ impl Renderer for Console<'_, '_> {
             "{}=> {}{}",
             "  ".repeat(subtask_level),
             term.term.to_string().bold().yellow(),
-            if term.inference.requirements.is_empty() {
+            if term
+                .inference
+                .as_ref()
+                .map(|x| x.requirements.is_empty())
+                .unwrap_or(true)
+            {
                 Default::default()
             } else {
-                format!(" needed: [{}]", VecDisplay(&term.inference.requirements))
+                format!(
+                    " needed: [{}]",
+                    VecDisplay(&term.inference.as_ref().unwrap().requirements)
+                )
             }
         )
     }
@@ -65,7 +73,12 @@ impl Renderer for Console<'_, '_> {
 
     fn dump_frame(&mut self, frame: &[TermProps]) -> fmt::Result {
         for (i, s) in frame.iter().enumerate() {
-            writeln!(self.output, "{i} {} {:?}", s.term, s.inference.parent)?;
+            writeln!(
+                self.output,
+                "{i} {} {:?}",
+                s.term,
+                s.inference.as_ref().map(|x| x.parent)
+            )?;
         }
         Ok(())
     }

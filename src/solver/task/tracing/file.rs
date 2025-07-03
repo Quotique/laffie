@@ -82,9 +82,8 @@ impl Tracer for FileDumpTracer {
                     term.term,
                     parent.term,
                     term.inference
-                        .rule
                         .as_ref()
-                        .map(|x| x.to_string())
+                        .map(|x| x.rule.to_string())
                         .unwrap_or_default()
                 )
                 .as_bytes(),

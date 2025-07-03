@@ -36,7 +36,7 @@ impl Solution {
             .iter()
             .filter(|x| !(x.filters.is_replaced() || x.filters.is_purpose()))
             .min_by_key(|x| x.filters.weight)
-            .map(|x| x.inference.id)
+            .map(|x| x.id)
     }
 
     #[inline]

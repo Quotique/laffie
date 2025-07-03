@@ -83,12 +83,21 @@ impl View<'_> {
     ) -> fmt::Result {
         let mut trace: Vec<usize> = vec![answer_idx];
 
-        while let Some(parent) = frame[*trace.last().unwrap()].inference.parent {
+        while let Some(parent) = frame[*trace.last().unwrap()]
+            .inference
+            .as_ref()
+            .map(|x| x.parent)
+        {
             trace.push(parent);
         }
 
         while let Some(id) = trace.pop() {
-            for r in &frame[id].inference.requirements {
+            for r in frame[id]
+                .inference
+                .as_ref()
+                .map(|x| &x.requirements)
+                .unwrap_or(&vec![])
+            {
                 if self.rendered.borrow_mut().insert(r.as_ref().clone()) {
                     if let Some(solution) = self.solution.cache.status(r).and_then(|x| x.solver()) {
                         View {
