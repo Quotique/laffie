@@ -16,7 +16,7 @@ type SymbolTree = Tree<TermNode>;
 pub type VariablesMap = HashMap<Variable, Term>;
 
 #[derive(Debug, Default, Clone, From, PartialEq, Eq, Hash)]
-pub struct SubtermId(pub Vec<usize>);
+pub struct SubtermId(pub(super) Vec<usize>);
 
 #[derive(Debug, Clone, Default)]
 pub struct ParamsMapping {

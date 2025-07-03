@@ -4,13 +4,10 @@ use multimap::MultiMap;
 
 use crate::{
     term::{Symbol, Term},
-    NormalizationLevel, RuleId,
+    NormalizationLevel,
 };
 
-use super::{
-    rule::Rule,
-    rule_attribute::{RuleAttr, RuleAttrValue},
-};
+use super::{Rule, RuleAttr, RuleAttrValue, RuleId};
 
 #[derive(Clone, Debug)]
 pub enum RuleBuilderError {

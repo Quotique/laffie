@@ -6,14 +6,11 @@ use itertools::Itertools;
 
 use utils::VecDisplay;
 
-use super::{
-    builder::TaskBuilder, cache::TaskStatus, purpose::Purpose, tracing::SolutionTracer, Solution,
-    Task,
-};
+use super::{cache::TaskStatus, Purpose, Solution, SolutionTracer, Task, TaskBuilder, TermProps};
 use crate::{
-    rule::{Hypothesis, HypothesisIterator, Rule, RuleAttr, RulesEngine, SharedRule},
-    term::{SubtermMut, Term, TermProps},
-    NormalizationLevel, RuleId,
+    rule::{Hypothesis, HypothesisIterator, Rule, RuleAttr, RuleId, RulesEngine, SharedRule},
+    term::{SubtermMut, Term},
+    NormalizationLevel,
 };
 
 pub const MAX_SUBTASK_LEVEL: usize = 10;
@@ -252,7 +249,7 @@ impl Solver {
         let purpose = purpose.unwrap_or(&solution.task.purpose);
         let engine_rules = self
             .rules_engine
-            .suggest_rules(&solution.terms[index], purpose);
+            .suggest_rules(&solution.terms[index].filters, &purpose.term);
         let suggested_rules: Vec<_> = engine_rules
             .into_iter()
             .chain(self.local_rules.iter().unique().cloned())

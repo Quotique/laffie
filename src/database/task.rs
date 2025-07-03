@@ -8,8 +8,8 @@ use bincode::{config, config::Configuration, Decode, Encode};
 use sled::{Db, Error};
 
 use solver::{
-    task::Task,
-    term::{Term, TermProps},
+    task::{Task, TermProps},
+    term::Term,
 };
 
 use super::err_handle;

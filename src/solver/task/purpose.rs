@@ -1,6 +1,7 @@
 use std::{convert::TryFrom, fmt, rc::Rc};
 
-use crate::term::{Term, TermProps};
+use super::TermProps;
+use crate::term::Term;
 
 // TODO: remove
 #[derive(Clone, Debug)]

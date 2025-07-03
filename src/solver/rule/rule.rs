@@ -1,17 +1,14 @@
-use std::{collections::HashSet, fmt, hash::Hash, rc::Rc};
+use std::{collections::HashSet, fmt, hash, rc::Rc};
 
 use eyre::Result;
 use multimap::MultiMap;
 
 use utils::VecDisplay;
 
-use super::{
-    hypothesis::Hypothesis,
-    rule_attribute::{RuleAttr, RuleAttrValue},
-};
+use super::{Hypothesis, RuleAttr, RuleAttrValue, RuleId, TermFilters};
 use crate::{
-    term::{ParamsMapping, Subterm, SubtermId, Symbol, Term, TermFilters},
-    NormalizationLevel, RuleId,
+    term::{ParamsMapping, Subterm, SubtermId, Symbol, Term},
+    NormalizationLevel,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -42,16 +39,15 @@ pub struct Rule {
     pub pattern_symbols: HashSet<Symbol>,
 }
 
+impl Eq for Rule {}
 impl PartialEq for Rule {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
-impl Eq for Rule {}
-
-impl Hash for Rule {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl hash::Hash for Rule {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state);
     }
 }
@@ -208,8 +204,8 @@ pub mod tests {
     use std::rc::Rc;
 
     use crate::{
-        rule::{parse_rule, RuleDeclineReason},
-        term::{term_with_params, term_with_vars, TermProps},
+        rule::{parse_rule, RuleDeclineReason, TermFilters},
+        term::{term_with_params, term_with_vars, Term},
         NormalizationLevel,
     };
 
@@ -243,20 +239,20 @@ pub mod tests {
         ))
     }
 
-    fn test_term_fraction() -> TermProps {
-        TermProps::from(Rc::new(term_with_vars(r#"2/(x + 1) == 0"#)))
+    fn test_term_fraction() -> Term {
+        term_with_vars(r#"2/(x + 1) == 0"#)
     }
 
-    fn test_term() -> TermProps {
-        TermProps::from(Rc::new(term_with_vars(r#"2 + x == 0"#)))
+    fn test_term() -> Term {
+        term_with_vars(r#"2 + x == 0"#)
     }
 
-    fn test_term_subtree() -> TermProps {
-        TermProps::from(Rc::new(term_with_vars(r#"x + (-(-2)) == 0"#)))
+    fn test_term_subtree() -> Term {
+        term_with_vars(r#"x + (-(-2)) == 0"#)
     }
 
-    fn test_purpose() -> TermProps {
-        TermProps::from(Rc::new(term_with_params(r#"find(x)"#)))
+    fn test_purpose() -> Term {
+        term_with_params(r#"find(x)"#)
     }
 
     #[test]
@@ -264,9 +260,10 @@ pub mod tests {
         let rule = base_rule();
         let term = test_term();
         let purpose = test_purpose();
+        let filters = TermFilters::from(term.symbols());
 
         assert_eq!(
-            rule.apply(&term.term, &term.filters, &purpose.term).err(),
+            rule.apply(&term, &filters, &purpose).err(),
             Some(RuleDeclineReason::LevelMissmatch)
         );
     }
@@ -274,11 +271,12 @@ pub mod tests {
     #[test]
     fn apply_test() {
         let rule = base_rule();
-        let mut term = test_term();
+        let term = test_term();
         let purpose = test_purpose();
+        let mut filters = TermFilters::from(term.symbols());
 
-        term.filters.weight = 1;
-        let hypothesis = rule.apply(&term.term, &term.filters, &purpose.term);
+        filters.weight = 1;
+        let hypothesis = rule.apply(&term, &filters, &purpose);
         assert!(hypothesis.is_ok());
         let mut hypothesis = hypothesis.unwrap();
         hypothesis.sort_by_key(|x| x.requirements[0].to_string());
@@ -299,11 +297,12 @@ pub mod tests {
     #[ignore] // TODO: fix double - autoremove
     fn subtree_apply_test() {
         let rule = subtree_rule();
-        let mut term = test_term_subtree();
+        let term = test_term_subtree();
         let purpose = test_purpose();
+        let mut filters = TermFilters::from(term.symbols());
 
-        term.filters.weight = 1;
-        let hypothesis = rule.apply(&term.term, &term.filters, &purpose.term);
+        filters.weight = 1;
+        let hypothesis = rule.apply(&term, &filters, &purpose);
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
         assert_eq!(hypothesis.len(), 1);
@@ -323,12 +322,12 @@ pub mod tests {
         ));
 
         let test_term = r#"(x^4 - 25*x^2 + 60*x -36 != 0) && ((3600 < 0 && x in empty_set) || (3600 >= 0 && x in set(1, 2)))"#;
-        let mut term = TermProps::from(Rc::new(term_with_vars(test_term)));
+        let term = term_with_vars(test_term);
+        let purpose = term_with_vars(r#"transform(a)"#);
+        let mut filters = TermFilters::from(term.symbols());
+        filters.weight = 0;
 
-        let purpose = TermProps::from(Rc::new(term_with_vars(r#"transform(a)"#)));
-        term.filters.weight = 0;
-
-        let hypothesis = rule.apply(&term.term, &term.filters, &purpose.term);
+        let hypothesis = rule.apply(&term, &filters, &purpose);
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
         assert_eq!(hypothesis.len(), 3);
@@ -338,13 +337,14 @@ pub mod tests {
     #[ignore] // TODO: fix double - autoremove
     fn twice_apply_test() {
         let rule = subtree_rule();
-        let mut term = test_term_subtree();
+        let term = test_term_subtree();
         let purpose = test_purpose();
+        let mut filters = TermFilters::from(term.symbols());
 
-        term.filters.weight = 1;
-        assert!(rule.apply(&term.term, &term.filters, &purpose.term).is_ok());
+        filters.weight = 1;
+        assert!(rule.apply(&term, &filters, &purpose).is_ok());
         assert_eq!(
-            rule.apply(&term.term, &term.filters, &purpose.term).err(),
+            rule.apply(&term, &filters, &purpose).err(),
             Some(RuleDeclineReason::AlreadyApplied)
         );
     }
@@ -352,13 +352,12 @@ pub mod tests {
     #[test]
     fn bind_apply_test() {
         let rule = rule_with_binds();
-        let mut term = test_term_fraction();
+        let term = test_term_fraction();
         let purpose = test_purpose();
+        let mut filters = TermFilters::from(term.symbols());
 
-        term.filters.weight = 1;
-        let hypothesis = rule
-            .apply(&term.term, &term.filters, &purpose.term)
-            .unwrap();
+        filters.weight = 1;
+        let hypothesis = rule.apply(&term, &filters, &purpose).unwrap();
         assert_eq!(hypothesis[0].requirements.len(), 0);
         assert_eq!(
             hypothesis[0].resolution,
@@ -376,12 +375,12 @@ pub mod tests {
         ));
 
         let test_term = r#"1 + a + 2 == 0"#;
-        let mut term = TermProps::from(Rc::new(term_with_vars(test_term)));
+        let term = term_with_vars(test_term);
+        let purpose = term_with_vars(r#"find(a+2)"#);
+        let mut filters = TermFilters::from(term.symbols());
+        filters.weight = 0;
 
-        let purpose = TermProps::from(Rc::new(term_with_vars(r#"find(a+2)"#)));
-        term.filters.weight = 0;
-
-        let hypothesis = rule.apply(&term.term, &term.filters, &purpose.term);
+        let hypothesis = rule.apply(&term, &filters, &purpose);
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
         assert_eq!(hypothesis.len(), 1);

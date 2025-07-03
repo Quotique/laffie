@@ -2,8 +2,8 @@ use std::{fs::File, io::prelude::*, path::Path, rc::Rc};
 
 use crate::{
     rule::{Hypothesis, SharedRule},
-    task::{Solution, Task},
-    term::{Term, TermProps},
+    task::{Solution, Task, TermProps},
+    term::Term,
 };
 
 use super::Tracer;

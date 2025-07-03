@@ -4,8 +4,8 @@ use parking_lot::Mutex;
 
 use crate::{
     rule::{Hypothesis, SharedRule},
-    task::{Solution, Task},
-    term::{Term, TermProps},
+    task::{Solution, Task, TermProps},
+    term::Term,
 };
 
 pub trait Tracer: Send + Sync {

@@ -3,8 +3,8 @@ use std::fmt;
 use colored::*;
 
 use solver::{
-    task::{Purpose, Solution},
-    term::{Term, TermProps},
+    task::{Purpose, Solution, TermProps},
+    term::Term,
 };
 use utils::VecDisplay;
 

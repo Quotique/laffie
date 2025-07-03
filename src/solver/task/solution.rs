@@ -1,7 +1,7 @@
 use std::{rc::Rc, sync::Arc};
 
-use super::{Profiler, Purpose, Task, TasksCache};
-use crate::term::{Term, TermProps};
+use super::{Profiler, Purpose, Task, TasksCache, TermProps};
+use crate::term::Term;
 
 //#[derive(Debug, Clone, Default)]
 #[derive(Debug)]

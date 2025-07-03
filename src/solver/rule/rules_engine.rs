@@ -7,13 +7,10 @@ use itertools::Itertools;
 
 use utils::VecDisplay;
 
-use super::{
-    rule::{Rule, SharedRule},
-    rule_attribute::{RuleAttr, RuleAttrValue},
-};
+use super::{Rule, RuleAttr, RuleAttrValue, RuleId, SharedRule, TermFilters};
 use crate::{
-    term::{Symbol, TermProps},
-    CompactString, RuleId,
+    term::{Symbol, Term},
+    CompactString,
 };
 
 // TODO: move to correct place
@@ -50,32 +47,41 @@ impl RulesEngine {
         self.process_queue();
     }
 
-    pub fn suggest_rules(&self, term: &TermProps, purpose: &TermProps) -> Vec<SharedRule> {
+    pub fn suggest_rules(&self, filters: &TermFilters, purpose: &Term) -> Vec<SharedRule> {
         assert!(self.rule_queue.is_empty());
 
         let empty_level = LevelRules::new();
-        let level = self
-            .all_rules
-            .get(&term.filters.weight)
-            .unwrap_or(&empty_level);
+        let level = self.all_rules.get(&filters.weight).unwrap_or(&empty_level);
         let result: Vec<_> = once(&Symbol::by_name("AnySymbol").unwrap())
-            .chain(term.filters.func_symbols.iter())
+            .chain(filters.func_symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())
             .filter(|rule| {
-                rule.is_term_suitable(&term.filters).map_err(|e| {
-                    trace!(target: "rule_selection", "Rule {} rejected for term {} by reason {:?}", rule, term, e);
-                }).is_ok() &&
-                    rule.purpose_mapping(&purpose.term).map_err(|e| {
-                    trace!(target: "rule_selection", "Rule {} rejected for term {} by reason {:?}", rule, term, e);
-                }).is_ok()
+                rule.is_term_suitable(filters)
+                    .map_err(|e| {
+                        trace!(
+                            target: "rule_selection",
+                            "Rule {} rejected for filters {:?} by reason {:?}",
+                            rule, filters, e
+                        );
+                    })
+                    .is_ok() &&
+                    rule.purpose_mapping(purpose)
+                        .map_err(|e| {
+                            trace!(
+                                target: "rule_selection",
+                                "Rule {} rejected for filters {:?} by reason {:?}",
+                                rule, filters, e
+                            );
+                        })
+                        .is_ok()
             })
             .cloned()
             .collect();
         if !result.is_empty() {
             trace!(
                 "[{}] Suggested rules: [{}]",
-                term.filters.weight,
+                filters.weight,
                 VecDisplay(&result)
             );
         }

@@ -3,8 +3,8 @@ use std::fmt;
 use ratatui::{prelude::*, style::Stylize};
 
 use solver::{
-    task::{Purpose, Solution},
-    term::{Term, TermProps},
+    task::{Purpose, Solution, TermProps},
+    term::Term,
 };
 use utils::VecDisplay;
 

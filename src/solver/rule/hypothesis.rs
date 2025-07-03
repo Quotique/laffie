@@ -1,12 +1,9 @@
 use std::fmt;
 
-use crate::{
-    term::{ParamsMapping, Term, TermFilters},
-    RuleId,
-};
 use utils::VecDisplay;
 
-use super::{ApplyRule, SharedRule};
+use super::{ApplyRule, RuleId, SharedRule, TermFilters};
+use crate::term::{ParamsMapping, Term};
 
 #[derive(Debug)]
 pub struct Hypothesis {

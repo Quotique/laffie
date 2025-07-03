@@ -3,8 +3,8 @@ use std::fmt;
 use html_escape::encode_text;
 
 use solver::{
-    task::{Purpose, Solution},
-    term::{Term, TermProps},
+    task::{Purpose, Solution, TermProps},
+    term::Term,
 };
 
 use crate::Renderer;

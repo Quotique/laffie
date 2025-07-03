@@ -1,14 +1,12 @@
 //#![warn(missing_docs)]
 
 mod codec;
-mod props;
 mod subterm;
 mod subterm_mut;
 mod symbol;
 mod term_node;
 mod term_tree;
 
-pub use props::{TermFilters, TermProps};
 pub use subterm::Subterm;
 pub use subterm_mut::SubtermMut;
 pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};

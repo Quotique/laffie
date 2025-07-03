@@ -5,8 +5,7 @@ use std::{
 };
 
 use solver::{
-    task::{Task, TaskBuilder},
-    term::TermProps,
+    task::{Task, TaskBuilder, TermProps},
     NormalizationLevel,
 };
 

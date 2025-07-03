@@ -1,7 +1,7 @@
-use crate::term::{Term, TermProps};
 use std::{collections::HashMap, fmt, iter::Iterator};
 
-use super::Task;
+use super::{Task, TermProps};
+use crate::term::Term;
 
 #[derive(Clone, Debug)]
 pub enum TaskBuilderError {

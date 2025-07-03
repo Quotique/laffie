@@ -1,18 +1,20 @@
 mod builder;
 mod cache;
 mod profiler;
+mod props;
 mod purpose;
 mod solution;
 mod solver;
 mod tracing;
 
-use crate::term::{Term, TermProps};
+use crate::term::Term;
 use std::{fmt, iter::Iterator};
 
 pub use profiler::{Profiler, ProfilerNode, TaskProfileInfo, TermProfileInfo};
 
 pub use builder::TaskBuilder;
 pub use cache::TasksCache;
+pub use props::TermProps;
 pub use purpose::Purpose;
 pub use solution::Solution;
 pub use solver::{Solver, EXECUTION_DEADLINE_DEFAULT};

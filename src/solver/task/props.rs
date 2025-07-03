@@ -1,28 +1,14 @@
 use std::{
-    collections::HashSet,
     convert::From,
     fmt,
     hash::{Hash, Hasher},
     rc::Rc,
 };
 
-use bitflags::bitflags;
-
-use super::{Symbol, Term};
 use crate::{
-    rule::{RuleAttr, RuleAttrValue, RuleBuilder, SharedRule},
-    RuleId,
+    rule::{RuleAttr, RuleAttrValue, RuleBuilder, RuleId, SharedRule, TermFilters},
+    term::Term,
 };
-
-bitflags! {
-    #[derive(Debug, Default, Clone, Copy)]
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct TermFlags: u32 {
-        const REPLACED   = 0b0001;
-        const SIMPLIFIED = 0b0010;
-        const PURPOSE    = 0b0100;
-    }
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct TermInference {
@@ -30,15 +16,6 @@ pub struct TermInference {
     pub parent:       Option<usize>,
     pub rule:         Option<SharedRule>,
     pub requirements: Vec<Rc<Term>>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct TermFilters {
-    pub func_symbols:  HashSet<Symbol>,
-    pub applied_rules: HashSet<RuleId>,
-    pub blocked_rules: HashSet<RuleId>,
-    pub weight:        usize,
-    flags:             TermFlags,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -62,39 +39,10 @@ impl From<Rc<Term>> for TermProps {
     fn from(value: Rc<Term>) -> Self {
         Self {
             inference: Default::default(),
-            filters:   TermFilters {
-                func_symbols: value.symbols(),
-                ..Default::default()
-            },
+            filters:   TermFilters::from(value.symbols()),
             term:      value,
             rule:      Default::default(),
         }
-    }
-}
-
-impl TermFilters {
-    pub fn mark_replaced(&mut self) {
-        self.flags |= TermFlags::REPLACED;
-    }
-
-    pub fn is_replaced(&self) -> bool {
-        self.flags & TermFlags::REPLACED == TermFlags::REPLACED
-    }
-
-    pub fn mark_simplified(&mut self) {
-        self.flags |= TermFlags::SIMPLIFIED;
-    }
-
-    pub fn is_simplified(&self) -> bool {
-        self.flags & TermFlags::SIMPLIFIED == TermFlags::SIMPLIFIED
-    }
-
-    pub fn mark_purpose(&mut self) {
-        self.flags |= TermFlags::PURPOSE;
-    }
-
-    pub fn is_purpose(&self) -> bool {
-        self.flags & TermFlags::PURPOSE == TermFlags::PURPOSE
     }
 }
 

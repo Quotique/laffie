@@ -9,8 +9,8 @@ pub use html::Html;
 pub use tui::Tui;
 
 use solver::{
-    task::{Purpose, Solution},
-    term::{Term, TermProps},
+    task::{Purpose, Solution, TermProps},
+    term::Term,
 };
 
 pub trait Renderer {
