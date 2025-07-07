@@ -110,7 +110,7 @@ impl Rule {
         // TODO: multiple purposes
         if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Purpose).next() {
             return purpose.as_subterm().try_match(pattern.as_subterm()).map_err(|_| {
-                debug!(target: "rule_selection", "no match purpose: {}, required: {}", purpose, pattern);
+                debug!(target: "rule_selection", "no match purpose: {purpose}, required: {pattern}");
                 RuleDeclineReason::PurposeMissmatch
             });
         }
@@ -190,7 +190,7 @@ impl ApplyRule for SharedRule {
                     resolution,
                     params: i,
                 };
-                trace!(target: "rule_selection", "New hypothesis: {}", hypothesis);
+                trace!(target: "rule_selection", "New hypothesis: {hypothesis}");
                 result.push(hypothesis);
             }
         }

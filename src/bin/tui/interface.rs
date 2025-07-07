@@ -80,7 +80,7 @@ impl Status {
                             .chain(
                                 e.to_string()
                                     .lines()
-                                    .map(|x| Line::from(Span::from(format!("|{}", x)))),
+                                    .map(|x| Line::from(Span::from(format!("|{x}")))),
                             )
                             .chain(once(Line::from(Span::from(
                                 "Rules not updated!".to_owned(),
@@ -241,7 +241,7 @@ pub fn draw_scrollbar(frame: &mut Frame, area: Rect, len: usize, pos: usize) {
             .begin_symbol(Some("↑"))
             .end_symbol(Some("↓")),
         area.inner(Margin {
-            vertical: 1,
+            vertical:   1,
             horizontal: 0,
         }),
         &mut scrollbar_state,

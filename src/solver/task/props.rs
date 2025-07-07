@@ -112,12 +112,12 @@ impl TermAsRule {
             .ok()?;
         let mut builded = builder
             .build()
-            .map_err(|e| trace!("Error rule build: {} for  {}", e, term))
+            .map_err(|e| trace!("Error rule build: {e} for  {term}"))
             .ok()?;
         let rule = builded
             .pop()
             .filter(|r| r.pattern_node().data().variable().is_some())?;
-        trace!("New rule: {}", rule);
+        trace!("New rule: {rule}");
         Some(SharedRule::new(rule))
     }
 }

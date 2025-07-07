@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use ego_tree::{iter::Edge, NodeId, NodeMut, NodeRef, Tree};
 use ratatui::{
@@ -23,7 +23,7 @@ use super::interface::{border_focus, border_unfocus, default_state, draw_scrollb
 pub struct TaskStatus {
     pub task:         Task,
     pub rules_engine: Arc<RulesEngine>,
-    pub solution:     Option<Solution>,
+    pub solution:     Option<Rc<Solution>>,
     pub scroll_pos:   ListState,
 }
 
@@ -224,14 +224,11 @@ impl Tasks {
                 not_runned_count,
             } => Line::from(vec![
                 Span::styled(dir_name.to_string(), Style::new().fg(Color::LightBlue)),
-                Span::from(format!("[{}", not_runned_count)),
-                Span::styled(format!(" {}", solved_count), Style::new().fg(Color::Green)),
+                Span::from(format!("[{not_runned_count}")),
+                Span::styled(format!(" {solved_count}"), Style::new().fg(Color::Green)),
+                Span::styled(format!(" {unsolved_count}"), Style::new().fg(Color::Yellow)),
                 Span::styled(
-                    format!(" {}", unsolved_count),
-                    Style::new().fg(Color::Yellow),
-                ),
-                Span::styled(
-                    format!(" {}", wrong_answer_count),
+                    format!(" {wrong_answer_count}"),
                     Style::new().fg(Color::Red),
                 ),
                 Span::from("]".to_owned()),
@@ -287,7 +284,7 @@ impl Tasks {
             TasksNode::Task(task_id) => {
                 let tracing = self.tasks.get_mut(*task_id).unwrap();
                 let mut renderer = Tui::default();
-                View::try_from(tracing.task.solution.as_ref().unwrap())
+                View::try_from(tracing.task.solution.as_ref().unwrap().as_ref())
                     .unwrap()
                     .display_impl(&mut renderer)
                     .unwrap();
@@ -344,23 +341,20 @@ impl Tasks {
                     Line::default(),
                     Line::from(vec![
                         Span::styled("Not runned: ", Style::new().fg(Color::LightBlue)),
-                        Span::from(format!("{}", not_runned_count)),
+                        Span::from(format!("{not_runned_count}")),
                     ]),
                     Line::from(vec![
                         Span::styled("Solved: ", Style::new().fg(Color::LightBlue)),
-                        Span::styled(format!(" {}", solved_count), Style::new().fg(Color::Green)),
+                        Span::styled(format!(" {solved_count}"), Style::new().fg(Color::Green)),
                     ]),
                     Line::from(vec![
                         Span::styled("Not solved: ", Style::new().fg(Color::LightBlue)),
-                        Span::styled(
-                            format!(" {}", unsolved_count),
-                            Style::new().fg(Color::Yellow),
-                        ),
+                        Span::styled(format!(" {unsolved_count}"), Style::new().fg(Color::Yellow)),
                     ]),
                     Line::from(vec![
                         Span::styled("Wrong answers: ", Style::new().fg(Color::LightBlue)),
                         Span::styled(
-                            format!(" {}", wrong_answer_count),
+                            format!(" {wrong_answer_count}"),
                             Style::new().fg(Color::Red),
                         ),
                     ]),

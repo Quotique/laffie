@@ -121,7 +121,7 @@ fn main() {
     if !args.remove.is_empty() {
         let id = i128::from_str_radix(&args.remove, 16).expect("bad task id");
         if let Err(e) = db.remove(id) {
-            println!("task remove error: {}", e);
+            println!("task remove error: {e}");
         }
         return;
     }
@@ -168,7 +168,7 @@ fn main() {
                 println!(
                     "{}\n{}",
                     "Solution:".italic().blue(),
-                    View::try_from(&solution).unwrap()
+                    View::try_from(solution.as_ref()).unwrap()
                 );
                 if !solution.validate_answer() {
                     stats
@@ -195,7 +195,7 @@ fn main() {
                     "{} {}\n{}",
                     "Solution:".italic().blue(),
                     e.to_string().red(),
-                    View::try_from(&solution).unwrap()
+                    View::try_from(solution.as_ref()).unwrap()
                 );
             }
         };

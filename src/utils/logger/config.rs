@@ -74,7 +74,7 @@ impl Config {
         ));
         slog_stdlog::init().unwrap();
 
-        log::info!(target: "init", "Log initialized with params: {:?}", self);
+        log::info!(target: "init", "Log initialized with params: {self:?}");
         guard
     }
 

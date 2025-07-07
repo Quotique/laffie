@@ -58,13 +58,11 @@ impl Solver {
         }
     }
 
-    // TODO: fix it
-    #[allow(clippy::result_large_err)]
-    pub fn solve(&mut self, task: Task) -> Result<Solution, (Solution, SolverError)> {
+    pub fn solve(&mut self, task: Task) -> Result<Rc<Solution>, (Rc<Solution>, SolverError)> {
         let mut solution = Solution::new(task);
         match self.solve_alt(&mut solution) {
-            Ok(_) => Ok(solution),
-            Err(err) => Err((solution, err)),
+            Ok(_) => Ok(Rc::new(solution)),
+            Err(err) => Err((Rc::new(solution), err)),
         }
     }
 
@@ -135,7 +133,7 @@ impl Solver {
             }
 
             if let Some(term) = self.is_answer(solution, index) {
-                trace!("Resolution: {}", term);
+                trace!("Resolution: {term}");
                 if *solution.terms[index].term == *term.term {
                     trace!("Equivalence");
                     solution.answer = Some(index);
@@ -422,11 +420,11 @@ impl Solver {
             .update_status(&task, subtask_solution.clone());
         match result {
             Err(SolverError::MaxSubtaskLevelExceed) => {
-                trace!("Can't proof {}: MaxSubtaskLevelExceed", task);
+                trace!("Can't proof {task}: MaxSubtaskLevelExceed");
                 solution.cache.remove(&task);
             }
             Err(e) => {
-                trace!("Can't proof {}: {}", task, e);
+                trace!("Can't proof {task}: {e}");
             }
             Ok(_) => {}
         }

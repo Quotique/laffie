@@ -40,7 +40,7 @@ impl TasksCache {
         if let Some(s) = self.tasks.write().get_mut(purpose) {
             *s = Some(solution);
         } else {
-            warn!("attempt to update status for unknown purpose {}", purpose);
+            warn!("attempt to update status for unknown purpose {purpose}");
         }
     }
 

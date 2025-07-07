@@ -39,7 +39,7 @@ impl RulesEngine {
     pub fn register_rule(&mut self, mut rule: Rule) {
         self.last_id.increment();
         rule.id = self.last_id;
-        debug!("New rule: {}", rule);
+        debug!("New rule: {rule}");
         if let Some(RuleAttrValue::Str(s)) = rule.attribute(&RuleAttr::Id).next() {
             self.id_map.insert(s.clone(), rule.id);
         }
@@ -61,8 +61,7 @@ impl RulesEngine {
                     .map_err(|e| {
                         trace!(
                             target: "rule_selection",
-                            "Rule {} rejected for filters {:?} by reason {:?}",
-                            rule, filters, e
+                            "Rule {rule} rejected for filters {filters:?} by reason {e:?}",
                         );
                     })
                     .is_ok() &&
@@ -70,8 +69,7 @@ impl RulesEngine {
                         .map_err(|e| {
                             trace!(
                                 target: "rule_selection",
-                                "Rule {} rejected for filters {:?} by reason {:?}",
-                                rule, filters, e
+                                "Rule {rule} rejected for filters {filters:?} by reason {e:?}",
                             );
                         })
                         .is_ok()

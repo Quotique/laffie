@@ -56,7 +56,7 @@ fn task(
         }
     };
 
-    View::try_from(&solution)
+    View::try_from(solution.as_ref())
         .unwrap()
         .display_impl(&mut Html {
             output: &mut output,
@@ -88,7 +88,7 @@ pub async fn handler(
     match task(text, engine.clone(), tasks.clone(), &mut user) {
         Ok(s) => {
             for i in s.iter() {
-                println!("{}", i);
+                println!("{i}");
                 api.send(command.chat_id.text(i).parse_mode(ParseMode::Html))
                     .await
                     .unwrap();

@@ -163,9 +163,7 @@ impl PartialOrd for TermNode {
 impl fmt::Display for TermNode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TermNode::Symbol(s) => {
-                write!(f, "{}", s)
-            }
+            TermNode::Symbol(s) => write!(f, "{s}"),
             TermNode::Param(id) => write!(f, "{id}"),
             TermNode::Number(value) => {
                 if value.is_negative() {

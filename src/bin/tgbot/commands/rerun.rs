@@ -54,7 +54,7 @@ fn rerun(
         }
     };
 
-    View::try_from(&solution)
+    View::try_from(solution.as_ref())
         .unwrap()
         .display_impl(&mut Html {
             output: &mut output,
