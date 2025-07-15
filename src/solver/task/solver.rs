@@ -85,17 +85,10 @@ impl Solver {
 
         self.tracer
             .on_subtask_start(&solution.task, solution.current_cycles());
-        solution
-            .profiler
-            .on_subtask_start(&solution.task, solution.current_cycles());
 
         let result = self.solver_loop(solution);
 
         self.tracer.clone().on_subtask_end(solution);
-        solution.profiler.on_subtask_end(
-            solution.current_cycles(),
-            solution.answer().map(|x| x.to_string()),
-        );
         result
     }
 
@@ -266,12 +259,6 @@ impl Solver {
             &hypothesis,
             solution.current_cycles(),
         );
-        solution.profiler.on_new_hypothesis(
-            solution.terms[parent_idx].term.clone(),
-            hypothesis.rule.clone(),
-            &hypothesis,
-            solution.current_cycles(),
-        );
 
         let mut proof_res = 0;
         let mut solved = vec![];
@@ -296,9 +283,6 @@ impl Solver {
         }
 
         self.tracer
-            .on_hypothesis_finish(&hypothesis, solution.current_cycles(), proof_res);
-        solution
-            .profiler
             .on_hypothesis_finish(&hypothesis, solution.current_cycles(), proof_res);
 
         if solved
@@ -398,6 +382,7 @@ impl Solver {
         }
 
         if !solution.cache.add(task.as_subterm().to_term()) {
+            unimplemented!("subtask recursion");
             // TODO: recursion
         }
         let subtask = Self::subtask(solution, task.clone());

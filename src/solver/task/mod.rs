@@ -1,6 +1,5 @@
 mod builder;
 mod cache;
-mod profiler;
 mod props;
 mod purpose;
 mod solution;
@@ -9,8 +8,6 @@ mod tracing;
 
 use crate::term::Term;
 use std::{fmt, iter::Iterator};
-
-pub use profiler::{Profiler, ProfilerNode, TaskProfileInfo, TermProfileInfo};
 
 pub use builder::TaskBuilder;
 pub use cache::TasksCache;
@@ -22,11 +19,12 @@ pub use tracing::{Config as DumperConfig, SolutionTracer, Tracer};
 
 #[derive(Debug, Clone)]
 pub struct Task {
-    pub id:            u64,
-    pub text:          String,
-    pub group:         String,
-    pub conditions:    Vec<TermProps>,
+    pub id:    u64,
+    pub text:  String,
+    pub group: String,
+
     pub purpose:       TermProps,
+    pub conditions:    Vec<TermProps>,
     pub subtask_level: usize,
 
     pub possible_answers: Vec<Term>,

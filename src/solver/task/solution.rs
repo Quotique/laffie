@@ -1,15 +1,15 @@
 use std::{rc::Rc, sync::Arc};
 
-use super::{Profiler, Purpose, Task, TasksCache, TermProps};
+use super::{Purpose, Task, TasksCache, TermProps};
 use crate::term::Term;
 
 //#[derive(Debug, Clone, Default)]
 #[derive(Debug)]
 pub struct Solution {
-    pub task:     Task,
-    pub purpose:  Purpose,
-    pub profiler: Profiler,
+    pub task:    Task,
+    pub purpose: Purpose,
 
+    // pub profiler: Profiler,
     pub cycles: usize,
     pub terms:  Vec<TermProps>,
     pub cache:  Arc<TasksCache>,
@@ -23,7 +23,7 @@ impl Solution {
         Self {
             task,
             purpose,
-            profiler: Default::default(),
+            // profiler: Default::default(),
             cycles: Default::default(),
             terms: Default::default(),
             cache: Default::default(),
