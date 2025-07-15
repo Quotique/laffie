@@ -1,11 +1,11 @@
 use std::{rc::Rc, sync::Arc};
 
-use ego_tree::{iter::Edge, NodeId, NodeMut, NodeRef, Tree};
 use ratatui::{
     prelude::*,
     style::Stylize,
     widgets::{Block, Borders, List, ListState, Scrollbar, ScrollbarOrientation},
 };
+use trees::{tr, Node, Tree};
 use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 
 use solver::{
@@ -13,7 +13,7 @@ use solver::{
     task::{DumperConfig, Solution, Solver, Task},
     CompactString,
 };
-use utils::VecDisplay;
+use utils::{IndexedTree, TreeIndex, VecDisplay};
 use view::{Tui, View};
 
 use crate::tracing::Tracing;
@@ -30,7 +30,7 @@ pub struct TaskStatus {
 pub struct Tasks {
     tasks:            Vec<Tracing>,
     tasks_index:      Tree<TasksNode>,
-    tasks_tree_state: TreeState<Option<NodeId>>,
+    tasks_tree_state: TreeState<TreeIndex>,
 
     exec_deadline: usize,
     focused_pane:  usize,
@@ -64,7 +64,6 @@ impl TasksNode {
 }
 
 impl Tasks {
-    #[inline]
     pub fn new(
         exec_deadline: usize,
         rules: Arc<RulesEngine>,
@@ -85,6 +84,7 @@ impl Tasks {
         result
     }
 
+    #[inline]
     pub fn replace_rules(&mut self, rules: Arc<RulesEngine>) {
         for task in self.tasks.iter_mut() {
             task.task.rules_engine = rules.clone();
@@ -93,16 +93,13 @@ impl Tasks {
 
     #[inline]
     pub fn solve_all(&mut self) {
-        let ids: Vec<_> = self.tasks_index.nodes().map(|x| x.id()).collect();
-        for node in ids {
-            self.solve_node_id(node);
-        }
+        self.solve_node_id(&self.tasks_index.root().id());
     }
 
     #[inline]
     pub fn solve(&mut self) {
-        if let Some(selected) = self.tasks_tree_state.selected().last() {
-            self.solve_node_id(selected.unwrap());
+        if let Some(selected) = self.tasks_tree_state.selected().last().cloned() {
+            self.solve_node_id(&selected);
         }
     }
 
@@ -111,9 +108,7 @@ impl Tasks {
         if self.focused_pane == 0 {
             self.tasks_tree_state.key_down();
         } else if let Some(selected) = self.tasks_tree_state.selected().last() {
-            if let TasksNode::Task(tracing) =
-                self.tasks_index.get_mut(selected.unwrap()).unwrap().value()
-            {
+            if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
                 self.tasks[*tracing].task.scroll_pos.select_next()
             }
         }
@@ -124,9 +119,7 @@ impl Tasks {
         if self.focused_pane == 0 {
             self.tasks_tree_state.key_up();
         } else if let Some(selected) = self.tasks_tree_state.selected().last() {
-            if let TasksNode::Task(tracing) =
-                self.tasks_index.get_mut(selected.unwrap()).unwrap().value()
-            {
+            if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
                 self.tasks[*tracing].task.scroll_pos.select_previous()
             }
         }
@@ -152,9 +145,7 @@ impl Tasks {
     #[inline]
     pub fn tracing(&mut self) -> Option<&mut Tracing> {
         if let Some(selected) = self.tasks_tree_state.selected().last() {
-            if let TasksNode::Task(tracing) =
-                self.tasks_index.get(selected.unwrap()).unwrap().value()
-            {
+            if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
                 return self.tasks.get_mut(*tracing);
             }
         }
@@ -171,10 +162,10 @@ impl Tasks {
         self.draw_solution(frame, layout[1]);
     }
 
-    fn tree(&self, tasks_node: &NodeRef<TasksNode>) -> TreeItem<'static, Option<NodeId>> {
-        let text = match tasks_node.value() {
+    fn tree(&self, tasks_node: &Node<TasksNode>) -> TreeItem<'static, TreeIndex> {
+        let text = match tasks_node.data() {
             TasksNode::Task(task) => {
-                let task_line_style = if self.tasks[*task].task.solution.is_some() {
+                let task_line_style = if self.tasks[*task].task.solution.is_none() {
                     Style::new()
                 } else if self.tasks[*task]
                     .task
@@ -199,14 +190,7 @@ impl Tasks {
 
                 Line::from(vec![
                     Span::styled(
-                        // TODO: unwrap bug
-                        self.tasks[*task]
-                            .task
-                            .solution
-                            .as_ref()
-                            .unwrap()
-                            .purpose
-                            .to_string(),
+                        self.tasks[*task].task.task.purpose.to_string(),
                         task_line_style,
                     ),
                     Span::from(" "),
@@ -235,20 +219,20 @@ impl Tasks {
             ]),
         };
 
-        if tasks_node.has_children() {
+        if tasks_node.degree() > 0 {
             TreeItem::new(
-                Some(tasks_node.id()),
+                tasks_node.id(),
                 text,
-                tasks_node.children().map(|s| self.tree(&s)).collect(),
+                tasks_node.iter().map(|s| self.tree(s)).collect(),
             )
             .unwrap()
         } else {
-            TreeItem::new_leaf(Some(tasks_node.id()), text)
+            TreeItem::new_leaf(tasks_node.id(), text)
         }
     }
 
     fn draw_tasks_list(&mut self, frame: &mut Frame, area: Rect) {
-        let items = [self.tree(&self.tasks_index.root())];
+        let items = [self.tree(self.tasks_index.root())];
 
         let widget = TuiTree::new(&items)
             .expect("all item identifiers are unique")
@@ -277,22 +261,23 @@ impl Tasks {
     fn draw_solution(&mut self, frame: &mut Frame, area: Rect) {
         let pane_style = self.pane_style(1);
 
-        let Some(selected) = self.tasks_tree_state.selected().last().cloned().flatten() else {
+        let Some(selected) = self.tasks_tree_state.selected().last().cloned() else {
             return;
         };
-        match self.tasks_index.get(selected).unwrap().value() {
+        match self.tasks_index[&selected].data() {
             TasksNode::Task(task_id) => {
                 let tracing = self.tasks.get_mut(*task_id).unwrap();
-                let mut renderer = Tui::default();
-                View::try_from(tracing.task.solution.as_ref().unwrap().as_ref())
-                    .unwrap()
-                    .display_impl(&mut renderer)
-                    .unwrap();
                 let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.task.task)
                     .split('\n')
                     .map(|x| Line::from(Span::from(x.to_owned())))
                     .collect();
+
                 if tracing.task.solution.is_some() {
+                    let mut renderer = Tui::default();
+                    View::try_from(tracing.task.solution.as_ref().unwrap().as_ref())
+                        .unwrap()
+                        .display_impl(&mut renderer)
+                        .unwrap();
                     lines.append(&mut renderer.output);
                 } else {
                     lines.push(Line::from(Span::from("Press s to solve".to_owned())));
@@ -386,55 +371,49 @@ impl Tasks {
         let group = self.tasks.last().unwrap().task.task.group.clone();
         let index = self.tasks.len() - 1;
         let node_id = {
-            let mut node = self.find_node(group.as_str());
-            node.append(TasksNode::new_task(index));
+            let node = self.find_node_mut(group.as_str());
+            node.push_back(tr(TasksNode::new_task(index)));
             node.id()
         };
-        self.counters_update(node_id, 0, 0, 0, 1);
+        self.counters_update(&node_id, 0, 0, 0, 1);
     }
 
-    fn find_node<'a>(&'a mut self, path: &str) -> NodeMut<'a, TasksNode> {
-        let mut current_node_id = self.tasks_index.root().id();
+    fn find_node_mut<'a>(&'a mut self, path: &str) -> &'a mut Node<TasksNode> {
+        let mut current_node = self.tasks_index.root_mut().get_mut();
         for i in path.split(['/']).filter(|x| !x.is_empty()) {
-            if let Some(next_node) = self
-                .tasks_index
-                .get(current_node_id)
-                .unwrap()
-                .children()
-                .find(|x| {
-                    if let TasksNode::Directory { dir_name, .. } = x.value() {
+            let next_idx = if let Some(next_idx) = current_node
+                .iter_mut()
+                .enumerate()
+                .find(|(_, x)| {
+                    if let TasksNode::Directory { dir_name, .. } = x.data() {
                         dir_name == i
                     } else {
                         false
                     }
                 })
+                .map(|(num, _)| num)
             {
-                current_node_id = next_node.id();
+                next_idx
             } else {
-                current_node_id = self
-                    .tasks_index
-                    .get_mut(current_node_id)
-                    .unwrap()
-                    .append(TasksNode::new_directory(i.into()))
-                    .id();
-            }
+                current_node.push_back(tr(TasksNode::new_directory(i.into())));
+                current_node.degree() - 1
+            };
+            current_node = current_node.iter_mut().nth(next_idx).unwrap().get_mut();
         }
-        self.tasks_index.get_mut(current_node_id).unwrap()
+        current_node
     }
 
     fn counters_update(
         &mut self,
-        node_id: NodeId,
+        node_id: &TreeIndex,
         solved_delta: isize,
         unsolved_delta: isize,
         wrong_answer_delta: isize,
         not_runned_delta: isize,
     ) {
-        let mut node_id = Some(node_id);
-
-        while let Some(id) = node_id {
-            let mut node = self.tasks_index.get_mut(id).unwrap();
-            match node.value() {
+        let mut node = self.tasks_index.get_mut(node_id);
+        while let Some(n) = node {
+            match n.data_mut() {
                 TasksNode::Directory {
                     solved_count,
                     unsolved_count,
@@ -450,34 +429,29 @@ impl Tasks {
                 }
                 TasksNode::Task(_) => {}
             }
-            node_id = node.parent().map(|x| x.id())
+
+            // TODO: optimize
+            let parent_id = n.parent().map(|x| x.id());
+            node = parent_id.and_then(|id| self.tasks_index.get_mut(&id));
         }
     }
 
-    fn solve_node_id(&mut self, node_id: NodeId) {
-        let Some(TasksNode::Task(task_idx)) =
-            self.tasks_index.get(node_id).map(|node| node.value())
-        else {
-            if let Some(node) = self.tasks_index.get(node_id) {
-                let child_ids: Vec<_> = node
-                    .traverse()
-                    .filter_map(|x| {
-                        let node = match x {
-                            Edge::Open(node) => node,
-                            Edge::Close(node) => node,
-                        };
-                        match node.value() {
-                            TasksNode::Task(_) => Some(node.id()),
-                            TasksNode::Directory { .. } => None,
-                        }
-                    })
-                    .collect();
-                for id in child_ids {
-                    self.solve_node_id(id);
-                }
-            }
+    fn solve_node_id(&mut self, node_id: &TreeIndex) {
+        let Some(node) = self.tasks_index.get_mut(node_id) else {
             return;
         };
+
+        let task_idx = match node.data() {
+            TasksNode::Directory { .. } => {
+                let indexes: Vec<_> = node.iter().map(|x| x.id()).collect();
+                for id in indexes {
+                    self.solve_node_id(&id);
+                }
+                return;
+            }
+            TasksNode::Task(idx) => idx,
+        };
+
         let mut solved_delta: isize = 0;
         let mut unsolved_delta: isize = 0;
         let mut wrong_answer_delta: isize = 0;

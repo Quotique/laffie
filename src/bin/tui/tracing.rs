@@ -1,6 +1,5 @@
-use std::{cmp::Ordering, vec};
+use std::{fmt::Display, hash, rc::Rc};
 
-use ego_tree::{NodeId, NodeRef};
 use ratatui::{
     prelude::*,
     style::Stylize,
@@ -8,15 +7,24 @@ use ratatui::{
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use solver::task::{ProfilerNode, Solution, TaskProfileInfo, TermProfileInfo};
+use solver::{
+    task::{Solution, TermInference},
+    term::Term,
+};
 
 use super::interface::{border_focus, border_unfocus, draw_scrollbar};
 use crate::tasks::TaskStatus;
 
+#[derive(Clone, Debug)]
+struct TermId {
+    solution: Rc<Solution>,
+    idx:      usize,
+}
+
 pub struct Tracing {
     pub task: TaskStatus,
 
-    tree_state:   TreeState<Option<NodeId>>,
+    tree_state:   TreeState<TermId>,
     focused_pane: usize,
 }
 
@@ -54,53 +62,6 @@ impl Tracing {
         self.tree_state.toggle_selected();
     }
 
-    fn tree(
-        profiler: &NodeRef<ProfilerNode>,
-        total_cycles: usize,
-    ) -> TreeItem<'static, Option<NodeId>> {
-        let default_style = Style::new();
-        let not_proved_style = Style::new().crossed_out().dim();
-
-        let text = match profiler.value() {
-            ProfilerNode::Helper(task) => Line::from(vec![
-                Span::styled(
-                    task.purpose.clone(),
-                    if task.answer.is_some() {
-                        default_style
-                    } else {
-                        not_proved_style
-                    },
-                ),
-                Span::from(format!(" {} {}", profiler.value().cycles(), total_cycles)),
-            ]),
-            ProfilerNode::Hypothesis(hypothesis) => Line::from(vec![
-                Span::styled(
-                    hypothesis.term.clone(),
-                    if hypothesis.first_unproven == hypothesis.requirements.len() {
-                        default_style
-                    } else {
-                        not_proved_style
-                    },
-                ),
-                Span::from(format!(" {} {}", profiler.value().cycles(), total_cycles)),
-            ]),
-        };
-
-        if profiler.has_children() {
-            TreeItem::new(
-                Some(profiler.id()),
-                text,
-                profiler
-                    .children()
-                    .map(|s| Self::tree(&s, profiler.value().cycles()))
-                    .collect(),
-            )
-            .unwrap()
-        } else {
-            TreeItem::new_leaf(Some(profiler.id()), text)
-        }
-    }
-
     pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
@@ -111,15 +72,50 @@ impl Tracing {
         self.draw_profiler_node_details(frame, layout[1]);
     }
 
+    fn draw_profiler_tree(&mut self, frame: &mut Frame, area: Rect) {
+        let Some(solution) = &self.task.solution else {
+            // unimplemented!("TODO: not solved task");
+            return;
+        };
+
+        let items = [Self::tree(solution.clone())];
+        let widget = Tree::new(&items)
+            .expect("all item identifiers are unique")
+            .block(
+                Block::bordered()
+                    .title("Tracing")
+                    //.title_bottom(format!("{:?}", &mut self.tree_state)),
+            )
+            .experimental_scrollbar(Some(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(None)
+                    .track_symbol(None)
+                    .end_symbol(None),
+            ))
+            .highlight_style(
+                Style::new()
+                    .fg(Color::Black)
+                    .bg(Color::LightGreen)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(">");
+        frame.render_stateful_widget(widget, area, &mut self.tree_state);
+    }
+
     fn draw_profiler_node_details(&mut self, frame: &mut Frame, area: Rect) {
         let pane_style = self.pane_style(1);
 
         if let Some(selected) = self.tree_state.selected().last() {
-            let node = &self.task.solution.as_ref().unwrap().profiler;
-
-            let text = match node.task.get(selected.unwrap()).unwrap().value() {
-                ProfilerNode::Helper(task) => Self::task_lines(task),
-                ProfilerNode::Hypothesis(hypothesis) => Self::term_lines(hypothesis),
+            let text = if selected.idx == 0 {
+                let solution = &selected.solution;
+                Self::task_lines(solution.as_ref())
+            } else {
+                let term = &selected.solution.terms[selected.idx - 1];
+                if let Some(inference) = &term.inference {
+                    Self::term_inference_lines(&term.term, inference, &selected.solution)
+                } else {
+                    Self::term_lines(&term.term)
+                }
             };
             frame.render_widget(
                 List::new(text.iter().cloned())
@@ -142,20 +138,88 @@ impl Tracing {
         }
     }
 
-    fn task_lines(task: &TaskProfileInfo) -> Vec<Line> {
+    fn tree(solution: Rc<Solution>) -> TreeItem<'static, TermId> {
+        let children: Vec<_> = solution
+            .terms
+            .iter()
+            .enumerate()
+            .filter_map(|(num, x)| x.inference.as_ref().map(|inference| (num, inference)))
+            .map(|(num, inference)| {
+                let term_id = TermId {
+                    solution: solution.clone(),
+                    idx:      num + 1,
+                };
+                let line = Self::tree_line(&term_id);
+                let children: Vec<_> = inference
+                    .requirements
+                    .iter()
+                    .map(|x| Self::tree(x.1.as_ref().unwrap().clone()))
+                    .collect();
+
+                if children.is_empty() {
+                    TreeItem::new_leaf(term_id, line)
+                } else {
+                    TreeItem::new(term_id, line, children).unwrap()
+                }
+            })
+            .collect();
+
+        let term_id = TermId {
+            solution: solution.clone(),
+            idx:      0,
+        };
+
+        if children.is_empty() {
+            TreeItem::new_leaf(term_id, solution.task.purpose.to_string())
+        } else {
+            TreeItem::new(term_id, solution.task.purpose.to_string(), children)
+                .expect("index must be unique")
+        }
+    }
+
+    // TODO: total cycles
+    fn tree_line(id: &TermId) -> Line<'static> {
+        let default_style = Style::new();
+        let not_proved_style = Style::new().crossed_out().dim();
+
+        if id.idx == 0 {
+            let style = if id.solution.answer().is_some() {
+                default_style
+            } else {
+                not_proved_style
+            };
+            Line::from(vec![
+                Span::styled(id.solution.task.purpose.to_string(), style),
+                Span::from(format!(" {} {}", id.solution.current_cycles(), 0)),
+            ])
+        } else {
+            let term = &id.solution.terms[id.idx - 1];
+            let style = match &term.inference {
+                Some(x) if x.is_proven() => default_style,
+                Some(_) => not_proved_style,
+                None => default_style,
+            };
+            Line::from(vec![
+                Span::styled(term.term.to_string(), style),
+                Span::from(format!(" {} {}", id.solution.current_cycles(), 0)),
+            ])
+        }
+    }
+
+    fn task_lines(solution: &Solution) -> Vec<Line> {
         let highlighted = Style::new().fg(Color::LightBlue).bold();
         let no_answer = Style::new().fg(Color::Red).bold();
 
         vec![
             Line::from(vec![
                 Span::styled("Task: ", highlighted),
-                Span::from(&task.purpose),
+                Span::from(solution.purpose.to_string()),
             ]),
             Line::default(),
             Line::from(vec![
                 Span::styled("Answer: ", highlighted),
-                if let Some(answer) = &task.answer {
-                    Span::from(answer)
+                if let Some(answer) = solution.answer() {
+                    Span::from(answer.to_string())
                 } else {
                     Span::styled("no answer".to_owned(), no_answer)
                 },
@@ -163,95 +227,61 @@ impl Tracing {
             Line::default(),
             Line::from(vec![
                 Span::styled("Cycles: ", highlighted),
-                Span::from(task.cycles().to_string()),
+                Span::from(solution.current_cycles().to_string()),
             ]),
         ]
     }
 
-    fn term_lines(hypothesis: &TermProfileInfo) -> Vec<Line> {
+    fn key_value_line<'a>(key: &'a str, text: impl Display) -> Line<'a> {
+        let highlighted = Style::new().fg(Color::LightBlue).bold();
+        Line::from(vec![
+            Span::styled(key, highlighted),
+            Span::from(text.to_string()),
+        ])
+    }
+
+    fn term_inference_lines(
+        term: &Term,
+        inference: &TermInference,
+        solution: &Solution,
+    ) -> Vec<Line<'static>> {
         let highlighted = Style::new().fg(Color::LightBlue).bold();
         let mut result = vec![
-            Line::from(vec![
-                Span::styled("Parent: ", highlighted),
-                Span::from(&hypothesis.parent),
-            ]),
-            Line::from(vec![
-                Span::styled("Term: ", highlighted),
-                Span::from(&hypothesis.term),
-            ]),
+            Self::key_value_line("Parent: ", &solution.terms[inference.parent]),
+            Self::key_value_line("Term: ", term),
             Line::default(),
-            Line::from(vec![
-                Span::styled("Rule: ", highlighted),
-                Span::from(&hypothesis.rule),
-            ]),
+            Self::key_value_line("Rule: ", &inference.rule),
             Line::from(Span::styled("Params:", highlighted)),
         ];
-        result.append(
-            &mut hypothesis
-                .params
-                .iter()
-                .map(|(param, value)| Line::from(vec![Span::raw(format!("  {param} = {value}"))]))
-                .collect(),
-        );
-        result.append(&mut vec![
-            Line::default(),
-            Line::from(Span::styled("Requirements:", highlighted)),
-        ]);
-        let first_unproven = hypothesis.first_unproven;
+        // TODO:
+        // result.append(
+        //     &mut term
+        //         .params
+        //         .iter()
+        //         .map(|(param, value)| Line::from(vec![Span::raw(format!("  {param} =
+        // {value}"))]))         .collect(),
+        // );
+        result.push(Line::default());
+        result.push(Self::key_value_line("Requirements:", ""));
+
         let proven = Style::new().fg(Color::Green).bold();
         let unproven = Style::new().fg(Color::Red).bold();
         let skiped = Style::new().fg(Color::Gray).bold();
-        result.append(
-            &mut hypothesis
-                .requirements
-                .iter()
-                .enumerate()
-                .map(|(num, x)| {
-                    let (symbol, style) = match first_unproven.cmp(&num) {
-                        Ordering::Greater => ("☑", proven),
-                        Ordering::Equal => ("☒", unproven),
-                        Ordering::Less => ("☐", skiped),
-                    };
-                    Line::from(vec![Span::styled(format!("  {symbol} {x}"), style)])
-                })
-                .collect(),
-        );
-        result.append(&mut vec![
-            Line::default(),
-            Line::from(vec![
-                Span::styled("Cycles: ", highlighted),
-                Span::from(hypothesis.cycles().to_string()),
-            ]),
-        ]);
+        for i in &inference.requirements {
+            let span = match i.1.as_ref().map(|x| x.answer().is_some()) {
+                Some(true) => Span::styled(format!("  ☑  {}", i.0), proven),
+                Some(false) => Span::styled(format!("  ☒  {}", i.0), unproven),
+                None => Span::styled(format!("  ☐  {}", i.0), skiped),
+            };
+            result.push(Line::from(span));
+        }
+        result.push(Line::default());
+        result.push(Self::key_value_line("Cycles: ", 0));
         result
     }
 
-    fn draw_profiler_tree(&mut self, frame: &mut Frame, area: Rect) {
-        let items = [Self::tree(
-            &self.task.solution.as_ref().unwrap().profiler.task.root(),
-            self.task.solution.as_ref().unwrap().cycles,
-        )];
-        let widget = Tree::new(&items)
-            .expect("all item identifiers are unique")
-            .block(
-                Block::bordered()
-                    .title("Tracing")
-                    //.title_bottom(format!("{:?}", &mut self.tree_state)),
-            )
-            .experimental_scrollbar(Some(
-                Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                    .begin_symbol(None)
-                    .track_symbol(None)
-                    .end_symbol(None),
-            ))
-            .highlight_style(
-                Style::new()
-                    .fg(Color::Black)
-                    .bg(Color::LightGreen)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol(">");
-        frame.render_stateful_widget(widget, area, &mut self.tree_state);
+    fn term_lines(term: &Term) -> Vec<Line> {
+        vec![Self::key_value_line("Term: ", term)]
     }
 
     fn _draw_solution_text(solution: &Solution, pane_style: Style, frame: &mut Frame, area: Rect) {
@@ -296,5 +326,20 @@ impl Tracing {
         } else {
             border_unfocus()
         }
+    }
+}
+
+impl Eq for TermId {}
+impl PartialEq for TermId {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.solution.as_ref(), other.solution.as_ref()) && self.idx == other.idx
+    }
+}
+
+impl hash::Hash for TermId {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        let ptr: *const Solution = self.solution.as_ref();
+        ptr.hash(state);
+        self.idx.hash(state);
     }
 }

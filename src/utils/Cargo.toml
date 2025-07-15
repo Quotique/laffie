@@ -12,7 +12,10 @@ chrono = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
+trees = { workspace = true }
 
+itertools = "0.14"
+derive_more = { version = "2.0", features = ["full"] }
 file-rotate = "0.8"
 patricia_tree = { version = "0.9" }
 slog-async = { version = "2.8" }

@@ -88,6 +88,14 @@ impl fmt::Display for TermProps {
     }
 }
 
+impl TermInference {
+    pub fn is_proven(&self) -> bool {
+        self.requirements
+            .iter()
+            .all(|x| x.1.as_ref().and_then(|x| x.answer()).is_some())
+    }
+}
+
 impl TermAsRule {
     pub fn get_or_insert(&mut self, term: &Term, id: RuleId, level: u64) -> Option<SharedRule> {
         match self {
