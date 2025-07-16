@@ -6,7 +6,7 @@ use telegram_bot::*;
 use database::{TaskDb, UserDb, UserRecord};
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, Solver, EXECUTION_DEADLINE_DEFAULT},
+    task::{DumperConfig, SolutionStatus, Solver, EXECUTION_DEADLINE_DEFAULT},
     CompactString,
 };
 use view::{Html, View};
@@ -37,22 +37,21 @@ fn rerun(
         EXECUTION_DEADLINE_DEFAULT,
     );
 
-    let result = solution.solve(record.clone().into());
+    let solution = solution.solve(record.clone().into());
     let mut output = Paginator::new(4096);
-    let solution = match result {
-        Ok(solution) => {
+    match solution.status {
+        SolutionStatus::Answer(_) => {
             output
                 .write_str("Solution:")
                 .map_err(|e| format!("error {e}"))?;
-            solution
         }
-        Err((solution, e)) => {
+        SolutionStatus::Err(e) => {
             output
                 .write_str(&format!("Solution: {e}"))
                 .map_err(|e| format!("error {e}"))?;
-            solution
         }
-    };
+        _ => unreachable!(),
+    }
 
     View::try_from(solution.as_ref())
         .unwrap()

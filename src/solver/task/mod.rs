@@ -4,6 +4,7 @@ mod props;
 mod purpose;
 mod solution;
 mod solver;
+mod steps;
 mod tracing;
 
 use crate::term::Term;
@@ -13,7 +14,7 @@ pub use builder::TaskBuilder;
 pub use cache::TasksCache;
 pub use props::{TermInference, TermProps};
 pub use purpose::Purpose;
-pub use solution::{SharedSolution, Solution};
+pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError};
 pub use solver::{Solver, EXECUTION_DEADLINE_DEFAULT};
 pub use tracing::{Config as DumperConfig, SolutionTracer, Tracer};
 

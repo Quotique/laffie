@@ -1,17 +1,16 @@
 use std::{collections::HashMap, sync::Arc};
 
-use bincode::{Decode, Encode};
-use derive_more::Display;
 use itertools::Itertools;
 
 use utils::VecDisplay;
 
 use super::{
-    props::TermInference, Purpose, SharedSolution, Solution, SolutionTracer, Task, TaskBuilder,
-    TermProps,
+    props::TermInference, Purpose, SharedSolution, Solution, SolutionTracer, SolveError, Task,
+    TaskBuilder, TermProps,
 };
 use crate::{
     rule::{Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine, SharedRule},
+    task::solution::SolutionStatus,
     term::{SharedTerm, SubtermMut, Term},
     NormalizationLevel,
 };
@@ -32,15 +31,6 @@ pub struct Solver {
     pub tracer:         SolutionTracer,
 }
 
-#[derive(Debug, Display, Clone, Copy, Encode, Decode)]
-pub enum SolverError {
-    StackOverflow,
-    MaxSubtaskLevelExceed,
-    NoConditions,
-    NoSolutionsFound,
-    ExecutionDeadline,
-}
-
 impl Solver {
     pub fn new(
         rules: Arc<RulesEngine>,
@@ -59,15 +49,13 @@ impl Solver {
         }
     }
 
-    pub fn solve(&mut self, task: Task) -> Result<SharedSolution, (SharedSolution, SolverError)> {
+    pub fn solve(&mut self, task: Task) -> SharedSolution {
         let mut solution = Solution::new(task);
-        match self.solve_alt(&mut solution) {
-            Ok(_) => Ok(SharedSolution::new(solution)),
-            Err(err) => Err((SharedSolution::new(solution), err)),
-        }
+        let _ = self.solve_alt(&mut solution);
+        solution.into()
     }
 
-    pub fn solve_alt(&mut self, solution: &mut Solution) -> Result<SharedTerm, SolverError> {
+    pub fn solve_alt(&mut self, solution: &mut Solution) -> Result<SharedTerm, SolveError> {
         let conditions = solution.task.conditions.clone();
         for i in conditions.into_iter() {
             let _ = self.add_main(solution, i);
@@ -81,26 +69,29 @@ impl Solver {
             VecDisplay(&solution.task.conditions)
         );
         if solution.task.subtask_level > MAX_SUBTASK_LEVEL {
-            return Err(SolverError::MaxSubtaskLevelExceed);
+            return Err(SolveError::MaxSubtaskLevelExceed);
         }
 
         self.tracer
             .on_subtask_start(&solution.task, solution.current_cycles());
 
         let result = self.solver_loop(solution);
+        if let Err(e) = result {
+            solution.status = SolutionStatus::Err(e)
+        }
 
         self.tracer.clone().on_subtask_end(solution);
         result
     }
 
-    fn solver_loop(&mut self, solution: &mut Solution) -> Result<SharedTerm, SolverError> {
+    fn solver_loop(&mut self, solution: &mut Solution) -> Result<SharedTerm, SolveError> {
         loop {
             solution.increment_cycles();
             if solution.current_cycles() > self.execution_deadline {
-                return Err(SolverError::ExecutionDeadline);
+                return Err(SolveError::ExecutionDeadline);
             }
 
-            let index = solution.pick_term().ok_or(SolverError::NoConditions)?;
+            let index = solution.pick_term().ok_or(SolveError::NoConditions)?;
             self.tracer.on_term_focus(&solution.terms[index]);
 
             let level = solution.terms[index].filters.weight;
@@ -112,7 +103,7 @@ impl Solver {
                 level, solution.terms[index]
             );
             if level > MAX_LEVEL {
-                return Err(SolverError::NoSolutionsFound);
+                return Err(SolveError::NoSolutionsFound);
             }
             self.prepare_purpose(solution, level);
 
@@ -130,10 +121,10 @@ impl Solver {
                 trace!("Resolution: {term}");
                 if *solution.terms[index].term == *term.term {
                     trace!("Equivalence");
-                    solution.answer = Some(index);
+                    solution.status = SolutionStatus::Answer(index);
                 } else {
                     let id = self.add_main(solution, term)?;
-                    solution.answer = Some(id);
+                    solution.status = SolutionStatus::Answer(id);
                 }
                 trace!(
                     "Solved {}. Answer: {}",
@@ -183,7 +174,7 @@ impl Solver {
         }
     }
 
-    fn add_main(&mut self, solution: &mut Solution, term: TermProps) -> Result<usize, SolverError> {
+    fn add_main(&mut self, solution: &mut Solution, term: TermProps) -> Result<usize, SolveError> {
         if let Some(id) = self.main_index.get(&term.term) {
             return Ok(*id);
         }
@@ -197,7 +188,7 @@ impl Solver {
         &mut self,
         solution: &mut Solution,
         mut term: TermProps,
-    ) -> Result<(), SolverError> {
+    ) -> Result<(), SolveError> {
         term.filters.mark_purpose();
         if self.purpose_index.contains_key(&term.term) {
             return Ok(());
@@ -208,7 +199,7 @@ impl Solver {
         Ok(())
     }
 
-    fn add_term(&self, solution: &mut Solution, mut term: TermProps) -> Result<usize, SolverError> {
+    fn add_term(&self, solution: &mut Solution, mut term: TermProps) -> Result<usize, SolveError> {
         self.tracer.on_new_term(
             &term,
             &term
@@ -221,7 +212,7 @@ impl Solver {
         let id = solution.terms.len();
         term.id = id;
         if solution.terms.len() + 1 > STACK_SIZE {
-            return Err(SolverError::StackOverflow);
+            return Err(SolveError::StackOverflow);
         }
         solution.terms.push(term);
         Ok(id)
@@ -406,7 +397,7 @@ impl Solver {
             .cache
             .update_status(&task, subtask_solution.clone());
         match result {
-            Err(SolverError::MaxSubtaskLevelExceed) => {
+            Err(SolveError::MaxSubtaskLevelExceed) => {
                 trace!("Can't proof {task}: MaxSubtaskLevelExceed");
                 solution.cache.remove(&task);
             }
@@ -643,8 +634,11 @@ mod solution_tests {
         let task = parse_task("task {purpose find(x); x == 1;}");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules, SolutionTracer::default(), usize::MAX);
-        let solution = solver.solve(task).expect("task is not solved");
-        assert_eq!(*solution.answer().unwrap(), term_with_vars("x == 1"));
+        let solution = solver.solve(task);
+        assert_eq!(
+            *solution.answer().expect("task is not solved"),
+            term_with_vars("x == 1")
+        );
     }
 
     #[test]
@@ -652,7 +646,7 @@ mod solution_tests {
         let task = parse_task("task { purpose proof(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules, SolutionTracer::default(), usize::MAX);
-        let solution = solver.solve(task).expect("task is not solved");
+        let solution = solver.solve(task);
         assert!(solution.answer().is_some());
     }
 }

@@ -6,7 +6,7 @@ use database::{TaskDb, TaskRecord, UserDb, UserRecord};
 use parser::{lang, TaskParser};
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, Solver, EXECUTION_DEADLINE_DEFAULT},
+    task::{DumperConfig, SolutionStatus, Solver, EXECUTION_DEADLINE_DEFAULT},
 };
 use view::{Html, View};
 
@@ -41,19 +41,19 @@ fn task(
     user.add_task_id(record.id);
 
     let mut output = Paginator::new(4096);
-    let solution = match solver.solve(task) {
-        Ok(solution) => {
+    let solution = solver.solve(task);
+    match solution.status {
+        SolutionStatus::Answer(_) => {
             output
                 .write_str("Solution: ")
                 .map_err(|e| format!("error {e}"))?;
-            solution
         }
-        Err((solution, e)) => {
+        SolutionStatus::Err(e) => {
             output
                 .write_str(&format!("Solution: {e} "))
                 .map_err(|e| format!("error {e}"))?;
-            solution
         }
+        _ => unreachable!(),
     };
 
     View::try_from(solution.as_ref())

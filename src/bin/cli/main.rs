@@ -10,7 +10,7 @@ use colored::*;
 
 use database::{TaskDb, TaskRecord};
 use parser::DirectoryParser;
-use solver::task::{DumperConfig, Solver, Task};
+use solver::task::{DumperConfig, SolutionStatus, Solver, Task};
 use utils::VecDisplay;
 use view::View;
 
@@ -162,8 +162,9 @@ fn main() {
             args.exec_deadline,
         );
 
-        match solver.solve(p) {
-            Ok(solution) => {
+        let solution = solver.solve(p);
+        match solution.status {
+            SolutionStatus::Answer(_) => {
                 stats.entry(record.group.clone()).or_default().solved += 1;
                 println!(
                     "{}\n{}",
@@ -189,7 +190,7 @@ fn main() {
                 //     println!("Cant put record {}", e);
                 // }
             }
-            Err((solution, e)) => {
+            SolutionStatus::Err(e) => {
                 stats.entry(record.group.clone()).or_default().not_solved += 1;
                 println!(
                     "{} {}\n{}",
@@ -198,6 +199,7 @@ fn main() {
                     View::try_from(solution.as_ref()).unwrap()
                 );
             }
+            _ => unreachable!(),
         };
         if !record.reports.is_empty() {
             println!(

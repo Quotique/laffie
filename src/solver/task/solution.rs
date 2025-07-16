@@ -1,14 +1,29 @@
-use std::{
-    cell::RefCell,
-    collections::{HashSet, VecDeque},
-    rc::Rc,
-    sync::Arc,
-};
+use std::{error, rc::Rc, sync::Arc};
+
+use bincode::{Decode, Encode};
+use derive_more::Display;
 
 use super::{Purpose, Task, TasksCache, TermProps};
-use crate::term::{SharedTerm, Term};
+use crate::term::SharedTerm;
 
 pub type SharedSolution = Rc<Solution>;
+
+#[derive(Debug, Display, Clone, Copy, Encode, Decode)]
+pub enum SolveError {
+    StackOverflow,
+    MaxSubtaskLevelExceed,
+    NoConditions,
+    NoSolutionsFound,
+    ExecutionDeadline,
+}
+
+#[derive(Debug, Display, Default, Clone, Copy, Encode, Decode)]
+pub enum SolutionStatus {
+    #[default]
+    NotDone,
+    Answer(usize),
+    Err(SolveError),
+}
 
 #[derive(Debug)]
 pub struct Solution {
@@ -19,77 +34,7 @@ pub struct Solution {
     pub terms:  Vec<TermProps>,
     pub cache:  Arc<TasksCache>,
 
-    pub answer: Option<usize>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Steps {
-    solution:    SharedSolution,
-    terms_queue: Vec<usize>,
-
-    subtasks: VecDeque<Steps>,
-    rendered: Arc<RefCell<HashSet<Term>>>,
-}
-
-impl From<SharedSolution> for Steps {
-    fn from(solution: SharedSolution) -> Self {
-        // TODO: no answer
-        let answer_idx = solution.answer.unwrap();
-        let mut terms_queue: Vec<usize> = vec![answer_idx];
-
-        while let Some(ref parent) = solution.terms[*terms_queue.last().unwrap()]
-            .inference
-            .parent_id()
-        {
-            terms_queue.push(*parent);
-        }
-        Self {
-            solution,
-            terms_queue,
-            subtasks: Default::default(),
-            rendered: Default::default(),
-        }
-    }
-}
-
-impl Iterator for Steps {
-    type Item = SharedTerm;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let subtask_empty = self.subtasks.is_empty();
-            while let Some(subtask) = self.subtasks.front_mut() {
-                if let Some(term) = subtask.next() {
-                    return Some(term);
-                }
-                self.subtasks.pop_front();
-            }
-
-            if !subtask_empty {
-                let id = self.terms_queue.pop().unwrap();
-                return Some(self.solution.terms[id].term.clone());
-            }
-
-            if let Some(next_id) = self.terms_queue.last() {
-                for r in self.solution.terms[*next_id]
-                    .inference
-                    .requirements()
-                    .iter()
-                    .flat_map(|x| x.iter())
-                    .filter(|x| !self.rendered.borrow().contains(&x.task.purpose.term))
-                {
-                    self.rendered
-                        .borrow_mut()
-                        .insert(r.task.purpose.term.as_ref().clone());
-                    let mut steps = Steps::from(r.clone());
-                    steps.rendered = self.rendered.clone();
-                    self.subtasks.push_back(steps);
-                }
-            } else {
-                return None;
-            }
-        }
-    }
+    pub status: SolutionStatus,
 }
 
 impl Solution {
@@ -101,7 +46,7 @@ impl Solution {
             cycles: Default::default(),
             terms: Default::default(),
             cache: Default::default(),
-            answer: None,
+            status: Default::default(),
         }
     }
 
@@ -125,7 +70,10 @@ impl Solution {
 
     #[inline]
     pub fn answer(&self) -> Option<SharedTerm> {
-        self.answer.map(|i| self.terms[i].term.clone())
+        if let SolutionStatus::Answer(i) = self.status {
+            return Some(self.terms[i].term.clone());
+        }
+        None
     }
 
     pub fn validate_answer(&self) -> bool {
@@ -153,3 +101,5 @@ impl Solution {
         false
     }
 }
+
+impl error::Error for SolveError {}

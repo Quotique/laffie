@@ -4,7 +4,7 @@ use colored::*;
 
 use solver::{
     task::{Purpose, Solution, TermProps},
-    term::Term,
+    term::SharedTerm,
 };
 use utils::VecDisplay;
 
@@ -52,7 +52,7 @@ impl Renderer for Console<'_, '_> {
     fn display_answer(
         &mut self,
         purpose: &Purpose,
-        answer: Option<&Term>,
+        answer: Option<SharedTerm>,
         status: &Solution,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {

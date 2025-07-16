@@ -4,7 +4,7 @@ use ratatui::{prelude::*, style::Stylize};
 
 use solver::{
     task::{Purpose, Solution, TermProps},
-    term::Term,
+    term::SharedTerm,
 };
 use utils::VecDisplay;
 
@@ -58,7 +58,7 @@ impl Renderer for Tui<'_> {
     fn display_answer(
         &mut self,
         purpose: &Purpose,
-        answer: Option<&Term>,
+        answer: Option<SharedTerm>,
         status: &Solution,
     ) -> fmt::Result {
         let answer_style = Style::new().fg(Color::Green).bold();

@@ -4,7 +4,7 @@ use html_escape::encode_text;
 
 use solver::{
     task::{Purpose, Solution, TermProps},
-    term::Term,
+    term::SharedTerm,
 };
 
 use crate::Renderer;
@@ -33,7 +33,7 @@ impl Renderer for Html<'_> {
     fn display_answer(
         &mut self,
         purpose: &Purpose,
-        answer: Option<&Term>,
+        answer: Option<SharedTerm>,
         status: &Solution,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {

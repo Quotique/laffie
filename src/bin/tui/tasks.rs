@@ -172,7 +172,7 @@ impl Tasks {
                     .solution
                     .as_ref()
                     .unwrap()
-                    .answer
+                    .answer()
                     .is_none()
                 {
                     Style::new().fg(Color::Yellow).bold()
@@ -465,7 +465,7 @@ impl Tasks {
             .solution
             .as_ref()
             .unwrap()
-            .answer
+            .answer()
             .is_none()
         {
             unsolved_delta -= 1;
@@ -490,13 +490,10 @@ impl Tasks {
             .build(),
             self.exec_deadline,
         );
-        task.solution = Some(match solver.solve(task.task.clone()) {
-            Ok(solution) => solution,
-            Err((solution, _)) => solution,
-        });
+        task.solution = Some(solver.solve(task.task.clone()));
 
         // Add new task status to remove
-        if task.solution.as_ref().unwrap().answer.is_none() {
+        if task.solution.as_ref().unwrap().answer().is_none() {
             unsolved_delta += 1;
         } else if !task.solution.as_ref().unwrap().validate_answer() {
             wrong_answer_delta += 1;

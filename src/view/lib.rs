@@ -9,8 +9,8 @@ pub use html::Html;
 pub use tui::Tui;
 
 use solver::{
-    task::{Purpose, Solution, TermProps},
-    term::Term,
+    task::{Purpose, Solution, SolutionStatus, TermProps},
+    term::{SharedTerm, Term},
 };
 
 pub trait Renderer {
@@ -21,7 +21,7 @@ pub trait Renderer {
     fn display_answer(
         &mut self,
         purpose: &Purpose,
-        answer: Option<&Term>,
+        answer: Option<SharedTerm>,
         status: &Solution,
     ) -> fmt::Result;
 
@@ -113,7 +113,7 @@ impl View<'_> {
     }
 
     pub fn display_impl(&self, renderer: &mut dyn Renderer) -> fmt::Result {
-        if let Some(a) = self.solution.answer {
+        if let SolutionStatus::Answer(a) = self.solution.status {
             self.display_purpose(
                 &self.solution.purpose,
                 &self.solution.terms[a].term,
@@ -132,9 +132,7 @@ impl View<'_> {
         if self.solution.task.subtask_level == 0 {
             renderer.display_answer(
                 &self.solution.purpose,
-                self.solution
-                    .answer
-                    .map(|x| self.solution.terms[x].term.as_ref()),
+                self.solution.answer(),
                 self.solution,
             )?;
         }
