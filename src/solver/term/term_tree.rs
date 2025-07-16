@@ -2,6 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     convert::From,
     fmt,
+    rc::Rc,
 };
 
 use derive_more::From;
@@ -13,6 +14,7 @@ use crate::{CompactString, Decimal, NormalizationLevel};
 
 type SymbolTree = Tree<TermNode>;
 
+pub type SharedTerm = Rc<Term>;
 pub type VariablesMap = HashMap<Variable, Term>;
 
 #[derive(Debug, Default, Clone, From, PartialEq, Eq, Hash)]

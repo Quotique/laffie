@@ -1,11 +1,11 @@
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 
 use crate::{
     rule::{Hypothesis, SharedRule},
     task::{Solution, Task, TermProps},
-    term::Term,
+    term::SharedTerm,
 };
 
 pub trait Tracer: Send + Sync {
@@ -27,7 +27,7 @@ pub trait Tracer: Send + Sync {
     // Called on each new hypothesis
     fn on_new_hypothesis(
         &mut self,
-        _parent: Rc<Term>,
+        _parent: SharedTerm,
         _rule: SharedRule,
         _hypothesis: &Hypothesis,
         _cycle: usize,
@@ -92,7 +92,7 @@ impl SolutionTracer {
 
     pub fn on_new_hypothesis(
         &self,
-        parent: Rc<Term>,
+        parent: SharedTerm,
         rule: SharedRule,
         hypothesis: &Hypothesis,
         cycle: usize,

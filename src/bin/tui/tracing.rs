@@ -1,4 +1,4 @@
-use std::{fmt::Display, hash, rc::Rc};
+use std::{fmt::Display, hash};
 
 use ratatui::{
     prelude::*,
@@ -8,7 +8,8 @@ use ratatui::{
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use solver::{
-    task::{Solution, TermInference},
+    rule::SharedRule,
+    task::{SharedSolution, Solution, TermInference},
     term::Term,
 };
 
@@ -17,7 +18,7 @@ use crate::tasks::TaskStatus;
 
 #[derive(Clone, Debug)]
 struct TermId {
-    solution: Rc<Solution>,
+    solution: SharedSolution,
     idx:      usize,
 }
 
@@ -111,8 +112,18 @@ impl Tracing {
                 Self::task_lines(solution.as_ref())
             } else {
                 let term = &selected.solution.terms[selected.idx - 1];
-                if let Some(inference) = &term.inference {
-                    Self::term_inference_lines(&term.term, inference, &selected.solution)
+                if let TermInference::Rule {
+                    parent,
+                    rule,
+                    requirements,
+                } = &term.inference
+                {
+                    Self::term_inference_lines(
+                        &term.term,
+                        &selected.solution.terms[*parent].term,
+                        rule.clone(),
+                        requirements,
+                    )
                 } else {
                     Self::term_lines(&term.term)
                 }
@@ -138,23 +149,19 @@ impl Tracing {
         }
     }
 
-    fn tree(solution: Rc<Solution>) -> TreeItem<'static, TermId> {
+    fn tree(solution: SharedSolution) -> TreeItem<'static, TermId> {
         let children: Vec<_> = solution
             .terms
             .iter()
             .enumerate()
-            .filter_map(|(num, x)| x.inference.as_ref().map(|inference| (num, inference)))
-            .map(|(num, inference)| {
+            .filter_map(|(num, x)| x.inference.requirements().map(|reqs| (num, reqs)))
+            .map(|(num, requirements)| {
                 let term_id = TermId {
                     solution: solution.clone(),
                     idx:      num + 1,
                 };
                 let line = Self::tree_line(&term_id);
-                let children: Vec<_> = inference
-                    .requirements
-                    .iter()
-                    .map(|x| Self::tree(x.1.as_ref().unwrap().clone()))
-                    .collect();
+                let children: Vec<_> = requirements.iter().map(|x| Self::tree(x.clone())).collect();
 
                 if children.is_empty() {
                     TreeItem::new_leaf(term_id, line)
@@ -194,11 +201,12 @@ impl Tracing {
             ])
         } else {
             let term = &id.solution.terms[id.idx - 1];
-            let style = match &term.inference {
-                Some(x) if x.is_proven() => default_style,
-                Some(_) => not_proved_style,
-                None => default_style,
+            let style = if term.inference.is_proven() {
+                default_style
+            } else {
+                not_proved_style
             };
+
             Line::from(vec![
                 Span::styled(term.term.to_string(), style),
                 Span::from(format!(" {} {}", id.solution.current_cycles(), 0)),
@@ -242,15 +250,16 @@ impl Tracing {
 
     fn term_inference_lines(
         term: &Term,
-        inference: &TermInference,
-        solution: &Solution,
+        parent: &Term,
+        rule: SharedRule,
+        requirements: &Vec<SharedSolution>,
     ) -> Vec<Line<'static>> {
         let highlighted = Style::new().fg(Color::LightBlue).bold();
         let mut result = vec![
-            Self::key_value_line("Parent: ", &solution.terms[inference.parent]),
+            Self::key_value_line("Parent: ", parent),
             Self::key_value_line("Term: ", term),
             Line::default(),
-            Self::key_value_line("Rule: ", &inference.rule),
+            Self::key_value_line("Rule: ", rule),
             Line::from(Span::styled("Params:", highlighted)),
         ];
         // TODO:
@@ -266,12 +275,12 @@ impl Tracing {
 
         let proven = Style::new().fg(Color::Green).bold();
         let unproven = Style::new().fg(Color::Red).bold();
-        let skiped = Style::new().fg(Color::Gray).bold();
-        for i in &inference.requirements {
-            let span = match i.1.as_ref().map(|x| x.answer().is_some()) {
-                Some(true) => Span::styled(format!("  ☑  {}", i.0), proven),
-                Some(false) => Span::styled(format!("  ☒  {}", i.0), unproven),
-                None => Span::styled(format!("  ☐  {}", i.0), skiped),
+        // let skiped = Style::new().fg(Color::Gray).bold();
+        for i in requirements {
+            let span = match i.answer().is_some() {
+                true => Span::styled(format!("  ☑  {}", i.task.purpose.term), proven),
+                false => Span::styled(format!("  ☒  {}", i.task.purpose.term), unproven),
+                // None => Span::styled(format!("  ☐  {}", i.0), skiped),
             };
             result.push(Line::from(span));
         }
@@ -292,11 +301,10 @@ impl Tracing {
             .flat_map(|x| {
                 std::iter::once(x.to_string()).chain(
                     x.inference
-                        .as_ref()
-                        .map(|x| &x.requirements)
+                        .requirements()
                         .unwrap_or(&empty)
                         .iter()
-                        .map(|x| format!("  {}", x.0)),
+                        .map(|x| format!("  {}", x.task.purpose.term)),
                 )
             })
             .collect();

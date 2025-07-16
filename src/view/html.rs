@@ -56,11 +56,8 @@ impl Renderer for Html<'_> {
 
     fn dump_frame(&mut self, frame: &[TermProps]) -> fmt::Result {
         for (i, s) in frame.iter().enumerate() {
-            self.output.write_str(&format!(
-                "{i} {} {:?}\n",
-                s.term,
-                s.inference.as_ref().map(|x| x.parent)
-            ))?;
+            self.output
+                .write_str(&format!("{i} {} {:?}\n", s.term, s.inference.parent_id()))?;
         }
         Ok(())
     }

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt, iter::Iterator};
 
-use super::{Task, TermProps};
+use super::{Task, TermInference, TermProps};
 use crate::term::Term;
 
 #[derive(Clone, Debug)]
@@ -46,8 +46,14 @@ impl TaskBuilder {
         condition.filters.weight = 0;
         condition.id = self.conditions.len();
 
-        if let Some(inference) = condition.inference.as_mut() {
-            inference.parent = *self.term_id_map.get(&inference.parent).unwrap();
+        match &mut condition.inference {
+            TermInference::Rule { parent, .. } => {
+                *parent = *self.term_id_map.get(parent).unwrap();
+            }
+            TermInference::Transform { parent, .. } => {
+                *parent = *self.term_id_map.get(parent).unwrap();
+            }
+            _ => {}
         }
         self.conditions.push(condition);
         self

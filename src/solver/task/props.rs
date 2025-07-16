@@ -2,26 +2,27 @@ use std::{
     convert::From,
     fmt,
     hash::{Hash, Hasher},
-    rc::Rc,
 };
 
-use super::Solution;
+use super::SharedSolution;
 use crate::{
     rule::{RuleAttr, RuleAttrValue, RuleBuilder, RuleId, SharedRule, TermFilters},
-    term::Term,
+    term::{SharedTerm, Term},
 };
 
-#[derive(Debug, Clone)]
-pub enum Cause {
-    Rule(SharedRule),
-    Transform,
-}
-
-#[derive(Debug, Clone)]
-pub struct TermInference {
-    pub parent:       usize,
-    pub rule:         Cause,
-    pub requirements: Vec<(Rc<Term>, Option<Rc<Solution>>)>,
+#[derive(Debug, Clone, Default)]
+pub enum TermInference {
+    Rule {
+        parent:       usize,
+        rule:         SharedRule,
+        requirements: Vec<SharedSolution>,
+    },
+    Transform {
+        parent:   usize,
+        solution: SharedSolution,
+    },
+    #[default]
+    Condition,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -35,30 +36,21 @@ pub enum TermAsRule {
 #[derive(Debug, Clone)]
 pub struct TermProps {
     pub id:        usize,
-    pub term:      Rc<Term>,
-    pub inference: Option<TermInference>,
+    pub term:      SharedTerm,
+    pub inference: TermInference,
     pub filters:   TermFilters,
 
     rule: TermAsRule,
 }
 
-impl fmt::Display for Cause {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Cause::Rule(r) => write!(f, "{r}"),
-            Cause::Transform => write!(f, "Transform"),
-        }
-    }
-}
-
 impl From<Term> for TermProps {
     fn from(value: Term) -> Self {
-        Self::from(Rc::new(value))
+        Self::from(SharedTerm::new(value))
     }
 }
 
-impl From<Rc<Term>> for TermProps {
-    fn from(value: Rc<Term>) -> Self {
+impl From<SharedTerm> for TermProps {
+    fn from(value: SharedTerm) -> Self {
         Self {
             id:        Default::default(),
             inference: Default::default(),
@@ -89,10 +81,35 @@ impl fmt::Display for TermProps {
 }
 
 impl TermInference {
+    pub fn requirements(&self) -> Option<&Vec<SharedSolution>> {
+        match self {
+            TermInference::Rule { requirements, .. } => Some(requirements),
+            _ => None,
+        }
+    }
+
     pub fn is_proven(&self) -> bool {
-        self.requirements
-            .iter()
-            .all(|x| x.1.as_ref().and_then(|x| x.answer()).is_some())
+        match self {
+            TermInference::Rule { requirements, .. } => {
+                requirements.iter().all(|x| x.answer().is_some())
+            }
+            _ => true,
+        }
+    }
+
+    pub fn rule(&self) -> Option<SharedRule> {
+        match self {
+            TermInference::Rule { rule, .. } => Some(rule.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn parent_id(&self) -> Option<usize> {
+        match self {
+            TermInference::Rule { parent, .. } => Some(*parent),
+            TermInference::Transform { parent, .. } => Some(*parent),
+            _ => None,
+        }
     }
 }
 

@@ -1,20 +1,95 @@
-use std::{rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    collections::{HashSet, VecDeque},
+    rc::Rc,
+    sync::Arc,
+};
 
 use super::{Purpose, Task, TasksCache, TermProps};
-use crate::term::Term;
+use crate::term::{SharedTerm, Term};
 
-//#[derive(Debug, Clone, Default)]
+pub type SharedSolution = Rc<Solution>;
+
 #[derive(Debug)]
 pub struct Solution {
     pub task:    Task,
     pub purpose: Purpose,
 
-    // pub profiler: Profiler,
     pub cycles: usize,
     pub terms:  Vec<TermProps>,
     pub cache:  Arc<TasksCache>,
 
     pub answer: Option<usize>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Steps {
+    solution:    SharedSolution,
+    terms_queue: Vec<usize>,
+
+    subtasks: VecDeque<Steps>,
+    rendered: Arc<RefCell<HashSet<Term>>>,
+}
+
+impl From<SharedSolution> for Steps {
+    fn from(solution: SharedSolution) -> Self {
+        // TODO: no answer
+        let answer_idx = solution.answer.unwrap();
+        let mut terms_queue: Vec<usize> = vec![answer_idx];
+
+        while let Some(ref parent) = solution.terms[*terms_queue.last().unwrap()]
+            .inference
+            .parent_id()
+        {
+            terms_queue.push(*parent);
+        }
+        Self {
+            solution,
+            terms_queue,
+            subtasks: Default::default(),
+            rendered: Default::default(),
+        }
+    }
+}
+
+impl Iterator for Steps {
+    type Item = SharedTerm;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let subtask_empty = self.subtasks.is_empty();
+            while let Some(subtask) = self.subtasks.front_mut() {
+                if let Some(term) = subtask.next() {
+                    return Some(term);
+                }
+                self.subtasks.pop_front();
+            }
+
+            if !subtask_empty {
+                let id = self.terms_queue.pop().unwrap();
+                return Some(self.solution.terms[id].term.clone());
+            }
+
+            if let Some(next_id) = self.terms_queue.last() {
+                for r in self.solution.terms[*next_id]
+                    .inference
+                    .requirements()
+                    .iter()
+                    .flat_map(|x| x.iter())
+                    .filter(|x| !self.rendered.borrow().contains(&x.task.purpose.term))
+                {
+                    self.rendered
+                        .borrow_mut()
+                        .insert(r.task.purpose.term.as_ref().clone());
+                    let mut steps = Steps::from(r.clone());
+                    steps.rendered = self.rendered.clone();
+                    self.subtasks.push_back(steps);
+                }
+            } else {
+                return None;
+            }
+        }
+    }
 }
 
 impl Solution {
@@ -23,7 +98,6 @@ impl Solution {
         Self {
             task,
             purpose,
-            // profiler: Default::default(),
             cycles: Default::default(),
             terms: Default::default(),
             cache: Default::default(),
@@ -50,7 +124,7 @@ impl Solution {
     }
 
     #[inline]
-    pub fn answer(&self) -> Option<Rc<Term>> {
+    pub fn answer(&self) -> Option<SharedTerm> {
         self.answer.map(|i| self.terms[i].term.clone())
     }
 

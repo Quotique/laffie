@@ -32,8 +32,8 @@ impl Renderer for Tui<'_> {
             Span::style(term.term.to_string().into(), term_style),
             if term
                 .inference
-                .as_ref()
-                .map(|x| x.requirements.is_empty())
+                .requirements()
+                .map(|x| x.is_empty())
                 .unwrap_or(true)
             {
                 Span::from("".to_owned())
@@ -43,11 +43,10 @@ impl Renderer for Tui<'_> {
                     VecDisplay(
                         &term
                             .inference
-                            .as_ref()
-                            .unwrap()
-                            .requirements
+                            .requirements()
                             .iter()
-                            .map(|x| &x.0)
+                            .flat_map(|x| x.iter())
+                            .map(|x| &x.task.purpose.term)
                             .collect()
                     )
                 ))
@@ -102,7 +101,7 @@ impl Renderer for Tui<'_> {
                     Line::from(vec![Span::from(format!(
                         "{i} {} {:?}",
                         s.term,
-                        s.inference.as_ref().map(|x| x.parent)
+                        s.inference.parent_id()
                     ))])
                 })
                 .collect(),

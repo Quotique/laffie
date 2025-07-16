@@ -1,9 +1,9 @@
-use std::{fs::File, io::prelude::*, path::Path, rc::Rc};
+use std::{fs::File, io::prelude::*, path::Path};
 
 use crate::{
     rule::{Hypothesis, SharedRule},
     task::{Solution, Task, TermProps},
-    term::Term,
+    term::SharedTerm,
 };
 
 use super::Tracer;
@@ -82,8 +82,8 @@ impl Tracer for FileDumpTracer {
                     term.term,
                     parent.term,
                     term.inference
-                        .as_ref()
-                        .map(|x| x.rule.to_string())
+                        .rule()
+                        .map(|x| x.to_string())
                         .unwrap_or_default()
                 )
                 .as_bytes(),
@@ -105,7 +105,7 @@ impl Tracer for FileDumpTracer {
 
     fn on_new_hypothesis(
         &mut self,
-        _parent: Rc<Term>,
+        _parent: SharedTerm,
         rule: SharedRule,
         hypothesis: &Hypothesis,
         _cycle: usize,

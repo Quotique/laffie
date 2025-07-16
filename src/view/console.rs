@@ -27,8 +27,8 @@ impl Renderer for Console<'_, '_> {
             term.term.to_string().bold().yellow(),
             if term
                 .inference
-                .as_ref()
-                .map(|x| x.requirements.is_empty())
+                .requirements()
+                .map(|x| x.is_empty())
                 .unwrap_or(true)
             {
                 Default::default()
@@ -38,11 +38,10 @@ impl Renderer for Console<'_, '_> {
                     VecDisplay(
                         &term
                             .inference
-                            .as_ref()
-                            .unwrap()
-                            .requirements
+                            .requirements()
                             .iter()
-                            .map(|x| &x.0)
+                            .flat_map(|x| x.iter())
+                            .map(|x| &x.task.purpose.term)
                             .collect()
                     )
                 )
@@ -82,12 +81,7 @@ impl Renderer for Console<'_, '_> {
 
     fn dump_frame(&mut self, frame: &[TermProps]) -> fmt::Result {
         for (i, s) in frame.iter().enumerate() {
-            writeln!(
-                self.output,
-                "{i} {} {:?}",
-                s.term,
-                s.inference.as_ref().map(|x| x.parent)
-            )?;
+            writeln!(self.output, "{i} {} {:?}", s.term, s.inference.parent_id())?;
         }
         Ok(())
     }

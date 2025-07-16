@@ -1,12 +1,12 @@
-use std::{collections::HashMap, fmt, rc::Rc};
+use std::{collections::HashMap, fmt};
 
 use parking_lot::RwLock;
 
-use crate::{task::Solution, term::Term};
+use crate::{task::SharedSolution, term::Term};
 
 #[derive(Default)]
 pub struct TasksCache {
-    tasks: RwLock<HashMap<Term, Option<Rc<Solution>>>>,
+    tasks: RwLock<HashMap<Term, Option<SharedSolution>>>,
 }
 
 impl fmt::Debug for TasksCache {
@@ -32,11 +32,11 @@ impl TasksCache {
         self.tasks.write().remove(purpose);
     }
 
-    pub fn status(&self, purpose: &Term) -> Option<Option<Rc<Solution>>> {
+    pub fn status(&self, purpose: &Term) -> Option<Option<SharedSolution>> {
         self.tasks.read().get(purpose).cloned()
     }
 
-    pub fn update_status(&self, purpose: &Term, solution: Rc<Solution>) {
+    pub fn update_status(&self, purpose: &Term, solution: SharedSolution) {
         if let Some(s) = self.tasks.write().get_mut(purpose) {
             *s = Some(solution);
         } else {

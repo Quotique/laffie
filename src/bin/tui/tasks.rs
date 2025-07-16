@@ -1,4 +1,4 @@
-use std::{rc::Rc, sync::Arc};
+use std::sync::Arc;
 
 use ratatui::{
     prelude::*,
@@ -10,7 +10,7 @@ use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, Solution, Solver, Task},
+    task::{DumperConfig, SharedSolution, Solver, Task},
     CompactString,
 };
 use utils::{IndexedTree, TreeIndex, VecDisplay};
@@ -23,7 +23,7 @@ use super::interface::{border_focus, border_unfocus, default_state, draw_scrollb
 pub struct TaskStatus {
     pub task:         Task,
     pub rules_engine: Arc<RulesEngine>,
-    pub solution:     Option<Rc<Solution>>,
+    pub solution:     Option<SharedSolution>,
     pub scroll_pos:   ListState,
 }
 

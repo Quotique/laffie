@@ -11,9 +11,9 @@ use std::{fmt, iter::Iterator};
 
 pub use builder::TaskBuilder;
 pub use cache::TasksCache;
-pub use props::{Cause, TermInference, TermProps};
+pub use props::{TermInference, TermProps};
 pub use purpose::Purpose;
-pub use solution::Solution;
+pub use solution::{SharedSolution, Solution};
 pub use solver::{Solver, EXECUTION_DEADLINE_DEFAULT};
 pub use tracing::{Config as DumperConfig, SolutionTracer, Tracer};
 
