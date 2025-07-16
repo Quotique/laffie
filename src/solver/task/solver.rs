@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use itertools::Itertools;
 
@@ -6,7 +6,7 @@ use utils::VecDisplay;
 
 use super::{
     props::TermInference, Purpose, SharedSolution, Solution, SolutionTracer, SolveError, Task,
-    TaskBuilder, TermProps,
+    TaskBuilder, TasksCache, TermProps,
 };
 use crate::{
     rule::{Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine, SharedRule},
@@ -17,18 +17,17 @@ use crate::{
 
 pub const MAX_SUBTASK_LEVEL: usize = 10;
 pub const MAX_LEVEL: usize = 20;
-pub const STACK_SIZE: usize = 2048;
 pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 
 pub struct Solver {
-    main_index:    HashMap<SharedTerm, usize>,
-    purpose_index: HashMap<SharedTerm, usize>,
-
     local_rules: Vec<SharedRule>,
 
-    execution_deadline: usize,
     rules_engine:       Arc<RulesEngine>,
-    pub tracer:         SolutionTracer,
+    execution_deadline: usize,
+
+    cycles: usize,
+    cache:  Arc<TasksCache>,
+    tracer: SolutionTracer,
 }
 
 impl Solver {
@@ -38,15 +37,24 @@ impl Solver {
         execution_deadline: usize,
     ) -> Solver {
         Solver {
-            main_index: Default::default(),
-            purpose_index: Default::default(),
-
             local_rules: vec![],
 
             rules_engine: rules.clone(),
-            tracer,
             execution_deadline,
+            cycles: Default::default(),
+            cache: Default::default(),
+            tracer,
         }
+    }
+
+    #[inline]
+    pub fn current_cycles(&self) -> usize {
+        self.cycles
+    }
+
+    #[inline]
+    pub fn increment_cycles(&mut self) {
+        self.cycles += 1;
     }
 
     pub fn solve(&mut self, task: Task) -> SharedSolution {
@@ -55,12 +63,12 @@ impl Solver {
         solution.into()
     }
 
-    pub fn solve_alt(&mut self, solution: &mut Solution) -> Result<SharedTerm, SolveError> {
+    fn solve_alt(&mut self, solution: &mut Solution) -> Result<SharedTerm, SolveError> {
         let conditions = solution.task.conditions.clone();
         for i in conditions.into_iter() {
-            let _ = self.add_main(solution, i);
+            let _ = solution.add_main(i);
         }
-        let _ = self.add_purpose(solution, solution.purpose.term().clone());
+        let _ = solution.add_purpose(solution.purpose.term().clone());
 
         trace!(
             target: "subtask",
@@ -73,12 +81,14 @@ impl Solver {
         }
 
         self.tracer
-            .on_subtask_start(&solution.task, solution.current_cycles());
+            .on_subtask_start(&solution.task, self.current_cycles());
 
+        solution.start_cycle = self.cycles;
         let result = self.solver_loop(solution);
         if let Err(e) = result {
             solution.status = SolutionStatus::Err(e)
         }
+        solution.end_cycle = self.cycles;
 
         self.tracer.clone().on_subtask_end(solution);
         result
@@ -86,8 +96,8 @@ impl Solver {
 
     fn solver_loop(&mut self, solution: &mut Solution) -> Result<SharedTerm, SolveError> {
         loop {
-            solution.increment_cycles();
-            if solution.current_cycles() > self.execution_deadline {
+            self.increment_cycles();
+            if self.current_cycles() > self.execution_deadline {
                 return Err(SolveError::ExecutionDeadline);
             }
 
@@ -99,7 +109,7 @@ impl Solver {
                 target: "subtask",
                 "[{}]({}) Level: {} -> {}",
                 solution.task.subtask_level,
-                solution.current_cycles(),
+                self.current_cycles(),
                 level, solution.terms[index]
             );
             if level > MAX_LEVEL {
@@ -110,7 +120,7 @@ impl Solver {
             if !solution.purpose.is_transform() {
                 if let Some(simplified) = self.transform(solution, index) {
                     solution.terms[index].filters.mark_replaced();
-                    self.add_main(solution, simplified).unwrap();
+                    solution.add_main(simplified).unwrap();
                     continue;
                 } else {
                     solution.terms[index].filters.mark_simplified();
@@ -123,7 +133,7 @@ impl Solver {
                     trace!("Equivalence");
                     solution.status = SolutionStatus::Answer(index);
                 } else {
-                    let id = self.add_main(solution, term)?;
+                    let id = solution.add_main(term)?;
                     solution.status = SolutionStatus::Answer(id);
                 }
                 trace!(
@@ -150,13 +160,17 @@ impl Solver {
                         &solution.terms[index].filters,
                         &solution.task.purpose.term,
                     )
-                    .filter(|h| !self.main_index.contains_key(&h.resolution))
-                    .filter_map(|h| self.hypothesis_proof(index, solution, h))
+                    .filter_map(|h| {
+                        if solution.main_index.contains_key(&h.resolution) {
+                            return None;
+                        }
+                        self.hypothesis_proof(index, solution, h)
+                    })
                     .next()
                     {
                         Some(s) => {
                             trace!("{} => {}", solution.terms[index], s);
-                            self.add_main(solution, s)?;
+                            solution.add_main(s)?;
                             added = true;
                             break;
                         }
@@ -172,50 +186,6 @@ impl Solver {
                 solution.terms[index].filters.weight += 1;
             }
         }
-    }
-
-    fn add_main(&mut self, solution: &mut Solution, term: TermProps) -> Result<usize, SolveError> {
-        if let Some(id) = self.main_index.get(&term.term) {
-            return Ok(*id);
-        }
-        let key = term.term.clone();
-        let id = self.add_term(solution, term)?;
-        self.main_index.insert(key, id);
-        Ok(id)
-    }
-
-    fn add_purpose(
-        &mut self,
-        solution: &mut Solution,
-        mut term: TermProps,
-    ) -> Result<(), SolveError> {
-        term.filters.mark_purpose();
-        if self.purpose_index.contains_key(&term.term) {
-            return Ok(());
-        }
-        let key = term.term.clone();
-        let id = self.add_term(solution, term)?;
-        self.purpose_index.insert(key, id);
-        Ok(())
-    }
-
-    fn add_term(&self, solution: &mut Solution, mut term: TermProps) -> Result<usize, SolveError> {
-        self.tracer.on_new_term(
-            &term,
-            &term
-                .inference
-                .parent_id()
-                .map(|parent| solution.terms[parent].clone())
-                .unwrap_or_else(|| TermProps::from(SharedTerm::new(Term::zero()))),
-        );
-
-        let id = solution.terms.len();
-        term.id = id;
-        if solution.terms.len() + 1 > STACK_SIZE {
-            return Err(SolveError::StackOverflow);
-        }
-        solution.terms.push(term);
-        Ok(id)
     }
 
     fn suggest_rules(&self, term: &TermProps, purpose: &TermProps) -> Vec<SharedRule> {
@@ -249,7 +219,7 @@ impl Solver {
             solution.terms[parent_idx].term.clone(),
             hypothesis.rule.clone(),
             &hypothesis,
-            solution.current_cycles(),
+            self.current_cycles(),
         );
 
         let mut proof_res = 0;
@@ -281,7 +251,7 @@ impl Solver {
         }
 
         self.tracer
-            .on_hypothesis_finish(&hypothesis, solution.current_cycles(), proof_res);
+            .on_hypothesis_finish(&hypothesis, self.current_cycles(), proof_res);
 
         if solved.iter().all(|x| x.answer().is_some()) {
             trace!(
@@ -350,6 +320,44 @@ impl Solver {
         Some(result)
     }
 
+    fn solve_subtask(&self, solution: &mut Solution, task: SharedTerm) -> SharedSolution {
+        if let Some(x) = self.cache.status(&task).flatten() {
+            return x.clone();
+        }
+
+        if !self.cache.add(task.as_subterm().to_term()) {
+            unimplemented!("subtask recursion");
+            // TODO: recursion
+        }
+        let subtask = Self::subtask(solution, task.clone());
+
+        let mut subtask_solver = Solver::new(
+            self.rules_engine.clone(),
+            self.tracer.clone(),
+            self.execution_deadline,
+        );
+
+        let mut subtask_solution = Solution::new(subtask);
+        subtask_solver.cycles = self.cycles;
+        subtask_solver.cache = self.cache.clone();
+
+        let result = subtask_solver.solve_alt(&mut subtask_solution);
+        let subtask_solution = SharedSolution::new(subtask_solution);
+
+        self.cache.update_status(&task, subtask_solution.clone());
+        match result {
+            Err(SolveError::MaxSubtaskLevelExceed) => {
+                trace!("Can't proof {task}: MaxSubtaskLevelExceed");
+                self.cache.remove(&task);
+            }
+            Err(e) => {
+                trace!("Can't proof {task}: {e}");
+            }
+            Ok(_) => {}
+        }
+        subtask_solution
+    }
+
     fn subtask(solution: &mut Solution, task: SharedTerm) -> Task {
         TaskBuilder::default()
             .with_purpose(TermProps::from(task.clone()))
@@ -367,46 +375,6 @@ impl Solver {
             .with_level(solution.task.subtask_level + 1)
             .build()
             .expect("Can't build subtask")
-    }
-
-    fn solve_subtask(&self, solution: &mut Solution, task: SharedTerm) -> SharedSolution {
-        if let Some(x) = solution.cache.status(&task).flatten() {
-            return x.clone();
-        }
-
-        if !solution.cache.add(task.as_subterm().to_term()) {
-            unimplemented!("subtask recursion");
-            // TODO: recursion
-        }
-        let subtask = Self::subtask(solution, task.clone());
-
-        let mut subtask_solver = Solver::new(
-            self.rules_engine.clone(),
-            self.tracer.clone(),
-            self.execution_deadline,
-        );
-
-        let mut subtask_solution = Solution::new(subtask);
-        subtask_solution.cycles = solution.cycles;
-        subtask_solution.cache = solution.cache.clone();
-
-        let result = subtask_solver.solve_alt(&mut subtask_solution);
-        let subtask_solution = SharedSolution::new(subtask_solution);
-
-        solution
-            .cache
-            .update_status(&task, subtask_solution.clone());
-        match result {
-            Err(SolveError::MaxSubtaskLevelExceed) => {
-                trace!("Can't proof {task}: MaxSubtaskLevelExceed");
-                solution.cache.remove(&task);
-            }
-            Err(e) => {
-                trace!("Can't proof {task}: {e}");
-            }
-            Ok(_) => {}
-        }
-        subtask_solution
     }
 
     fn pick_purpose_term(&self, solution: &mut Solution) -> Option<usize> {
@@ -435,7 +403,7 @@ impl Solver {
             if let Some(simplified) = self.transform(solution, index) {
                 solution.terms[index].filters.mark_replaced();
                 // TODO remove unwrap
-                self.add_purpose(solution, simplified).unwrap();
+                solution.add_purpose(simplified).unwrap();
                 continue;
             } else {
                 solution.terms[index].filters.mark_simplified();
@@ -456,13 +424,17 @@ impl Solver {
                     &solution.terms[index].filters,
                     &purpose.term,
                 )
-                .filter(|h| !self.purpose_index.contains_key(&h.resolution))
-                .filter_map(|hypothesis| self.hypothesis_proof(index, solution, hypothesis))
+                .filter_map(|hypothesis| {
+                    if solution.purpose_index.contains_key(&hypothesis.resolution) {
+                        return None;
+                    }
+                    self.hypothesis_proof(index, solution, hypothesis)
+                })
                 .next()
                 {
                     Some(s) => {
                         trace!("{} => {}", solution.terms[index], s);
-                        let _ = self.add_purpose(solution, s);
+                        let _ = solution.add_purpose(s);
                         added = true;
                     }
                     None => {
@@ -490,13 +462,17 @@ impl Solver {
                     &solution.terms[index].filters,
                     &solution.task.purpose.term,
                 )
-                .filter(|h| !self.purpose_index.contains_key(&h.resolution))
-                .filter_map(|h| self.hypothesis_proof(index, solution, h))
+                .filter_map(|h| {
+                    if solution.purpose_index.contains_key(&h.resolution) {
+                        return None;
+                    }
+                    self.hypothesis_proof(index, solution, h)
+                })
                 .next()
                 {
                     Some(s) => {
                         trace!("{} => {}", solution.terms[index], s);
-                        if self.add_purpose(solution, s).is_ok() {
+                        if solution.add_purpose(s).is_ok() {
                             solution.terms[index].filters.weight = MAX_LEVEL + 1;
                             break;
                         }
@@ -544,7 +520,7 @@ impl Solver {
     fn check_proof_answer(&self, solution: &mut Solution, index: usize) -> Option<TermProps> {
         let term = &solution.terms[index];
 
-        for i in self.purpose_index.values() {
+        for i in solution.purpose_index.values() {
             if term.term == solution.terms[*i].term {
                 return Some(term.clone());
             }

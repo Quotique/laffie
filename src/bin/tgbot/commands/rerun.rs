@@ -62,7 +62,7 @@ fn rerun(
 
     // TODO: answer validation
 
-    record.runs.push(solution.current_cycles());
+    record.runs.push(solution.cycles());
     tasks.put(&record).map_err(|e| e.to_string())?;
 
     Ok(output)

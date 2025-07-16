@@ -197,7 +197,7 @@ impl Tracing {
             };
             Line::from(vec![
                 Span::styled(id.solution.task.purpose.to_string(), style),
-                Span::from(format!(" {} {}", id.solution.current_cycles(), 0)),
+                Span::from(format!(" {} {}", id.solution.cycles(), 0)),
             ])
         } else {
             let term = &id.solution.terms[id.idx - 1];
@@ -209,7 +209,7 @@ impl Tracing {
 
             Line::from(vec![
                 Span::styled(term.term.to_string(), style),
-                Span::from(format!(" {} {}", id.solution.current_cycles(), 0)),
+                Span::from(format!(" {} {}", id.solution.cycles(), 0)),
             ])
         }
     }
@@ -235,7 +235,7 @@ impl Tracing {
             Line::default(),
             Line::from(vec![
                 Span::styled("Cycles: ", highlighted),
-                Span::from(solution.current_cycles().to_string()),
+                Span::from(solution.cycles().to_string()),
             ]),
         ]
     }

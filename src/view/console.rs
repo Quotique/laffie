@@ -67,14 +67,14 @@ impl Renderer for Console<'_, '_> {
                         "PROOFED!".bold().green()
                     }
                 },
-                format!("[{} cycles]", status.current_cycles()).yellow()
+                format!("[{} cycles]", status.cycles()).yellow()
             )
         } else {
             writeln!(
                 self.output,
                 "{} {}",
                 "NOT SOLVED!".bold().blink().red(),
-                format!("[{} cycles]", status.current_cycles()).yellow()
+                format!("[{} cycles]", status.cycles()).yellow()
             )
         }
     }

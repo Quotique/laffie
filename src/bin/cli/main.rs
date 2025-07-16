@@ -183,7 +183,7 @@ fn main() {
                         solution.answer().unwrap()
                     );
                 }
-                record.runs.push(solution.current_cycles());
+                record.runs.push(solution.cycles());
 
                 // TODO: db is temporary disabled
                 // if let Err(e) = db.put(&record) {

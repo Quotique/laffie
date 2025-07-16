@@ -76,7 +76,7 @@ impl Renderer for Tui<'_> {
                         answer_style,
                     ),
                     Span::style(
-                        format!(" [{} cycles]", status.current_cycles()).into(),
+                        format!(" [{} cycles]", status.cycles()).into(),
                         cycles_counter_style,
                     ),
                 ]
@@ -84,7 +84,7 @@ impl Renderer for Tui<'_> {
                 vec![
                     Span::style("NOT SOLVED!".into(), not_solved_style),
                     Span::style(
-                        format!(" [{} cycles]", status.current_cycles()).into(),
+                        format!(" [{} cycles]", status.cycles()).into(),
                         cycles_counter_style,
                     ),
                 ]

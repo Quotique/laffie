@@ -58,10 +58,7 @@ impl Tracer for FileDumpTracer {
                 format!(
                     "{} [{} cycles] {} Answer: {}\n",
                     self.idention(),
-                    status.cycles -
-                        self.subtask_start_cycle
-                            .pop()
-                            .expect("finished task never starts"),
+                    status.cycles(),
                     status.task.purpose.to_string().replace("\n", "; "),
                     status
                         .answer()

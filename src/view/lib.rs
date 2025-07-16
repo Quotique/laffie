@@ -94,15 +94,11 @@ impl View<'_> {
                     .borrow_mut()
                     .insert(r.task.purpose.term.as_ref().clone())
                 {
-                    if let Some(solution) =
-                        self.solution.cache.status(&r.task.purpose.term).flatten()
-                    {
-                        View {
-                            solution: &solution,
-                            rendered: self.rendered.clone(),
-                        }
-                        .display_impl(renderer)?;
+                    View {
+                        solution: r.as_ref(),
+                        rendered: self.rendered.clone(),
                     }
+                    .display_impl(renderer)?;
                 }
             }
             if !trace.is_empty() {
