@@ -1,16 +1,23 @@
-use std::{collections::HashMap, error, rc::Rc};
+use std::{
+    collections::HashMap,
+    error,
+    ops::{Index, IndexMut},
+    rc::Rc,
+};
 
 use bincode::{Decode, Encode};
 use derive_more::Display;
 
 use super::{Purpose, Task, TermProps};
 use crate::term::SharedTerm;
+use utils::VecDisplay;
 
 pub const STACK_SIZE: usize = 2048;
 
 pub type SharedSolution = Rc<Solution>;
+pub type TermIdx = usize;
 
-#[derive(Debug, Display, Clone, Copy, Encode, Decode)]
+#[derive(Debug, Display, Clone, Copy, Encode, Decode, PartialEq, Eq)]
 pub enum SolveError {
     StackOverflow,
     MaxSubtaskLevelExceed,
@@ -32,10 +39,10 @@ pub struct Solution {
     pub task:    Task,
     pub purpose: Purpose,
 
-    pub status: SolutionStatus,
+    pub status:      SolutionStatus,
+    pub start_cycle: usize,
+    pub end_cycle:   usize,
 
-    pub start_cycle:   usize,
-    pub end_cycle:     usize,
     pub main_index:    HashMap<SharedTerm, usize>,
     pub purpose_index: HashMap<SharedTerm, usize>,
     pub terms:         Vec<TermProps>,
@@ -44,7 +51,8 @@ pub struct Solution {
 impl Solution {
     pub fn new(task: Task) -> Self {
         let purpose = Purpose::try_from((*task.purpose.term).clone()).unwrap();
-        Self {
+
+        let mut solution = Self {
             task,
             purpose,
             start_cycle: Default::default(),
@@ -53,7 +61,17 @@ impl Solution {
             purpose_index: Default::default(),
             terms: Default::default(),
             status: Default::default(),
+        };
+        let conditions = solution.task.conditions.clone();
+        for i in conditions.into_iter() {
+            let _ = solution.add_main(i);
         }
+        let _ = solution.add_purpose(solution.purpose.term().clone());
+
+        trace!(target: "subtask", "Subtask: {}, {}",
+            solution.purpose, VecDisplay(&solution.task.conditions)
+        );
+        solution
     }
 
     #[inline]
@@ -82,16 +100,7 @@ impl Solution {
         Ok(id)
     }
 
-    fn add_term(&mut self, mut term: TermProps) -> Result<usize, SolveError> {
-        // self.tracer.on_new_term(
-        //     &term,
-        //     &term
-        //         .inference
-        //         .parent_id()
-        //         .map(|parent| solution.terms[parent].clone())
-        //         .unwrap_or_else(|| TermProps::from(SharedTerm::new(Term::zero()))),
-        // );
-
+    fn add_term(&mut self, mut term: TermProps) -> Result<TermIdx, SolveError> {
         let id = self.terms.len();
         term.id = id;
         if self.terms.len() + 1 > STACK_SIZE {
@@ -101,10 +110,18 @@ impl Solution {
         Ok(id)
     }
 
-    pub fn pick_term(&self) -> Option<usize> {
+    pub fn pick_next(&self) -> Option<TermIdx> {
         self.terms
             .iter()
-            .filter(|x| !(x.filters.is_replaced() || x.filters.is_purpose()))
+            .filter(|x| !x.filters.is_replaced())
+            .min_by_key(|x| x.filters.weight)
+            .map(|x| x.id)
+    }
+
+    pub fn pick_purpose_term(&self) -> Option<TermIdx> {
+        self.terms
+            .iter()
+            .filter(|x| !x.filters.is_replaced() && x.filters.is_purpose())
             .min_by_key(|x| x.filters.weight)
             .map(|x| x.id)
     }
@@ -140,6 +157,20 @@ impl Solution {
                 .any(|x| x.to_string() == answer.to_string());
         }
         false
+    }
+}
+
+impl Index<TermIdx> for Solution {
+    type Output = TermProps;
+
+    fn index(&self, index: TermIdx) -> &Self::Output {
+        &self.terms[index]
+    }
+}
+
+impl IndexMut<TermIdx> for Solution {
+    fn index_mut(&mut self, index: TermIdx) -> &mut Self::Output {
+        &mut self.terms[index]
     }
 }
 

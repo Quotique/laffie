@@ -133,6 +133,7 @@ impl TermAsRule {
         let builder = RuleBuilder::default()
             .with_id(id)
             .with_attribute(RuleAttr::Level, RuleAttrValue::UInt(level))
+            .with_attribute(RuleAttr::Equivalence, RuleAttrValue::None)
             .with_term(term.clone())
             .ok()?;
         let mut builded = builder

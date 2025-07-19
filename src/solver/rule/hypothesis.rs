@@ -32,7 +32,7 @@ impl HypothesisIterator {
         let hypothesis = match rule.apply(term, filters, purpose) {
             Ok(x) => x,
             Err(e) => {
-                trace!(target: "rule_selection", "rule {rule} not applied to term {term}: {e:?}" );
+                trace!(target: "rule_selection", "rule {rule} not applied to term {term}: {e:?}");
                 return Self::empty();
             }
         };

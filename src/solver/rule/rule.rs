@@ -1,5 +1,6 @@
 use std::{collections::HashSet, fmt, hash, rc::Rc};
 
+use derive_more::Display;
 use eyre::Result;
 use multimap::MultiMap;
 
@@ -11,7 +12,7 @@ use crate::{
     NormalizationLevel,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub enum RuleDeclineReason {
     LevelMissmatch,
     PurposeMissmatch,
@@ -84,6 +85,26 @@ impl Rule {
 
     pub fn is_tautology(&self) -> bool {
         self.pattern_node() == self.replace_node()
+    }
+
+    pub fn try_filter(
+        &self,
+        filters: &TermFilters,
+        purpose: &Term,
+    ) -> Result<(), RuleDeclineReason> {
+        self.is_term_suitable(filters).inspect_err(|e| {
+            trace!(
+                target: "rule_selection",
+                "Rule {self} rejected for filters {filters:?} by reason {e:?}",
+            );
+        })?;
+        self.purpose_mapping(purpose).inspect_err(|e| {
+            trace!(
+                target: "rule_selection",
+                "Rule {self} rejected for purpose {purpose:?} by reason {e:?}",
+            );
+        })?;
+        Ok(())
     }
 
     pub fn is_term_suitable(&self, filters: &TermFilters) -> Result<(), RuleDeclineReason> {
@@ -198,6 +219,8 @@ impl ApplyRule for SharedRule {
         Ok(result)
     }
 }
+
+impl std::error::Error for RuleDeclineReason {}
 
 #[cfg(test)]
 pub mod tests {

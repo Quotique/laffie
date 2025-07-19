@@ -56,24 +56,7 @@ impl RulesEngine {
             .chain(filters.func_symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())
-            .filter(|rule| {
-                rule.is_term_suitable(filters)
-                    .map_err(|e| {
-                        trace!(
-                            target: "rule_selection",
-                            "Rule {rule} rejected for filters {filters:?} by reason {e:?}",
-                        );
-                    })
-                    .is_ok() &&
-                    rule.purpose_mapping(purpose)
-                        .map_err(|e| {
-                            trace!(
-                                target: "rule_selection",
-                                "Rule {rule} rejected for filters {filters:?} by reason {e:?}",
-                            );
-                        })
-                        .is_ok()
-            })
+            .filter(|rule| rule.try_filter(filters, purpose).is_ok())
             .cloned()
             .collect();
         if !result.is_empty() {

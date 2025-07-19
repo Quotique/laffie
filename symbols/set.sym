@@ -19,8 +19,9 @@ rule {
     set(S) is known;
 }
 
+// TODO: apply only to root
 rule {
-    attr level(0),purpose(find(x)),replace;
+    attr level(0),purpose(find(x)),replace,id(answer_in_set),block(answer_in_set);
 
     x in set(a, b) => answer(x in set(a, b));
 

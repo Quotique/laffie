@@ -57,6 +57,7 @@ impl TryFrom<Term> for Purpose {
 }
 
 impl Purpose {
+    #[inline]
     pub fn term(&self) -> &TermProps {
         match self {
             Purpose::Find(s) => s,
@@ -65,8 +66,25 @@ impl Purpose {
         }
     }
 
+    #[inline]
     pub fn is_transform(&self) -> bool {
         if let Purpose::Transform(_) = self {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn is_proof(&self) -> bool {
+        if let Purpose::Proof(_) = self {
+            return true;
+        }
+        false
+    }
+
+    #[inline]
+    pub fn is_find(&self) -> bool {
+        if let Purpose::Find(_) = self {
             return true;
         }
         false

@@ -14,7 +14,7 @@ pub use builder::TaskBuilder;
 pub use cache::TasksCache;
 pub use props::{TermInference, TermProps};
 pub use purpose::Purpose;
-pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError};
+pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError, TermIdx};
 pub use solver::{Solver, EXECUTION_DEADLINE_DEFAULT};
 pub use tracing::{Config as DumperConfig, SolutionTracer, Tracer};
 
@@ -29,6 +29,20 @@ pub struct Task {
     pub subtask_level: usize,
 
     pub possible_answers: Vec<Term>,
+}
+
+impl From<TermProps> for Task {
+    fn from(value: TermProps) -> Self {
+        Self {
+            id:               Default::default(),
+            text:             Default::default(),
+            group:            Default::default(),
+            purpose:          value,
+            conditions:       Default::default(),
+            subtask_level:    Default::default(),
+            possible_answers: Default::default(),
+        }
+    }
 }
 
 impl fmt::Display for Task {
