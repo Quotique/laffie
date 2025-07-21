@@ -7,11 +7,11 @@ use std::{collections::HashMap, convert::TryFrom, fmt, path::PathBuf, sync::Arc}
 
 use clap::Parser;
 use colored::*;
+use itertools::Itertools;
 
 use database::{TaskDb, TaskRecord};
 use parser::DirectoryParser;
 use solver::task::{DumperConfig, SolutionStatus, Solver, Task};
-use utils::VecDisplay;
 use view::View;
 
 use crate::settings::Settings;
@@ -177,9 +177,9 @@ fn main() {
                         .or_default()
                         .answer_changed += 1;
                     println!(
-                        "{}\nValid answers: {}\nObtained: {}",
+                        "{}\nValid answers: [{}]\nObtained: {}",
                         "Answer changed: ".bold().blink().red(),
-                        VecDisplay(&solution.task.possible_answers),
+                        solution.task.possible_answers.iter().format(", "),
                         solution.answer().unwrap()
                     );
                 }
@@ -203,9 +203,9 @@ fn main() {
         };
         if !record.reports.is_empty() {
             println!(
-                "{} {}",
+                "{} [{}]",
                 "Reported:".bold().blink().red(),
-                VecDisplay(&record.reports)
+                record.reports.iter().format(", ")
             );
         }
     }

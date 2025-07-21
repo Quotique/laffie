@@ -11,20 +11,18 @@ path = "./lib.rs"
 utils = { path = "../utils" }
 
 eyre = { workspace = true }
+itertools = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 smartstring = { workspace = true }
 trees = { workspace = true }
 
-ego-tree = "0.10"
-
 bigdecimal = "0.4"
 bincode = "2.0"
 bitflags = "2.9"
 derive_more = { version = "2.0", features = ["full"] }
 indexmap = "2.10"
-itertools = "0.14"
 multimap = "0.10"
 num = "0.4"
 num-bigint = "0.4"

@@ -333,6 +333,7 @@ dependencies = [
  "colored",
  "config",
  "database",
+ "itertools 0.14.0",
  "parser",
  "serde",
  "serde_derive",
@@ -672,12 +673,6 @@ checksum = "442039f5147480ba31067cb00ada1adae6892028e40e45fc5de7b7df6dcc1b5f"
 dependencies = [
  "const-random",
 ]
-
-[[package]]
-name = "ego-tree"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2972feb8dffe7bc8c5463b1dacda1b0dfbed3710e50f977d965429692d74cd8"
 
 [[package]]
 name = "either"
@@ -1604,6 +1599,7 @@ name = "parser"
 version = "0.4.2"
 dependencies = [
  "eyre",
+ "itertools 0.14.0",
  "log",
  "peg",
  "smartstring",
@@ -2368,7 +2364,6 @@ dependencies = [
  "bincode",
  "bitflags 2.9.1",
  "derive_more",
- "ego-tree",
  "eyre",
  "indexmap",
  "insta",
@@ -2530,6 +2525,7 @@ dependencies = [
  "cpu-freq",
  "database",
  "futures",
+ "itertools 0.14.0",
  "parser",
  "rust-i18n",
  "serde",
@@ -2792,6 +2788,7 @@ dependencies = [
  "config",
  "database",
  "derive_more",
+ "itertools 0.14.0",
  "log",
  "parser",
  "ratatui",
@@ -2943,6 +2940,7 @@ dependencies = [
  "colored",
  "eyre",
  "html-escape",
+ "itertools 0.14.0",
  "ratatui",
  "solver",
  "utils",

@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use itertools::Itertools;
 
-use utils::VecDisplay;
-
 use super::{
     props::TermInference, Purpose, SharedSolution, Solution, SolutionTracer, SolveError, Task,
     TaskBuilder, TasksCache, TermIdx, TermProps,
@@ -179,7 +177,7 @@ impl Solver {
 
         trace!(target: "rule_selection",
             "purpose: {purpose_term}, term: {term}, suggested_rules: {}",
-            VecDisplay(&rules)
+            rules.iter().format(", ")
         );
         rules
     }

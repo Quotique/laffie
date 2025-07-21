@@ -5,8 +5,6 @@ use std::{
 
 use itertools::Itertools;
 
-use utils::VecDisplay;
-
 use super::{Rule, RuleAttr, RuleAttrValue, RuleId, SharedRule, TermFilters};
 use crate::{
     term::{Symbol, Term},
@@ -53,7 +51,7 @@ impl RulesEngine {
         let empty_level = LevelRules::new();
         let level = self.all_rules.get(&filters.weight).unwrap_or(&empty_level);
         let result: Vec<_> = once(&Symbol::by_name("AnySymbol").unwrap())
-            .chain(filters.func_symbols.iter())
+            .chain(filters.symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())
             .filter(|rule| rule.try_filter(filters, purpose).is_ok())
@@ -63,7 +61,7 @@ impl RulesEngine {
             trace!(
                 "[{}] Suggested rules: [{}]",
                 filters.weight,
-                VecDisplay(&result)
+                result.iter().format(", ")
             );
         }
         result

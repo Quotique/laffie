@@ -1,6 +1,6 @@
 use std::fmt;
 
-use utils::VecDisplay;
+use itertools::Itertools;
 
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
 use crate::term::{ParamsMapping, Term};
@@ -61,7 +61,7 @@ impl fmt::Display for Hypothesis {
         write!(
             f,
             "[{}] => {}",
-            VecDisplay(&self.requirements),
+            self.requirements.iter().format(", "),
             self.resolution,
         )
     }

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use itertools::Itertools;
 use ratatui::{
     prelude::*,
     style::Stylize,
@@ -13,7 +14,7 @@ use solver::{
     task::{DumperConfig, SharedSolution, Solver, Task},
     CompactString,
 };
-use utils::{IndexedTree, TreeIndex, VecDisplay};
+use utils::{IndexedTree, TreeIndex};
 use view::{Tui, View};
 
 use crate::tracing::Tracing;
@@ -195,7 +196,10 @@ impl Tasks {
                     ),
                     Span::from(" "),
                     Span::styled(
-                        VecDisplay(&self.tasks[*task].task.task.conditions).to_string(),
+                        format!(
+                            "[{}]",
+                            self.tasks[*task].task.task.conditions.iter().format(", "),
+                        ),
                         task_line_style,
                     ),
                 ])

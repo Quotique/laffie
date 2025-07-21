@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use itertools::Itertools;
 use trees::Tree;
 
 use solver::{
@@ -10,7 +11,6 @@ use solver::{
     task::Task,
     term::{Symbol, SymbolProgram},
 };
-use utils::VecDisplay;
 
 use crate::{lang, NodeData, RuleParser, SymbolParser, TaskParser};
 
@@ -63,10 +63,10 @@ impl DirectoryParser {
                 match TaskParser::with(s).parse() {
                     Ok(mut t) => {
                         trace!(
-                            "New task: [{:x}] {} {}",
+                            "New task: [{:x}] {} [{}]",
                             t.id,
                             t.purpose,
-                            VecDisplay(&t.conditions)
+                            t.conditions.iter().format(", ")
                         );
                         t.group = path.with_extension("").display().to_string();
                         result.push(t)

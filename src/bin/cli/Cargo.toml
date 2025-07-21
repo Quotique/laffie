@@ -9,12 +9,13 @@ name = "cli"
 path = "./main.rs"
 
 [dependencies]
-solver = { path = "../../solver" }
-parser = { path = "../../parser" }
-view = { path = "../../view" }
 database = { path = "../../database" }
+parser = { path = "../../parser" }
+solver = { path = "../../solver" }
 utils = { path = "../../utils" }
+view = { path = "../../view" }
 
+itertools = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 

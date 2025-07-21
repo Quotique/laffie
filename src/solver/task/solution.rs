@@ -7,10 +7,10 @@ use std::{
 
 use bincode::{Decode, Encode};
 use derive_more::Display;
+use itertools::Itertools;
 
 use super::{Purpose, Task, TermProps};
 use crate::term::SharedTerm;
-use utils::VecDisplay;
 
 pub const STACK_SIZE: usize = 2048;
 
@@ -68,8 +68,8 @@ impl Solution {
         }
         let _ = solution.add_purpose(solution.purpose.term().clone());
 
-        trace!(target: "subtask", "Subtask: {}, {}",
-            solution.purpose, VecDisplay(&solution.task.conditions)
+        trace!(target: "subtask", "Subtask: {}, [{}]",
+            solution.purpose, solution.task.conditions.iter().format(", ")
         );
         solution
     }

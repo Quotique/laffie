@@ -2,9 +2,8 @@ use std::{collections::HashSet, fmt, hash, rc::Rc};
 
 use derive_more::Display;
 use eyre::Result;
+use itertools::Itertools;
 use multimap::MultiMap;
-
-use utils::VecDisplay;
 
 use super::{Hypothesis, RuleAttr, RuleAttrValue, RuleId, TermFilters};
 use crate::{
@@ -57,10 +56,10 @@ impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "[{}](L:{}) {} => {}",
+            "[{}](L:{}) [{}] => {}",
             self.id,
             self.level,
-            VecDisplay(&self.requirements),
+            self.requirements.iter().format(", "),
             self.term
         )
     }
@@ -101,7 +100,7 @@ impl Rule {
         self.purpose_mapping(purpose).inspect_err(|e| {
             trace!(
                 target: "rule_selection",
-                "Rule {self} rejected for purpose {purpose:?} by reason {e:?}",
+                "Rule {self} rejected for purpose {purpose} by reason {e:?}",
             );
         })?;
         Ok(())
@@ -117,7 +116,7 @@ impl Rule {
         }
 
         for s in self.pattern_symbols.iter() {
-            if !filters.func_symbols.contains(s) {
+            if !filters.symbols.contains(s) {
                 return Err(RuleDeclineReason::ParamsMappingErr(format!(
                     "symbol: {s} not found"
                 )));

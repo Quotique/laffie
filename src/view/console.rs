@@ -2,11 +2,12 @@ use std::fmt;
 
 use colored::*;
 
+use itertools::Itertools;
+
 use solver::{
     task::{Purpose, Solution, TermProps},
     term::SharedTerm,
 };
-use utils::VecDisplay;
 
 use crate::Renderer;
 
@@ -35,15 +36,12 @@ impl Renderer for Console<'_, '_> {
             } else {
                 format!(
                     " needed: [{}]",
-                    VecDisplay(
-                        &term
-                            .inference
-                            .requirements()
-                            .iter()
-                            .flat_map(|x| x.iter())
-                            .map(|x| &x.task.purpose.term)
-                            .collect()
-                    )
+                    term.inference
+                        .requirements()
+                        .iter()
+                        .flat_map(|x| x.iter())
+                        .map(|x| &x.task.purpose.term)
+                        .format(", ")
                 )
             }
         )

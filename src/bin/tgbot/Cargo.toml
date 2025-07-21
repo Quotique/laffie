@@ -10,12 +10,13 @@ path = "./main.rs"
 
 [dependencies]
 database = { path = "../../database" }
-solver = { path = "../../solver" }
 parser = { path = "../../parser" }
-view = { path = "../../view" }
+solver = { path = "../../solver" }
 utils = { path = "../../utils" }
+view = { path = "../../view" }
 
 chrono = { workspace = true }
+itertools = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 

@@ -7,11 +7,11 @@ use std::{
 use bigdecimal::BigDecimal;
 use derive_more::{Debug, From};
 use eyre::{bail, ensure, Result};
-use itertools::Itertools;
+use itertools::{chain, Itertools};
 use num::Zero;
 use trees::Node;
 
-use utils::{SubsetIterator, VecDisplay};
+use utils::SubsetIterator;
 
 use super::{ParamsMapping, SubtermId, Symbol, Term, TermNode, Truth};
 
@@ -175,7 +175,7 @@ impl<'a> Subterm<'a> {
         pattern: Subterm,
         mut params: ParamsMapping,
     ) -> Result<Vec<ParamsMapping>> {
-        trace!(target: "pattern_match", "Pattern: {pattern}, traget: {self}, mapping: {params:?}");
+        trace!(target: "pattern_match", "Pattern: {pattern}, traget: {self}, mapping: {params}");
 
         match (&pattern.data(), &self.data()) {
             (TermNode::Symbol(sym), TermNode::Symbol(t_sym)) => {
@@ -277,7 +277,7 @@ impl<'a> Subterm<'a> {
             let mut new_result = vec![];
             for r in result.drain(..) {
                 if let Ok(mut p) = t.try_match_extend(p, r) {
-                    trace!(target: "pattern_match", "New mapping: [{}]", VecDisplay(&p));
+                    trace!(target: "pattern_match", "New mapping: [{}]", p.iter().format(", "));
                     new_result.append(&mut p);
                 }
             }
@@ -306,15 +306,13 @@ impl fmt::Display for ParamsMapping {
         write!(
             f,
             "{{ {} }}",
-            self.params
-                .iter()
-                .map(|(x, y)| format!("{x}: {y}"))
-                .chain(
-                    self.arglists
-                        .iter()
-                        .map(|(x, y)| format!("..{}: {}", x, VecDisplay(y)))
-                )
-                .join(", ")
+            chain(
+                self.params.iter().map(|(x, y)| format!("{x}: {y}")),
+                self.arglists
+                    .iter()
+                    .map(|(x, y)| format!("..{x}: [{}]", y.iter().format(", ")))
+            )
+            .format(", ")
         )
     }
 }
@@ -356,8 +354,9 @@ impl<'a> fmt::Display for Subterm<'a> {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use crate::term::{term_with_params, term_with_vars};
-    use utils::VecDisplay;
 
     #[test]
     fn symbol_display_test() {
@@ -389,7 +388,7 @@ mod tests {
             .try_match(pattern.as_subterm())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 1, b: x }, { a: x, b: 1 }]");
+        insta::assert_snapshot!(maps.iter().format(", "), @"{ a: 1, b: x }, { a: x, b: 1 }");
     }
 
     #[test]
@@ -402,7 +401,7 @@ mod tests {
             .try_match(pattern.as_subterm())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 5, b: -x }, { a: x, b: -5 }]");
+        insta::assert_snapshot!(maps.iter().format(", "), @"{ a: 5, b: -x }, { a: x, b: -5 }");
     }
 
     #[test]
@@ -415,7 +414,7 @@ mod tests {
             .try_match(pattern.as_subterm())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 5, b: x }, { a: x, b: 5 }]");
+        insta::assert_snapshot!(maps.iter().format(", "), @"{ a: 5, b: x }, { a: x, b: 5 }");
     }
 
     #[test]
@@ -428,7 +427,7 @@ mod tests {
             .try_match(pattern.as_subterm())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: x }]");
+        insta::assert_snapshot!(maps.iter().format(", "), @"{ a: x }");
     }
 
     #[test]
@@ -441,7 +440,7 @@ mod tests {
             .try_match(pattern.as_subterm())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 2*x^2, b: x-1 }]");
+        insta::assert_snapshot!(maps.iter().format(", "), @"{ a: 2*x^2, b: x-1 }");
     }
 
     #[test]
@@ -471,7 +470,7 @@ mod tests {
             .try_match(pattern.as_subterm())
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
-        insta::assert_snapshot!(VecDisplay(&maps), @"[{ a: 3, ..1: [5, 7] }]");
+        insta::assert_snapshot!(maps.iter().format(", "), @"{ a: 3, ..1: [5, 7] }");
     }
 
     #[test]

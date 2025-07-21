@@ -15,5 +15,6 @@ eyre = { workspace = true }
 log = { workspace = true }
 smartstring = { workspace = true }
 trees = { workspace = true }
+itertools = { workspace = true }
 
 peg = "0.8"

@@ -1,12 +1,12 @@
 use std::fmt;
 
+use itertools::Itertools;
 use ratatui::{prelude::*, style::Stylize};
 
 use solver::{
     task::{Purpose, Solution, TermProps},
     term::SharedTerm,
 };
-use utils::VecDisplay;
 
 use crate::Renderer;
 
@@ -28,7 +28,7 @@ impl Renderer for Tui<'_> {
     fn display_term(&mut self, subtask_level: usize, term: &TermProps) -> fmt::Result {
         let term_style = Style::new().fg(Color::Yellow).bold();
         self.output.push(Line::from(vec![
-            Span::from(format!("{}=> ", "  ".repeat(subtask_level))),
+            Span::from(format!("{} => ", "  ".repeat(subtask_level))),
             Span::style(term.term.to_string().into(), term_style),
             if term
                 .inference
@@ -40,15 +40,12 @@ impl Renderer for Tui<'_> {
             } else {
                 Span::from(format!(
                     " needed: [{}]",
-                    VecDisplay(
-                        &term
-                            .inference
-                            .requirements()
-                            .iter()
-                            .flat_map(|x| x.iter())
-                            .map(|x| &x.task.purpose.term)
-                            .collect()
-                    )
+                    term.inference
+                        .requirements()
+                        .iter()
+                        .flat_map(|x| x.iter())
+                        .map(|x| &x.task.purpose.term)
+                        .format(", ")
                 ))
             },
         ]));
