@@ -43,9 +43,10 @@ pub struct Solution {
     pub start_cycle: usize,
     pub end_cycle:   usize,
 
-    pub main_index:    HashMap<SharedTerm, usize>,
-    pub purpose_index: HashMap<SharedTerm, usize>,
-    pub terms:         Vec<TermProps>,
+    pub main_index:       HashMap<SharedTerm, usize>,
+    pub purpose_index:    HashMap<SharedTerm, usize>,
+    pub terms:            Vec<TermProps>,
+    unproven_terms_count: usize,
 }
 
 impl Solution {
@@ -61,12 +62,13 @@ impl Solution {
             purpose_index: Default::default(),
             terms: Default::default(),
             status: Default::default(),
+            unproven_terms_count: Default::default(),
         };
         let conditions = solution.task.conditions.clone();
         for i in conditions.into_iter() {
-            let _ = solution.add_main(i);
+            let _ = solution.add_term(i);
         }
-        let _ = solution.add_purpose(solution.purpose.term().clone());
+        let _ = solution.add_term(solution.purpose.term().clone());
 
         trace!(target: "subtask", "Subtask: {}, [{}]",
             solution.purpose, solution.task.conditions.iter().format(", ")
@@ -79,33 +81,29 @@ impl Solution {
         self.end_cycle - self.start_cycle
     }
 
-    pub fn add_main(&mut self, term: TermProps) -> Result<usize, SolveError> {
-        if let Some(id) = self.main_index.get(&term.term) {
-            return Ok(*id);
-        }
-        let key = term.term.clone();
-        let id = self.add_term(term)?;
-        self.main_index.insert(key, id);
-        Ok(id)
-    }
-
-    pub fn add_purpose(&mut self, mut term: TermProps) -> Result<usize, SolveError> {
-        term.filters.mark_purpose();
-        if let Some(id) = self.purpose_index.get(&term.term) {
-            return Ok(*id);
-        }
-        let key = term.term.clone();
-        let id = self.add_term(term)?;
-        self.purpose_index.insert(key, id);
-        Ok(id)
-    }
-
-    fn add_term(&mut self, mut term: TermProps) -> Result<TermIdx, SolveError> {
-        let id = self.terms.len();
-        term.id = id;
-        if self.terms.len() + 1 > STACK_SIZE {
+    pub fn add_term(&mut self, mut term: TermProps) -> Result<TermIdx, SolveError> {
+        if self.terms.len() - self.unproven_terms_count + 1 > STACK_SIZE {
             return Err(SolveError::StackOverflow);
         }
+        let id = self.terms.len();
+        term.id = id;
+
+        if !term.inference.is_proven() {
+            self.unproven_terms_count += 1;
+            self.terms.push(term);
+            return Ok(id);
+        }
+
+        let index = if term.filters.is_purpose() {
+            &mut self.purpose_index
+        } else {
+            &mut self.main_index
+        };
+        if let Some(id) = index.get(&term.term) {
+            return Ok(*id);
+        }
+        index.insert(term.term.clone(), id);
+
         self.terms.push(term);
         Ok(id)
     }
@@ -113,6 +111,7 @@ impl Solution {
     pub fn pick_next(&self) -> Option<TermIdx> {
         self.terms
             .iter()
+            .filter(|x| x.inference.is_proven())
             .filter(|x| !x.filters.is_replaced())
             .min_by_key(|x| x.filters.weight)
             .map(|x| x.id)
@@ -121,6 +120,7 @@ impl Solution {
     pub fn pick_purpose_term(&self) -> Option<TermIdx> {
         self.terms
             .iter()
+            .filter(|x| x.inference.is_proven())
             .filter(|x| !x.filters.is_replaced() && x.filters.is_purpose())
             .min_by_key(|x| x.filters.weight)
             .map(|x| x.id)

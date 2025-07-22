@@ -154,15 +154,26 @@ impl Tracing {
             .terms
             .iter()
             .enumerate()
-            .filter_map(|(num, x)| x.inference.requirements().map(|reqs| (num, reqs)))
-            .map(|(num, requirements)| {
+            .filter_map(|(num, x)| {
+                let children = match &x.inference {
+                    TermInference::Rule { requirements, .. } => {
+                        requirements.iter().map(|x| Self::tree(x.clone())).collect()
+                    }
+                    TermInference::Transform { solution, .. } => {
+                        vec![Self::tree(solution.clone())]
+                    }
+                    _ => {
+                        return None;
+                    }
+                };
+                Some((num, children))
+            })
+            .map(|(num, children)| {
                 let term_id = TermId {
                     solution: solution.clone(),
                     idx:      num + 1,
                 };
                 let line = Self::tree_line(&term_id);
-                let children: Vec<_> = requirements.iter().map(|x| Self::tree(x.clone())).collect();
-
                 if children.is_empty() {
                     TreeItem::new_leaf(term_id, line)
                 } else {

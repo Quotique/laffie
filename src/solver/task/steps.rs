@@ -26,10 +26,7 @@ impl From<SharedSolution> for Steps {
 
         let mut terms_queue: Vec<usize> = vec![answer_idx];
 
-        while let Some(ref parent) = solution.terms[*terms_queue.last().unwrap()]
-            .inference
-            .parent_id()
-        {
+        while let Some(ref parent) = solution[*terms_queue.last().unwrap()].inference.parent_id() {
             terms_queue.push(*parent);
         }
         Self {
@@ -56,11 +53,11 @@ impl Iterator for Steps {
 
             if !subtask_empty {
                 let id = self.terms_queue.pop().unwrap();
-                return Some(self.solution.terms[id].term.clone());
+                return Some(self.solution[id].term.clone());
             }
 
             if let Some(next_id) = self.terms_queue.last() {
-                for r in self.solution.terms[*next_id]
+                for r in self.solution[*next_id]
                     .inference
                     .requirements()
                     .iter()

@@ -71,7 +71,7 @@ impl Solver {
                 trace!("Solved {level}. Answer: {answer}",);
                 break Ok(());
             }
-            self.add_local_rule(index, &mut solution);
+            self.add_local_rule(&mut solution[index]);
             self.try_infer_new_terms(index, &mut solution)?;
         };
         if let Err(e) = main_loop() {
@@ -124,21 +124,20 @@ impl Solver {
                 .unwrap_or_else(|| TermProps::from(Term::zero())),
         );
 
-        if term.filters.is_purpose() {
-            s.add_purpose(term)
-        } else {
-            let index = s.add_main(term)?;
-            self.add_local_rule(index, s);
-            Ok(index)
+        let is_purpose = term.filters.is_purpose();
+        let index = s.add_term(term)?;
+        if !is_purpose {
+            self.add_local_rule(&mut s[index]);
         }
+        Ok(index)
     }
 
-    fn add_local_rule(&mut self, index: TermIdx, solution: &mut Solution) {
-        if solution[index].filters.is_purpose() {
+    fn add_local_rule(&mut self, term: &mut TermProps) {
+        if term.filters.is_purpose() {
             return;
         }
-        let level = solution[index].filters.weight;
-        if let Some(r) = solution[index].rule(
+        let level = term.filters.weight;
+        if let Some(r) = term.rule(
             RuleId::new(0x80_00_00_00_00_00_00_00, self.local_rules.len() as u64 + 1),
             (level + 1) as u64,
         ) {
@@ -238,32 +237,37 @@ impl Solver {
             },
         )
         .filter_map(|hypothesis| {
-            let term_index = if is_purpose {
-                &s.purpose_index
+            let is_dub = if is_purpose {
+                s.purpose_index.contains_key(&hypothesis.resolution)
             } else {
-                &s.main_index
+                s.main_index.contains_key(&hypothesis.resolution)
             };
-            if term_index.contains_key(&hypothesis.resolution) {
+            if is_dub {
                 return None;
             }
-
-            self.hypothesis_proof(index, s, hypothesis)
+            let props = self.try_prove_hypothesis(index, s, hypothesis);
+            if props.inference.is_proven() {
+                Some(props)
+            } else {
+                // TODO: option to disable
+                s.add_term(props).expect("can't add unproven");
+                None
+            }
         })
         .next()
     }
 
-    fn hypothesis_proof(
+    fn try_prove_hypothesis(
         &self,
         parent_idx: usize,
-        solution: &mut Solution,
+        solution: &Solution,
         hypothesis: Hypothesis,
-    ) -> Option<TermProps> {
+    ) -> TermProps {
         trace!(
             target: "rule_selection",
             "new hypothesis {hypothesis}, rule {}, term: {}",
             hypothesis.rule, solution[parent_idx]
         );
-
         self.tracer.on_new_hypothesis(
             solution[parent_idx].term.clone(),
             hypothesis.rule.clone(),
@@ -271,13 +275,17 @@ impl Solver {
             self.current_cycle(),
         );
 
+        let mut props = TermProps::from(hypothesis.resolution.clone());
+        props.filters.blocked_rules = hypothesis.blocked_rules.iter().cloned().collect();
+        if solution[parent_idx].filters.is_purpose() {
+            props.filters.mark_purpose();
+        }
         let mut proof_res = 0;
-        let mut solved = vec![];
-        let mut requirements_iter = hypothesis.requirements.clone().into_iter();
-        for req in requirements_iter.by_ref() {
-            let sol = self.proof(solution, req);
-            solved.push(sol);
-            let last = solved.last().unwrap();
+        let mut requirements = vec![];
+        let mut iter = hypothesis.requirements.clone().into_iter();
+        for i in iter.by_ref() {
+            requirements.push(self.proof(solution, i));
+            let last = requirements.last().unwrap();
             if last.answer().is_none() {
                 trace!(
                     target: "rule_selection",
@@ -289,40 +297,31 @@ impl Solver {
             }
             proof_res += 1;
         }
-        for req in requirements_iter {
-            solved.push(SharedSolution::new(Solution::new(Task::from(
+        for req in iter {
+            requirements.push(SharedSolution::new(Solution::new(Task::from(
                 TermProps::from(Term::symbol("proof").with_child(req)),
             ))));
         }
+        props.inference = TermInference::Rule {
+            rule: hypothesis.rule.clone(),
+            parent: parent_idx,
+            requirements,
+        };
 
         self.tracer
             .on_hypothesis_finish(&hypothesis, self.current_cycle(), proof_res);
 
-        if solved.iter().all(|x| x.answer().is_some()) {
+        if props.inference.is_proven() {
             trace!(
                 target: "rule_selection",
                 "hypothesis {hypothesis} proven, resolution {} applied",
                 hypothesis.resolution
             );
-
-            let mut props = TermProps::from(hypothesis.resolution);
-            props.inference = TermInference::Rule {
-                rule:         hypothesis.rule,
-                parent:       parent_idx,
-                requirements: solved,
-            };
-            props.filters.blocked_rules = hypothesis.blocked_rules.into_iter().collect();
-            if solution[parent_idx].filters.is_purpose() {
-                props.filters.mark_purpose();
-            }
-
-            Some(props)
-        } else {
-            None
         }
+        props
     }
 
-    fn proof(&self, solution: &mut Solution, mut term: Term) -> SharedSolution {
+    fn proof(&self, solution: &Solution, mut term: Term) -> SharedSolution {
         is_replace(&mut term.as_subterm_mut());
         let term = term.normalize(NormalizationLevel::max());
         let proof_purpose = SharedTerm::new(Term::symbol("proof").with_child(term));
@@ -371,7 +370,7 @@ impl Solver {
         Some(result)
     }
 
-    fn solve_subtask(&self, solution: &mut Solution, task: SharedTerm) -> SharedSolution {
+    fn solve_subtask(&self, solution: &Solution, task: SharedTerm) -> SharedSolution {
         if let Some(x) = self.cache.status(&task) {
             return x.clone();
         }
@@ -401,7 +400,7 @@ impl Solver {
         subtask_solution
     }
 
-    fn subtask(solution: &mut Solution, task: SharedTerm) -> Task {
+    fn subtask(solution: &Solution, task: SharedTerm) -> Task {
         TaskBuilder::default()
             .with_purpose(TermProps::from(task.clone()))
             .expect("Can't build subtask")
@@ -409,6 +408,7 @@ impl Solver {
                 solution
                     .terms
                     .iter()
+                    .filter(|x| x.inference.is_proven())
                     .filter(|x| {
                         !(x.filters.is_purpose() ||
                             x.term.as_subterm().data().is_symbol_name("answer"))
@@ -447,7 +447,7 @@ impl Solver {
                 TermProps::from(term.term.as_subterm().first_arg().unwrap().to_term());
             resolution.inference = term.inference.clone();
             // TODO: remove unwrap
-            let idx = solution.add_main(resolution).unwrap();
+            let idx = solution.add_term(resolution).unwrap();
             solution.status = SolutionStatus::Answer(idx);
             return true;
         }
@@ -504,12 +504,12 @@ impl Solver {
         };
 
         if solution[index].filters.weight >= MAX_LEVEL {
-            let mut iter = solution.terms.iter().rev();
-            let res = iter
-                .find_position(|x| x.filters.is_purpose())
-                .map(|(pos, _)| pos)
-                .unwrap();
-            let res = solution.terms.len() - 1 - res;
+            let mut iter = solution
+                .terms
+                .iter()
+                .rev()
+                .filter(|x| x.inference.is_proven());
+            let res = iter.find(|x| x.filters.is_purpose()).map(|x| x.id).unwrap();
             // TODO: надо заполнить правильно
             // согласовать с выводом решения по шагам
             // res.inference = TermInference::Condition;

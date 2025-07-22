@@ -45,7 +45,8 @@ impl TryFrom<Term> for Purpose {
         if root.degree() != 1 {
             return Err(SemanticError::WorngArgCount(String::default()));
         }
-        let term = TermProps::from(Rc::new(root.pop_first_arg().unwrap()));
+        let mut term = TermProps::from(Rc::new(root.pop_first_arg().unwrap()));
+        term.filters.mark_purpose();
 
         match root.data().symbol() {
             Some(x) if x.as_str() == "find" => Ok(Self::Find(term)),
