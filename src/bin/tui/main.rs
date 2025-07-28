@@ -13,6 +13,7 @@ mod rules;
 mod settings;
 mod state;
 mod tasks;
+mod theme;
 mod tracing;
 
 use settings::Settings;

@@ -3,14 +3,13 @@ use std::{fmt::Display, hash};
 use itertools::{chain, Itertools};
 use ratatui::{
     prelude::*,
-    style::Stylize,
-    widgets::{Block, Borders, List, Scrollbar, ScrollbarOrientation},
+    widgets::{Block, List, Scrollbar, ScrollbarOrientation},
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use solver::task::{SharedSolution, Solution, SolutionStatus, TermInference};
 
-use super::state::{border_focus, border_unfocus, draw_scrollbar};
+use super::theme::{draw_scrollbar, Theme};
 use crate::tasks::TaskStatus;
 
 #[derive(Clone, Debug)]
@@ -19,58 +18,24 @@ struct TermId {
     idx:      usize,
 }
 
-struct Theme {}
-
-impl Theme {
-    pub fn tree_cursor_style(&self) -> Style {
-        Style::new()
-            .fg(Color::Black)
-            .bg(Color::LightGreen)
-            .add_modifier(Modifier::BOLD)
-    }
-
-    pub fn error(&self) -> Style {
-        Style::new().fg(Color::Red).bold()
-    }
-
-    pub fn highlighted(&self) -> Style {
-        Style::new().fg(Color::LightBlue).bold()
-    }
-
-    pub fn focused_border(&self) -> Style {
-        border_focus()
-    }
-
-    pub fn unfocused_border(&self) -> Style {
-        border_unfocus()
-    }
-
-    pub fn default_tree_item(&self) -> Style {
-        Style::new()
-    }
-
-    pub fn unproven_tree_item(&self) -> Style {
-        Style::new().crossed_out().dim()
-    }
-
-    pub fn proven_requirement(&self) -> Style {
-        Style::new().fg(Color::Green).bold()
-    }
-
-    pub fn unproven_requirement(&self) -> Style {
-        Style::new().fg(Color::Red).bold()
-    }
-
-    pub fn skipped_requirement(&self) -> Style {
-        Style::new().fg(Color::Gray).bold()
-    }
-}
-
 pub struct Tracing {
     pub task: TaskStatus,
 
     tree_state:   TreeState<TermId>,
     focused_pane: usize,
+}
+
+impl TermId {
+    pub fn new_solution(solution: SharedSolution) -> Self {
+        Self { solution, idx: 0 }
+    }
+
+    pub fn new_term(solution: SharedSolution, idx: usize) -> Self {
+        Self {
+            solution,
+            idx: idx + 1,
+        }
+    }
 }
 
 impl Tracing {
@@ -141,12 +106,6 @@ impl Tracing {
     }
 
     fn draw_profiler_node_details(&mut self, frame: &mut Frame, area: Rect) {
-        let pane_style = if self.focused_pane == 1 {
-            self.theme().focused_border()
-        } else {
-            self.theme().unfocused_border()
-        };
-
         if let Some(selected) = self.tree_state.selected().last() {
             let text = if selected.idx == 0 {
                 self.task_lines(selected.solution.as_ref())
@@ -155,13 +114,8 @@ impl Tracing {
             };
             frame.render_widget(
                 List::new(text.iter().cloned())
-                    .highlight_style(Style::new().underlined())
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .border_style(pane_style)
-                            .title("Detailed"),
-                    ),
+                    .highlight_style(self.theme().list_cursor_style())
+                    .block(self.theme().block(self.focused_pane == 1, "Detailed")),
                 area,
             );
             let cursor_pos = self.task.scroll_pos.selected().unwrap();
@@ -189,10 +143,7 @@ impl Tracing {
                 Some((num, children))
             })
             .map(|(num, children)| {
-                let term_id = TermId {
-                    solution: solution.clone(),
-                    idx:      num + 1,
-                };
+                let term_id = TermId::new_term(solution.clone(), num);
                 let line = self.tree_line(&term_id);
                 if children.is_empty() {
                     TreeItem::new_leaf(term_id, line)
@@ -202,10 +153,7 @@ impl Tracing {
             })
             .collect();
 
-        let term_id = TermId {
-            solution: solution.clone(),
-            idx:      0,
-        };
+        let term_id = TermId::new_solution(solution.clone());
 
         if children.is_empty() {
             TreeItem::new_leaf(term_id, solution.task.purpose.to_string())

@@ -3,8 +3,7 @@ use std::{fmt::Display, sync::Arc};
 use itertools::Itertools;
 use ratatui::{
     prelude::*,
-    style::Stylize,
-    widgets::{block::Title, Block, Borders, List, ListState, Scrollbar, ScrollbarOrientation},
+    widgets::{List, ListState},
 };
 use trees::{tr, Node, Tree};
 use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
@@ -18,7 +17,10 @@ use utils::{IndexedTree, TreeIndex};
 
 use crate::tracing::Tracing;
 
-use super::state::{border_focus, border_unfocus, default_state, draw_scrollbar};
+use super::{
+    state::default_state,
+    theme::{draw_scrollbar, Theme},
+};
 
 pub struct TaskStatus {
     pub task:         Task,
@@ -34,72 +36,6 @@ pub struct Tasks {
 
     exec_deadline: usize,
     focused_pane:  usize,
-}
-
-pub struct Theme {}
-
-impl Theme {
-    pub fn tree_cursor_style(&self) -> Style {
-        Style::new()
-            .fg(Color::Black)
-            .bg(Color::LightGreen)
-            .add_modifier(Modifier::BOLD)
-    }
-
-    pub fn list_cursor_style(&self) -> Style {
-        Style::new().underlined()
-    }
-
-    pub fn wrong_answer(&self) -> Style {
-        Style::new().fg(Color::Red)
-    }
-
-    pub fn unsolved(&self) -> Style {
-        Style::new().fg(Color::Yellow)
-    }
-
-    pub fn solved(&self) -> Style {
-        Style::new().fg(Color::Green)
-    }
-
-    pub fn not_started(&self) -> Style {
-        Style::new()
-    }
-
-    pub fn default(&self) -> Style {
-        Style::new()
-    }
-
-    pub fn highlighted(&self) -> Style {
-        Style::new().fg(Color::LightBlue).bold()
-    }
-
-    pub fn focused_border(&self) -> Style {
-        border_focus()
-    }
-
-    pub fn unfocused_border(&self) -> Style {
-        border_unfocus()
-    }
-
-    pub fn block(&self, focused: bool, title: impl Into<Title<'static>>) -> Block<'static> {
-        let pane_style = if focused {
-            self.focused_border()
-        } else {
-            self.unfocused_border()
-        };
-        Block::default()
-            .borders(Borders::ALL)
-            .border_style(pane_style)
-            .title(title)
-    }
-
-    pub fn scrollbar(&self) -> Scrollbar<'static> {
-        Scrollbar::new(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(None)
-            .track_symbol(None)
-            .end_symbol(None)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -336,7 +272,6 @@ impl Tasks {
                     area,
                     &mut self.tasks[*task_id].task.scroll_pos,
                 );
-
                 draw_scrollbar(frame, area, lines.len(), scroll_pos);
             }
             TasksNode::Directory(dir) => {

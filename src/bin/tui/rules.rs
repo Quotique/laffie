@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListState, Paragraph},
+    widgets::{List, ListState, Paragraph},
 };
 
 use solver::rule::RulesEngine;
 
-use super::state::{border_focus, border_unfocus, default_state, draw_scrollbar};
+use super::{
+    state::default_state,
+    theme::{draw_scrollbar, Theme},
+};
 
 pub struct Rules {
     engine:       Arc<RulesEngine>,
@@ -16,6 +19,11 @@ pub struct Rules {
 }
 
 impl Rules {
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
+    }
+
     #[inline]
     pub fn new(engine: Arc<RulesEngine>) -> Self {
         Self {
@@ -53,13 +61,8 @@ impl Rules {
 
         let items: Vec<_> = self.engine.iter().collect();
         let list = List::new(items.iter().map(|x| x.term.to_string()))
-            .highlight_symbol("> ")
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(self.pane_style(0))
-                    .title("Rules"),
-            );
+            .block(self.theme().block(self.focused_pane == 0, "Rules"))
+            .highlight_symbol("> ");
 
         frame.render_stateful_widget(list, layout[0], &mut self.list_state);
         draw_scrollbar(
@@ -76,21 +79,8 @@ impl Rules {
                     .unwrap()
                     .to_string(),
             )
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(self.pane_style(1))
-                    .title("Detailed"),
-            ),
+            .block(self.theme().block(self.focused_pane == 1, "Detailed")),
             layout[1],
         );
-    }
-
-    fn pane_style(&self, pane: usize) -> Style {
-        if self.focused_pane == pane {
-            border_focus()
-        } else {
-            border_unfocus()
-        }
     }
 }

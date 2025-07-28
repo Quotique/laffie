@@ -1,0 +1,101 @@
+use ratatui::{
+    prelude::*,
+    style::{Style, Stylize},
+    widgets::{block::Title, Block, Borders, Scrollbar, ScrollbarOrientation, ScrollbarState},
+};
+
+pub struct Theme {}
+
+impl Theme {
+    pub fn block(&self, focused: bool, title: impl Into<Title<'static>>) -> Block<'static> {
+        let pane_style = if focused {
+            Style::new().fg(Color::Cyan)
+        } else {
+            Style::new()
+        };
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(pane_style)
+            .title(title)
+    }
+
+    pub fn scrollbar(&self) -> Scrollbar<'static> {
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .track_symbol(None)
+            .end_symbol(None)
+    }
+
+    pub fn tree_cursor_style(&self) -> Style {
+        Style::new()
+            .fg(Color::Black)
+            .bg(Color::LightGreen)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    pub fn list_cursor_style(&self) -> Style {
+        Style::new().underlined()
+    }
+
+    pub fn wrong_answer(&self) -> Style {
+        Style::new().fg(Color::Red)
+    }
+
+    pub fn unsolved(&self) -> Style {
+        Style::new().fg(Color::Yellow)
+    }
+
+    pub fn solved(&self) -> Style {
+        Style::new().fg(Color::Green)
+    }
+
+    pub fn not_started(&self) -> Style {
+        Style::new()
+    }
+
+    pub fn default(&self) -> Style {
+        Style::new()
+    }
+
+    pub fn highlighted(&self) -> Style {
+        Style::new().fg(Color::LightBlue).bold()
+    }
+
+    pub fn error(&self) -> Style {
+        Style::new().fg(Color::Red).bold()
+    }
+
+    pub fn default_tree_item(&self) -> Style {
+        Style::new()
+    }
+
+    pub fn unproven_tree_item(&self) -> Style {
+        Style::new().crossed_out().dim()
+    }
+
+    pub fn proven_requirement(&self) -> Style {
+        Style::new().fg(Color::Green).bold()
+    }
+
+    pub fn unproven_requirement(&self) -> Style {
+        Style::new().fg(Color::Red).bold()
+    }
+
+    pub fn skipped_requirement(&self) -> Style {
+        Style::new().fg(Color::Gray).bold()
+    }
+}
+
+pub fn draw_scrollbar(frame: &mut Frame, area: Rect, len: usize, pos: usize) {
+    let mut scrollbar_state = ScrollbarState::new(len).position(pos);
+    frame.render_stateful_widget(
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(Some("↑"))
+            .end_symbol(Some("↓")),
+        area.inner(Margin {
+            vertical:   1,
+            horizontal: 0,
+        }),
+        &mut scrollbar_state,
+    );
+}

@@ -9,7 +9,7 @@ use derive_more::Display;
 use ratatui::{
     prelude::*,
     text::Line,
-    widgets::{ListState, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{ListState, Paragraph},
 };
 
 use parser::DirectoryParser;
@@ -224,28 +224,6 @@ impl From<usize> for Tab {
             // _ => Tab::Setting,
         }
     }
-}
-
-pub fn border_focus() -> Style {
-    Style::new().fg(Color::Cyan)
-}
-
-pub fn border_unfocus() -> Style {
-    Style::new()
-}
-
-pub fn draw_scrollbar(frame: &mut Frame, area: Rect, len: usize, pos: usize) {
-    let mut scrollbar_state = ScrollbarState::new(len).position(pos);
-    frame.render_stateful_widget(
-        Scrollbar::new(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(Some("↑"))
-            .end_symbol(Some("↓")),
-        area.inner(Margin {
-            vertical:   1,
-            horizontal: 0,
-        }),
-        &mut scrollbar_state,
-    );
 }
 
 pub fn default_state() -> ListState {
