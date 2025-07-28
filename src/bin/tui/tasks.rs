@@ -1,21 +1,20 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use itertools::Itertools;
 use ratatui::{
     prelude::*,
     style::Stylize,
-    widgets::{Block, Borders, List, ListState, Scrollbar, ScrollbarOrientation},
+    widgets::{block::Title, Block, Borders, List, ListState, Scrollbar, ScrollbarOrientation},
 };
 use trees::{tr, Node, Tree};
 use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, SharedSolution, Solution, SolutionStatus, Solver, Task},
+    task::{DumperConfig, SharedSolution, Solution, SolutionStatus, Solver, StepsSource, Task},
     CompactString,
 };
 use utils::{IndexedTree, TreeIndex};
-use view::{Tui, View};
 
 use crate::tracing::Tracing;
 
@@ -37,15 +36,102 @@ pub struct Tasks {
     focused_pane:  usize,
 }
 
+pub struct Theme {}
+
+impl Theme {
+    pub fn tree_cursor_style(&self) -> Style {
+        Style::new()
+            .fg(Color::Black)
+            .bg(Color::LightGreen)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    pub fn list_cursor_style(&self) -> Style {
+        Style::new().underlined()
+    }
+
+    pub fn wrong_answer(&self) -> Style {
+        Style::new().fg(Color::Red)
+    }
+
+    pub fn unsolved(&self) -> Style {
+        Style::new().fg(Color::Yellow)
+    }
+
+    pub fn solved(&self) -> Style {
+        Style::new().fg(Color::Green)
+    }
+
+    pub fn not_started(&self) -> Style {
+        Style::new()
+    }
+
+    pub fn default(&self) -> Style {
+        Style::new()
+    }
+
+    pub fn highlighted(&self) -> Style {
+        Style::new().fg(Color::LightBlue).bold()
+    }
+
+    pub fn focused_border(&self) -> Style {
+        border_focus()
+    }
+
+    pub fn unfocused_border(&self) -> Style {
+        border_unfocus()
+    }
+
+    pub fn block(&self, focused: bool, title: impl Into<Title<'static>>) -> Block<'static> {
+        let pane_style = if focused {
+            self.focused_border()
+        } else {
+            self.unfocused_border()
+        };
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(pane_style)
+            .title(title)
+    }
+
+    pub fn scrollbar(&self) -> Scrollbar<'static> {
+        Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .track_symbol(None)
+            .end_symbol(None)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct DirectoryStatus {
+    dir_name:           CompactString,
+    solved_count:       usize,
+    unsolved_count:     usize,
+    wrong_answer_count: usize,
+    not_started_count:  usize,
+}
+
+impl DirectoryStatus {
+    pub fn total(&self) -> usize {
+        self.solved_count + self.unsolved_count + self.wrong_answer_count + self.not_started_count
+    }
+}
+
+impl From<CompactString> for DirectoryStatus {
+    fn from(dir_name: CompactString) -> Self {
+        Self {
+            dir_name,
+            solved_count: 0,
+            unsolved_count: 0,
+            wrong_answer_count: 0,
+            not_started_count: 0,
+        }
+    }
+}
+
 enum TasksNode {
     Task(usize),
-    Directory {
-        dir_name:           CompactString,
-        solved_count:       usize,
-        unsolved_count:     usize,
-        wrong_answer_count: usize,
-        not_runned_count:   usize,
-    },
+    Directory(DirectoryStatus),
 }
 
 impl TasksNode {
@@ -54,17 +140,16 @@ impl TasksNode {
     }
 
     pub fn new_directory(dir_name: CompactString) -> Self {
-        Self::Directory {
-            dir_name,
-            solved_count: 0,
-            unsolved_count: 0,
-            wrong_answer_count: 0,
-            not_runned_count: 0,
-        }
+        Self::Directory(dir_name.into())
     }
 }
 
 impl Tasks {
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
+    }
+
     pub fn new(
         exec_deadline: usize,
         rules: Arc<RulesEngine>,
@@ -164,59 +249,45 @@ impl Tasks {
     }
 
     fn tree(&self, tasks_node: &Node<TasksNode>) -> TreeItem<'static, TreeIndex> {
+        let wrong_answer = self.theme().wrong_answer();
+        let unsolved = self.theme().unsolved();
+        let solved = self.theme().solved();
+        let not_started = self.theme().not_started();
+        let default = self.theme().default();
+
         let text = match tasks_node.data() {
             TasksNode::Task(task) => {
-                let task_line_style = if self.tasks[*task].task.solution.answer().is_none() {
-                    Style::new().fg(Color::Yellow).bold()
-                } else if !self.tasks[*task].task.solution.validate_answer() {
-                    Style::new().fg(Color::Red).bold()
-                } else {
-                    Style::new().fg(Color::Green).bold()
+                let task = &self.tasks[*task].task;
+                let line_style = match task.solution.status {
+                    SolutionStatus::NotDone => not_started,
+                    SolutionStatus::Err(_) => unsolved,
+                    SolutionStatus::Answer(_) if task.solution.validate_answer() => solved,
+                    _ => wrong_answer,
                 };
 
+                let conditions = format!("[{}]", task.task.conditions.iter().format(", "),);
                 Line::from(vec![
-                    Span::styled(
-                        self.tasks[*task].task.task.purpose.to_string(),
-                        task_line_style,
-                    ),
+                    Span::styled(task.task.purpose.to_string(), line_style),
                     Span::from(" "),
-                    Span::styled(
-                        format!(
-                            "[{}]",
-                            self.tasks[*task].task.task.conditions.iter().format(", "),
-                        ),
-                        task_line_style,
-                    ),
+                    Span::styled(conditions, default),
                 ])
             }
-            TasksNode::Directory {
-                dir_name,
-                solved_count,
-                unsolved_count,
-                wrong_answer_count,
-                not_runned_count,
-            } => Line::from(vec![
-                Span::styled(dir_name.to_string(), Style::new().fg(Color::LightBlue)),
-                Span::from(format!("[{not_runned_count}")),
-                Span::styled(format!(" {solved_count}"), Style::new().fg(Color::Green)),
-                Span::styled(format!(" {unsolved_count}"), Style::new().fg(Color::Yellow)),
-                Span::styled(
-                    format!(" {wrong_answer_count}"),
-                    Style::new().fg(Color::Red),
-                ),
+            TasksNode::Directory(dir) => Line::from(vec![
+                Span::styled(dir.dir_name.to_string(), self.theme().highlighted()),
+                Span::from("[".to_owned()),
+                Span::styled(format!("{}", dir.not_started_count), not_started),
+                Span::styled(format!(" {}", dir.solved_count), solved),
+                Span::styled(format!(" {}", dir.unsolved_count), unsolved),
+                Span::styled(format!(" {}", dir.wrong_answer_count), wrong_answer),
                 Span::from("]".to_owned()),
             ]),
         };
 
-        if tasks_node.degree() > 0 {
-            TreeItem::new(
-                tasks_node.id(),
-                text,
-                tasks_node.iter().map(|s| self.tree(s)).collect(),
-            )
-            .unwrap()
-        } else {
+        let children: Vec<_> = tasks_node.iter().map(|s| self.tree(s)).collect();
+        if children.is_empty() {
             TreeItem::new_leaf(tasks_node.id(), text)
+        } else {
+            TreeItem::new(tasks_node.id(), text, children).unwrap()
         }
     }
 
@@ -225,129 +296,86 @@ impl Tasks {
 
         let widget = TuiTree::new(&items)
             .expect("all item identifiers are unique")
-            .block(
-                Block::bordered()
-                    .title("Tasks")
-                    .border_style(self.pane_style(0))
-                    //.title_bottom(format!("{:?}", &mut self.tree_state)),
-            )
-            .experimental_scrollbar(Some(
-                Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                    .begin_symbol(None)
-                    .track_symbol(None)
-                    .end_symbol(None),
-            ))
-            .highlight_style(
-                Style::new()
-                    .fg(Color::Black)
-                    .bg(Color::LightGreen)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .block(self.theme().block(self.focused_pane == 0, "Tasks"))
+            .experimental_scrollbar(Some(self.theme().scrollbar()))
+            .highlight_style(self.theme().tree_cursor_style())
             .highlight_symbol(">");
+
         frame.render_stateful_widget(widget, area, &mut self.tasks_tree_state);
     }
 
     fn draw_solution(&mut self, frame: &mut Frame, area: Rect) {
-        let pane_style = self.pane_style(1);
+        let block = self.theme().block(self.focused_pane == 1, "Detailed");
 
         let Some(selected) = self.tasks_tree_state.selected().last().cloned() else {
             return;
         };
         match self.tasks_index[&selected].data() {
             TasksNode::Task(task_id) => {
-                let tracing = self.tasks.get_mut(*task_id).unwrap();
+                let tracing = self.tasks.get(*task_id).unwrap();
                 let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.task.task)
                     .split('\n')
                     .map(|x| Line::from(Span::from(x.to_owned())))
                     .collect();
 
                 if tracing.task.solution.status != SolutionStatus::NotDone {
-                    let mut renderer = Tui::default();
-                    // TODO: replace with steps
-                    View::try_from(tracing.task.solution.as_ref())
-                        .unwrap()
-                        .display_impl(&mut renderer)
-                        .unwrap();
-                    lines.append(&mut renderer.output);
+                    lines.extend(
+                        // TODO: format
+                        { tracing.task.solution.steps() }.map(|x| {
+                            Line::from(Span::styled(x.to_string(), self.theme().default()))
+                        }),
+                    );
                 } else {
                     lines.push(Line::from(Span::from("Press s to solve".to_owned())));
                 };
+                let scroll_pos = tracing.task.scroll_pos.selected().unwrap();
                 frame.render_stateful_widget(
                     List::new(lines.iter().cloned())
-                        .highlight_style(Style::new().underlined())
-                        .block(
-                            Block::default()
-                                .borders(Borders::ALL)
-                                .border_style(pane_style)
-                                .title("Detailed"),
-                        ),
+                        .highlight_style(self.theme().list_cursor_style())
+                        .block(block),
                     area,
-                    &mut tracing.task.scroll_pos,
+                    &mut self.tasks[*task_id].task.scroll_pos,
                 );
 
-                draw_scrollbar(
-                    frame,
-                    area,
-                    lines.len(),
-                    tracing.task.scroll_pos.selected().unwrap(),
-                );
+                draw_scrollbar(frame, area, lines.len(), scroll_pos);
             }
-            TasksNode::Directory {
-                dir_name,
-                solved_count,
-                unsolved_count,
-                wrong_answer_count,
-                not_runned_count,
-            } => {
-                let lines = [
-                    Line::from(vec![
-                        Span::styled("Group: ", Style::new().fg(Color::LightBlue)),
-                        Span::styled(dir_name.to_string(), Style::new()),
-                    ]),
-                    Line::default(),
-                    Line::from(vec![
-                        Span::styled("Total: ", Style::new().fg(Color::LightBlue)),
-                        Span::styled(
-                            (solved_count + unsolved_count + wrong_answer_count + not_runned_count)
-                                .to_string(),
-                            Style::new(),
-                        ),
-                    ]),
-                    Line::default(),
-                    Line::from(vec![
-                        Span::styled("Not runned: ", Style::new().fg(Color::LightBlue)),
-                        Span::from(format!("{not_runned_count}")),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("Solved: ", Style::new().fg(Color::LightBlue)),
-                        Span::styled(format!(" {solved_count}"), Style::new().fg(Color::Green)),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("Not solved: ", Style::new().fg(Color::LightBlue)),
-                        Span::styled(format!(" {unsolved_count}"), Style::new().fg(Color::Yellow)),
-                    ]),
-                    Line::from(vec![
-                        Span::styled("Wrong answers: ", Style::new().fg(Color::LightBlue)),
-                        Span::styled(
-                            format!(" {wrong_answer_count}"),
-                            Style::new().fg(Color::Red),
-                        ),
-                    ]),
-                ];
-
+            TasksNode::Directory(dir) => {
                 frame.render_widget(
-                    List::new(lines.iter().cloned())
-                        .highlight_style(Style::new().underlined())
-                        .block(
-                            Block::default()
-                                .borders(Borders::ALL)
-                                .border_style(pane_style)
-                                .title("Detailed"),
-                        ),
+                    List::new(self.dir_status_lines(dir))
+                        .highlight_style(self.theme().list_cursor_style())
+                        .block(block),
                     area,
                 );
             }
         };
+    }
+
+    fn dir_status_lines(&self, dir: &DirectoryStatus) -> impl Iterator<Item = Line<'static>> {
+        let wrong_answer = self.theme().wrong_answer();
+        let unsolved = self.theme().unsolved();
+        let solved = self.theme().solved();
+        let not_started = self.theme().not_started();
+        let default = self.theme().default();
+
+        [
+            self.pair_line("Group: ", &dir.dir_name, default),
+            Line::default(),
+            self.pair_line("Total: ", dir.total(), default),
+            Line::default(),
+            self.pair_line("Not started: ", dir.not_started_count, not_started),
+            self.pair_line("Solved: ", dir.solved_count, solved),
+            self.pair_line("Not solved: ", dir.unsolved_count, unsolved),
+            self.pair_line("Wrong answers: ", dir.wrong_answer_count, wrong_answer),
+        ]
+        .into_iter()
+    }
+
+    fn pair_line<'a>(&self, k: &'a str, v: impl Display, v_style: Style) -> Line<'a> {
+        let highlighted = self.theme().highlighted();
+        Line::from(vec![
+            Span::styled(k, highlighted),
+            Span::styled(v.to_string(), v_style),
+        ])
     }
 
     fn add_task(&mut self, rules: Arc<RulesEngine>, task: Task) {
@@ -375,8 +403,8 @@ impl Tasks {
                 .iter_mut()
                 .enumerate()
                 .find(|(_, x)| {
-                    if let TasksNode::Directory { dir_name, .. } = x.data() {
-                        dir_name == i
+                    if let TasksNode::Directory(dir) = x.data() {
+                        dir.dir_name == i
                     } else {
                         false
                     }
@@ -404,18 +432,13 @@ impl Tasks {
         let mut node = self.tasks_index.get_mut(node_id);
         while let Some(n) = node {
             match n.data_mut() {
-                TasksNode::Directory {
-                    solved_count,
-                    unsolved_count,
-                    wrong_answer_count,
-                    not_runned_count,
-                    ..
-                } => {
-                    *solved_count = (*solved_count as isize + solved_delta) as usize;
-                    *unsolved_count = (*unsolved_count as isize + unsolved_delta) as usize;
-                    *wrong_answer_count =
-                        (*wrong_answer_count as isize + wrong_answer_delta) as usize;
-                    *not_runned_count = (*not_runned_count as isize + not_runned_delta) as usize;
+                TasksNode::Directory(dir) => {
+                    dir.solved_count = (dir.solved_count as isize + solved_delta) as usize;
+                    dir.unsolved_count = (dir.unsolved_count as isize + unsolved_delta) as usize;
+                    dir.wrong_answer_count =
+                        (dir.wrong_answer_count as isize + wrong_answer_delta) as usize;
+                    dir.not_started_count =
+                        (dir.not_started_count as isize + not_runned_delta) as usize;
                 }
                 TasksNode::Task(_) => {}
             }
@@ -486,13 +509,5 @@ impl Tasks {
             wrong_answer_delta,
             not_runned_delta,
         );
-    }
-
-    fn pane_style(&self, pane: usize) -> Style {
-        if self.focused_pane == pane {
-            border_focus()
-        } else {
-            border_unfocus()
-        }
     }
 }

@@ -71,6 +71,10 @@ impl Iterator for Steps {
                     steps.rendered = self.rendered.clone();
                     self.subtasks.push_back(steps);
                 }
+                if self.subtasks.is_empty() {
+                    let id = self.terms_queue.pop().unwrap();
+                    return Some(self.solution[id].term.clone());
+                }
             } else {
                 return None;
             }
