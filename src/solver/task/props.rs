@@ -7,13 +7,14 @@ use std::{
 use super::SharedSolution;
 use crate::{
     rule::{RuleAttr, RuleAttrValue, RuleBuilder, RuleId, SharedRule, TermFilters},
-    term::{SharedTerm, Term},
+    term::{ParamsMapping, SharedTerm, Term},
 };
 
 #[derive(Debug, Clone, Default)]
 pub enum TermInference {
     Rule {
         parent:       usize,
+        params:       ParamsMapping,
         rule:         SharedRule,
         requirements: Vec<SharedSolution>,
     },

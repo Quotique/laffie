@@ -26,7 +26,7 @@ pub enum SolveError {
     ExecutionDeadline,
 }
 
-#[derive(Debug, Display, Default, Clone, Copy, Encode, Decode)]
+#[derive(Debug, Display, Default, Clone, Copy, Encode, Decode, PartialEq, Eq)]
 pub enum SolutionStatus {
     #[default]
     NotDone,

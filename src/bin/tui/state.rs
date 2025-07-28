@@ -16,7 +16,7 @@ use parser::DirectoryParser;
 
 use super::{popup::Popup, rules::Rules, tasks::Tasks};
 
-pub struct Status {
+pub struct State {
     pub current_tab: Tab,
 
     rules_path: PathBuf,
@@ -36,7 +36,7 @@ pub enum Tab {
     // Setting,
 }
 
-impl Status {
+impl State {
     pub fn try_new(
         exec_deadline: usize,
         symbols_dir: impl AsRef<Path>,
@@ -47,7 +47,7 @@ impl Status {
         let rules = parser.load_rules().map(Arc::new)?;
         let tasks = parser.load_tasks()?;
 
-        Ok(Status {
+        Ok(State {
             current_tab: Tab::Rules,
 
             rules_path: symbols_dir.as_ref().into(),

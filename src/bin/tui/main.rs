@@ -8,15 +8,15 @@ use ratatui::{
     DefaultTerminal,
 };
 
-mod interface;
 mod popup;
 mod rules;
 mod settings;
+mod state;
 mod tasks;
 mod tracing;
 
-use interface::Tab as Itab;
 use settings::Settings;
+use state::Tab as Itab;
 
 /// Core develop/debug enviroment
 #[derive(Parser, Debug)]
@@ -44,7 +44,7 @@ struct Args {
 }
 
 fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
-    let mut status = interface::Status::try_new(
+    let mut status = state::State::try_new(
         args.exec_deadline,
         args.symbols.clone().unwrap_or("symbols".into()),
         args.tasks.clone().unwrap_or("tasks".into()),

@@ -304,6 +304,7 @@ impl Solver {
         }
         props.inference = TermInference::Rule {
             rule: hypothesis.rule.clone(),
+            params: hypothesis.params.clone(),
             parent: parent_idx,
             requirements,
         };

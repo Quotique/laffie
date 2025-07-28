@@ -11,7 +11,7 @@ use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, SharedSolution, Solver, Task},
+    task::{DumperConfig, SharedSolution, Solution, SolutionStatus, Solver, Task},
     CompactString,
 };
 use utils::{IndexedTree, TreeIndex};
@@ -19,12 +19,12 @@ use view::{Tui, View};
 
 use crate::tracing::Tracing;
 
-use super::interface::{border_focus, border_unfocus, default_state, draw_scrollbar};
+use super::state::{border_focus, border_unfocus, default_state, draw_scrollbar};
 
 pub struct TaskStatus {
     pub task:         Task,
     pub rules_engine: Arc<RulesEngine>,
-    pub solution:     Option<SharedSolution>,
+    pub solution:     SharedSolution,
     pub scroll_pos:   ListState,
 }
 
@@ -166,24 +166,9 @@ impl Tasks {
     fn tree(&self, tasks_node: &Node<TasksNode>) -> TreeItem<'static, TreeIndex> {
         let text = match tasks_node.data() {
             TasksNode::Task(task) => {
-                let task_line_style = if self.tasks[*task].task.solution.is_none() {
-                    Style::new()
-                } else if self.tasks[*task]
-                    .task
-                    .solution
-                    .as_ref()
-                    .unwrap()
-                    .answer()
-                    .is_none()
-                {
+                let task_line_style = if self.tasks[*task].task.solution.answer().is_none() {
                     Style::new().fg(Color::Yellow).bold()
-                } else if !self.tasks[*task]
-                    .task
-                    .solution
-                    .as_ref()
-                    .unwrap()
-                    .validate_answer()
-                {
+                } else if !self.tasks[*task].task.solution.validate_answer() {
                     Style::new().fg(Color::Red).bold()
                 } else {
                     Style::new().fg(Color::Green).bold()
@@ -276,9 +261,10 @@ impl Tasks {
                     .map(|x| Line::from(Span::from(x.to_owned())))
                     .collect();
 
-                if tracing.task.solution.is_some() {
+                if tracing.task.solution.status != SolutionStatus::NotDone {
                     let mut renderer = Tui::default();
-                    View::try_from(tracing.task.solution.as_ref().unwrap().as_ref())
+                    // TODO: replace with steps
+                    View::try_from(tracing.task.solution.as_ref())
                         .unwrap()
                         .display_impl(&mut renderer)
                         .unwrap();
@@ -366,9 +352,9 @@ impl Tasks {
 
     fn add_task(&mut self, rules: Arc<RulesEngine>, task: Task) {
         self.tasks.push(Tracing::new(TaskStatus {
-            task,
             rules_engine: rules,
-            solution: None,
+            solution: Solution::new(task.clone()).into(),
+            task,
             scroll_pos: default_state(),
         }));
 
@@ -462,24 +448,11 @@ impl Tasks {
         let mut not_runned_delta: isize = 0;
 
         // Mark previous task status to remove
-        if self.tasks[*task_idx].task.solution.is_none() {
+        if self.tasks[*task_idx].task.solution.status == SolutionStatus::NotDone {
             not_runned_delta -= 1;
-        } else if self.tasks[*task_idx]
-            .task
-            .solution
-            .as_ref()
-            .unwrap()
-            .answer()
-            .is_none()
-        {
+        } else if self.tasks[*task_idx].task.solution.answer().is_none() {
             unsolved_delta -= 1;
-        } else if !self.tasks[*task_idx]
-            .task
-            .solution
-            .as_ref()
-            .unwrap()
-            .validate_answer()
-        {
+        } else if !self.tasks[*task_idx].task.solution.validate_answer() {
             wrong_answer_delta -= 1;
         } else {
             solved_delta -= 1;
@@ -494,12 +467,12 @@ impl Tasks {
             .build(),
             self.exec_deadline,
         );
-        task.solution = Some(solver.solve(task.task.clone()));
+        task.solution = solver.solve(task.task.clone());
 
         // Add new task status to remove
-        if task.solution.as_ref().unwrap().answer().is_none() {
+        if task.solution.answer().is_none() {
             unsolved_delta += 1;
-        } else if !task.solution.as_ref().unwrap().validate_answer() {
+        } else if !task.solution.as_ref().validate_answer() {
             wrong_answer_delta += 1;
         } else {
             solved_delta += 1;

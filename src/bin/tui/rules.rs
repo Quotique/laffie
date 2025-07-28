@@ -7,7 +7,7 @@ use ratatui::{
 
 use solver::rule::RulesEngine;
 
-use super::interface::{border_focus, border_unfocus, default_state, draw_scrollbar};
+use super::state::{border_focus, border_unfocus, default_state, draw_scrollbar};
 
 pub struct Rules {
     engine:       Arc<RulesEngine>,
