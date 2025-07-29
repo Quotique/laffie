@@ -8,7 +8,7 @@ use ratatui::{
 use solver::rule::RulesEngine;
 
 use super::{
-    state::default_state,
+    state::{default_state, Command},
     theme::{draw_scrollbar, Theme},
 };
 
@@ -19,11 +19,6 @@ pub struct Rules {
 }
 
 impl Rules {
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
-    }
-
     #[inline]
     pub fn new(engine: Arc<RulesEngine>) -> Self {
         Self {
@@ -33,24 +28,14 @@ impl Rules {
         }
     }
 
-    #[inline]
-    pub fn select_next(&mut self) {
-        self.list_state.select_next()
-    }
-
-    #[inline]
-    pub fn select_previous(&mut self) {
-        self.list_state.select_previous()
-    }
-
-    #[inline]
-    pub fn left(&mut self) {
-        self.focused_pane = 0;
-    }
-
-    #[inline]
-    pub fn right(&mut self) {
-        self.focused_pane = 1;
+    pub fn process(&mut self, command: Command) {
+        match command {
+            Command::Down => self.list_state.select_next(),
+            Command::Up => self.list_state.select_previous(),
+            Command::Left => self.focused_pane = 0,
+            Command::Right => self.focused_pane = 1,
+            _ => {}
+        }
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
@@ -82,5 +67,10 @@ impl Rules {
             .block(self.theme().block(self.focused_pane == 1, "Detailed")),
             layout[1],
         );
+    }
+
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
     }
 }

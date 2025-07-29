@@ -17,7 +17,7 @@ mod theme;
 mod tracing;
 
 use settings::Settings;
-use state::Tab as Itab;
+use state::{Command, Tab as Itab};
 
 /// Core develop/debug enviroment
 #[derive(Parser, Debug)]
@@ -79,24 +79,24 @@ fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
 
         if let event::Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::F(1) => status.current_tab = Itab::Rules,
-                    KeyCode::F(2) => status.current_tab = Itab::Tasks,
-                    KeyCode::F(3) => status.current_tab = Itab::Tracing,
+                let command = match key.code {
+                    KeyCode::F(1) => Command::SwitchTab(0),
+                    KeyCode::F(2) => Command::SwitchTab(1),
+                    KeyCode::F(3) => Command::SwitchTab(2),
                     // KeyCode::F(4) => status.current_tab = Itab::Setting,
-                    KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('о') => status.next(),
-                    KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('л') => status.previous(),
-                    KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('р') => status.left(),
-                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('д') => status.right(),
-                    KeyCode::Enter | KeyCode::Char(' ') => status.toggle(),
+                    KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('о') => Command::Down,
 
-                    KeyCode::Char('s') | KeyCode::Char('ы') => status.solve(),
-                    KeyCode::Char('a') | KeyCode::Char('ф') => status.solve_all(),
-                    KeyCode::Char('r') | KeyCode::Char('к') => status.reload(),
-
+                    KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('л') => Command::Up,
+                    KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('р') => Command::Left,
+                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('д') => Command::Right,
+                    KeyCode::Enter | KeyCode::Char(' ') => Command::Toggle,
+                    KeyCode::Char('s') | KeyCode::Char('ы') => Command::Solve,
+                    KeyCode::Char('a') | KeyCode::Char('ф') => Command::SolveAll,
+                    KeyCode::Char('r') | KeyCode::Char('к') => Command::Reload,
                     KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
-                    _ => {}
-                }
+                    _ => Command::None,
+                };
+                status.process(command);
             }
         }
     }

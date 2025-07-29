@@ -9,7 +9,10 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use solver::task::{SharedSolution, Solution, SolutionStatus, TermInference};
 
-use super::theme::{draw_scrollbar, Theme};
+use super::{
+    state::Command,
+    theme::{draw_scrollbar, Theme},
+};
 use crate::tasks::TaskStatus;
 
 #[derive(Clone, Debug)]
@@ -47,34 +50,15 @@ impl Tracing {
         }
     }
 
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
-    }
-
-    #[inline]
-    pub fn select_next(&mut self) {
-        self.tree_state.key_down();
-    }
-
-    #[inline]
-    pub fn select_previous(&mut self) {
-        self.tree_state.key_up();
-    }
-
-    #[inline]
-    pub fn left(&mut self) {
-        self.tree_state.key_left();
-    }
-
-    #[inline]
-    pub fn right(&mut self) {
-        self.tree_state.key_right();
-    }
-
-    #[inline]
-    pub fn toggle(&mut self) {
-        self.tree_state.toggle_selected();
+    pub fn process(&mut self, command: Command) {
+        let _ = match command {
+            Command::Down => self.tree_state.key_down(),
+            Command::Up => self.tree_state.key_up(),
+            Command::Left => self.tree_state.key_left(),
+            Command::Right => self.tree_state.key_right(),
+            Command::Toggle => self.tree_state.toggle_selected(),
+            _ => false,
+        };
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
@@ -267,6 +251,11 @@ impl Tracing {
                 vec![self.key_value_line("Term: ", term)]
             }
         }
+    }
+
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
     }
 }
 

@@ -18,7 +18,7 @@ use utils::{IndexedTree, TreeIndex};
 use crate::tracing::Tracing;
 
 use super::{
-    state::default_state,
+    state::{default_state, Command},
     theme::{draw_scrollbar, Theme},
 };
 
@@ -36,6 +36,11 @@ pub struct Tasks {
 
     exec_deadline: usize,
     focused_pane:  usize,
+}
+
+enum TasksNode {
+    Task(usize),
+    Directory(DirectoryStatus),
 }
 
 #[derive(Debug, Clone)]
@@ -65,11 +70,6 @@ impl From<CompactString> for DirectoryStatus {
     }
 }
 
-enum TasksNode {
-    Task(usize),
-    Directory(DirectoryStatus),
-}
-
 impl TasksNode {
     pub fn new_task(task_pos: usize) -> Self {
         Self::Task(task_pos)
@@ -81,11 +81,6 @@ impl TasksNode {
 }
 
 impl Tasks {
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
-    }
-
     pub fn new(
         exec_deadline: usize,
         rules: Arc<RulesEngine>,
@@ -106,62 +101,46 @@ impl Tasks {
         result
     }
 
+    pub fn process(&mut self, command: Command) {
+        match command {
+            Command::SolveAll => self.solve_node_id(&self.tasks_index.root().id()),
+            Command::Solve => {
+                if let Some(selected) = self.tasks_tree_state.selected().last().cloned() {
+                    self.solve_node_id(&selected);
+                }
+            }
+            Command::Down => {
+                if self.focused_pane == 0 {
+                    self.tasks_tree_state.key_down();
+                } else if let Some(selected) = self.tasks_tree_state.selected().last() {
+                    if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
+                        self.tasks[*tracing].task.scroll_pos.select_next()
+                    }
+                }
+            }
+            Command::Up => {
+                if self.focused_pane == 0 {
+                    self.tasks_tree_state.key_up();
+                } else if let Some(selected) = self.tasks_tree_state.selected().last() {
+                    if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
+                        self.tasks[*tracing].task.scroll_pos.select_previous()
+                    }
+                }
+            }
+            Command::Left => self.focused_pane = 0,
+            Command::Right => self.focused_pane = 1,
+            Command::Toggle if self.focused_pane == 0 => {
+                self.tasks_tree_state.toggle_selected();
+            }
+            _ => {}
+        }
+    }
+
     #[inline]
     pub fn replace_rules(&mut self, rules: Arc<RulesEngine>) {
         for task in self.tasks.iter_mut() {
             task.task.rules_engine = rules.clone();
         }
-    }
-
-    #[inline]
-    pub fn solve_all(&mut self) {
-        self.solve_node_id(&self.tasks_index.root().id());
-    }
-
-    #[inline]
-    pub fn solve(&mut self) {
-        if let Some(selected) = self.tasks_tree_state.selected().last().cloned() {
-            self.solve_node_id(&selected);
-        }
-    }
-
-    #[inline]
-    pub fn select_next(&mut self) {
-        if self.focused_pane == 0 {
-            self.tasks_tree_state.key_down();
-        } else if let Some(selected) = self.tasks_tree_state.selected().last() {
-            if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
-                self.tasks[*tracing].task.scroll_pos.select_next()
-            }
-        }
-    }
-
-    #[inline]
-    pub fn select_previous(&mut self) {
-        if self.focused_pane == 0 {
-            self.tasks_tree_state.key_up();
-        } else if let Some(selected) = self.tasks_tree_state.selected().last() {
-            if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
-                self.tasks[*tracing].task.scroll_pos.select_previous()
-            }
-        }
-    }
-
-    #[inline]
-    pub fn toggle(&mut self) {
-        if self.focused_pane == 0 {
-            self.tasks_tree_state.toggle_selected();
-        }
-    }
-
-    #[inline]
-    pub fn left(&mut self) {
-        self.focused_pane = 0;
-    }
-
-    #[inline]
-    pub fn right(&mut self) {
-        self.focused_pane = 1;
     }
 
     #[inline]
@@ -444,5 +423,10 @@ impl Tasks {
             wrong_answer_delta,
             not_runned_delta,
         );
+    }
+
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
     }
 }

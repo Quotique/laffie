@@ -16,6 +16,20 @@ use parser::DirectoryParser;
 
 use super::{popup::Popup, rules::Rules, tasks::Tasks};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Command {
+    SwitchTab(usize),
+    None,
+    Solve,
+    SolveAll,
+    Down,
+    Up,
+    Left,
+    Right,
+    Toggle,
+    Reload,
+}
+
 pub struct State {
     pub current_tab: Tab,
 
@@ -60,6 +74,30 @@ impl State {
         })
     }
 
+    pub fn process(&mut self, command: Command) {
+        if self.popup.is_some() {
+            return;
+        }
+
+        match self.current_tab {
+            Tab::Rules => self.rules.process(command),
+            Tab::Tasks => self.tasks.process(command),
+            Tab::Tracing => {
+                if let Some(tracing) = self.tasks.tracing() {
+                    tracing.process(command);
+                }
+            }
+        }
+
+        match command {
+            Command::Reload => self.reload(),
+            Command::SwitchTab(num) => {
+                self.current_tab = Tab::from(num);
+            }
+            _ => {}
+        }
+    }
+
     pub fn reload(&mut self) {
         if self.popup.is_some() {
             return;
@@ -90,98 +128,6 @@ impl State {
                 ))
             }
         };
-    }
-
-    #[inline]
-    pub fn solve_all(&mut self) {
-        if self.popup.is_some() {
-            return;
-        }
-
-        if self.current_tab == Tab::Tasks {
-            self.tasks.solve_all();
-        }
-    }
-
-    #[inline]
-    pub fn solve(&mut self) {
-        if self.popup.is_some() {
-            return;
-        }
-
-        if self.current_tab == Tab::Tasks {
-            self.tasks.solve();
-        }
-    }
-
-    pub fn next(&mut self) {
-        if self.popup.is_some() {
-            return;
-        }
-
-        match self.current_tab {
-            Tab::Rules => self.rules.select_next(),
-            Tab::Tasks => self.tasks.select_next(),
-            Tab::Tracing => {
-                let _ = self.tasks.tracing().map(|x| x.select_next());
-            }
-        }
-    }
-
-    pub fn previous(&mut self) {
-        if self.popup.is_some() {
-            return;
-        }
-
-        match self.current_tab {
-            Tab::Rules => self.rules.select_previous(),
-            Tab::Tasks => self.tasks.select_previous(),
-            Tab::Tracing => {
-                let _ = self.tasks.tracing().map(|x| x.select_previous());
-            }
-        }
-    }
-
-    pub fn left(&mut self) {
-        if self.popup.is_some() {
-            return;
-        }
-
-        match self.current_tab {
-            Tab::Rules => self.rules.left(),
-            Tab::Tasks => self.tasks.left(),
-            Tab::Tracing => {
-                let _ = self.tasks.tracing().map(|x| x.left());
-            }
-        }
-    }
-
-    pub fn right(&mut self) {
-        if self.popup.is_some() {
-            return;
-        }
-
-        match self.current_tab {
-            Tab::Rules => self.rules.right(),
-            Tab::Tasks => self.tasks.right(),
-            Tab::Tracing => {
-                let _ = self.tasks.tracing().map(|x| x.right());
-            }
-        }
-    }
-
-    pub fn toggle(&mut self) {
-        if self.popup.is_some() {
-            let _ = self.popup.take();
-        }
-
-        match self.current_tab {
-            Tab::Tracing => {
-                let _ = self.tasks.tracing().map(|x| x.toggle());
-            }
-            Tab::Tasks => self.tasks.toggle(),
-            _ => {}
-        }
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
