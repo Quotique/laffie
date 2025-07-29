@@ -15,6 +15,7 @@ mod state;
 mod tasks;
 mod theme;
 mod tracing;
+mod widgets;
 
 use settings::Settings;
 use state::{Command, Tab as Itab};
