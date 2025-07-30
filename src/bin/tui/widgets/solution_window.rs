@@ -10,14 +10,14 @@ use solver::task::{SolutionStatus, StepsSource};
 use utils::TreeIndex;
 
 use crate::{
+    tasks::TaskState,
     theme::{draw_scrollbar_buf, Theme},
-    tracing::Tracing,
     widgets::tasks_list::{DirectoryStatus, TasksNode},
 };
 
 pub struct SolutionWindow<'a> {
     pub tasks_index: &'a Tree<TasksNode>,
-    pub tasks:       &'a mut [Tracing],
+    pub tasks:       &'a mut [TaskState],
 
     pub selected: Option<TreeIndex>,
 }
@@ -32,28 +32,28 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
         match self.tasks_index[selected].data() {
             TasksNode::Task(task_id) => {
                 let tracing = &self.tasks[*task_id];
-                let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.task.task)
+                let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.solution.task)
                     .split('\n')
                     .map(|x| Line::from(Span::from(x.to_owned())))
                     .collect();
 
-                if tracing.task.solution.status != SolutionStatus::NotDone {
+                if tracing.solution.status != SolutionStatus::NotDone {
                     lines.extend(
                         // TODO: format
-                        { tracing.task.solution.steps() }.map(|x| {
+                        { tracing.solution.steps() }.map(|x| {
                             Line::from(Span::styled(x.to_string(), self.theme().default()))
                         }),
                     );
                 } else {
                     lines.push(Line::from(Span::from("Press s to solve".to_owned())));
                 };
-                let scroll_pos = tracing.task.scroll_pos.selected().unwrap();
+                let scroll_pos = tracing.solution_pos.selected().unwrap();
                 <List as StatefulWidget>::render(
                     List::new(lines.iter().cloned())
                         .highlight_style(self.theme().list_cursor_style()),
                     area,
                     buf,
-                    &mut self.tasks[*task_id].task.scroll_pos,
+                    &mut self.tasks[*task_id].solution_pos,
                 );
                 draw_scrollbar_buf(buf, area, lines.len(), scroll_pos);
             }

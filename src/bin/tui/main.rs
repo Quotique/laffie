@@ -14,7 +14,6 @@ mod settings;
 mod state;
 mod tasks;
 mod theme;
-mod tracing;
 mod widgets;
 
 use settings::Settings;

@@ -12,29 +12,76 @@ use utils::{IndexedTree, TreeIndex};
 
 use crate::{
     theme::Theme,
-    tracing::Tracing,
     widgets::{
         solution_window::SolutionWindow,
         tasks_list::{TasksList, TasksNode},
+        tracing_tree::{TermId, TracingTree},
+        tracing_window::TracingWindow,
     },
 };
 
 use super::state::{default_state, Command};
 
-pub struct TaskStatus {
-    pub task:         Task,
-    pub rules_engine: Arc<RulesEngine>,
+pub struct TaskState {
     pub solution:     SharedSolution,
-    pub scroll_pos:   ListState,
+    pub solution_pos: ListState,
+    pub tracing_pos:  TreeState<TermId>,
 }
 
 pub struct Tasks {
-    tasks:            Vec<Tracing>,
+    rules_engine:     Arc<RulesEngine>,
+    tasks:            Vec<TaskState>,
     tasks_index:      Tree<TasksNode>,
     tasks_tree_state: TreeState<TreeIndex>,
 
     exec_deadline: usize,
     focused_pane:  usize,
+}
+
+impl TaskState {
+    pub fn process(&mut self, command: Command) {
+        let _ = match command {
+            Command::Down => self.tracing_pos.key_down(),
+            Command::Up => self.tracing_pos.key_up(),
+            Command::Left => self.tracing_pos.key_left(),
+            Command::Right => self.tracing_pos.key_right(),
+            Command::Toggle => self.tracing_pos.toggle_selected(),
+            _ => false,
+        };
+    }
+
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+        let layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(area);
+
+        let block = self.theme().block(true, "Tracing");
+        let inner = block.inner(layout[0]);
+        frame.render_widget(block, layout[0]);
+        frame.render_stateful_widget(
+            TracingTree {
+                solution: self.solution.clone(),
+            },
+            inner,
+            &mut self.tracing_pos,
+        );
+
+        let block = self.theme().block(false, "Detailed");
+        let inner = block.inner(layout[1]);
+        frame.render_widget(block, layout[1]);
+        frame.render_widget(
+            TracingWindow {
+                selected: self.tracing_pos.selected().last().cloned(),
+            },
+            inner,
+        );
+    }
+
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
+    }
 }
 
 impl Tasks {
@@ -44,6 +91,7 @@ impl Tasks {
         arg: impl IntoIterator<Item = Task>,
     ) -> Self {
         let mut result = Self {
+            rules_engine: rules,
             tasks: Default::default(),
             tasks_index: Tree::new(TasksNode::new_directory("Tasks".into())),
             tasks_tree_state: Default::default(),
@@ -52,7 +100,7 @@ impl Tasks {
         };
 
         for task in arg.into_iter() {
-            result.add_task(rules.clone(), task);
+            result.add_task(task);
         }
 
         result
@@ -71,7 +119,7 @@ impl Tasks {
                     self.tasks_tree_state.key_down();
                 } else if let Some(selected) = self.tasks_tree_state.selected().last() {
                     if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
-                        self.tasks[*tracing].task.scroll_pos.select_next()
+                        self.tasks[*tracing].solution_pos.select_next()
                     }
                 }
             }
@@ -80,7 +128,7 @@ impl Tasks {
                     self.tasks_tree_state.key_up();
                 } else if let Some(selected) = self.tasks_tree_state.selected().last() {
                     if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
-                        self.tasks[*tracing].task.scroll_pos.select_previous()
+                        self.tasks[*tracing].solution_pos.select_previous()
                     }
                 }
             }
@@ -95,13 +143,11 @@ impl Tasks {
 
     #[inline]
     pub fn replace_rules(&mut self, rules: Arc<RulesEngine>) {
-        for task in self.tasks.iter_mut() {
-            task.task.rules_engine = rules.clone();
-        }
+        self.rules_engine = rules;
     }
 
     #[inline]
-    pub fn tracing(&mut self) -> Option<&mut Tracing> {
+    pub fn tracing(&mut self) -> Option<&mut TaskState> {
         if let Some(selected) = self.tasks_tree_state.selected().last() {
             if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
                 return self.tasks.get_mut(*tracing);
@@ -136,15 +182,14 @@ impl Tasks {
         frame.render_stateful_widget(solution, inner, &mut ());
     }
 
-    fn add_task(&mut self, rules: Arc<RulesEngine>, task: Task) {
-        self.tasks.push(Tracing::new(TaskStatus {
-            rules_engine: rules,
-            solution: Solution::new(task.clone()).into(),
-            task,
-            scroll_pos: default_state(),
-        }));
+    fn add_task(&mut self, task: Task) {
+        self.tasks.push(TaskState {
+            solution:     Solution::new(task.clone()).into(),
+            solution_pos: default_state(),
+            tracing_pos:  Default::default(),
+        });
 
-        let group = self.tasks.last().unwrap().task.task.group.clone();
+        let group = self.tasks.last().unwrap().solution.task.group.clone();
         let index = self.tasks.len() - 1;
         let node_id = {
             let node = self.find_node_mut(group.as_str());
@@ -229,18 +274,18 @@ impl Tasks {
         let mut not_runned_delta: isize = 0;
 
         // Mark previous task status to remove
-        if self.tasks[*task_idx].task.solution.status == SolutionStatus::NotDone {
+        if self.tasks[*task_idx].solution.status == SolutionStatus::NotDone {
             not_runned_delta -= 1;
-        } else if self.tasks[*task_idx].task.solution.answer().is_none() {
+        } else if self.tasks[*task_idx].solution.answer().is_none() {
             unsolved_delta -= 1;
-        } else if !self.tasks[*task_idx].task.solution.validate_answer() {
+        } else if !self.tasks[*task_idx].solution.validate_answer() {
             wrong_answer_delta -= 1;
         } else {
             solved_delta -= 1;
         };
-        let task = &mut self.tasks[*task_idx].task;
+        let task = &mut self.tasks[*task_idx];
         let mut solver = Solver::new(
-            task.rules_engine.clone(),
+            self.rules_engine.clone(),
             DumperConfig {
                 sink:     "profiler".into(),
                 filename: None,
@@ -248,7 +293,7 @@ impl Tasks {
             .build(),
             self.exec_deadline,
         );
-        task.solution = solver.solve(task.task.clone());
+        task.solution = solver.solve(task.solution.task.clone());
 
         // Add new task status to remove
         if task.solution.answer().is_none() {

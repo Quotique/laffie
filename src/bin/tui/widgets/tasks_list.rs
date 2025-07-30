@@ -6,11 +6,11 @@ use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 use solver::{task::SolutionStatus, CompactString};
 use utils::{IndexedTree, TreeIndex};
 
-use crate::{theme::Theme, tracing::Tracing};
+use crate::{tasks::TaskState, theme::Theme};
 
 pub struct TasksList<'a> {
     pub tasks_index: &'a Tree<TasksNode>,
-    pub tasks:       &'a [Tracing],
+    pub tasks:       &'a [TaskState],
 }
 
 #[derive(Clone, Debug)]
@@ -82,7 +82,7 @@ impl<'a> TasksList<'a> {
 
         let text = match tasks_node.data() {
             TasksNode::Task(task) => {
-                let task = &self.tasks[*task].task;
+                let task = &self.tasks[*task];
                 let line_style = match task.solution.status {
                     SolutionStatus::NotDone => not_started,
                     SolutionStatus::Err(_) => unsolved,
@@ -90,9 +90,10 @@ impl<'a> TasksList<'a> {
                     _ => wrong_answer,
                 };
 
-                let conditions = format!("[{}]", task.task.conditions.iter().format(", "),);
+                let conditions =
+                    format!("[{}]", task.solution.task.conditions.iter().format(", "),);
                 Line::from(vec![
-                    Span::styled(task.task.purpose.to_string(), line_style),
+                    Span::styled(task.solution.task.purpose.to_string(), line_style),
                     Span::from(" "),
                     Span::styled(conditions, default),
                 ])
