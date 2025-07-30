@@ -1,16 +1,11 @@
 use std::sync::Arc;
 
-use ratatui::{
-    prelude::*,
-    widgets::{List, ListState, Paragraph},
-};
+use ratatui::{prelude::*, widgets::ListState};
 
 use solver::rule::RulesEngine;
 
-use super::{
-    state::{default_state, Command},
-    theme::{draw_scrollbar, Theme},
-};
+use super::state::{default_state, Command};
+use crate::widgets::{rule_window::RuleWindow, rules_list::RulesList};
 
 pub struct Rules {
     engine:       Arc<RulesEngine>,
@@ -44,33 +39,18 @@ impl Rules {
             .constraints(vec![Constraint::Percentage(40), Constraint::Percentage(60)])
             .split(area);
 
-        let items: Vec<_> = self.engine.iter().collect();
-        let list = List::new(items.iter().map(|x| x.term.to_string()))
-            .block(self.theme().block(self.focused_pane == 0, "Rules"))
-            .highlight_symbol("> ");
+        let rulse_list = RulesList {
+            engine:     self.engine.clone(),
+            is_focused: self.focused_pane == 0,
+        };
+        frame.render_stateful_widget(rulse_list, layout[0], &mut self.list_state);
 
-        frame.render_stateful_widget(list, layout[0], &mut self.list_state);
-        draw_scrollbar(
-            frame,
-            layout[0],
-            items.len(),
-            self.list_state.selected().unwrap(),
-        );
-
-        frame.render_widget(
-            Paragraph::new(
-                items
-                    .get(self.list_state.selected().unwrap())
-                    .unwrap()
-                    .to_string(),
-            )
-            .block(self.theme().block(self.focused_pane == 1, "Detailed")),
-            layout[1],
-        );
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
+        let rule_window = RuleWindow {
+            rule:       { self.engine.iter() }
+                .nth(self.list_state.selected().expect("missing selected"))
+                .expect("rule not found"),
+            is_focused: self.focused_pane == 1,
+        };
+        frame.render_widget(rule_window, layout[1]);
     }
 }

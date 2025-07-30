@@ -100,17 +100,3 @@ pub fn draw_scrollbar_buf(buf: &mut Buffer, area: Rect, len: usize, pos: usize) 
             &mut scrollbar_state,
         );
 }
-
-pub fn draw_scrollbar(frame: &mut Frame, area: Rect, len: usize, pos: usize) {
-    let mut scrollbar_state = ScrollbarState::new(len).position(pos);
-    frame.render_stateful_widget(
-        Scrollbar::new(ScrollbarOrientation::VerticalRight)
-            .begin_symbol(Some("↑"))
-            .end_symbol(Some("↓")),
-        area.inner(Margin {
-            vertical:   1,
-            horizontal: 0,
-        }),
-        &mut scrollbar_state,
-    );
-}
