@@ -11,6 +11,7 @@ use solver::{
 use utils::{IndexedTree, TreeIndex};
 
 use crate::{
+    theme::Theme,
     tracing::Tracing,
     widgets::{
         solution_window::SolutionWindow,
@@ -118,16 +119,21 @@ impl Tasks {
         let task_list = TasksList {
             tasks_index: &self.tasks_index,
             tasks:       &self.tasks,
-            is_focused:  self.focused_pane == 0,
         };
-        frame.render_stateful_widget(task_list, layout[0], &mut self.tasks_tree_state);
+        let block = self.theme().block(self.focused_pane == 0, "Tasks");
+        let inner = block.inner(layout[0]);
+        frame.render_widget(block, layout[0]);
+        frame.render_stateful_widget(task_list, inner, &mut self.tasks_tree_state);
+
+        let block = self.theme().block(self.focused_pane == 1, "Detailed");
         let solution = SolutionWindow {
             tasks_index: &self.tasks_index,
             tasks:       &mut self.tasks,
             selected:    self.tasks_tree_state.selected().last().cloned(),
-            is_focused:  self.focused_pane == 0,
         };
-        frame.render_stateful_widget(solution, layout[1], &mut ());
+        let inner = block.inner(layout[1]);
+        frame.render_widget(block, layout[1]);
+        frame.render_stateful_widget(solution, inner, &mut ());
     }
 
     fn add_task(&mut self, rules: Arc<RulesEngine>, task: Task) {
@@ -261,5 +267,10 @@ impl Tasks {
             wrong_answer_delta,
             not_runned_delta,
         );
+    }
+
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
     }
 }

@@ -12,8 +12,7 @@ use crate::{theme::Theme, widgets::tracing_tree::TermId};
 
 #[derive(Clone, Debug)]
 pub struct TracingWindow {
-    pub selected:   Option<TermId>,
-    pub is_focused: bool,
+    pub selected: Option<TermId>,
 }
 
 impl Widget for TracingWindow {
@@ -25,9 +24,7 @@ impl Widget for TracingWindow {
                 self.term_inference_lines(selected)
             };
             <List as Widget>::render(
-                List::new(text.iter().cloned())
-                    .highlight_style(self.theme().list_cursor_style())
-                    .block(self.theme().block(self.is_focused, "Detailed")),
+                List::new(text.iter().cloned()).highlight_style(self.theme().list_cursor_style()),
                 area,
                 buf,
             );

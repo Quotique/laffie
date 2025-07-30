@@ -2,7 +2,7 @@ use std::hash;
 
 use ratatui::{
     prelude::*,
-    widgets::{Block, Scrollbar, ScrollbarOrientation, StatefulWidget},
+    widgets::{Scrollbar, ScrollbarOrientation, StatefulWidget},
 };
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
@@ -43,7 +43,6 @@ impl StatefulWidget for TracingTree {
         let items = [self.tree(solution)];
         let widget = Tree::new(&items)
             .expect("all item identifiers are unique")
-            .block(Block::bordered().title("Tracing"))
             .experimental_scrollbar(Some(
                 Scrollbar::new(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(None)

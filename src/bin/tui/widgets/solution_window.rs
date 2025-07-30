@@ -19,16 +19,13 @@ pub struct SolutionWindow<'a> {
     pub tasks_index: &'a Tree<TasksNode>,
     pub tasks:       &'a mut [Tracing],
 
-    pub selected:   Option<TreeIndex>,
-    pub is_focused: bool,
+    pub selected: Option<TreeIndex>,
 }
 
 impl<'a> StatefulWidget for SolutionWindow<'a> {
     type State = ();
 
     fn render(self, area: Rect, buf: &mut Buffer, _state: &mut Self::State) {
-        let block = self.theme().block(self.is_focused, "Detailed");
-
         let Some(selected) = &self.selected else {
             return;
         };
@@ -53,8 +50,7 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
                 let scroll_pos = tracing.task.scroll_pos.selected().unwrap();
                 <List as StatefulWidget>::render(
                     List::new(lines.iter().cloned())
-                        .highlight_style(self.theme().list_cursor_style())
-                        .block(block),
+                        .highlight_style(self.theme().list_cursor_style()),
                     area,
                     buf,
                     &mut self.tasks[*task_id].task.scroll_pos,
@@ -64,8 +60,7 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
             TasksNode::Directory(dir) => {
                 <List as Widget>::render(
                     List::new(self.dir_status_lines(dir))
-                        .highlight_style(self.theme().list_cursor_style())
-                        .block(block),
+                        .highlight_style(self.theme().list_cursor_style()),
                     area,
                     buf,
                 );

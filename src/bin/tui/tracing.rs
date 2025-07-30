@@ -4,6 +4,7 @@ use tui_tree_widget::TreeState;
 use super::state::Command;
 use crate::{
     tasks::TaskStatus,
+    theme::Theme,
     widgets::{
         tracing_tree::{TermId, TracingTree},
         tracing_window::TracingWindow,
@@ -13,8 +14,7 @@ use crate::{
 pub struct Tracing {
     pub task: TaskStatus,
 
-    tree_state:   TreeState<TermId>,
-    focused_pane: usize,
+    tree_state: TreeState<TermId>,
 }
 
 impl Tracing {
@@ -22,7 +22,6 @@ impl Tracing {
         Self {
             task,
             tree_state: Default::default(),
-            focused_pane: 0,
         }
     }
 
@@ -43,19 +42,30 @@ impl Tracing {
             .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
 
+        let block = self.theme().block(true, "Tracing");
+        let inner = block.inner(layout[0]);
+        frame.render_widget(block, layout[0]);
         frame.render_stateful_widget(
             TracingTree {
                 solution: self.task.solution.clone(),
             },
-            layout[0],
+            inner,
             &mut self.tree_state,
         );
+
+        let block = self.theme().block(false, "Detailed");
+        let inner = block.inner(layout[1]);
+        frame.render_widget(block, layout[1]);
         frame.render_widget(
             TracingWindow {
-                selected:   self.tree_state.selected().last().cloned(),
-                is_focused: self.focused_pane == 1,
+                selected: self.tree_state.selected().last().cloned(),
             },
-            layout[1],
+            inner,
         );
+    }
+
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
     }
 }

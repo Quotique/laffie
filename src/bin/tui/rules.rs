@@ -5,7 +5,10 @@ use ratatui::{prelude::*, widgets::ListState};
 use solver::rule::RulesEngine;
 
 use super::state::{default_state, Command};
-use crate::widgets::{rule_window::RuleWindow, rules_list::RulesList};
+use crate::{
+    theme::Theme,
+    widgets::{rule_window::RuleWindow, rules_list::RulesList},
+};
 
 pub struct Rules {
     engine:       Arc<RulesEngine>,
@@ -40,17 +43,26 @@ impl Rules {
             .split(area);
 
         let rulse_list = RulesList {
-            engine:     self.engine.clone(),
-            is_focused: self.focused_pane == 0,
+            engine: self.engine.clone(),
         };
-        frame.render_stateful_widget(rulse_list, layout[0], &mut self.list_state);
+        let block = self.theme().block(self.focused_pane == 0, "Rules");
+        let inner = block.inner(layout[0]);
+        frame.render_widget(block, layout[0]);
+        frame.render_stateful_widget(rulse_list, inner, &mut self.list_state);
 
         let rule_window = RuleWindow {
-            rule:       { self.engine.iter() }
+            rule: { self.engine.iter() }
                 .nth(self.list_state.selected().expect("missing selected"))
                 .expect("rule not found"),
-            is_focused: self.focused_pane == 1,
         };
-        frame.render_widget(rule_window, layout[1]);
+        let block = self.theme().block(self.focused_pane == 1, "Detailed");
+        let inner = block.inner(layout[1]);
+        frame.render_widget(block, layout[1]);
+        frame.render_widget(rule_window, inner);
+    }
+
+    fn theme(&self) -> &Theme {
+        static THEME: Theme = Theme {};
+        &THEME
     }
 }

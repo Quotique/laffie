@@ -11,7 +11,6 @@ use crate::{theme::Theme, tracing::Tracing};
 pub struct TasksList<'a> {
     pub tasks_index: &'a Tree<TasksNode>,
     pub tasks:       &'a [Tracing],
-    pub is_focused:  bool,
 }
 
 #[derive(Clone, Debug)]
@@ -65,7 +64,6 @@ impl<'a> StatefulWidget for TasksList<'a> {
 
         let widget = TuiTree::new(&items)
             .expect("all item identifiers are unique")
-            .block(self.theme().block(self.is_focused, "Tasks"))
             .experimental_scrollbar(Some(self.theme().scrollbar()))
             .highlight_style(self.theme().tree_cursor_style())
             .highlight_symbol(">");
