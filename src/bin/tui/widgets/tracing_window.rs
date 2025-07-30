@@ -10,6 +10,7 @@ use solver::task::{Solution, SolutionStatus, TermInference};
 
 use crate::{theme::Theme, widgets::tracing_tree::TermId};
 
+#[derive(Clone, Debug)]
 pub struct TracingWindow {
     pub selected:   Option<TermId>,
     pub is_focused: bool,

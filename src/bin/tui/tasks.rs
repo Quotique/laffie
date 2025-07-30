@@ -1,26 +1,24 @@
-use std::{fmt::Display, sync::Arc};
+use std::sync::Arc;
 
-use itertools::Itertools;
-use ratatui::{
-    prelude::*,
-    widgets::{List, ListState},
-};
+use ratatui::{prelude::*, widgets::ListState};
 use trees::{tr, Node, Tree};
-use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
+use tui_tree_widget::TreeState;
 
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, SharedSolution, Solution, SolutionStatus, Solver, StepsSource, Task},
-    CompactString,
+    task::{DumperConfig, SharedSolution, Solution, SolutionStatus, Solver, Task},
 };
 use utils::{IndexedTree, TreeIndex};
 
-use crate::tracing::Tracing;
-
-use super::{
-    state::{default_state, Command},
-    theme::{draw_scrollbar, Theme},
+use crate::{
+    tracing::Tracing,
+    widgets::{
+        solution_window::SolutionWindow,
+        tasks_list::{TasksList, TasksNode},
+    },
 };
+
+use super::state::{default_state, Command};
 
 pub struct TaskStatus {
     pub task:         Task,
@@ -36,48 +34,6 @@ pub struct Tasks {
 
     exec_deadline: usize,
     focused_pane:  usize,
-}
-
-enum TasksNode {
-    Task(usize),
-    Directory(DirectoryStatus),
-}
-
-#[derive(Debug, Clone)]
-struct DirectoryStatus {
-    dir_name:           CompactString,
-    solved_count:       usize,
-    unsolved_count:     usize,
-    wrong_answer_count: usize,
-    not_started_count:  usize,
-}
-
-impl DirectoryStatus {
-    pub fn total(&self) -> usize {
-        self.solved_count + self.unsolved_count + self.wrong_answer_count + self.not_started_count
-    }
-}
-
-impl From<CompactString> for DirectoryStatus {
-    fn from(dir_name: CompactString) -> Self {
-        Self {
-            dir_name,
-            solved_count: 0,
-            unsolved_count: 0,
-            wrong_answer_count: 0,
-            not_started_count: 0,
-        }
-    }
-}
-
-impl TasksNode {
-    pub fn new_task(task_pos: usize) -> Self {
-        Self::Task(task_pos)
-    }
-
-    pub fn new_directory(dir_name: CompactString) -> Self {
-        Self::Directory(dir_name.into())
-    }
 }
 
 impl Tasks {
@@ -159,137 +115,19 @@ impl Tasks {
             .constraints(vec![Constraint::Percentage(40), Constraint::Percentage(60)])
             .split(area);
 
-        self.draw_tasks_list(frame, layout[0]);
-        self.draw_solution(frame, layout[1]);
-    }
-
-    fn tree(&self, tasks_node: &Node<TasksNode>) -> TreeItem<'static, TreeIndex> {
-        let wrong_answer = self.theme().wrong_answer();
-        let unsolved = self.theme().unsolved();
-        let solved = self.theme().solved();
-        let not_started = self.theme().not_started();
-        let default = self.theme().default();
-
-        let text = match tasks_node.data() {
-            TasksNode::Task(task) => {
-                let task = &self.tasks[*task].task;
-                let line_style = match task.solution.status {
-                    SolutionStatus::NotDone => not_started,
-                    SolutionStatus::Err(_) => unsolved,
-                    SolutionStatus::Answer(_) if task.solution.validate_answer() => solved,
-                    _ => wrong_answer,
-                };
-
-                let conditions = format!("[{}]", task.task.conditions.iter().format(", "),);
-                Line::from(vec![
-                    Span::styled(task.task.purpose.to_string(), line_style),
-                    Span::from(" "),
-                    Span::styled(conditions, default),
-                ])
-            }
-            TasksNode::Directory(dir) => Line::from(vec![
-                Span::styled(dir.dir_name.to_string(), self.theme().highlighted()),
-                Span::from("[".to_owned()),
-                Span::styled(format!("{}", dir.not_started_count), not_started),
-                Span::styled(format!(" {}", dir.solved_count), solved),
-                Span::styled(format!(" {}", dir.unsolved_count), unsolved),
-                Span::styled(format!(" {}", dir.wrong_answer_count), wrong_answer),
-                Span::from("]".to_owned()),
-            ]),
+        let task_list = TasksList {
+            tasks_index: &self.tasks_index,
+            tasks:       &self.tasks,
+            is_focused:  self.focused_pane == 0,
         };
-
-        let children: Vec<_> = tasks_node.iter().map(|s| self.tree(s)).collect();
-        if children.is_empty() {
-            TreeItem::new_leaf(tasks_node.id(), text)
-        } else {
-            TreeItem::new(tasks_node.id(), text, children).unwrap()
-        }
-    }
-
-    fn draw_tasks_list(&mut self, frame: &mut Frame, area: Rect) {
-        let items = [self.tree(self.tasks_index.root())];
-
-        let widget = TuiTree::new(&items)
-            .expect("all item identifiers are unique")
-            .block(self.theme().block(self.focused_pane == 0, "Tasks"))
-            .experimental_scrollbar(Some(self.theme().scrollbar()))
-            .highlight_style(self.theme().tree_cursor_style())
-            .highlight_symbol(">");
-
-        frame.render_stateful_widget(widget, area, &mut self.tasks_tree_state);
-    }
-
-    fn draw_solution(&mut self, frame: &mut Frame, area: Rect) {
-        let block = self.theme().block(self.focused_pane == 1, "Detailed");
-
-        let Some(selected) = self.tasks_tree_state.selected().last().cloned() else {
-            return;
+        frame.render_stateful_widget(task_list, layout[0], &mut self.tasks_tree_state);
+        let solution = SolutionWindow {
+            tasks_index: &self.tasks_index,
+            tasks:       &mut self.tasks,
+            selected:    self.tasks_tree_state.selected().last().cloned(),
+            is_focused:  self.focused_pane == 0,
         };
-        match self.tasks_index[&selected].data() {
-            TasksNode::Task(task_id) => {
-                let tracing = self.tasks.get(*task_id).unwrap();
-                let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.task.task)
-                    .split('\n')
-                    .map(|x| Line::from(Span::from(x.to_owned())))
-                    .collect();
-
-                if tracing.task.solution.status != SolutionStatus::NotDone {
-                    lines.extend(
-                        // TODO: format
-                        { tracing.task.solution.steps() }.map(|x| {
-                            Line::from(Span::styled(x.to_string(), self.theme().default()))
-                        }),
-                    );
-                } else {
-                    lines.push(Line::from(Span::from("Press s to solve".to_owned())));
-                };
-                let scroll_pos = tracing.task.scroll_pos.selected().unwrap();
-                frame.render_stateful_widget(
-                    List::new(lines.iter().cloned())
-                        .highlight_style(self.theme().list_cursor_style())
-                        .block(block),
-                    area,
-                    &mut self.tasks[*task_id].task.scroll_pos,
-                );
-                draw_scrollbar(frame, area, lines.len(), scroll_pos);
-            }
-            TasksNode::Directory(dir) => {
-                frame.render_widget(
-                    List::new(self.dir_status_lines(dir))
-                        .highlight_style(self.theme().list_cursor_style())
-                        .block(block),
-                    area,
-                );
-            }
-        };
-    }
-
-    fn dir_status_lines(&self, dir: &DirectoryStatus) -> impl Iterator<Item = Line<'static>> {
-        let wrong_answer = self.theme().wrong_answer();
-        let unsolved = self.theme().unsolved();
-        let solved = self.theme().solved();
-        let not_started = self.theme().not_started();
-        let default = self.theme().default();
-
-        [
-            self.pair_line("Group: ", &dir.dir_name, default),
-            Line::default(),
-            self.pair_line("Total: ", dir.total(), default),
-            Line::default(),
-            self.pair_line("Not started: ", dir.not_started_count, not_started),
-            self.pair_line("Solved: ", dir.solved_count, solved),
-            self.pair_line("Not solved: ", dir.unsolved_count, unsolved),
-            self.pair_line("Wrong answers: ", dir.wrong_answer_count, wrong_answer),
-        ]
-        .into_iter()
-    }
-
-    fn pair_line<'a>(&self, k: &'a str, v: impl Display, v_style: Style) -> Line<'a> {
-        let highlighted = self.theme().highlighted();
-        Line::from(vec![
-            Span::styled(k, highlighted),
-            Span::styled(v.to_string(), v_style),
-        ])
+        frame.render_stateful_widget(solution, layout[1], &mut ());
     }
 
     fn add_task(&mut self, rules: Arc<RulesEngine>, task: Task) {
@@ -423,10 +261,5 @@ impl Tasks {
             wrong_answer_delta,
             not_runned_delta,
         );
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
     }
 }

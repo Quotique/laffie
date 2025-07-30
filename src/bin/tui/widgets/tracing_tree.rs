@@ -16,6 +16,7 @@ pub struct TermId {
     pub idx:      usize,
 }
 
+#[derive(Clone, Debug)]
 pub struct TracingTree {
     pub solution: SharedSolution,
 }
