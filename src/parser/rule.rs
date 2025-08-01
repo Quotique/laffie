@@ -113,7 +113,7 @@ impl<'a> RuleParser<'a> {
                 let purpose = TermParser::default().try_parse(attr.front().unwrap())?;
                 Ok((
                     RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
-                    RuleAttrValue::Target(purpose),
+                    RuleAttrValue::Purpose(purpose),
                 ))
             }
             "id" => {

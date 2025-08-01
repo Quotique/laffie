@@ -23,9 +23,9 @@ pub enum RuleDeclineReason {
 pub type SharedRule = Rc<Rule>;
 #[derive(Clone, Debug)]
 pub struct Rule {
-    pub id:          RuleId,
-    pub level:       usize,
-    pub func_symbol: Symbol,
+    pub id:     RuleId,
+    pub level:  usize,
+    pub symbol: Symbol,
 
     pub attrs: MultiMap<RuleAttr, RuleAttrValue>,
     pub block: Vec<RuleId>,
@@ -128,7 +128,7 @@ impl Rule {
 
     pub fn purpose_mapping(&self, purpose: &Term) -> Result<Vec<ParamsMapping>, RuleDeclineReason> {
         // TODO: multiple purposes
-        if let Some(RuleAttrValue::Target(pattern)) = self.attribute(&RuleAttr::Purpose).next() {
+        if let Some(RuleAttrValue::Purpose(pattern)) = self.attribute(&RuleAttr::Purpose).next() {
             return purpose.as_subterm().try_match(pattern.as_subterm()).map_err(|_| {
                 debug!(target: "rule_selection", "no match purpose: {purpose}, required: {pattern}");
                 RuleDeclineReason::PurposeMissmatch

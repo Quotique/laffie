@@ -22,7 +22,7 @@ pub enum RuleAttrValue {
     None,
     UInt(u64),
     Str(CompactString),
-    Target(Term),
+    Purpose(Term),
 }
 
 impl FromStr for RuleAttr {

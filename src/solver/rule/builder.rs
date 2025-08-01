@@ -22,7 +22,7 @@ pub struct RuleBuilder {
     term:         Option<Term>,
     requirements: Vec<Term>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
-    func_symbol:  Symbol,
+    symbol:       Symbol,
 
     replaces: Vec<(RuleAttr, Term)>,
 }
@@ -51,7 +51,7 @@ impl Default for RuleBuilder {
             term:         None,
             requirements: Default::default(),
             attributes:   Default::default(),
-            func_symbol:  Symbol::by_name("AnySymbol")
+            symbol:       Symbol::by_name("AnySymbol")
                 .expect("System symbol AnySymbol is not found"),
             replaces:     Default::default(),
         }
@@ -65,7 +65,7 @@ impl RuleBuilder {
     }
 
     pub fn with_func_symbol(mut self, func_symbol: Symbol) -> Self {
-        self.func_symbol = func_symbol;
+        self.symbol = func_symbol;
         self
     }
 
@@ -83,8 +83,8 @@ impl RuleBuilder {
 
     pub fn with_attribute(mut self, attr: RuleAttr, value: RuleAttrValue) -> Self {
         match (&attr, &value) {
-            (RuleAttr::Zero, RuleAttrValue::Target(s)) |
-            (RuleAttr::One, RuleAttrValue::Target(s)) => self.replaces.push((attr, s.clone())),
+            (RuleAttr::Zero, RuleAttrValue::Purpose(s)) |
+            (RuleAttr::One, RuleAttrValue::Purpose(s)) => self.replaces.push((attr, s.clone())),
             _ => self.attributes.push((attr, value)),
         }
         self
@@ -150,7 +150,7 @@ impl RuleBuilder {
             result.push(Rule {
                 id: self.rule_id,
                 level: *level as usize,
-                func_symbol: self.func_symbol.clone(),
+                symbol: self.symbol.clone(),
                 attrs: attrs.clone(),
                 block: Default::default(),
                 pattern_symbols: term.as_subterm().first_arg().unwrap().symbols(),

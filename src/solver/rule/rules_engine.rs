@@ -96,7 +96,7 @@ impl RulesEngine {
             self.all_rules
                 .entry(rule.level)
                 .or_default()
-                .entry(rule.func_symbol.clone())
+                .entry(rule.symbol.clone())
                 .or_default()
                 .push(SharedRule::new(rule));
         }
