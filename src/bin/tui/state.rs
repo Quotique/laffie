@@ -8,27 +8,88 @@ use parser::DirectoryParser;
 use solver::{
     rule::RulesEngine,
     task::{DumperConfig, SharedSolution, Solution, SolutionStatus, Solver, Task},
+    CompactString,
 };
 use utils::{IndexedTree, TreeIndex};
 
 use super::{settings::Settings, ui::default_state};
-use crate::widgets::{tasks_list::TasksNode, tracing_tree::TermId};
-
-pub struct TaskState {
-    pub solution:     SharedSolution,
-    pub solution_pos: ListState,
-    pub tracing_pos:  TreeState<TermId>,
-}
+use crate::widgets::tracing_tree::TermId;
 
 pub struct State {
     pub rules_engine: Arc<RulesEngine>,
     pub rules_pos:    ListState,
 
-    pub tasks:            Vec<TaskState>,
-    pub tasks_index:      Tree<TasksNode>,
-    pub tasks_tree_state: TreeState<TreeIndex>,
+    pub tasks:     Tree<TasksNode>,
+    pub tasks_pos: TreeState<TreeIndex>,
 
     settings: Settings,
+}
+
+#[derive(Debug)]
+pub struct TaskState {
+    pub solution: SharedSolution,
+
+    pub solution_pos: ListState,
+    pub tracing_pos:  TreeState<TermId>,
+}
+
+#[derive(Debug)]
+pub enum TasksNode {
+    Task(TaskState),
+    Directory(DirectoryStat),
+}
+
+#[derive(Debug, Clone)]
+pub struct DirectoryStat {
+    pub dir_name:           CompactString,
+    pub solved_count:       usize,
+    pub unsolved_count:     usize,
+    pub wrong_answer_count: usize,
+    pub not_started_count:  usize,
+}
+
+#[derive(Debug, Clone, Default)]
+struct DirectoryStatUpdate {
+    pub solved_delta:       isize,
+    pub unsolved_delta:     isize,
+    pub wrong_answer_delta: isize,
+    pub not_started_delta:  isize,
+}
+
+impl DirectoryStat {
+    pub fn total(&self) -> usize {
+        self.solved_count + self.unsolved_count + self.wrong_answer_count + self.not_started_count
+    }
+
+    fn update(&mut self, upd: &DirectoryStatUpdate) {
+        self.solved_count = (self.solved_count as isize + upd.solved_delta) as usize;
+        self.unsolved_count = (self.unsolved_count as isize + upd.unsolved_delta) as usize;
+        self.wrong_answer_count =
+            (self.wrong_answer_count as isize + upd.wrong_answer_delta) as usize;
+        self.not_started_count = (self.not_started_count as isize + upd.not_started_delta) as usize;
+    }
+}
+
+impl From<CompactString> for DirectoryStat {
+    fn from(dir_name: CompactString) -> Self {
+        Self {
+            dir_name,
+            solved_count: 0,
+            unsolved_count: 0,
+            wrong_answer_count: 0,
+            not_started_count: 0,
+        }
+    }
+}
+
+impl TasksNode {
+    pub fn new_task(task: TaskState) -> Self {
+        Self::Task(task)
+    }
+
+    pub fn new_directory(dir_name: CompactString) -> Self {
+        Self::Directory(dir_name.into())
+    }
 }
 
 impl State {
@@ -40,9 +101,8 @@ impl State {
         let mut result = Self {
             rules_engine: rules,
             rules_pos: default_state(),
-            tasks: Default::default(),
-            tasks_index: Tree::new(TasksNode::new_directory("Tasks".into())),
-            tasks_tree_state: Default::default(),
+            tasks: Tree::new(TasksNode::new_directory("Tasks".into())),
+            tasks_pos: Default::default(),
             settings,
         };
 
@@ -61,34 +121,34 @@ impl State {
     }
 
     #[inline]
-    pub fn tracing(&mut self) -> Option<&mut TaskState> {
-        if let Some(selected) = self.tasks_tree_state.selected().last() {
-            if let TasksNode::Task(tracing) = self.tasks_index[selected].data() {
-                return self.tasks.get_mut(*tracing);
-            }
+    pub fn selected_task(&mut self) -> Option<&mut TaskState> {
+        let selected = self.tasks_pos.selected().last()?;
+
+        if let TasksNode::Task(tracing) = self.tasks[selected].data_mut() {
+            return Some(tracing);
         }
         None
     }
 
     fn add_task(&mut self, task: Task) {
-        self.tasks.push(TaskState {
-            solution:     Solution::new(task.clone()).into(),
-            solution_pos: default_state(),
-            tracing_pos:  Default::default(),
-        });
-
-        let group = self.tasks.last().unwrap().solution.task.group.clone();
-        let index = self.tasks.len() - 1;
         let node_id = {
-            let node = self.find_node_mut(group.as_str());
-            node.push_back(tr(TasksNode::new_task(index)));
+            let node = self.find_node_mut(task.group.as_str());
+            node.push_back(tr(TasksNode::new_task(TaskState {
+                solution:     Solution::new(task.clone()).into(),
+                solution_pos: default_state(),
+                tracing_pos:  Default::default(),
+            })));
             node.id()
         };
-        self.counters_update(&node_id, 0, 0, 0, 1);
+        let upd = DirectoryStatUpdate {
+            not_started_delta: 1,
+            ..Default::default()
+        };
+        self.counters_update(&node_id, upd);
     }
 
     fn find_node_mut<'a>(&'a mut self, path: &str) -> &'a mut Node<TasksNode> {
-        let mut current_node = self.tasks_index.root_mut().get_mut();
+        let mut current_node = self.tasks.root_mut().get_mut();
         for i in path.split(['/']).filter(|x| !x.is_empty()) {
             let next_idx = if let Some(next_idx) = current_node
                 .iter_mut()
@@ -112,40 +172,28 @@ impl State {
         current_node
     }
 
-    fn counters_update(
-        &mut self,
-        node_id: &TreeIndex,
-        solved_delta: isize,
-        unsolved_delta: isize,
-        wrong_answer_delta: isize,
-        not_runned_delta: isize,
-    ) {
-        let mut node = self.tasks_index.get_mut(node_id);
+    fn counters_update(&mut self, node_id: &TreeIndex, upd: DirectoryStatUpdate) {
+        let mut node = self.tasks.get_mut(node_id);
         while let Some(n) = node {
             match n.data_mut() {
                 TasksNode::Directory(dir) => {
-                    dir.solved_count = (dir.solved_count as isize + solved_delta) as usize;
-                    dir.unsolved_count = (dir.unsolved_count as isize + unsolved_delta) as usize;
-                    dir.wrong_answer_count =
-                        (dir.wrong_answer_count as isize + wrong_answer_delta) as usize;
-                    dir.not_started_count =
-                        (dir.not_started_count as isize + not_runned_delta) as usize;
+                    dir.update(&upd);
                 }
                 TasksNode::Task(_) => {}
             }
 
             // TODO: optimize
             let parent_id = n.parent().map(|x| x.id());
-            node = parent_id.and_then(|id| self.tasks_index.get_mut(&id));
+            node = parent_id.and_then(|id| self.tasks.get_mut(&id));
         }
     }
 
     pub fn solve_node_id(&mut self, node_id: &TreeIndex) {
-        let Some(node) = self.tasks_index.get_mut(node_id) else {
+        let Some(node) = self.tasks.get_mut(node_id) else {
             return;
         };
 
-        let task_idx = match node.data() {
+        let task = match node.data_mut() {
             TasksNode::Directory { .. } => {
                 let indexes: Vec<_> = node.iter().map(|x| x.id()).collect();
                 for id in indexes {
@@ -153,25 +201,21 @@ impl State {
                 }
                 return;
             }
-            TasksNode::Task(idx) => idx,
+            TasksNode::Task(task) => task,
         };
 
-        let mut solved_delta: isize = 0;
-        let mut unsolved_delta: isize = 0;
-        let mut wrong_answer_delta: isize = 0;
-        let mut not_runned_delta: isize = 0;
+        let mut upd = DirectoryStatUpdate::default();
 
         // Mark previous task status to remove
-        if self.tasks[*task_idx].solution.status == SolutionStatus::NotDone {
-            not_runned_delta -= 1;
-        } else if self.tasks[*task_idx].solution.answer().is_none() {
-            unsolved_delta -= 1;
-        } else if !self.tasks[*task_idx].solution.validate_answer() {
-            wrong_answer_delta -= 1;
+        if task.solution.status == SolutionStatus::NotDone {
+            upd.not_started_delta -= 1;
+        } else if task.solution.answer().is_none() {
+            upd.unsolved_delta -= 1;
+        } else if !task.solution.validate_answer() {
+            upd.wrong_answer_delta -= 1;
         } else {
-            solved_delta -= 1;
+            upd.solved_delta -= 1;
         };
-        let task = &mut self.tasks[*task_idx];
         let mut solver = Solver::new(
             self.rules_engine.clone(),
             DumperConfig {
@@ -185,20 +229,14 @@ impl State {
 
         // Add new task status to remove
         if task.solution.answer().is_none() {
-            unsolved_delta += 1;
+            upd.unsolved_delta += 1;
         } else if !task.solution.as_ref().validate_answer() {
-            wrong_answer_delta += 1;
+            upd.wrong_answer_delta += 1;
         } else {
-            solved_delta += 1;
+            upd.solved_delta += 1;
         };
 
         // Propagate changes to all parent nodes
-        self.counters_update(
-            node_id,
-            solved_delta,
-            unsolved_delta,
-            wrong_answer_delta,
-            not_runned_delta,
-        );
+        self.counters_update(node_id, upd);
     }
 }

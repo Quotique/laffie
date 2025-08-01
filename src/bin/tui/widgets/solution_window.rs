@@ -10,14 +10,12 @@ use solver::task::{SolutionStatus, StepsSource};
 use utils::TreeIndex;
 
 use crate::{
-    state::TaskState,
+    state::{DirectoryStat, TasksNode},
     theme::{draw_scrollbar_buf, Theme},
-    widgets::tasks_list::{DirectoryStatus, TasksNode},
 };
 
 pub struct SolutionWindow<'a> {
-    pub tasks_index: &'a Tree<TasksNode>,
-    pub tasks:       &'a mut [TaskState],
+    pub tasks_index: &'a mut Tree<TasksNode>,
 
     pub selected: Option<TreeIndex>,
 }
@@ -29,48 +27,45 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
         let Some(selected) = &self.selected else {
             return;
         };
-        match self.tasks_index[selected].data() {
-            TasksNode::Task(task_id) => {
-                let tracing = &self.tasks[*task_id];
-                let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.solution.task)
-                    .split('\n')
-                    .map(|x| Line::from(Span::from(x.to_owned())))
-                    .collect();
+        let default = self.theme().default();
+        let list_cursor = self.theme().list_cursor_style();
+        if let TasksNode::Task(tracing) = self.tasks_index[selected].data_mut() {
+            let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.solution.task)
+                .split('\n')
+                .map(|x| Line::from(Span::from(x.to_owned())))
+                .collect();
 
-                if tracing.solution.status != SolutionStatus::NotDone {
-                    lines.extend(
-                        // TODO: format
-                        { tracing.solution.steps() }.map(|x| {
-                            Line::from(Span::styled(x.to_string(), self.theme().default()))
-                        }),
-                    );
-                } else {
-                    lines.push(Line::from(Span::from("Press s to solve".to_owned())));
-                };
-                let scroll_pos = tracing.solution_pos.selected().unwrap();
-                <List as StatefulWidget>::render(
-                    List::new(lines.iter().cloned())
-                        .highlight_style(self.theme().list_cursor_style()),
-                    area,
-                    buf,
-                    &mut self.tasks[*task_id].solution_pos,
+            if tracing.solution.status != SolutionStatus::NotDone {
+                lines.extend(
+                    // TODO: format
+                    { tracing.solution.steps() }
+                        .map(|x| Line::from(Span::styled(x.to_string(), default))),
                 );
-                draw_scrollbar_buf(buf, area, lines.len(), scroll_pos);
-            }
-            TasksNode::Directory(dir) => {
-                <List as Widget>::render(
-                    List::new(self.dir_status_lines(dir))
-                        .highlight_style(self.theme().list_cursor_style()),
-                    area,
-                    buf,
-                );
-            }
+            } else {
+                lines.push(Line::from(Span::from("Press s to solve".to_owned())));
+            };
+            let scroll_pos = tracing.solution_pos.selected().unwrap();
+            <List as StatefulWidget>::render(
+                List::new(lines.iter().cloned()).highlight_style(list_cursor),
+                area,
+                buf,
+                &mut tracing.solution_pos,
+            );
+            draw_scrollbar_buf(buf, area, lines.len(), scroll_pos);
+        };
+        if let TasksNode::Directory(dir) = self.tasks_index[selected].data() {
+            <List as Widget>::render(
+                List::new(self.dir_status_lines(dir))
+                    .highlight_style(self.theme().list_cursor_style()),
+                area,
+                buf,
+            );
         };
     }
 }
 
 impl<'a> SolutionWindow<'a> {
-    fn dir_status_lines(&self, dir: &DirectoryStatus) -> impl Iterator<Item = Line<'static>> {
+    fn dir_status_lines(&self, dir: &DirectoryStat) -> impl Iterator<Item = Line<'static>> {
         let wrong_answer = self.theme().wrong_answer();
         let unsolved = self.theme().unsolved();
         let solved = self.theme().solved();

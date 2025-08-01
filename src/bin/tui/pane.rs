@@ -75,27 +75,25 @@ impl StatefulWidget for Pane {
                 }
                 WidgetType::TasksList => {
                     let task_list = TasksList {
-                        tasks_index: &state.tasks_index,
-                        tasks:       &state.tasks,
+                        tasks_index: &state.tasks,
                     };
                     let block = self.theme().block(is_focused, "Tasks");
                     let inner = block.inner(*area);
                     block.render(*area, buf);
-                    task_list.render(inner, buf, &mut state.tasks_tree_state);
+                    task_list.render(inner, buf, &mut state.tasks_pos);
                 }
                 WidgetType::Solution => {
                     let block = self.theme().block(is_focused, "Detailed");
                     let solution = SolutionWindow {
-                        tasks_index: &state.tasks_index,
-                        tasks:       &mut state.tasks,
-                        selected:    state.tasks_tree_state.selected().last().cloned(),
+                        tasks_index: &mut state.tasks,
+                        selected:    state.tasks_pos.selected().last().cloned(),
                     };
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     solution.render(inner, buf, &mut ());
                 }
                 WidgetType::TracingTree => {
-                    if let Some(task_state) = state.tracing() {
+                    if let Some(task_state) = state.selected_task() {
                         let block = self.theme().block(is_focused, "Tracing");
                         let inner = block.inner(*area);
                         block.render(*area, buf);
@@ -106,7 +104,7 @@ impl StatefulWidget for Pane {
                     }
                 }
                 WidgetType::TracingWindow => {
-                    if let Some(task_state) = state.tracing() {
+                    if let Some(task_state) = state.selected_task() {
                         let block = self.theme().block(is_focused, "Detailed");
                         let inner = block.inner(*area);
                         block.render(*area, buf);
@@ -133,7 +131,7 @@ impl Pane {
                 _ => {}
             },
             WidgetType::TracingTree => {
-                if let Some(task_state) = state.tracing() {
+                if let Some(task_state) = state.selected_task() {
                     let _ = match command {
                         Command::Down => task_state.tracing_pos.key_down(),
                         Command::Up => task_state.tracing_pos.key_up(),
@@ -146,41 +144,41 @@ impl Pane {
             }
             WidgetType::TasksList => {
                 match command {
-                    Command::SolveAll => state.solve_node_id(&state.tasks_index.root().id()),
+                    Command::SolveAll => state.solve_node_id(&state.tasks.root().id()),
                     Command::Solve => {
-                        if let Some(selected) = state.tasks_tree_state.selected().last().cloned() {
+                        if let Some(selected) = state.tasks_pos.selected().last().cloned() {
                             state.solve_node_id(&selected);
                         }
                     }
                     Command::Down => {
-                        state.tasks_tree_state.key_down();
+                        state.tasks_pos.key_down();
                     }
                     Command::Up => {
-                        state.tasks_tree_state.key_up();
+                        state.tasks_pos.key_up();
                     }
                     Command::Left => self.focused_pane = 0,
                     Command::Right => self.focused_pane = 1,
                     Command::Toggle => {
-                        state.tasks_tree_state.toggle_selected();
+                        state.tasks_pos.toggle_selected();
                     }
                     _ => {}
                 };
             }
             WidgetType::Solution => {
                 match command {
-                    Command::SolveAll => state.solve_node_id(&state.tasks_index.root().id()),
+                    Command::SolveAll => state.solve_node_id(&state.tasks.root().id()),
                     Command::Solve => {
-                        if let Some(selected) = state.tasks_tree_state.selected().last().cloned() {
+                        if let Some(selected) = state.tasks_pos.selected().last().cloned() {
                             state.solve_node_id(&selected);
                         }
                     }
                     Command::Down => {
-                        if let Some(task_state) = state.tracing() {
+                        if let Some(task_state) = state.selected_task() {
                             task_state.solution_pos.select_next()
                         }
                     }
                     Command::Up => {
-                        if let Some(task_state) = state.tracing() {
+                        if let Some(task_state) = state.selected_task() {
                             task_state.solution_pos.select_previous()
                         }
                     }

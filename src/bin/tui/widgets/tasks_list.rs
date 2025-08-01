@@ -3,57 +3,13 @@ use ratatui::{prelude::*, widgets::StatefulWidget};
 use trees::{Node, Tree};
 use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 
-use solver::{task::SolutionStatus, CompactString};
+use solver::task::SolutionStatus;
 use utils::{IndexedTree, TreeIndex};
 
-use crate::{state::TaskState, theme::Theme};
+use crate::{state::TasksNode, theme::Theme};
 
 pub struct TasksList<'a> {
     pub tasks_index: &'a Tree<TasksNode>,
-    pub tasks:       &'a [TaskState],
-}
-
-#[derive(Clone, Debug)]
-pub enum TasksNode {
-    Task(usize),
-    Directory(DirectoryStatus),
-}
-
-#[derive(Debug, Clone)]
-pub struct DirectoryStatus {
-    pub dir_name:           CompactString,
-    pub solved_count:       usize,
-    pub unsolved_count:     usize,
-    pub wrong_answer_count: usize,
-    pub not_started_count:  usize,
-}
-
-impl DirectoryStatus {
-    pub fn total(&self) -> usize {
-        self.solved_count + self.unsolved_count + self.wrong_answer_count + self.not_started_count
-    }
-}
-
-impl From<CompactString> for DirectoryStatus {
-    fn from(dir_name: CompactString) -> Self {
-        Self {
-            dir_name,
-            solved_count: 0,
-            unsolved_count: 0,
-            wrong_answer_count: 0,
-            not_started_count: 0,
-        }
-    }
-}
-
-impl TasksNode {
-    pub fn new_task(task_pos: usize) -> Self {
-        Self::Task(task_pos)
-    }
-
-    pub fn new_directory(dir_name: CompactString) -> Self {
-        Self::Directory(dir_name.into())
-    }
 }
 
 impl<'a> StatefulWidget for TasksList<'a> {
@@ -82,7 +38,6 @@ impl<'a> TasksList<'a> {
 
         let text = match tasks_node.data() {
             TasksNode::Task(task) => {
-                let task = &self.tasks[*task];
                 let line_style = match task.solution.status {
                     SolutionStatus::NotDone => not_started,
                     SolutionStatus::Err(_) => unsolved,
