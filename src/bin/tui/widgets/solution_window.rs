@@ -10,7 +10,7 @@ use solver::task::{SolutionStatus, StepsSource};
 use utils::TreeIndex;
 
 use crate::{
-    tasks::TaskState,
+    state::TaskState,
     theme::{draw_scrollbar_buf, Theme},
     widgets::tasks_list::{DirectoryStatus, TasksNode},
 };

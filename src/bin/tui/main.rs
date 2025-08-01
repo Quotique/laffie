@@ -1,6 +1,5 @@
-use std::{io, path::PathBuf};
+use std::io;
 
-use clap::Parser;
 use ratatui::{
     crossterm::event::{self, KeyCode, KeyEventKind},
     prelude::*,
@@ -8,48 +7,19 @@ use ratatui::{
     DefaultTerminal,
 };
 
+mod pane;
 mod popup;
-mod rules;
 mod settings;
 mod state;
-mod tasks;
 mod theme;
+mod ui;
 mod widgets;
 
 use settings::Settings;
-use state::{Command, Tab as Itab};
+use ui::{Command, Tab as Itab};
 
-/// Core develop/debug enviroment
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct Args {
-    /// Sets a custom config file
-    #[clap(short, long, default_value = "./config/tui.yaml")]
-    config: PathBuf,
-
-    /// Specify symbols path
-    #[clap(short, long)]
-    symbols: Option<PathBuf>,
-
-    /// Specify tasks path
-    #[clap(short = 'p', long)]
-    tasks: Option<PathBuf>,
-
-    /// Specify tasks DB path
-    #[clap(short = 'd', long, default_value = "./db/tasks")]
-    tasks_db: PathBuf,
-
-    /// Execution deadline (in cycles) for individual problem
-    #[clap(short, long, default_value = "100000")]
-    exec_deadline: usize,
-}
-
-fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
-    let mut status = state::State::try_new(
-        args.exec_deadline,
-        args.symbols.clone().unwrap_or("symbols".into()),
-        args.tasks.clone().unwrap_or("tasks".into()),
-    )?;
+fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
+    let mut status = ui::Ui::try_new(settings)?;
 
     loop {
         terminal.draw(|frame| {
@@ -103,9 +73,7 @@ fn run(mut terminal: DefaultTerminal, args: &Args) -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
-    let args = Args::parse();
-
-    let settings = Settings::new(args.config.clone())
+    let settings = Settings::new()
         .map_err(|e| {
             println!("Config error: {e:?}");
             e
@@ -117,7 +85,7 @@ fn main() -> io::Result<()> {
 
     let mut terminal = ratatui::init();
     terminal.clear()?;
-    let app_result = run(terminal, &args);
+    let app_result = run(terminal, settings);
     ratatui::restore();
     if let Err(e) = app_result {
         eprintln!("{e}");

@@ -6,7 +6,7 @@ use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 use solver::{task::SolutionStatus, CompactString};
 use utils::{IndexedTree, TreeIndex};
 
-use crate::{tasks::TaskState, theme::Theme};
+use crate::{state::TaskState, theme::Theme};
 
 pub struct TasksList<'a> {
     pub tasks_index: &'a Tree<TasksNode>,
