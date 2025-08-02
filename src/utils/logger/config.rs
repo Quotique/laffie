@@ -11,7 +11,7 @@ use super::{
     format::{print_msg_header, system_time_write},
 };
 
-const DEFAULT_CHANNEL_SIZE: usize = 100 * 1024 * 1024;
+const DEFAULT_CHANNEL_SIZE: usize = 1024;
 
 #[derive(Debug, Deserialize)]
 pub struct ConfLevel(#[serde(deserialize_with = "deserialize_level")] pub Level);
