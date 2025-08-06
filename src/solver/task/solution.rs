@@ -9,7 +9,7 @@ use bincode::{Decode, Encode};
 use derive_more::Display;
 use itertools::Itertools;
 
-use super::{steps::Steps, Purpose, Task, TermProps};
+use super::{Purpose, Task, TermProps};
 use crate::term::SharedTerm;
 
 pub const STACK_SIZE: usize = 2048;
@@ -157,16 +157,6 @@ impl Solution {
                 .any(|x| x.to_string() == answer.to_string());
         }
         false
-    }
-}
-
-pub trait StepsSource {
-    fn steps(&self) -> Steps;
-}
-
-impl StepsSource for SharedSolution {
-    fn steps(&self) -> Steps {
-        Steps::from(self.clone())
     }
 }
 

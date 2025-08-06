@@ -84,6 +84,18 @@ impl Theme {
     pub fn skipped_requirement(&self) -> Style {
         Style::new().fg(Color::Gray).bold()
     }
+
+    pub fn solution_answer(&self) -> Style {
+        Style::new().fg(Color::Green).italic()
+    }
+
+    pub fn solution_term(&self) -> Style {
+        Style::new().fg(Color::Yellow)
+    }
+
+    pub fn solution_purpose(&self) -> Style {
+        Style::new().fg(Color::Cyan).bold()
+    }
 }
 
 pub fn draw_scrollbar_buf(buf: &mut Buffer, area: Rect, len: usize, pos: usize) {

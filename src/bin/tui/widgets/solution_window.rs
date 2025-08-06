@@ -6,7 +6,7 @@ use ratatui::{
 };
 use trees::Tree;
 
-use solver::task::{SolutionStatus, StepsSource};
+use solver::task::{SharedSolution, SolutionStatus, StepsSource, Task, Visit};
 use utils::TreeIndex;
 
 use crate::{
@@ -27,44 +27,89 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
         let Some(selected) = &self.selected else {
             return;
         };
-        let default = self.theme().default();
         let list_cursor = self.theme().list_cursor_style();
-        if let TasksNode::Task(tracing) = self.tasks_index[selected].data_mut() {
-            let mut lines: Vec<_> = format!("Task {}\n\nSolution", tracing.solution.task)
-                .split('\n')
-                .map(|x| Line::from(Span::from(x.to_owned())))
-                .collect();
-
-            if tracing.solution.status != SolutionStatus::NotDone {
-                lines.extend(
-                    // TODO: format
-                    { tracing.solution.steps() }
-                        .map(|x| Line::from(Span::styled(x.to_string(), default))),
-                );
-            } else {
-                lines.push(Line::from(Span::from("Press s to solve".to_owned())));
-            };
-            let scroll_pos = tracing.solution_pos.selected().unwrap();
-            <List as StatefulWidget>::render(
-                List::new(lines.iter().cloned()).highlight_style(list_cursor),
-                area,
-                buf,
-                &mut tracing.solution_pos,
-            );
-            draw_scrollbar_buf(buf, area, lines.len(), scroll_pos);
+        let list = match self.tasks_index[selected].data() {
+            TasksNode::Task(tracing) => {
+                let mut lines = self.task_lines(&tracing.solution.task);
+                if tracing.solution.status != SolutionStatus::NotDone {
+                    lines.extend(self.solution_status_lines(tracing.solution.clone()));
+                } else {
+                    lines.push(Line::from(Span::from("Press s to solve".to_owned())));
+                };
+                List::new(lines.iter().cloned()).highlight_style(list_cursor)
+            }
+            TasksNode::Directory(dir) => List::new(self.dir_status_lines(dir))
+                .highlight_style(self.theme().list_cursor_style()),
         };
-        if let TasksNode::Directory(dir) = self.tasks_index[selected].data() {
-            <List as Widget>::render(
-                List::new(self.dir_status_lines(dir))
-                    .highlight_style(self.theme().list_cursor_style()),
-                area,
-                buf,
-            );
-        };
+        match self.tasks_index[selected].data_mut() {
+            TasksNode::Task(tracing) => {
+                let scroll_pos = tracing.solution_pos.selected().unwrap();
+                let list_len = list.len();
+                <List as StatefulWidget>::render(list, area, buf, &mut tracing.solution_pos);
+                draw_scrollbar_buf(buf, area, list_len, scroll_pos);
+            }
+            TasksNode::Directory(_) => {
+                <List as Widget>::render(list, area, buf);
+            }
+        }
     }
 }
 
 impl<'a> SolutionWindow<'a> {
+    fn task_lines(&self, task: &Task) -> Vec<Line<'static>> {
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled(format!("{:x}", task.id), self.theme().highlighted()),
+                Span::from(". "),
+                Span::from(task.text.clone()),
+            ]),
+            Line::default(),
+            Line::from(Span::styled(
+                task.purpose.to_string(),
+                self.theme().solution_purpose(),
+            )),
+        ];
+        for condition in &task.conditions {
+            lines.push(Line::from(Span::styled(
+                format!("  {condition}"),
+                self.theme().solution_term(),
+            )));
+        }
+        lines.push(Line::default());
+        lines
+    }
+
+    fn solution_status_lines(&self, solution: SharedSolution) -> Vec<Line<'static>> {
+        let mut lines = vec![];
+        let mut depth = 0;
+
+        for step in solution.steps() {
+            match step {
+                Visit::Subtask(t) => {
+                    lines.push(Line::from(Span::styled(
+                        format!("{}{}", "  ".repeat(depth), t.purpose),
+                        self.theme().solution_purpose(),
+                    )));
+                    depth += 1;
+                }
+                Visit::Term(t) => {
+                    lines.push(Line::from(Span::styled(
+                        format!("{}{t}", "  ".repeat(depth)),
+                        self.theme().solution_term(),
+                    )));
+                }
+                Visit::Answer(a) => {
+                    lines.push(Line::from(Span::styled(
+                        format!("{}{a}", "  ".repeat(depth)),
+                        self.theme().solution_answer(),
+                    )));
+                    depth -= 1;
+                }
+            }
+        }
+        lines
+    }
+
     fn dir_status_lines(&self, dir: &DirectoryStat) -> impl Iterator<Item = Line<'static>> {
         let wrong_answer = self.theme().wrong_answer();
         let unsolved = self.theme().unsolved();

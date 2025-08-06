@@ -14,8 +14,9 @@ pub use builder::TaskBuilder;
 pub use cache::TasksCache;
 pub use props::{TermInference, TermProps};
 pub use purpose::Purpose;
-pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError, StepsSource, TermIdx};
+pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError, TermIdx};
 pub use solver::{Solver, EXECUTION_DEADLINE_DEFAULT};
+pub use steps::{StepsSource, Visit};
 pub use tracing::{Config as DumperConfig, SolutionTracer, Tracer};
 
 #[derive(Debug, Clone)]
