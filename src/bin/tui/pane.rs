@@ -144,10 +144,10 @@ impl Pane {
             }
             WidgetType::TasksList => {
                 match command {
-                    Command::SolveAll => state.solve_node_id(&state.tasks.root().id()),
+                    Command::SolveAll => state.mark_to_solve(state.tasks.root().id()),
                     Command::Solve => {
                         if let Some(selected) = state.tasks_pos.selected().last().cloned() {
-                            state.solve_node_id(&selected);
+                            state.mark_to_solve(selected);
                         }
                     }
                     Command::Down => {
@@ -166,10 +166,10 @@ impl Pane {
             }
             WidgetType::Solution => {
                 match command {
-                    Command::SolveAll => state.solve_node_id(&state.tasks.root().id()),
+                    Command::SolveAll => state.mark_to_solve(state.tasks.root().id()),
                     Command::Solve => {
                         if let Some(selected) = state.tasks_pos.selected().last().cloned() {
-                            state.solve_node_id(&selected);
+                            state.mark_to_solve(selected);
                         }
                     }
                     Command::Down => {

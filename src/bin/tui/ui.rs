@@ -6,7 +6,15 @@ use ratatui::{
     widgets::{ListState, Paragraph},
 };
 
-use super::{pane::Pane, popup::Popup, settings::Settings, state::State};
+use solver::task::{DumperConfig, Solver};
+use utils::IndexedTree;
+
+use super::{
+    pane::Pane,
+    popup::Popup,
+    settings::Settings,
+    state::{State, TasksNode},
+};
 use crate::pane::WidgetType;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,6 +82,25 @@ impl Ui {
             state,
             popup: None,
         })
+    }
+
+    pub fn process_queue(&mut self) {
+        for idx in self.state.solve_queue.split_off(0) {
+            let TasksNode::Task(task) = self.state.tasks.get_mut(&idx).unwrap().data_mut() else {
+                continue;
+            };
+            let mut solver = Solver::new(
+                self.state.rules_engine.clone(),
+                DumperConfig {
+                    sink:     "profiler".into(),
+                    filename: None,
+                }
+                .build(),
+                self.state.settings.exec_deadline,
+            );
+            let solution = solver.solve(task.solution.task.clone());
+            self.state.update_task_solution(&idx, solution);
+        }
     }
 
     pub fn process(&mut self, command: Command) {

@@ -7,7 +7,7 @@ use tui_tree_widget::TreeState;
 use parser::DirectoryParser;
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, SharedSolution, Solution, SolutionStatus, Solver, Task},
+    task::{SharedSolution, Solution, SolutionStatus, Task},
     CompactString,
 };
 use utils::{IndexedTree, TreeIndex};
@@ -22,7 +22,15 @@ pub struct State {
     pub tasks:     Tree<TasksNode>,
     pub tasks_pos: TreeState<TreeIndex>,
 
-    settings: Settings,
+    pub solve_queue: Vec<TreeIndex>,
+
+    pub settings: Settings,
+}
+
+#[derive(Debug)]
+pub enum TasksNode {
+    Task(TaskState),
+    Directory(DirectoryStat),
 }
 
 #[derive(Debug)]
@@ -31,12 +39,6 @@ pub struct TaskState {
 
     pub solution_pos: ListState,
     pub tracing_pos:  TreeState<TermId>,
-}
-
-#[derive(Debug)]
-pub enum TasksNode {
-    Task(TaskState),
-    Directory(DirectoryStat),
 }
 
 #[derive(Debug, Clone)]
@@ -104,6 +106,7 @@ impl State {
             tasks: Tree::new(TasksNode::new_directory("Tasks".into())),
             tasks_pos: Default::default(),
             settings,
+            solve_queue: Default::default(),
         };
 
         for task in tasks.into_iter() {
@@ -188,20 +191,24 @@ impl State {
         }
     }
 
-    pub fn solve_node_id(&mut self, node_id: &TreeIndex) {
-        let Some(node) = self.tasks.get_mut(node_id) else {
+    pub fn mark_to_solve(&mut self, node_id: TreeIndex) {
+        let Some(node) = self.tasks.get_mut(&node_id) else {
             return;
         };
 
-        let task = match node.data_mut() {
-            TasksNode::Directory { .. } => {
-                let indexes: Vec<_> = node.iter().map(|x| x.id()).collect();
-                for id in indexes {
-                    self.solve_node_id(&id);
-                }
-                return;
-            }
-            TasksNode::Task(task) => task,
+        if let TasksNode::Directory { .. } = node.data_mut() {
+            self.solve_queue.extend(node.iter().map(|x| x.id()));
+        } else {
+            self.solve_queue.push(node_id);
+        };
+    }
+
+    pub fn update_task_solution(&mut self, idx: &TreeIndex, solution: SharedSolution) {
+        let Some(node) = self.tasks.get_mut(idx) else {
+            return;
+        };
+        let TasksNode::Task(task) = node.data_mut() else {
+            return;
         };
 
         let mut upd = DirectoryStatUpdate::default();
@@ -216,16 +223,7 @@ impl State {
         } else {
             upd.solved_delta -= 1;
         };
-        let mut solver = Solver::new(
-            self.rules_engine.clone(),
-            DumperConfig {
-                sink:     "profiler".into(),
-                filename: None,
-            }
-            .build(),
-            self.settings.exec_deadline,
-        );
-        task.solution = solver.solve(task.solution.task.clone());
+        task.solution = solution;
 
         // Add new task status to remove
         if task.solution.answer().is_none() {
@@ -237,6 +235,6 @@ impl State {
         };
 
         // Propagate changes to all parent nodes
-        self.counters_update(node_id, upd);
+        self.counters_update(idx, upd);
     }
 }

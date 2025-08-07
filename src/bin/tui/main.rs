@@ -19,7 +19,7 @@ use settings::Settings;
 use ui::{Command, Tab as Itab};
 
 fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
-    let mut status = ui::Ui::try_new(settings)?;
+    let mut ui = ui::Ui::try_new(settings)?;
 
     loop {
         terminal.draw(|frame| {
@@ -33,11 +33,12 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                 .split(frame.area());
 
             let tabs = Tabs::new((0..=Itab::MAX).map(|x| format!("F{}: {}", x + 1, Itab::from(x))))
-                .select(Some(status.current_tab.into()))
+                .select(Some(ui.current_tab.into()))
                 .block(Block::default().borders(Borders::LEFT | Borders::RIGHT));
             frame.render_widget(tabs, vertical_layout[0]);
 
-            status.draw(frame, vertical_layout[1]);
+            ui.draw(frame, vertical_layout[1]);
+            ui.process_queue();
 
             let help = Paragraph::new(
                 "←↑→↓ - navigation | q - quit | s - solve selected | r - reload symbols | a - solve all | Space - toggle tree node",
@@ -66,7 +67,7 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                     KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
                     _ => Command::None,
                 };
-                status.process(command);
+                ui.process(command);
             }
         }
     }
