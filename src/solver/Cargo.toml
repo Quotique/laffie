@@ -17,6 +17,7 @@ serde = { workspace = true }
 serde_derive = { workspace = true }
 smartstring = { workspace = true }
 trees = { workspace = true }
+parking_lot = { workspace = true }
 
 bigdecimal = "0.4"
 bincode = "2.0"
@@ -26,7 +27,6 @@ indexmap = "2.10"
 multimap = "0.10"
 num = "0.4"
 num-bigint = "0.4"
-parking_lot = "0.12"
 
 [dev-dependencies]
 parser = { path = "../parser" }

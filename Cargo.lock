@@ -334,6 +334,7 @@ dependencies = [
  "config",
  "database",
  "itertools 0.14.0",
+ "parking_lot 0.12.4",
  "parser",
  "serde",
  "serde_derive",

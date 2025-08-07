@@ -1,12 +1,10 @@
-use std::sync::Arc;
-
-use parking_lot::Mutex;
-
 use crate::{
     rule::{Hypothesis, SharedRule},
-    task::{Solution, Task, TermProps},
+    task::{Solution, Task, TermInference, TermProps},
     term::SharedTerm,
 };
+
+use super::file::FileDumpTracer;
 
 pub trait Tracer: Send + Sync {
     // Called each time when new task spawned
@@ -25,91 +23,80 @@ pub trait Tracer: Send + Sync {
     fn on_rule_selection(&mut self, _rule: SharedRule) {}
 
     // Called on each new hypothesis
-    fn on_new_hypothesis(
-        &mut self,
-        _parent: SharedTerm,
-        _rule: SharedRule,
-        _hypothesis: &Hypothesis,
-        _cycle: usize,
-    ) {
-    }
+    fn on_new_hypothesis(&mut self, _parent: SharedTerm, _hypothesis: &Hypothesis, _cycle: usize) {}
 
     // Called on hypothesis processing finished
-    fn on_hypothesis_finish(
-        &mut self,
-        _hypothesis: &Hypothesis,
-        _cycle: usize,
-        _first_unproven: usize,
-    ) {
-    }
+    fn on_hypothesis_finish(&mut self, _inference: &TermInference, _cycle: usize) {}
 }
 
-#[derive(Clone)]
-pub struct SolutionTracer {
-    sink: Arc<Mutex<Box<dyn Tracer>>>,
+#[derive(Default)]
+pub struct TracerHub {
+    tracers: Vec<Box<dyn Tracer>>,
 }
 
 pub struct EmptyTracer {}
 
 impl Tracer for EmptyTracer {}
 
-impl SolutionTracer {
-    pub fn new(tracer: impl Tracer + 'static) -> Self {
+impl TracerHub {
+    pub fn new() -> Self {
         Self {
-            sink: Arc::new(Mutex::new(Box::new(tracer))),
+            tracers: Default::default(),
         }
+    }
+
+    pub fn add_custom(&mut self, tracer: impl Tracer + 'static) -> &mut Self {
+        self.tracers.push(Box::new(tracer));
+        self
+    }
+
+    pub fn add_file_dumper(&mut self, filename: impl AsRef<str>) -> &mut Self {
+        self.tracers
+            .push(Box::new(FileDumpTracer::new(filename.as_ref())));
+        self
     }
 }
 
-impl Default for SolutionTracer {
-    fn default() -> Self {
-        Self {
-            sink: Arc::new(Mutex::new(Box::new(EmptyTracer {}))),
+impl Tracer for TracerHub {
+    fn on_subtask_start(&mut self, task: &Task, cycle: usize) {
+        for i in self.tracers.iter_mut() {
+            i.on_subtask_start(task, cycle);
         }
     }
-}
 
-impl SolutionTracer {
-    pub fn on_subtask_start(&self, task: &Task, cycle: usize) {
-        self.sink.lock().on_subtask_start(task, cycle);
+    fn on_subtask_end(&mut self, status: &Solution) {
+        for i in self.tracers.iter_mut() {
+            i.on_subtask_end(status);
+        }
     }
 
-    pub fn on_subtask_end(&self, status: &Solution) {
-        self.sink.lock().on_subtask_end(status);
+    fn on_new_term(&mut self, term: &TermProps, parent: &TermProps) {
+        for i in self.tracers.iter_mut() {
+            i.on_new_term(term, parent);
+        }
     }
 
-    pub fn on_new_term(&self, term: &TermProps, parent: &TermProps) {
-        self.sink.lock().on_new_term(term, parent);
+    fn on_term_focus(&mut self, term: &TermProps) {
+        for i in self.tracers.iter_mut() {
+            i.on_term_focus(term);
+        }
     }
 
-    pub fn on_term_focus(&self, term: &TermProps) {
-        self.sink.lock().on_term_focus(term);
+    fn on_rule_selection(&mut self, rule: SharedRule) {
+        for i in self.tracers.iter_mut() {
+            i.on_rule_selection(rule.clone());
+        }
     }
 
-    pub fn on_rule_selection(&self, rule: SharedRule) {
-        self.sink.lock().on_rule_selection(rule.clone());
+    fn on_new_hypothesis(&mut self, parent: SharedTerm, hypothesis: &Hypothesis, cycle: usize) {
+        for i in self.tracers.iter_mut() {
+            i.on_new_hypothesis(parent.clone(), hypothesis, cycle);
+        }
     }
 
-    pub fn on_new_hypothesis(
-        &self,
-        parent: SharedTerm,
-        rule: SharedRule,
-        hypothesis: &Hypothesis,
-        cycle: usize,
-    ) {
-        self.sink
-            .lock()
-            .on_new_hypothesis(parent.clone(), rule.clone(), hypothesis, cycle);
-    }
-
-    pub fn on_hypothesis_finish(
-        &self,
-        hypothesis: &Hypothesis,
-        cycle: usize,
-        first_unproven: usize,
-    ) {
-        self.sink
-            .lock()
-            .on_hypothesis_finish(hypothesis, cycle, first_unproven);
+    fn on_hypothesis_finish(&mut self, inference: &TermInference, cycle: usize) {
+        for i in self.tracers.iter_mut() {
+            i.on_hypothesis_finish(inference, cycle);
+        }
     }
 }

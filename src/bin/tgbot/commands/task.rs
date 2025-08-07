@@ -6,7 +6,7 @@ use database::{TaskDb, TaskRecord, UserDb, UserRecord};
 use parser::{lang, TaskParser};
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, SolutionStatus, Solver, EXECUTION_DEADLINE_DEFAULT},
+    task::{SolutionStatus, Solver, EXECUTION_DEADLINE_DEFAULT},
 };
 use view::{Html, View};
 
@@ -28,15 +28,7 @@ fn task(
     let record = TaskRecord::from(&task);
     let mut record = tasks.get_or_insert(record).map_err(|e| e.to_string())?;
 
-    let mut solver = Solver::new(
-        engine,
-        DumperConfig {
-            sink:     "none".into(),
-            filename: None,
-        }
-        .build(),
-        EXECUTION_DEADLINE_DEFAULT,
-    );
+    let mut solver = Solver::new(engine, Default::default(), EXECUTION_DEADLINE_DEFAULT);
 
     user.add_task_id(record.id);
 

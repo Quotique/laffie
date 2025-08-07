@@ -100,15 +100,9 @@ impl Tracer for FileDumpTracer {
             .expect(WRITE_ERROR_TEXT);
     }
 
-    fn on_new_hypothesis(
-        &mut self,
-        _parent: SharedTerm,
-        rule: SharedRule,
-        hypothesis: &Hypothesis,
-        _cycle: usize,
-    ) {
+    fn on_new_hypothesis(&mut self, _parent: SharedTerm, hypothesis: &Hypothesis, _cycle: usize) {
         self.file
-            .write_all(format!("{}|> {} {}\n", self.idention(), rule, hypothesis).as_bytes())
+            .write_all(format!("{}|> {}\n", self.idention(), hypothesis).as_bytes())
             .expect(WRITE_ERROR_TEXT);
     }
 }

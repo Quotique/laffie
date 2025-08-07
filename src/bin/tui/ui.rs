@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{ListState, Paragraph},
 };
 
-use solver::task::{DumperConfig, Solver};
+use solver::task::Solver;
 use utils::IndexedTree;
 
 use super::{
@@ -91,11 +91,7 @@ impl Ui {
             };
             let mut solver = Solver::new(
                 self.state.rules_engine.clone(),
-                DumperConfig {
-                    sink:     "profiler".into(),
-                    filename: None,
-                }
-                .build(),
+                Default::default(),
                 self.state.settings.exec_deadline,
             );
             let solution = solver.solve(task.solution.task.clone());

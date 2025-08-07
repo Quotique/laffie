@@ -8,10 +8,11 @@ use std::{collections::HashMap, convert::TryFrom, fmt, path::PathBuf, sync::Arc}
 use clap::Parser;
 use colored::*;
 use itertools::Itertools;
+use parking_lot::Mutex;
 
 use database::{TaskDb, TaskRecord};
 use parser::DirectoryParser;
-use solver::task::{DumperConfig, SolutionStatus, Solver, Task};
+use solver::task::{SolutionStatus, Solver, Task, TracerHub};
 use view::View;
 
 use crate::settings::Settings;
@@ -150,15 +151,13 @@ fn main() {
         let p_id = p.id;
         let mut solver = Solver::new(
             rules_engine.clone(),
-            DumperConfig {
-                sink:     if args.trace {
-                    "file".into()
-                } else {
-                    "none".into()
-                },
-                filename: Some(format!("dumps/{p_id:x}.dump")),
-            }
-            .build(),
+            Arc::new(Mutex::new({
+                let mut tracer = TracerHub::default();
+                if args.trace {
+                    tracer.add_file_dumper(format!("dumps/{p_id:x}.dump"));
+                }
+                tracer
+            })),
             args.exec_deadline,
         );
 

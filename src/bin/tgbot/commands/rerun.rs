@@ -6,7 +6,7 @@ use telegram_bot::*;
 use database::{TaskDb, UserDb, UserRecord};
 use solver::{
     rule::RulesEngine,
-    task::{DumperConfig, SolutionStatus, Solver, EXECUTION_DEADLINE_DEFAULT},
+    task::{SolutionStatus, Solver, EXECUTION_DEADLINE_DEFAULT},
     CompactString,
 };
 use view::{Html, View};
@@ -27,15 +27,7 @@ fn rerun(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| t!("errors.task_not_found"))?;
 
-    let mut solution = Solver::new(
-        engine,
-        DumperConfig {
-            sink:     "none".into(),
-            filename: None,
-        }
-        .build(),
-        EXECUTION_DEADLINE_DEFAULT,
-    );
+    let mut solution = Solver::new(engine, Default::default(), EXECUTION_DEADLINE_DEFAULT);
 
     let solution = solution.solve(record.clone().into());
     let mut output = Paginator::new(4096);
