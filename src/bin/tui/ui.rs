@@ -89,12 +89,12 @@ impl Ui {
             let TasksNode::Task(task) = self.state.tasks.get_mut(&idx).unwrap().data_mut() else {
                 continue;
             };
-            let mut solver = Solver::new(
-                self.state.rules_engine.clone(),
+            let mut solver = Solver::new(self.state.rules_engine.clone());
+            let solution = solver.solve(
+                task.solution.task.clone(),
                 Default::default(),
                 self.state.settings.exec_deadline,
             );
-            let solution = solver.solve(task.solution.task.clone());
             self.state.update_task_solution(&idx, solution);
         }
     }

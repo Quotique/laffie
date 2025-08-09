@@ -8,7 +8,6 @@ use std::{collections::HashMap, convert::TryFrom, fmt, path::PathBuf, sync::Arc}
 use clap::Parser;
 use colored::*;
 use itertools::Itertools;
-use parking_lot::Mutex;
 
 use database::{TaskDb, TaskRecord};
 use parser::DirectoryParser;
@@ -149,19 +148,19 @@ fn main() {
 
         println!("{} {}", "Task".bold().green(), p);
         let p_id = p.id;
-        let mut solver = Solver::new(
-            rules_engine.clone(),
-            Arc::new(Mutex::new({
+        let mut solver = Solver::new(rules_engine.clone());
+
+        let solution = solver.solve(
+            p,
+            {
                 let mut tracer = TracerHub::default();
                 if args.trace {
                     tracer.add_file_dumper(format!("dumps/{p_id:x}.dump"));
                 }
                 tracer
-            })),
+            },
             args.exec_deadline,
         );
-
-        let solution = solver.solve(p);
         match solution.status {
             SolutionStatus::Answer(_) => {
                 stats.entry(record.group.clone()).or_default().solved += 1;

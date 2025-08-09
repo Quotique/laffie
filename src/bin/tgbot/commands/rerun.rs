@@ -27,9 +27,13 @@ fn rerun(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| t!("errors.task_not_found"))?;
 
-    let mut solution = Solver::new(engine, Default::default(), EXECUTION_DEADLINE_DEFAULT);
+    let mut solution = Solver::new(engine);
 
-    let solution = solution.solve(record.clone().into());
+    let solution = solution.solve(
+        record.clone().into(),
+        Default::default(),
+        EXECUTION_DEADLINE_DEFAULT,
+    );
     let mut output = Paginator::new(4096);
     match solution.status {
         SolutionStatus::Answer(_) => {

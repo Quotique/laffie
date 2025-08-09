@@ -1,7 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
 use itertools::Itertools;
-use parking_lot::{Mutex, RwLock};
 
 use super::{
     props::TermInference, Purpose, SharedSolution, Solution, SolveError, Task, TaskBuilder,
@@ -18,83 +17,93 @@ pub const MAX_SUBTASK_LEVEL: usize = 10;
 pub const MAX_LEVEL: usize = 20;
 pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 
+struct SolutionState {
+    execution_deadline: usize,
+    cycle_counter:      usize,
+    cache:              HashMap<Term, SharedSolution>,
+    tracer:             TracerHub,
+}
+
 pub struct Solver {
     rules_engine: Arc<RulesEngine>,
 
     local_rules: Vec<SharedRule>,
-
-    execution_deadline: usize,
-    cycle_counter:      usize,
-
-    cache:  Arc<RwLock<HashMap<Term, SharedSolution>>>,
-    tracer: Arc<Mutex<TracerHub>>,
 }
 
 impl Solver {
-    pub fn new(
-        rules: Arc<RulesEngine>,
-        tracer: Arc<Mutex<TracerHub>>,
-        execution_deadline: usize,
-    ) -> Solver {
+    pub fn new(rules: Arc<RulesEngine>) -> Solver {
         Solver {
-            local_rules: vec![],
-
             rules_engine: rules.clone(),
+            local_rules:  vec![],
+        }
+    }
+
+    pub fn solve(
+        &mut self,
+        task: Task,
+        tracer: TracerHub,
+        execution_deadline: usize,
+    ) -> SharedSolution {
+        let mut solution = Solution::new(task);
+        let mut state = SolutionState {
             execution_deadline,
             cycle_counter: Default::default(),
             cache: Default::default(),
             tracer,
-        }
+        };
+
+        self.solve_impl(&mut solution, &mut state);
+        solution.into()
     }
 
-    pub fn solve(&mut self, task: Task) -> SharedSolution {
-        let mut solution = Solution::new(task);
-
+    fn solve_impl(&mut self, solution: &mut Solution, state: &mut SolutionState) {
         if solution.task.subtask_level > MAX_SUBTASK_LEVEL {
             solution.status = SolutionStatus::Err(SolveError::MaxSubtaskLevelExceed);
-            return solution.into();
+            return;
         }
-        self.tracer
-            .lock()
-            .on_subtask_start(&solution.task, self.current_cycle());
+        state
+            .tracer
+            .on_subtask_start(&solution.task, state.current_cycle());
 
-        solution.start_cycle = self.cycle_counter;
+        solution.start_cycle = state.cycle_counter;
 
         // TODO: can be replaced with try { .. } in future
         // track: https://github.com/rust-lang/rust/issues/31436
         let mut main_loop = || loop {
-            self.increment_cycle_counter()?;
-            let index = self.try_focus_term(&solution)?;
-            if self.try_simplify(index, &mut solution)? {
+            state.increment_cycle_counter()?;
+            let index = self.try_focus_term(solution, state)?;
+            if self.try_simplify(index, solution, state)? {
                 continue;
             }
-            if self.check_if_answer(&mut solution, index) {
+            if self.check_if_answer(solution, state, index) {
                 let level = solution.task.subtask_level;
                 let answer = solution.answer().unwrap();
                 trace!("Solved {level}. Answer: {answer}",);
                 break Ok(());
             }
             self.add_local_rule(&mut solution[index]);
-            self.try_infer_new_terms(index, &mut solution)?;
+            self.try_infer_new_terms(index, solution, state)?;
         };
         if let Err(e) = main_loop() {
             solution.status = SolutionStatus::Err(e);
         }
-        solution.end_cycle = self.cycle_counter;
-        self.tracer.clone().lock().on_subtask_end(&solution);
-
-        solution.into()
+        solution.end_cycle = state.cycle_counter;
+        state.tracer.on_subtask_end(solution);
     }
 
-    fn try_focus_term(&self, solution: &Solution) -> Result<TermIdx, SolveError> {
+    fn try_focus_term(
+        &self,
+        solution: &Solution,
+        state: &mut SolutionState,
+    ) -> Result<TermIdx, SolveError> {
         let index = solution.pick_next().ok_or(SolveError::NoConditions)?;
-        self.tracer.lock().on_term_focus(&solution[index]);
+        state.tracer.on_term_focus(&solution[index]);
         let level = solution[index].filters.weight;
 
         trace!(target: "subtask",
             "[{}]({}) Level: {level} -> {}",
             solution.task.subtask_level,
-            self.current_cycle(),
+            state.current_cycle(),
             solution[index]
         );
 
@@ -104,12 +113,17 @@ impl Solver {
         Ok(index)
     }
 
-    fn try_simplify(&mut self, index: usize, solution: &mut Solution) -> Result<bool, SolveError> {
+    fn try_simplify(
+        &mut self,
+        index: usize,
+        solution: &mut Solution,
+        state: &mut SolutionState,
+    ) -> Result<bool, SolveError> {
         if solution.purpose.is_transform() {
             Ok(false)
-        } else if let Some(simplified) = self.transform(solution, index) {
+        } else if let Some(simplified) = self.transform(solution, state, index) {
             solution[index].filters.mark_replaced();
-            self.add_term(simplified, solution)?;
+            self.add_term(simplified, solution, state)?;
             Ok(true)
         } else {
             solution[index].filters.mark_simplified();
@@ -117,8 +131,13 @@ impl Solver {
         }
     }
 
-    fn add_term(&mut self, term: TermProps, s: &mut Solution) -> Result<TermIdx, SolveError> {
-        self.tracer.lock().on_new_term(
+    fn add_term(
+        &mut self,
+        term: TermProps,
+        s: &mut Solution,
+        state: &mut SolutionState,
+    ) -> Result<TermIdx, SolveError> {
+        state.tracer.on_new_term(
             &term,
             &term
                 .inference
@@ -188,6 +207,7 @@ impl Solver {
         &mut self,
         index: TermIdx,
         solution: &mut Solution,
+        state: &mut SolutionState,
     ) -> Result<(), SolveError> {
         let is_purpose = solution[index].filters.is_purpose();
         let proof_purpose = TermProps::from(
@@ -204,10 +224,10 @@ impl Solver {
             },
             &solution.purpose,
         ) {
-            match self.produce(&rule, solution, index) {
+            match self.produce(&rule, solution, state, index) {
                 Some(s) => {
                     trace!("{} => {s}", solution[index]);
-                    self.add_term(s, solution)?;
+                    self.add_term(s, solution, state)?;
                     if is_purpose && solution.purpose.is_transform() {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
                         solution[index].filters.weight = MAX_LEVEL + 1;
@@ -226,7 +246,13 @@ impl Solver {
         Ok(())
     }
 
-    fn produce(&self, rule: &SharedRule, s: &mut Solution, index: TermIdx) -> Option<TermProps> {
+    fn produce(
+        &self,
+        rule: &SharedRule,
+        s: &mut Solution,
+        state: &mut SolutionState,
+        index: TermIdx,
+    ) -> Option<TermProps> {
         let is_purpose = s[index].filters.is_purpose();
         let proof_purpose = Term::symbol("proof").with_child(s[index].term.as_ref().clone());
         HypothesisIterator::new(
@@ -248,7 +274,7 @@ impl Solver {
             if is_dub {
                 return None;
             }
-            let props = self.try_prove_hypothesis(index, s, hypothesis);
+            let props = self.try_prove_hypothesis(index, s, hypothesis, state);
             if props.inference.is_proven() {
                 Some(props)
             } else {
@@ -265,16 +291,17 @@ impl Solver {
         parent_idx: usize,
         solution: &Solution,
         hypothesis: Hypothesis,
+        state: &mut SolutionState,
     ) -> TermProps {
         trace!(
             target: "rule_selection",
             "new hypothesis {hypothesis}, rule {}, term: {}",
             hypothesis.rule, solution[parent_idx]
         );
-        self.tracer.lock().on_new_hypothesis(
+        state.tracer.on_new_hypothesis(
             solution[parent_idx].term.clone(),
             &hypothesis,
-            self.current_cycle(),
+            state.current_cycle(),
         );
 
         let mut props = TermProps::from(hypothesis.resolution.clone());
@@ -285,7 +312,7 @@ impl Solver {
         let mut req_proofs = vec![];
         let mut iter = hypothesis.requirements.clone().into_iter();
         for i in iter.by_ref() {
-            req_proofs.push(self.proof(solution, i));
+            req_proofs.push(self.proof(solution, i, state));
             let last = req_proofs.last().unwrap();
             if last.answer().is_none() {
                 trace!(
@@ -309,9 +336,9 @@ impl Solver {
             requirements: req_proofs,
         };
 
-        self.tracer
-            .lock()
-            .on_hypothesis_finish(&props.inference, self.current_cycle());
+        state
+            .tracer
+            .on_hypothesis_finish(&props.inference, state.current_cycle());
 
         if props.inference.is_proven() {
             trace!(
@@ -323,15 +350,25 @@ impl Solver {
         props
     }
 
-    fn proof(&self, solution: &Solution, mut term: Term) -> SharedSolution {
+    fn proof(
+        &self,
+        solution: &Solution,
+        mut term: Term,
+        state: &mut SolutionState,
+    ) -> SharedSolution {
         is_replace(&mut term.as_subterm_mut());
         let term = term.normalize(NormalizationLevel::max());
         let proof_purpose = SharedTerm::new(Term::symbol("proof").with_child(term));
         // TODO: fast check truth
-        self.solve_subtask(solution, proof_purpose)
+        self.solve_subtask(solution, proof_purpose, state)
     }
 
-    fn transform(&mut self, solution: &mut Solution, index: usize) -> Option<TermProps> {
+    fn transform(
+        &mut self,
+        solution: &mut Solution,
+        state: &mut SolutionState,
+        index: usize,
+    ) -> Option<TermProps> {
         let term = &mut solution[index];
         if term.filters.is_simplified() {
             return None;
@@ -345,7 +382,7 @@ impl Solver {
             term.term.as_subterm().to_term()
         };
         let task = SharedTerm::new(Term::symbol("transform").with_child(to_transform));
-        let subtask_solution = self.solve_subtask(solution, task.clone());
+        let subtask_solution = self.solve_subtask(solution, task.clone(), state);
 
         let mut answer = subtask_solution.answer()?.as_ref().clone();
         if use_answer {
@@ -372,13 +409,19 @@ impl Solver {
         Some(result)
     }
 
-    fn solve_subtask(&self, solution: &Solution, task: SharedTerm) -> SharedSolution {
-        if let Some(x) = self.cache.read().get(&task) {
+    fn solve_subtask(
+        &self,
+        solution: &Solution,
+        task: SharedTerm,
+        state: &mut SolutionState,
+    ) -> SharedSolution {
+        if let Some(x) = state.cache.get(&task) {
             return x.clone();
         }
 
         let purpose = task.as_subterm().to_term();
-        if { self.cache.write() }
+        if state
+            .cache
             .insert(
                 purpose.clone(),
                 Solution::new(Task::from(TermProps::from(purpose))).into(),
@@ -389,21 +432,17 @@ impl Solver {
             unimplemented!("subtask recursion");
         }
 
-        let mut subtask_solver = Solver::new(
-            self.rules_engine.clone(),
-            self.tracer.clone(),
-            self.execution_deadline,
-        );
-        subtask_solver.cycle_counter = self.cycle_counter;
-        subtask_solver.cache = self.cache.clone();
+        let mut subtask_solver = Solver::new(self.rules_engine.clone());
 
         let subtask = Self::subtask(solution, task.clone());
-        let subtask_solution = subtask_solver.solve(subtask);
-        *self.cache.write().get_mut(&task).unwrap() = subtask_solution.clone();
+        let mut subtask_solution = Solution::new(subtask);
+        subtask_solver.solve_impl(&mut subtask_solution, state);
+        let subtask_solution = SharedSolution::new(subtask_solution);
+        *state.cache.get_mut(&task).unwrap() = subtask_solution.clone();
         if let SolutionStatus::Err(e) = subtask_solution.status {
             trace!("Can't proof {task}: {e}");
             if e == SolveError::MaxSubtaskLevelExceed {
-                self.cache.write().remove(&task);
+                state.cache.remove(&task);
             }
         }
         subtask_solution
@@ -429,7 +468,12 @@ impl Solver {
             .expect("Can't build subtask")
     }
 
-    fn check_if_answer(&self, solution: &mut Solution, index: usize) -> bool {
+    fn check_if_answer(
+        &self,
+        solution: &mut Solution,
+        state: &mut SolutionState,
+        index: usize,
+    ) -> bool {
         if solution[index].filters.is_purpose() {
             return false;
         }
@@ -438,7 +482,7 @@ impl Solver {
         }
 
         match solution.purpose.clone() {
-            Purpose::Find(x) => self.check_find_answer(solution, index, x.term.as_ref()),
+            Purpose::Find(x) => self.check_find_answer(solution, state, index, x.term.as_ref()),
             Purpose::Proof(_) => self.check_proof_answer(solution, index),
             Purpose::Transform(_) => self.check_transform_answer(solution),
         }
@@ -463,7 +507,13 @@ impl Solver {
         false
     }
 
-    fn check_find_answer(&self, solution: &mut Solution, index: usize, find: &Term) -> bool {
+    fn check_find_answer(
+        &self,
+        solution: &mut Solution,
+        state: &mut SolutionState,
+        index: usize,
+        find: &Term,
+    ) -> bool {
         let term = solution[index].term.as_subterm();
 
         if term.degree() != 2 {
@@ -477,7 +527,7 @@ impl Solver {
             let is_known = Term::symbol("is")
                 .with_child(term.last_arg().unwrap().to_term())
                 .with_child(Term::symbol("known"));
-            if self.proof(solution, is_known).answer().is_some() {
+            if self.proof(solution, is_known, state).answer().is_some() {
                 solution.status = SolutionStatus::Answer(index);
                 return true;
             }
@@ -527,7 +577,9 @@ impl Solver {
         }
         false
     }
+}
 
+impl SolutionState {
     fn current_cycle(&self) -> usize {
         self.cycle_counter
     }
@@ -573,8 +625,8 @@ mod solution_tests {
     fn check_answer_find_test() {
         let task = parse_task("task {purpose find(x); x == 1;}");
         let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules, Default::default(), usize::MAX);
-        let solution = solver.solve(task);
+        let mut solver = Solver::new(rules);
+        let solution = solver.solve(task, Default::default(), usize::MAX);
         assert_eq!(
             *solution.answer().expect("task is not solved"),
             term_with_vars("x == 1")
@@ -585,8 +637,8 @@ mod solution_tests {
     fn check_answer_proof_test() {
         let task = parse_task("task { purpose proof(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules, Default::default(), usize::MAX);
-        let solution = solver.solve(task);
+        let mut solver = Solver::new(rules);
+        let solution = solver.solve(task, Default::default(), usize::MAX);
         assert!(solution.answer().is_some());
     }
 }

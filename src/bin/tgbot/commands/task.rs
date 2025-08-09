@@ -28,12 +28,12 @@ fn task(
     let record = TaskRecord::from(&task);
     let mut record = tasks.get_or_insert(record).map_err(|e| e.to_string())?;
 
-    let mut solver = Solver::new(engine, Default::default(), EXECUTION_DEADLINE_DEFAULT);
+    let mut solver = Solver::new(engine);
 
     user.add_task_id(record.id);
 
     let mut output = Paginator::new(4096);
-    let solution = solver.solve(task);
+    let solution = solver.solve(task, Default::default(), EXECUTION_DEADLINE_DEFAULT);
     match solution.status {
         SolutionStatus::Answer(_) => {
             output
