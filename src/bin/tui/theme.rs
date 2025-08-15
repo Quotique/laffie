@@ -1,13 +1,15 @@
 use ratatui::{
     prelude::*,
     style::{Style, Stylize},
-    widgets::{block::Title, Block, Borders, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{
+        block::Title, Block, Borders, Gauge, Scrollbar, ScrollbarOrientation, ScrollbarState,
+    },
 };
 
 pub struct Theme {}
 
 impl Theme {
-    pub fn block(&self, focused: bool, title: impl Into<Title<'static>>) -> Block<'static> {
+    pub fn block<'a>(&self, focused: bool, title: impl Into<Title<'a>>) -> Block<'a> {
         let pane_style = if focused {
             Style::new().fg(Color::Cyan)
         } else {
@@ -17,6 +19,13 @@ impl Theme {
             .borders(Borders::ALL)
             .border_style(pane_style)
             .title(title)
+    }
+
+    pub fn gauge<'a>(&self, title: impl Into<Title<'a>>) -> Gauge<'a> {
+        let title = self.block(false, title);
+        Gauge::default()
+            .block(title)
+            .gauge_style(Style::default().fg(Color::Blue).bg(Color::DarkGray))
     }
 
     pub fn scrollbar(&self) -> Scrollbar<'static> {

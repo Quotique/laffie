@@ -8,7 +8,6 @@ use ratatui::{
 };
 
 mod pane;
-mod popup;
 mod settings;
 mod state;
 mod theme;
@@ -38,7 +37,6 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
             frame.render_widget(tabs, vertical_layout[0]);
 
             ui.draw(frame, vertical_layout[1]);
-            ui.process_queue();
 
             let help = Paragraph::new(
                 "←↑→↓ - navigation | q - quit | s - solve selected | r - reload symbols | a - solve all | Space - toggle tree node",
@@ -48,6 +46,9 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
             frame.render_widget(help, vertical_layout[2]);
         })?;
 
+        if !event::poll(std::time::Duration::from_millis(100))? {
+            continue;
+        }
         if let event::Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
                 let command = match key.code {

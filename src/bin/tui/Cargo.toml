@@ -20,6 +20,7 @@ log = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 trees = { workspace = true }
+parking_lot = { workspace = true }
 
 clap = { version = "4.5", features = ["derive"] }
 colored = "3"

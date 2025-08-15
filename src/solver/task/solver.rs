@@ -97,7 +97,9 @@ impl Solver {
         state: &mut SolutionState,
     ) -> Result<TermIdx, SolveError> {
         let index = solution.pick_next().ok_or(SolveError::NoConditions)?;
-        state.tracer.on_term_focus(&solution[index]);
+        state
+            .tracer
+            .on_term_focus(&solution[index], state.current_cycle());
         let level = solution[index].filters.weight;
 
         trace!(target: "subtask",

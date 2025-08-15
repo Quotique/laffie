@@ -1,21 +1,33 @@
-use std::{collections::HashMap, io, iter::once};
-
-use derive_more::Display;
-use ratatui::{
-    prelude::*,
-    widgets::{ListState, Paragraph},
+use std::{
+    collections::HashMap,
+    io,
+    iter::once,
+    sync::Arc,
+    thread::{spawn, JoinHandle},
 };
 
-use solver::task::Solver;
-use utils::IndexedTree;
+use derive_more::Display;
+use parking_lot::Mutex;
+use ratatui::{
+    prelude::*,
+    widgets::{ListState, Paragraph, Wrap},
+};
+
+use solver::task::{SharedSolution, Solution, Solver, TracerHub};
+use utils::{IndexedTree, TreeIndex};
 
 use super::{
     pane::Pane,
-    popup::Popup,
     settings::Settings,
     state::{State, TasksNode},
 };
-use crate::pane::WidgetType;
+use crate::{
+    pane::WidgetType,
+    widgets::{
+        popup::Popup,
+        solver_progress::{ProgressReporter, SolverProgress},
+    },
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Command {
@@ -33,11 +45,13 @@ pub enum Command {
 
 pub struct Ui {
     panes: HashMap<Tab, Pane>,
-    popup: Option<Popup<'static>>,
+
+    error:    String,
+    worker:   Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
+    progress: Arc<Mutex<SolverProgress>>,
 
     pub current_tab: Tab,
-
-    state: State,
+    state:           State,
 }
 
 #[derive(Debug, Clone, Copy, Display, Hash, Eq, PartialEq)]
@@ -79,28 +93,55 @@ impl Ui {
         Ok(Ui {
             current_tab: Tab::Rules,
             panes,
+            error: Default::default(),
+            worker: None,
+            progress: Mutex::new(SolverProgress::new(state.settings.exec_deadline)).into(),
             state,
-            popup: None,
         })
     }
 
     pub fn process_queue(&mut self) {
-        for idx in self.state.solve_queue.split_off(0) {
-            let TasksNode::Task(task) = self.state.tasks.get_mut(&idx).unwrap().data_mut() else {
-                continue;
-            };
-            let mut solver = Solver::new(self.state.rules_engine.clone());
-            let solution = solver.solve(
-                task.solution.task.clone(),
-                Default::default(),
-                self.state.settings.exec_deadline,
-            );
-            self.state.update_task_solution(&idx, solution);
+        if self.state.solve_queue.is_empty() {
+            return;
         }
+
+        let queue = { self.state.solve_queue.split_off(0) }
+            .into_iter()
+            .filter_map(|idx| {
+                let TasksNode::Task(task) = self.state.tasks.get_mut(&idx).unwrap().data() else {
+                    return None;
+                };
+                Some((idx, Solution::new(task.solution.task.clone())))
+            })
+            .collect::<Vec<_>>();
+
+        self.progress.lock().current_cycles = 0;
+        self.progress.lock().finished_tasks_count = 0;
+        self.progress.lock().total_tasks_count = queue.len();
+
+        let reporter = ProgressReporter(self.progress.clone());
+        let rules = self.state.rules_engine.clone();
+        let exec_deadline = self.state.settings.exec_deadline;
+        self.worker = Some(spawn(move || {
+            queue
+                .into_iter()
+                .map(|(idx, task)| {
+                    let mut hub = TracerHub::default();
+                    hub.add_custom(reporter.clone());
+
+                    reporter.0.lock().current_task = Some(task.task.clone());
+                    let solution = Solver::new(rules.clone()).solve(task.task, hub, exec_deadline);
+                    reporter.0.lock().finished_tasks_count += 1;
+                    reporter.0.lock().current_cycles = 0;
+                    std::thread::sleep(std::time::Duration::from_secs(10));
+                    (idx, solution)
+                })
+                .collect::<Vec<_>>()
+        }));
     }
 
     pub fn process(&mut self, command: Command) {
-        if self.popup.is_some() {
+        if !self.error.is_empty() || self.worker.is_some() {
             return;
         }
 
@@ -111,13 +152,7 @@ impl Ui {
         match command {
             Command::Reload => {
                 if let Err(e) = self.state.reload() {
-                    let err_text = Paragraph::new(
-                        once(Line::from("Error or rules update!"))
-                            .chain(e.to_string().lines().map(|x| Line::from(format!("|{x}"))))
-                            .chain(once(Line::from("Rules not updated!")))
-                            .collect::<Vec<_>>(),
-                    );
-                    self.popup = Some(Popup::new(Line::from("Error"), err_text))
+                    self.error = e.to_string();
                 }
             }
             Command::SwitchTab(num) => {
@@ -132,8 +167,34 @@ impl Ui {
             frame.render_stateful_widget(pane.clone(), area, &mut self.state)
         }
 
-        if let Some(popup) = self.popup.as_mut() {
+        if !self.error.is_empty() {
+            let mut popup = Popup::new(Line::from("Error"));
+            let inner = popup.inner(area);
             popup.draw(frame, area);
+
+            let err_lines = self.error.lines().map(|x| Line::from(format!("|{x}")));
+            let err_text = Paragraph::new(
+                once(Line::from("Error on rules update!"))
+                    .chain(err_lines)
+                    .chain(once(Line::from("Rules not updated!")))
+                    .collect::<Vec<_>>(),
+            );
+            err_text
+                .wrap(Wrap { trim: true })
+                .style(Style::new().white())
+                .render(inner, frame.buffer_mut());
+        }
+
+        if let Some(handler) = self.worker.as_mut() {
+            if !handler.is_finished() {
+                self.progress.lock().draw(frame, area);
+            } else {
+                for (idx, solution) in self.worker.take().unwrap().join().unwrap() {
+                    self.state.update_task_solution(&idx, solution);
+                }
+            }
+        } else {
+            self.process_queue();
         }
     }
 }

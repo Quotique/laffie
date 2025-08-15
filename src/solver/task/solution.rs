@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     error,
     ops::{Index, IndexMut},
-    rc::Rc,
+    sync::Arc,
 };
 
 use bincode::{Decode, Encode};
@@ -14,7 +14,7 @@ use crate::term::SharedTerm;
 
 pub const STACK_SIZE: usize = 2048;
 
-pub type SharedSolution = Rc<Solution>;
+pub type SharedSolution = Arc<Solution>;
 pub type TermIdx = usize;
 
 #[derive(Debug, Display, Clone, Copy, Encode, Decode, PartialEq, Eq)]
@@ -175,3 +175,15 @@ impl IndexMut<TermIdx> for Solution {
 }
 
 impl error::Error for SolveError {}
+
+#[cfg(test)]
+mod test {
+    use super::Solution;
+
+    fn is_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn test_send_sync_solution() {
+        is_send_sync::<Solution>();
+    }
+}

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt, hash, rc::Rc};
+use std::{collections::HashSet, fmt, hash, sync::Arc};
 
 use derive_more::Display;
 use eyre::Result;
@@ -20,7 +20,7 @@ pub enum RuleDeclineReason {
     ParamsMappingErr(String),
 }
 
-pub type SharedRule = Rc<Rule>;
+pub type SharedRule = Arc<Rule>;
 #[derive(Clone, Debug)]
 pub struct Rule {
     pub id:     RuleId,
@@ -142,12 +142,12 @@ impl Rule {
     }
 
     #[inline]
-    pub fn pattern_node(&self) -> Subterm {
+    pub fn pattern_node(&self) -> Subterm<'_> {
         self.term.get(&self.pattern).unwrap()
     }
 
     #[inline]
-    pub fn replace_node(&self) -> Subterm {
+    pub fn replace_node(&self) -> Subterm<'_> {
         self.term.get(&self.replace).unwrap()
     }
 }
@@ -223,7 +223,7 @@ impl std::error::Error for RuleDeclineReason {}
 
 #[cfg(test)]
 pub mod tests {
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use crate::{
         rule::{parse_rule, RuleDeclineReason, TermFilters},
@@ -234,7 +234,7 @@ pub mod tests {
     use super::{ApplyRule, SharedRule};
 
     fn base_rule() -> SharedRule {
-        Rc::new(parse_rule(
+        Arc::new(parse_rule(
             r#"rule {
                 attr level(1);
                 a + x == 0 => x == -a;
@@ -244,7 +244,7 @@ pub mod tests {
     }
 
     fn subtree_rule() -> SharedRule {
-        Rc::new(parse_rule(
+        Arc::new(parse_rule(
             r#"rule {
                 attr subtree,level(1);
                 --a <=> a;
@@ -253,7 +253,7 @@ pub mod tests {
     }
 
     fn rule_with_binds() -> SharedRule {
-        Rc::new(parse_rule(
+        Arc::new(parse_rule(
             r#"rule {
                 attr level(1);
                 a/((b + c) as D) == 0 <=> a == 0 && D != 0;
@@ -334,7 +334,7 @@ pub mod tests {
 
     #[test]
     fn subtree_apply_test_2() {
-        let rule = Rc::new(parse_rule(
+        let rule = Arc::new(parse_rule(
             r#"rule {
                 attr level(0),purpose(transform(x)),replace;
                 a && b <=> b;
@@ -389,7 +389,7 @@ pub mod tests {
 
     #[test]
     fn purpose_mapping_test() {
-        let rule = Rc::new(parse_rule(
+        let rule = Arc::new(parse_rule(
             r#"rule {
                 attr level(0),purpose(find(x));
                 a + x == 0 => x == -a;

@@ -1,7 +1,6 @@
 use std::{
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
-    rc::Rc,
 };
 
 use solver::{
@@ -39,14 +38,14 @@ impl<'a> TaskParser<'a> {
             match child.data().symbol.as_str() {
                 "Purpose" => {
                     builder = builder
-                        .with_purpose(TermProps::from(Rc::new(
+                        .with_purpose(TermProps::from(
                             TermParser::default().with_variables().try_parse(
                                 child.front().ok_or_else(|| ParserError {
                                     loc: child.data().location.clone(),
                                     msg: "must have one argument".to_owned(),
                                 })?,
                             )?,
-                        )))
+                        ))
                         .map_err(|e| ParserError {
                             loc: child.data().location.clone(),
                             msg: e.to_string(),
@@ -76,12 +75,12 @@ impl<'a> TaskParser<'a> {
                     }
                 }
                 _ => {
-                    builder = builder.with_condition(TermProps::from(Rc::new(
+                    builder = builder.with_condition(TermProps::from(
                         TermParser::default()
                             .with_variables()
                             .try_parse(child)?
                             .normalize(NormalizationLevel::max()),
-                    )));
+                    ));
                 }
             }
         }

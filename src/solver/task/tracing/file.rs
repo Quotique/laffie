@@ -88,7 +88,7 @@ impl Tracer for FileDumpTracer {
             .expect(WRITE_ERROR_TEXT);
     }
 
-    fn on_term_focus(&mut self, term: &TermProps) {
+    fn on_term_focus(&mut self, term: &TermProps, _cycle: usize) {
         self.file
             .write_all(format!("{}[> {}\n", self.idention(), term).as_bytes())
             .expect(WRITE_ERROR_TEXT);

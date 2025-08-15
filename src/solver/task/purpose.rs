@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, fmt, rc::Rc};
+use std::{convert::TryFrom, fmt};
 
 use super::TermProps;
 use crate::term::Term;
@@ -45,7 +45,7 @@ impl TryFrom<Term> for Purpose {
         if root.degree() != 1 {
             return Err(SemanticError::WorngArgCount(String::default()));
         }
-        let mut term = TermProps::from(Rc::new(root.pop_first_arg().unwrap()));
+        let mut term = TermProps::from(root.pop_first_arg().unwrap());
         term.filters.mark_purpose();
 
         match root.data().symbol() {

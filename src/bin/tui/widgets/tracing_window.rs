@@ -33,7 +33,7 @@ impl Widget for TracingWindow {
 }
 
 impl TracingWindow {
-    fn task_lines(&self, solution: &Solution) -> Vec<Line> {
+    fn task_lines<'a>(&'a self, solution: &Solution) -> Vec<Line<'a>> {
         vec![
             self.key_value_line("Task: ", &solution.purpose),
             Line::default(),

@@ -1,7 +1,6 @@
 use std::{
     convert::{From, Into},
     path::Path,
-    rc::Rc,
 };
 
 use bincode::{config, config::Configuration, Decode, Encode};
@@ -96,13 +95,9 @@ impl Into<Task> for TaskRecord {
             id:               self.id as u64,
             text:             self.text,
             group:            "".to_string(),
-            conditions:       Vec::from_iter(
-                self.conditions
-                    .into_iter()
-                    .map(|x| TermProps::from(Rc::new(x))),
-            ),
+            conditions:       Vec::from_iter(self.conditions.into_iter().map(TermProps::from)),
             possible_answers: self.answer,
-            purpose:          TermProps::from(Rc::new(self.purpose)),
+            purpose:          TermProps::from(self.purpose),
             subtask_level:    0,
         }
     }

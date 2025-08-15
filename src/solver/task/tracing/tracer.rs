@@ -17,7 +17,7 @@ pub trait Tracer: Send + Sync {
     fn on_new_term(&mut self, _term: &TermProps, _parent: &TermProps) {}
 
     // Called on each solution cycle iteration with picked term argument
-    fn on_term_focus(&mut self, _term: &TermProps) {}
+    fn on_term_focus(&mut self, _term: &TermProps, _cycle: usize) {}
 
     // Called on each attempt to apply rule
     fn on_rule_selection(&mut self, _rule: SharedRule) {}
@@ -33,10 +33,6 @@ pub trait Tracer: Send + Sync {
 pub struct TracerHub {
     tracers: Vec<Box<dyn Tracer>>,
 }
-
-pub struct EmptyTracer {}
-
-impl Tracer for EmptyTracer {}
 
 impl TracerHub {
     pub fn new() -> Self {
@@ -76,9 +72,9 @@ impl Tracer for TracerHub {
         }
     }
 
-    fn on_term_focus(&mut self, term: &TermProps) {
+    fn on_term_focus(&mut self, term: &TermProps, cycle: usize) {
         for i in self.tracers.iter_mut() {
-            i.on_term_focus(term);
+            i.on_term_focus(term, cycle);
         }
     }
 

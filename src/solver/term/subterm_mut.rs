@@ -13,12 +13,12 @@ pub struct SubtermMut<'a>(&'a mut Node<TermNode>);
 
 impl<'a> SubtermMut<'a> {
     #[inline]
-    pub fn as_ref(&self) -> Subterm {
+    pub fn as_ref(&self) -> Subterm<'_> {
         Subterm::from(self.0 as &Node<_>)
     }
 
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = Subterm> {
+    pub fn iter(&self) -> impl Iterator<Item = Subterm<'_>> {
         self.0.iter().map(Subterm::from)
     }
 
@@ -32,12 +32,12 @@ impl<'a> SubtermMut<'a> {
     }
 
     #[inline]
-    pub fn first_arg(&self) -> Option<Subterm> {
+    pub fn first_arg(&self) -> Option<Subterm<'_>> {
         self.0.front().map(Subterm::from)
     }
 
     #[inline]
-    pub fn last_arg(&self) -> Option<Subterm> {
+    pub fn last_arg(&self) -> Option<Subterm<'_>> {
         self.0.back().map(Subterm::from)
     }
 

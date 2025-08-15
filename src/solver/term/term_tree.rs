@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     convert::From,
     fmt,
-    rc::Rc,
+    sync::Arc,
 };
 
 use derive_more::From;
@@ -14,7 +14,7 @@ use crate::{CompactString, Decimal, NormalizationLevel};
 
 type SymbolTree = Tree<TermNode>;
 
-pub type SharedTerm = Rc<Term>;
+pub type SharedTerm = Arc<Term>;
 pub type VariablesMap = HashMap<Variable, Term>;
 
 #[derive(Debug, Default, Clone, From, PartialEq, Eq, Hash)]
@@ -95,7 +95,7 @@ impl Term {
     }
 
     #[inline]
-    pub fn get(&self, id: &SubtermId) -> Option<Subterm> {
+    pub fn get(&self, id: &SubtermId) -> Option<Subterm<'_>> {
         let mut root = self.0.root();
         for i in id.0.iter() {
             root = root.iter().nth(*i)?;
@@ -104,7 +104,7 @@ impl Term {
     }
 
     #[inline]
-    pub fn get_mut(&mut self, id: &SubtermId) -> Option<SubtermMut> {
+    pub fn get_mut(&mut self, id: &SubtermId) -> Option<SubtermMut<'_>> {
         let mut root = self.0.root_mut().get_mut();
         for i in id.0.iter() {
             let next_root = root.iter_mut().nth(*i)?.get_mut();
@@ -115,12 +115,12 @@ impl Term {
     }
 
     #[inline]
-    pub fn as_subterm(&self) -> Subterm {
+    pub fn as_subterm(&self) -> Subterm<'_> {
         self.0.root().into()
     }
 
     #[inline]
-    pub fn as_subterm_mut(&mut self) -> SubtermMut {
+    pub fn as_subterm_mut(&mut self) -> SubtermMut<'_> {
         self.0.root_mut().get_mut().into()
     }
 
