@@ -36,17 +36,27 @@ impl StepsSource for SharedSolution {
 
 impl From<SharedSolution> for Steps {
     fn from(solution: SharedSolution) -> Self {
-        let answer_idx = match solution.status {
-            SolutionStatus::Answer(i) => i,
-            // TODO: no answer
-            _ => unimplemented!(""),
+        let terms_queue = match solution.status {
+            SolutionStatus::Answer(answer_idx) => {
+                let mut terms_queue: Vec<usize> = vec![answer_idx];
+
+                while let Some(ref parent) =
+                    solution[*terms_queue.last().unwrap()].inference.parent_id()
+                {
+                    terms_queue.push(*parent);
+                }
+                terms_queue
+            }
+            _ => solution
+                .terms
+                .iter()
+                .rev()
+                .enumerate()
+                .filter(|(_, x)| x.inference.is_proven())
+                .map(|(n, _)| n)
+                .collect(),
         };
 
-        let mut terms_queue: Vec<usize> = vec![answer_idx];
-
-        while let Some(ref parent) = solution[*terms_queue.last().unwrap()].inference.parent_id() {
-            terms_queue.push(*parent);
-        }
         Self {
             visit_task: true,
             solution,

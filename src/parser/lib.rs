@@ -62,11 +62,8 @@ impl Location {
         } else {
             0
         };
-        Self {
-            col: pos - prev_row_end,
-            row,
-            len,
-        }
+        let col = pos.saturating_sub(prev_row_end);
+        Self { col, row, len }
     }
 }
 

@@ -27,6 +27,11 @@ pub trait Tracer: Send + Sync {
 
     // Called on hypothesis processing finished
     fn on_hypothesis_finish(&mut self, _inference: &TermInference, _cycle: usize) {}
+
+    // Cancel task form outside
+    fn is_cancelled(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Default)]
@@ -94,5 +99,9 @@ impl Tracer for TracerHub {
         for i in self.tracers.iter_mut() {
             i.on_hypothesis_finish(inference, cycle);
         }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.tracers.iter().any(|x| x.is_cancelled())
     }
 }

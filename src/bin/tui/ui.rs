@@ -41,6 +41,7 @@ pub enum Command {
     Right,
     Toggle,
     Reload,
+    Cancel,
 }
 
 pub struct Ui {
@@ -133,7 +134,6 @@ impl Ui {
                     let solution = Solver::new(rules.clone()).solve(task.task, hub, exec_deadline);
                     reporter.0.lock().finished_tasks_count += 1;
                     reporter.0.lock().current_cycles = 0;
-                    std::thread::sleep(std::time::Duration::from_secs(10));
                     (idx, solution)
                 })
                 .collect::<Vec<_>>()
@@ -141,7 +141,12 @@ impl Ui {
     }
 
     pub fn process(&mut self, command: Command) {
-        if !self.error.is_empty() || self.worker.is_some() {
+        if !self.error.is_empty() {
+            return;
+        }
+
+        if self.worker.is_some() {
+            self.progress.lock().process(command);
             return;
         }
 

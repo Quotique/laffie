@@ -72,6 +72,9 @@ impl Solver {
         let mut main_loop = || loop {
             state.increment_cycle_counter()?;
             let index = self.try_focus_term(solution, state)?;
+            if state.tracer.is_cancelled() {
+                return Err(SolveError::Canceled);
+            }
             if self.try_simplify(index, solution, state)? {
                 continue;
             }

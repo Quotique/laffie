@@ -7,7 +7,7 @@ use ratatui::{prelude::*, widgets::Paragraph};
 use solver::task::{Task, TermProps, Tracer};
 
 use super::popup::Popup;
-use crate::theme::Theme;
+use crate::{theme::Theme, ui::Command};
 
 #[derive(Clone)]
 pub struct ProgressReporter(pub Arc<Mutex<SolverProgress>>);
@@ -20,11 +20,16 @@ pub struct SolverProgress {
     pub exec_deadline:        usize,
     pub finished_tasks_count: usize,
     pub total_tasks_count:    usize,
+    pub cancel:               bool,
 }
 
 impl Tracer for ProgressReporter {
     fn on_term_focus(&mut self, _term: &TermProps, cycle: usize) {
         self.0.lock().current_cycles = cycle;
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.0.lock().cancel
     }
 }
 
@@ -33,6 +38,12 @@ impl SolverProgress {
         SolverProgress {
             exec_deadline,
             ..Default::default()
+        }
+    }
+
+    pub fn process(&mut self, command: Command) {
+        if Command::Cancel == command {
+            self.cancel = true;
         }
     }
 
@@ -80,6 +91,14 @@ impl SolverProgress {
             .gauge(Line::from("Total").left_aligned())
             .percent(total_percent)
             .render(layout[2], frame.buffer_mut());
+
+        let cancel_block = self.theme().block(true, "");
+        let inner = cancel_block.inner(layout[3]);
+        cancel_block.render(layout[3], frame.buffer_mut());
+
+        Line::from("Press C to Cancel")
+            .centered()
+            .render(inner, frame.buffer_mut());
     }
 
     fn theme(&self) -> &Theme {

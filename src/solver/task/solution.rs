@@ -24,6 +24,7 @@ pub enum SolveError {
     NoConditions,
     NoSolutionsFound,
     ExecutionDeadline,
+    Canceled,
 }
 
 #[derive(Debug, Display, Default, Clone, Copy, Encode, Decode, PartialEq, Eq)]
