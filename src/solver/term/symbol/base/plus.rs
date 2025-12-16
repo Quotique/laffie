@@ -48,7 +48,7 @@ pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
                     if let Some(d) = x.data().number().cloned() {
                         x.detach();
                         acc.1 |= d.is_zero();
-                        acc.1 |= degree != num - 1;
+                        acc.1 |= degree != num + 1;
                         acc.0 += d;
                     }
                     acc
