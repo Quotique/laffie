@@ -23,7 +23,7 @@ edition = "2021"
 chrono = "0.4"
 eyre = "0.6"
 itertools = "0.14"
-log = "0.4"
+log = { version = "0.4", features = ["kv"] }
 parking_lot = "0.12"
 serde = "1.0"
 serde_derive = "1.0"

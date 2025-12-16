@@ -13,7 +13,7 @@ use solver::{
 use utils::{IndexedTree, TreeIndex};
 
 use super::{settings::Settings, ui::default_state};
-use crate::widgets::tracing_tree::TermId;
+use crate::widgets::tracing_navigation::TermId;
 
 pub struct State {
     pub rules_engine: Arc<RulesEngine>,
@@ -35,10 +35,9 @@ pub enum TasksNode {
 
 #[derive(Debug)]
 pub struct TaskState {
-    pub solution: SharedSolution,
-
-    pub solution_pos: ListState,
-    pub tracing_pos:  TreeState<TermId>,
+    pub solution:      SharedSolution,
+    pub solution_pos:  ListState,
+    pub tracing_state: Vec<(SharedSolution, TreeState<TermId>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -137,9 +136,9 @@ impl State {
         let node_id = {
             let node = self.find_node_mut(task.group.as_str());
             node.push_back(tr(TasksNode::new_task(TaskState {
-                solution:     Solution::new(task.clone()).into(),
-                solution_pos: default_state(),
-                tracing_pos:  Default::default(),
+                solution:      Solution::new(task.clone()).into(),
+                solution_pos:  default_state(),
+                tracing_state: Default::default(),
             })));
             node.id()
         };
@@ -223,7 +222,8 @@ impl State {
         } else {
             upd.solved_delta -= 1;
         };
-        task.solution = solution;
+        task.solution = solution.clone();
+        task.tracing_state = vec![(solution, Default::default())];
 
         // Add new task status to remove
         if task.solution.answer().is_none() {

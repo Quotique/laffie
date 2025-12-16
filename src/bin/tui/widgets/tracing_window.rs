@@ -8,7 +8,10 @@ use ratatui::{
 
 use solver::task::{Solution, SolutionStatus, TermInference};
 
-use crate::{theme::Theme, widgets::tracing_tree::TermId};
+use crate::{
+    theme::Theme,
+    widgets::{tracing_navigation::TermId},
+};
 
 #[derive(Clone, Debug)]
 pub struct TracingWindow {

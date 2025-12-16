@@ -85,8 +85,8 @@ impl Ui {
             (
                 Tab::Tracing,
                 Pane::from_iter([
-                    (WidgetType::TracingTree, Constraint::Percentage(50)),
-                    (WidgetType::TracingWindow, Constraint::Percentage(50)),
+                    (WidgetType::TracingNavigation, Constraint::Percentage(60)),
+                    (WidgetType::TracingWindow, Constraint::Percentage(40)),
                 ]),
             ),
         ]);

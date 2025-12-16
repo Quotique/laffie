@@ -7,7 +7,8 @@ use crate::{
     theme::Theme,
     widgets::{
         rule_window::RuleWindow, rules_list::RulesList, solution_window::SolutionWindow,
-        tasks_list::TasksList, tracing_tree::TracingTree, tracing_window::TracingWindow,
+        tasks_list::TasksList, tracing_navigation::TracingNavigation,
+        tracing_window::TracingWindow,
     },
 };
 
@@ -19,7 +20,7 @@ pub enum WidgetType {
     RuleWindow,
     TasksList,
     Solution,
-    TracingTree,
+    TracingNavigation,
     TracingWindow,
 }
 
@@ -92,15 +93,12 @@ impl StatefulWidget for Pane {
                     block.render(*area, buf);
                     solution.render(inner, buf, &mut ());
                 }
-                WidgetType::TracingTree => {
+                WidgetType::TracingNavigation => {
                     if let Some(task_state) = state.selected_task() {
                         let block = self.theme().block(is_focused, "Tracing");
                         let inner = block.inner(*area);
                         block.render(*area, buf);
-                        TracingTree {
-                            solution: task_state.solution.clone(),
-                        }
-                        .render(inner, buf, &mut task_state.tracing_pos);
+                        TracingNavigation::default().render(inner, buf, task_state);
                     }
                 }
                 WidgetType::TracingWindow => {
@@ -109,7 +107,11 @@ impl StatefulWidget for Pane {
                         let inner = block.inner(*area);
                         block.render(*area, buf);
                         TracingWindow {
-                            selected: task_state.tracing_pos.selected().last().cloned(),
+                            selected: task_state
+                                .tracing_state
+                                .last()
+                                .and_then(|x| x.1.selected().last())
+                                .cloned(),
                         }
                         .render(inner, buf);
                     }
@@ -130,16 +132,37 @@ impl Pane {
                 Command::Right => self.focused_pane = 1,
                 _ => {}
             },
-            WidgetType::TracingTree => {
+            WidgetType::TracingNavigation => {
                 if let Some(task_state) = state.selected_task() {
-                    let _ = match command {
-                        Command::Down => task_state.tracing_pos.key_down(),
-                        Command::Up => task_state.tracing_pos.key_up(),
-                        Command::Left => task_state.tracing_pos.key_left(),
-                        Command::Right => task_state.tracing_pos.key_right(),
-                        Command::Toggle => task_state.tracing_pos.toggle_selected(),
-                        _ => false,
-                    };
+                    if let Some(state) = task_state.tracing_state.last_mut() {
+                        match command {
+                            Command::Down => state.1.key_down(),
+                            Command::Up => state.1.key_up(),
+                            Command::Toggle => state.1.toggle_selected(),
+                            _ => false,
+                        };
+                    }
+                    match command {
+                        Command::Left => {
+                            if task_state.tracing_state.len() > 1 {
+                                task_state.tracing_state.pop();
+                            }
+                        }
+                        Command::Right => {
+                            if let Some(term) = task_state
+                                .tracing_state
+                                .last()
+                                .and_then(|x| x.1.selected().last())
+                            {
+                                if term.idx == 0 {
+                                    task_state
+                                        .tracing_state
+                                        .push((term.solution.clone(), Default::default()));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
             WidgetType::TasksList => {
