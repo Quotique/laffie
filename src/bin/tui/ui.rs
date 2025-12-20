@@ -116,9 +116,13 @@ impl Ui {
             })
             .collect::<Vec<_>>();
 
-        self.progress.lock().current_cycles = 0;
-        self.progress.lock().finished_tasks_count = 0;
-        self.progress.lock().total_tasks_count = queue.len();
+        {
+            let mut progress = self.progress.lock();
+            progress.current_cycles = 0;
+            progress.finished_tasks_count = 0;
+            progress.total_tasks_count = queue.len();
+            progress.cancel = false;
+        }
 
         let reporter = ProgressReporter(self.progress.clone());
         let rules = self.state.rules_engine.clone();
