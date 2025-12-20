@@ -97,8 +97,6 @@ impl Iterator for Steps {
                 for r in self.solution[*next_id]
                     .inference
                     .requirements()
-                    .iter()
-                    .flat_map(|x| x.iter())
                     .filter(|x| !self.rendered.borrow().contains(&x.task.purpose.term))
                 {
                     self.rendered

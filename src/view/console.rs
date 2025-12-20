@@ -26,20 +26,13 @@ impl Renderer for Console<'_, '_> {
             "{}=> {}{}",
             "  ".repeat(subtask_level),
             term.term.to_string().bold().yellow(),
-            if term
-                .inference
-                .requirements()
-                .map(|x| x.is_empty())
-                .unwrap_or(true)
-            {
+            if term.inference.requirements().next().is_none() {
                 Default::default()
             } else {
                 format!(
                     " needed: [{}]",
                     term.inference
                         .requirements()
-                        .iter()
-                        .flat_map(|x| x.iter())
                         .map(|x| &x.task.purpose.term)
                         .format(", ")
                 )

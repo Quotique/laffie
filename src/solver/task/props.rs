@@ -82,10 +82,11 @@ impl fmt::Display for TermProps {
 }
 
 impl TermInference {
-    pub fn requirements(&self) -> Option<&Vec<SharedSolution>> {
+    pub fn requirements(&self) -> Box<dyn Iterator<Item = &SharedSolution> + '_> {
         match self {
-            TermInference::Rule { requirements, .. } => Some(requirements),
-            _ => None,
+            TermInference::Rule { requirements, .. } => Box::new(requirements.iter()),
+            TermInference::Transform { solution, .. } => Box::new(std::iter::once(solution)),
+            _ => Box::new(std::iter::empty()),
         }
     }
 

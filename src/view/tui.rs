@@ -30,20 +30,13 @@ impl Renderer for Tui<'_> {
         self.output.push(Line::from(vec![
             Span::from(format!("{} => ", "  ".repeat(subtask_level))),
             Span::style(term.term.to_string().into(), term_style),
-            if term
-                .inference
-                .requirements()
-                .map(|x| x.is_empty())
-                .unwrap_or(true)
-            {
+            if term.inference.requirements().next().is_none() {
                 Span::from("".to_owned())
             } else {
                 Span::from(format!(
                     " needed: [{}]",
                     term.inference
                         .requirements()
-                        .iter()
-                        .flat_map(|x| x.iter())
                         .map(|x| &x.task.purpose.term)
                         .format(", ")
                 ))

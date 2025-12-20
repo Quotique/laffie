@@ -88,7 +88,7 @@ impl View<'_> {
         }
 
         while let Some(id) = trace.pop() {
-            for r in frame[id].inference.requirements().unwrap_or(&vec![]) {
+            for r in frame[id].inference.requirements() {
                 if self
                     .rendered
                     .borrow_mut()
