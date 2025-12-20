@@ -13,8 +13,23 @@ use crate::{
     NormalizationLevel,
 };
 
+/// Maximum depth allowed for nested subtasks.
+///
+/// When the subtask level exceeds this value the solver aborts with
+/// `SolveError::MaxSubtaskLevelExceed`.
 pub const MAX_SUBTASK_LEVEL: usize = 10;
+
+/// Maximum allowed weight (or "level") for a term during solving.
+///
+/// If a term’s weight exceeds this limit it is discarded from further
+/// consideration.  When all candidate terms have been discarded the solver
+/// terminates the task with `SolveError::NoSolutionsFound`.
 pub const MAX_LEVEL: usize = 20;
+
+/// Default execution deadline (in cycle counts) for a solving run.
+///
+/// The solver stops and returns `SolveError::ExecutionDeadline` when the number
+/// of performed cycles exceeds this value.
 pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 
 struct SolutionState {
@@ -31,6 +46,12 @@ pub struct Solver {
 }
 
 impl Solver {
+    /// Creates a new `Solver` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `rules` – An `Arc` pointing to a `RulesEngine` that provides the
+    ///   global rule set used during proof search.
     pub fn new(rules: Arc<RulesEngine>) -> Solver {
         Solver {
             rules_engine: rules.clone(),
@@ -38,6 +59,18 @@ impl Solver {
         }
     }
 
+    /// Attempts to solve the given `task` and returns a `SharedSolution`.
+    ///
+    /// # Parameters
+    ///
+    /// * `task` – The task to be solved.
+    /// * `tracer` – A `TracerHub` used for instrumentation and cancellation.
+    /// * `execution_deadline` – Maximum number of cycles the solver may execute
+    ///   before aborting with `SolveError::ExecutionDeadline`.
+    ///
+    /// The method initializes a fresh `Solution` and `SolutionState`, and then
+    /// runs the main solving loop. The resulting `SharedSolution` contains
+    /// either the answer or an error status.
     pub fn solve(
         &mut self,
         task: Task,
