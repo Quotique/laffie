@@ -3,7 +3,7 @@ symbol && {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a == c && b <=> b;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a != c && b <=> b;
 
@@ -19,7 +19,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a >= c && b <=> b;
 
@@ -27,7 +27,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a <= c && b <=> b;
 
@@ -35,7 +35,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a > c && b <=> b;
 
@@ -43,7 +43,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a < c && b <=> b;
 
@@ -51,7 +51,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a == c && b <=> a == c;
 
@@ -59,7 +59,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a != c && b <=> a != c;
 
@@ -67,7 +67,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a <= c && b <=> a <= c;
 
@@ -75,7 +75,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a >= c && b <=> a >= c;
 
@@ -83,7 +83,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a < c && b <=> a < c;
 
@@ -91,7 +91,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a > c && b <=> a > c;
 
@@ -99,7 +99,7 @@ rule {
 }
 
 rule {
-    attr level(1),purpose(transform(x)),replace;
+    attr level(1),goal(transform(x)),replace;
 
     a == b && c =>  a == b && replace(a == b, c);
 
@@ -108,7 +108,7 @@ rule {
 }
 
 rule {
-    attr level(3),purpose(transform(x)),replace;
+    attr level(3),goal(transform(x)),replace;
 
     a && (b || c) => (a && b) || (a && c);
 }

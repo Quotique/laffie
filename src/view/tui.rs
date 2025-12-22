@@ -4,7 +4,7 @@ use itertools::Itertools;
 use ratatui::{prelude::*, style::Stylize};
 
 use solver::{
-    task::{Purpose, Solution, TermProps},
+    task::{Goal, Solution, TermProps},
     term::SharedTerm,
 };
 
@@ -16,11 +16,11 @@ pub struct Tui<'a> {
 }
 
 impl Renderer for Tui<'_> {
-    fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result {
-        let purpose_style = Style::new().fg(Color::Blue).bold();
+    fn display_goal(&mut self, subtask_level: usize, goal: &Goal) -> fmt::Result {
+        let goal_style = Style::new().fg(Color::Blue).bold();
         self.output.push(Line::from(vec![Span::style(
-            format!("{}{purpose}", "  ".repeat(subtask_level)).into(),
-            purpose_style,
+            format!("{}{goal}", "  ".repeat(subtask_level)).into(),
+            goal_style,
         )]));
         Ok(())
     }
@@ -37,7 +37,7 @@ impl Renderer for Tui<'_> {
                     " needed: [{}]",
                     term.inference
                         .requirements()
-                        .map(|x| &x.task.purpose.term)
+                        .map(|x| &x.task.goal.term)
                         .format(", ")
                 ))
             },
@@ -47,7 +47,7 @@ impl Renderer for Tui<'_> {
 
     fn display_answer(
         &mut self,
-        purpose: &Purpose,
+        goal: &Goal,
         answer: Option<SharedTerm>,
         status: &Solution,
     ) -> fmt::Result {
@@ -58,9 +58,9 @@ impl Renderer for Tui<'_> {
             .push(Line::from(if let Some(answer) = answer.as_ref() {
                 vec![
                     Span::style(
-                        match purpose {
-                            Purpose::Find(_) | Purpose::Transform(_) => format!("Answer: {answer}"),
-                            Purpose::Proof(_) => "PROOFED!".to_owned(),
+                        match goal {
+                            Goal::Find(_) | Goal::Transform(_) => format!("Answer: {answer}"),
+                            Goal::Proof(_) => "PROOFED!".to_owned(),
                         }
                         .into(),
                         answer_style,

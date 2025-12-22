@@ -3,7 +3,7 @@ symbol ^ {
 }
 
 rule {
-    attr level(4),purpose(find(x)),one(a),one(b),zero(b),zero(c),block(move_left);
+    attr level(4),goal(find(x)),one(a),one(b),zero(b),zero(c),block(move_left);
 
     a * x^2 + b * x + c == 0 => 
         (((b^2 - 4*a*c) as D) < 0 && x in empty_set) || 
@@ -14,7 +14,7 @@ rule {
 }
 
 rule {
-    attr level(4),purpose(find(x)),one(a),one(b),zero(c);
+    attr level(4),goal(find(x)),one(a),one(b),zero(c);
 
     a * x^3 + b * x^2 + c * x == 0 => (x == 0) || (a * x^2 + b * x + c == 0);
 
@@ -22,7 +22,7 @@ rule {
 }
 
 rule {
-    attr level(4),purpose(find(x)),one(a),one(b),zero(c);
+    attr level(4),goal(find(x)),one(a),one(b),zero(c);
 
     a * x^4 + b * x^3 + c * x^2 == 0 => (x == 0) || (a * x^2 + b * x + c == 0);
 
@@ -30,20 +30,20 @@ rule {
 }
 
 rule {
-    attr replace,level(1),purpose(transform(x));
+    attr replace,level(1),goal(transform(x));
 
     (a/b)^n <=> (a^n)/(b^n);
 }
 
 // TODO: n is natural
 rule {
-    attr replace,level(4),purpose(transform(x)),normalize(2);
+    attr replace,level(4),goal(transform(x)),normalize(2);
 
     (a+b)^n <=> (a+b)^(n - 1)*(a + b);
 }
 
 rule {
-    attr replace,level(1),purpose(transform(x));
+    attr replace,level(1),goal(transform(x));
 
     (sqrt(a))^2 <=> a;
 
@@ -51,13 +51,13 @@ rule {
 }
 
 rule {
-    attr replace,level(1),purpose(transform(x));
+    attr replace,level(1),goal(transform(x));
 
     (-a)^2 <=> a^2;
 }
 
 rule {
-    attr replace,level(3),purpose(find(x)),one(a);
+    attr replace,level(3),goal(find(x)),one(a);
 
     a*x^2 == b => ( a*b >= 0 && x in set( sqrt(b/a), -sqrt(b/a) ) ) || 
                   ( a*b < 0 && x in empty_set );

@@ -9,7 +9,7 @@ use bincode::{Decode, Encode};
 use derive_more::Display;
 use itertools::Itertools;
 
-use super::{Purpose, Task, TermProps};
+use super::{Goal, Task, TermProps};
 use crate::term::SharedTerm;
 
 pub const STACK_SIZE: usize = 2048;
@@ -37,42 +37,42 @@ pub enum SolutionStatus {
 
 #[derive(Debug)]
 pub struct Solution {
-    pub task:    Task,
-    pub purpose: Purpose,
+    pub task: Task,
+    pub goal: Goal,
 
     pub status:      SolutionStatus,
     pub start_cycle: usize,
     pub end_cycle:   usize,
 
     pub main_index:       HashMap<SharedTerm, usize>,
-    pub purpose_index:    HashMap<SharedTerm, usize>,
+    pub goal_index:       HashMap<SharedTerm, usize>,
     pub terms:            Vec<TermProps>,
     unproven_terms_count: usize,
 }
 
 impl Solution {
     pub fn new(task: Task) -> Self {
-        let purpose = Purpose::try_from((*task.purpose.term).clone()).unwrap();
+        let goal = Goal::try_from((*task.goal.term).clone()).unwrap();
 
         let mut solution = Self {
             task,
-            purpose,
+            goal,
             start_cycle: Default::default(),
             end_cycle: Default::default(),
             main_index: Default::default(),
-            purpose_index: Default::default(),
+            goal_index: Default::default(),
             terms: Default::default(),
             status: Default::default(),
             unproven_terms_count: Default::default(),
         };
-        let conditions = solution.task.conditions.clone();
+        let conditions = solution.task.givens.clone();
         for i in conditions.into_iter() {
             let _ = solution.add_term(i);
         }
-        let _ = solution.add_term(solution.purpose.term().clone());
+        let _ = solution.add_term(solution.goal.term().clone());
 
         trace!(target: "subtask", "Subtask: {}, [{}]",
-            solution.purpose, solution.task.conditions.iter().format(", ")
+            solution.goal, solution.task.givens.iter().format(", ")
         );
         solution
     }
@@ -95,8 +95,8 @@ impl Solution {
             return Ok(id);
         }
 
-        let index = if term.filters.is_purpose() {
-            &mut self.purpose_index
+        let index = if term.filters.is_goal() {
+            &mut self.goal_index
         } else {
             &mut self.main_index
         };
@@ -118,11 +118,11 @@ impl Solution {
             .map(|x| x.id)
     }
 
-    pub fn pick_purpose_term(&self) -> Option<TermIdx> {
+    pub fn pick_goal_term(&self) -> Option<TermIdx> {
         self.terms
             .iter()
             .filter(|x| x.inference.is_proven())
-            .filter(|x| !x.filters.is_replaced() && x.filters.is_purpose())
+            .filter(|x| !x.filters.is_replaced() && x.filters.is_goal())
             .min_by_key(|x| x.filters.weight)
             .map(|x| x.id)
     }

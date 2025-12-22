@@ -1,6 +1,6 @@
 mod builder;
+mod goal;
 mod props;
-mod purpose;
 mod solution;
 mod solver;
 mod steps;
@@ -10,8 +10,8 @@ use crate::term::Term;
 use std::{fmt, iter::Iterator};
 
 pub use builder::TaskBuilder;
+pub use goal::Goal;
 pub use props::{TermInference, TermProps};
-pub use purpose::Purpose;
 pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError, TermIdx};
 pub use solver::{Solver, EXECUTION_DEADLINE_DEFAULT};
 pub use steps::{StepsSource, Visit};
@@ -23,8 +23,8 @@ pub struct Task {
     pub text:  String,
     pub group: String,
 
-    pub purpose:       TermProps,
-    pub conditions:    Vec<TermProps>,
+    pub goal:          TermProps,
+    pub givens:        Vec<TermProps>,
     pub subtask_level: usize,
 
     pub possible_answers: Vec<Term>,
@@ -36,8 +36,8 @@ impl From<TermProps> for Task {
             id:               Default::default(),
             text:             Default::default(),
             group:            Default::default(),
-            purpose:          value,
-            conditions:       Default::default(),
+            goal:             value,
+            givens:           Default::default(),
             subtask_level:    Default::default(),
             possible_answers: Default::default(),
         }
@@ -55,8 +55,8 @@ impl fmt::Display for Task {
             } else {
                 format!("{}\n", self.text)
             },
-            self.purpose,
-            self.conditions
+            self.goal,
+            self.givens
                 .iter()
                 .map(|x| x.term.to_string())
                 .collect::<Vec<String>>()

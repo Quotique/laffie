@@ -3,7 +3,7 @@ symbol || {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a == c || b <=> a == c;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a != c || b <=> a != c;
 
@@ -19,7 +19,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a <= c || b <=> a <= c;
 
@@ -27,7 +27,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a >= c || b <=> a >= c;
 
@@ -35,7 +35,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a < c || b <=> a < c;
 
@@ -43,7 +43,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a > c || b <=> a > c;
 
@@ -51,7 +51,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a == c || b <=> b;
 
@@ -59,7 +59,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a != c || b <=> b;
 
@@ -67,7 +67,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a <= c || b <=> b;
 
@@ -75,7 +75,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a >= c || b <=> b;
 
@@ -83,7 +83,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a < c || b <=> b;
 
@@ -91,7 +91,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace;
+    attr level(2),goal(transform(x)),replace;
 
     a > c || b <=> b;
 
@@ -99,7 +99,7 @@ rule {
 }
 
 rule {
-    attr level(0),purpose(find(x)),replace;
+    attr level(0),goal(find(x)),replace;
 
     x == a || x == b => answer(x in set(a, b));
 
@@ -108,7 +108,7 @@ rule {
 }
 
 rule {
-    attr level(0),purpose(find(x)),replace;
+    attr level(0),goal(find(x)),replace;
 
     x == a || x == b || x == c => answer(x in set(a, b, c));
 

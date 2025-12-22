@@ -36,9 +36,9 @@ impl<'a> TaskParser<'a> {
 
         for child in self.syntax_tree.iter() {
             match child.data().symbol.as_str() {
-                "Purpose" => {
+                "Goal" => {
                     builder = builder
-                        .with_purpose(TermProps::from(
+                        .with_goal(TermProps::from(
                             TermParser::default().with_variables().try_parse(
                                 child.front().ok_or_else(|| ParserError {
                                     loc: child.data().location.clone(),
@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn task_parse_test() {
         let test = r#"task {
-                        purpose find(x);
+                        goal find(x);
                         2*x+5 == 0;
                     }"#;
 
@@ -112,10 +112,10 @@ mod tests {
         assert!(result.is_ok());
 
         let task = result.unwrap();
-        assert_eq!(task.conditions.len(), 1);
-        println!("{:?}", task.conditions[0].term);
+        assert_eq!(task.givens.len(), 1);
+        println!("{:?}", task.givens[0].term);
         assert_eq!(
-            *task.conditions[0].term,
+            *task.givens[0].term,
             Term::symbol("==")
                 .with_child(
                     Term::symbol("+")

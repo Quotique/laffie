@@ -3,7 +3,7 @@ use std::fmt;
 use html_escape::encode_text;
 
 use solver::{
-    task::{Purpose, Solution, TermProps},
+    task::{Goal, Solution, TermProps},
     term::SharedTerm,
 };
 
@@ -14,11 +14,11 @@ pub struct Html<'a> {
 }
 
 impl Renderer for Html<'_> {
-    fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result {
+    fn display_goal(&mut self, subtask_level: usize, goal: &Goal) -> fmt::Result {
         self.output.write_str(&format!(
             "{}{}\n",
             "  ".repeat(subtask_level),
-            encode_text(&purpose.to_string())
+            encode_text(&goal.to_string())
         ))
     }
 
@@ -32,18 +32,18 @@ impl Renderer for Html<'_> {
 
     fn display_answer(
         &mut self,
-        purpose: &Purpose,
+        goal: &Goal,
         answer: Option<SharedTerm>,
         status: &Solution,
     ) -> fmt::Result {
         if let Some(answer) = answer.as_ref() {
             self.output.write_str(&format!(
                 "{} {}\n",
-                match purpose {
-                    Purpose::Find(_) | Purpose::Transform(_) => {
+                match goal {
+                    Goal::Find(_) | Goal::Transform(_) => {
                         format!("<b>Answer:</b> {}", encode_text(&answer.to_string()))
                     }
-                    Purpose::Proof(_) => {
+                    Goal::Proof(_) => {
                         "<b>PROOFED!</b>".to_owned()
                     }
                 },

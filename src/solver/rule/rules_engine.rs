@@ -45,7 +45,7 @@ impl RulesEngine {
         self.process_queue();
     }
 
-    pub fn suggest_rules(&self, filters: &TermFilters, purpose: &Term) -> Vec<SharedRule> {
+    pub fn suggest_rules(&self, filters: &TermFilters, goal: &Term) -> Vec<SharedRule> {
         assert!(self.rule_queue.is_empty());
 
         let empty_level = LevelRules::new();
@@ -54,7 +54,7 @@ impl RulesEngine {
             .chain(filters.symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())
-            .filter(|rule| rule.try_filter(filters, purpose).is_ok())
+            .filter(|rule| rule.try_filter(filters, goal).is_ok())
             .cloned()
             .collect();
         if !result.is_empty() {

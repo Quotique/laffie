@@ -1,63 +1,63 @@
 task {
-	purpose proof(1 > 0);
+	goal proof(1 > 0);
 
 	x == 2;
 }
 
 task {
-	purpose proof(-9 < 0);
+	goal proof(-9 < 0);
 
 	x == 2;
 }
 
 task {
-	purpose proof((1>0) is (true));
+	goal proof((1>0) is (true));
 
 	x == 2;
 }
 
 task {
-	purpose proof(x > 0);
+	goal proof(x > 0);
 
 	x == 2;
 }
 
 task {
-	purpose proof(x > 0);
+	goal proof(x > 0);
 
 	x == 2 + 2;
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     answer x == 1;
 
     x == 1;
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     answer x == 1, x in set(1);
 
     x in set(1);
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     answer x == 1 || x == (sqrt(2) + 5)/2, x in set(1, (sqrt(2) + 5)/2 ), x == (sqrt(2) + 5)/2 || x == 1;
 
     x in set(1, (sqrt(2) + 5)/2 );
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     answer x == 1;
 
     -(-x) == 1;
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     answer x == -3;
 
     x+3 == 0;

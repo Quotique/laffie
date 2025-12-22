@@ -92,7 +92,7 @@ impl TracingNavigation {
             self.theme().unproven_tree_item()
         };
         Line::from(vec![
-            Span::styled(solution.task.purpose.to_string(), style),
+            Span::styled(solution.task.goal.to_string(), style),
             Span::from(format!(" {} {}", solution.cycles(), 0)),
         ])
     }
@@ -116,7 +116,7 @@ impl StatefulWidget for &TracingNavigation {
             state
                 .tracing_state
                 .iter()
-                .map(|x| x.0.task.purpose.to_string())
+                .map(|x| x.0.task.goal.to_string())
                 .collect::<Vec<String>>()
                 .join(" | "),
             Style::default().add_modifier(Modifier::BOLD),

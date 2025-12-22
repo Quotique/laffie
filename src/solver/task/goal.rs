@@ -11,33 +11,33 @@ pub enum SemanticError {
 }
 
 #[derive(Clone)]
-pub enum Purpose {
+pub enum Goal {
     Find(TermProps),
     Proof(TermProps),
     Transform(TermProps),
 }
 
-impl fmt::Debug for Purpose {
+impl fmt::Debug for Goal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Purpose::Find(s) => write!(f, "Find: {s:?}"),
-            Purpose::Proof(s) => write!(f, "Proof: {s:?}"),
-            Purpose::Transform(s) => write!(f, "Transform: {s:?}"),
+            Goal::Find(s) => write!(f, "Find: {s:?}"),
+            Goal::Proof(s) => write!(f, "Proof: {s:?}"),
+            Goal::Transform(s) => write!(f, "Transform: {s:?}"),
         }
     }
 }
 
-impl fmt::Display for Purpose {
+impl fmt::Display for Goal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Purpose::Find(s) => write!(f, "Find: {s}"),
-            Purpose::Proof(s) => write!(f, "Proof: {s}"),
-            Purpose::Transform(s) => write!(f, "Transform: {s}"),
+            Goal::Find(s) => write!(f, "Find: {s}"),
+            Goal::Proof(s) => write!(f, "Proof: {s}"),
+            Goal::Transform(s) => write!(f, "Transform: {s}"),
         }
     }
 }
 
-impl TryFrom<Term> for Purpose {
+impl TryFrom<Term> for Goal {
     type Error = SemanticError;
 
     fn try_from(mut value: Term) -> Result<Self, Self::Error> {
@@ -46,7 +46,7 @@ impl TryFrom<Term> for Purpose {
             return Err(SemanticError::WorngArgCount(String::default()));
         }
         let mut term = TermProps::from(root.pop_first_arg().unwrap());
-        term.filters.mark_purpose();
+        term.filters.mark_goal();
 
         match root.data().symbol() {
             Some(x) if x.as_str() == "find" => Ok(Self::Find(term)),
@@ -57,19 +57,19 @@ impl TryFrom<Term> for Purpose {
     }
 }
 
-impl Purpose {
+impl Goal {
     #[inline]
     pub fn term(&self) -> &TermProps {
         match self {
-            Purpose::Find(s) => s,
-            Purpose::Proof(s) => s,
-            Purpose::Transform(s) => s,
+            Goal::Find(s) => s,
+            Goal::Proof(s) => s,
+            Goal::Transform(s) => s,
         }
     }
 
     #[inline]
     pub fn is_transform(&self) -> bool {
-        if let Purpose::Transform(_) = self {
+        if let Goal::Transform(_) = self {
             return true;
         }
         false
@@ -77,7 +77,7 @@ impl Purpose {
 
     #[inline]
     pub fn is_proof(&self) -> bool {
-        if let Purpose::Proof(_) = self {
+        if let Goal::Proof(_) = self {
             return true;
         }
         false
@@ -85,7 +85,7 @@ impl Purpose {
 
     #[inline]
     pub fn is_find(&self) -> bool {
-        if let Purpose::Find(_) = self {
+        if let Goal::Find(_) = self {
             return true;
         }
         false

@@ -3,7 +3,7 @@ symbol set {
 }
 
 rule {
-    attr level(0),purpose(proof(set(a) is known));
+    attr level(0),goal(proof(set(a) is known));
 
     set(a) is known <=> true;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(0),purpose(proof(set(a, ..) is known));
+    attr level(0),goal(proof(set(a, ..) is known));
 
     set(a, .. as S) is known <=> true;
 
@@ -21,7 +21,7 @@ rule {
 
 // TODO: apply only to root
 rule {
-    attr level(0),purpose(find(x)),replace,id(answer_in_set),block(answer_in_set);
+    attr level(0),goal(find(x)),replace,id(answer_in_set),block(answer_in_set);
 
     x in set(a, b) => answer(x in set(a, b));
 
@@ -30,7 +30,7 @@ rule {
 }
 
 rule {
-    attr level(3),purpose(transform(x)),replace,block(move_left);
+    attr level(3),goal(transform(x)),replace,block(move_left);
 
     a in set(b, c) <=> a == b || a == c;
 }
@@ -40,7 +40,7 @@ symbol empty_set {
 }
 
 rule {
-    attr level(0),purpose(proof(empty_set is known));
+    attr level(0),goal(proof(empty_set is known));
 
     empty_set is known <=> true;
 }

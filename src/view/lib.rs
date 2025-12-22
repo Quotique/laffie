@@ -9,18 +9,18 @@ pub use html::Html;
 pub use tui::Tui;
 
 use solver::{
-    task::{Purpose, Solution, SolutionStatus, TermProps},
+    task::{Goal, Solution, SolutionStatus, TermProps},
     term::{SharedTerm, Term},
 };
 
 pub trait Renderer {
-    fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result;
+    fn display_goal(&mut self, subtask_level: usize, goal: &Goal) -> fmt::Result;
 
     fn display_term(&mut self, subtask_level: usize, term: &TermProps) -> fmt::Result;
 
     fn display_answer(
         &mut self,
-        purpose: &Purpose,
+        goal: &Goal,
         answer: Option<SharedTerm>,
         status: &Solution,
     ) -> fmt::Result;
@@ -47,22 +47,22 @@ impl<'a> TryFrom<&'a Solution> for View<'a> {
 }
 
 impl View<'_> {
-    fn display_purpose(
+    fn display_goal(
         &self,
-        purpose: &Purpose,
+        goal: &Goal,
         answer: &Term,
         subtask_level: usize,
         renderer: &mut dyn Renderer,
     ) -> fmt::Result {
-        renderer.display_purpose(subtask_level, purpose)?;
-        match purpose {
-            Purpose::Find(_) | Purpose::Transform(_) => {}
-            Purpose::Proof(_) => {
+        renderer.display_goal(subtask_level, goal)?;
+        match goal {
+            Goal::Find(_) | Goal::Transform(_) => {}
+            Goal::Proof(_) => {
                 let answer_idx = self
                     .solution
                     .terms
                     .iter()
-                    .filter(|x| x.filters.is_purpose())
+                    .filter(|x| x.filters.is_goal())
                     .enumerate()
                     .find(|(_, x)| x.term.as_ref() == answer)
                     .map(|(id, _)| id);
@@ -92,7 +92,7 @@ impl View<'_> {
                 if self
                     .rendered
                     .borrow_mut()
-                    .insert(r.task.purpose.term.as_ref().clone())
+                    .insert(r.task.goal.term.as_ref().clone())
                 {
                     View {
                         solution: r.as_ref(),
@@ -110,8 +110,8 @@ impl View<'_> {
 
     pub fn display_impl(&self, renderer: &mut dyn Renderer) -> fmt::Result {
         if let SolutionStatus::Answer(a) = self.solution.status {
-            self.display_purpose(
-                &self.solution.purpose,
+            self.display_goal(
+                &self.solution.goal,
                 &self.solution.terms[a].term,
                 self.solution.task.subtask_level,
                 renderer,
@@ -126,11 +126,7 @@ impl View<'_> {
             renderer.dump_frame(&self.solution.terms)?;
         }
         if self.solution.task.subtask_level == 0 {
-            renderer.display_answer(
-                &self.solution.purpose,
-                self.solution.answer(),
-                self.solution,
-            )?;
+            renderer.display_answer(&self.solution.goal, self.solution.answer(), self.solution)?;
         }
         Ok(())
     }

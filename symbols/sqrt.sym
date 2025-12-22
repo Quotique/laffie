@@ -3,7 +3,7 @@ symbol sqrt {
 }
 
 rule {
-    attr level(0),purpose(proof(sqrt(a) is known));
+    attr level(0),goal(proof(sqrt(a) is known));
 
     sqrt(a) is known <=> true;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(0),purpose(proof(x != 0));
+    attr level(0),goal(proof(x != 0));
 
     a*sqrt(b) + c != 0 <=> c*a > 0 || b != (c/a)^2;
 
@@ -20,7 +20,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(find(x)),one(a);
+    attr level(2),goal(find(x)),one(a);
 
     a*sqrt(b) + c == 0 => a*c <= 0 && b == (c/a)^2;
 
@@ -29,7 +29,7 @@ rule {
 }
 
 rule {
-    attr level(3),purpose(find(x)),one(a),one(c),zero(d);
+    attr level(3),goal(find(x)),one(a),one(c),zero(d);
 
     a*sqrt(b) + c*x + d == 0 => a*(c*x + d) <= 0 && b == ((c*x + d)/a)^2;
 
@@ -38,7 +38,7 @@ rule {
 }
 
 rule {
-    attr level(4),purpose(find(x)),one(a),one(c);
+    attr level(4),goal(find(x)),one(a),one(c);
 
     a*sqrt(b) + c*sqrt(d) == 0 => a*c <= 0 && a^2 * b == c^2 * d && b >= 0;
 
@@ -47,7 +47,7 @@ rule {
 }
 
 rule {
-    attr level(4),purpose(find(x)),one(a),one(c),zero(e);
+    attr level(4),goal(find(x)),one(a),one(c),zero(e);
 
     a*sqrt(b) + c*sqrt(d) == e => a^2 * b == e^2 - 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0;
 
@@ -56,7 +56,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(proof(x)),one(a);
+    attr level(2),goal(proof(x)),one(a);
 
     sqrt(a) <= b  <=> (b < 0 && a >= 0) || (b >= 0 && a >= 0 && a <= b^2);
 
@@ -64,7 +64,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(proof(x)),one(a);
+    attr level(2),goal(proof(x)),one(a);
 
     sqrt(a) >= b <=> (b < 0 && a >= 0) || (b >= 0 && a >= b^2);
 
@@ -72,7 +72,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(proof(x)),one(a);
+    attr level(2),goal(proof(x)),one(a);
 
     sqrt(a) > b <=> (b < 0 && a >= 0) || (b >= 0 && a > b^2);
 
@@ -81,7 +81,7 @@ rule {
 
 
 rule {
-    attr level(2),purpose(proof(x <= 0)),one(a);
+    attr level(2),goal(proof(x <= 0)),one(a);
 
     a*sqrt(b) + c <= 0 <=> (a > 0 && sqrt(b) <= -c/a) || (a < 0 && sqrt(b) >= -c/a);
 
@@ -90,7 +90,7 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(proof(x > 0)),one(a);
+    attr level(2),goal(proof(x > 0)),one(a);
 
     a*sqrt(b) + c > 0 <=> (a > 0 && sqrt(b) > -c/a) || (a < 0 && sqrt(b) < -c/a);
 

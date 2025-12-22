@@ -27,9 +27,9 @@ impl Widget for RuleWindow {
         lines.extend([
             Line::default(),
             self.pair_line(
-                "Purpose: ",
+                "Goal: ",
                 self.rule
-                    .attribute(&RuleAttr::Purpose)
+                    .attribute(&RuleAttr::Goal)
                     .next()
                     .map(|x| format!("{x:?}"))
                     .unwrap_or_default(),
@@ -41,7 +41,7 @@ impl Widget for RuleWindow {
             self.pair_line("Attributes:", "", default),
         ]);
         for (k, v) in { self.rule.attrs.iter() }
-            .filter(|(k, _)| ![RuleAttr::Level, RuleAttr::Purpose].contains(k))
+            .filter(|(k, _)| ![RuleAttr::Level, RuleAttr::Goal].contains(k))
         {
             lines.push(Line::from(format!(" {k:?}: {v:?}")));
         }

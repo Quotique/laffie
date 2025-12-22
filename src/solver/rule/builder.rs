@@ -83,8 +83,9 @@ impl RuleBuilder {
 
     pub fn with_attribute(mut self, attr: RuleAttr, value: RuleAttrValue) -> Self {
         match (&attr, &value) {
-            (RuleAttr::Zero, RuleAttrValue::Purpose(s)) |
-            (RuleAttr::One, RuleAttrValue::Purpose(s)) => self.replaces.push((attr, s.clone())),
+            (RuleAttr::Zero, RuleAttrValue::Goal(s)) | (RuleAttr::One, RuleAttrValue::Goal(s)) => {
+                self.replaces.push((attr, s.clone()))
+            }
             _ => self.attributes.push((attr, value)),
         }
         self

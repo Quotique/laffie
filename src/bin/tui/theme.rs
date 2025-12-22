@@ -102,7 +102,7 @@ impl Theme {
         Style::new().fg(Color::Yellow)
     }
 
-    pub fn solution_purpose(&self) -> Style {
+    pub fn solution_goal(&self) -> Style {
         Style::new().fg(Color::Cyan).bold()
     }
 }

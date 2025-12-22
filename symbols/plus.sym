@@ -3,7 +3,7 @@ symbol + {
 }
 
 rule {
-    attr level(0),purpose(proof(a+b is known));
+    attr level(0),goal(proof(a+b is known));
 
     a+b is known <=> true;
 
@@ -12,7 +12,7 @@ rule {
 }
 
 rule {
-    attr level(3),purpose(find(x)),one(n),block(brackets_disclosure);
+    attr level(3),goal(find(x)),one(n),block(brackets_disclosure);
 
     a*x^n + b*x^n + c <=> (a+b)*x^n + c;
 }

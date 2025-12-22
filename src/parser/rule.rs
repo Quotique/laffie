@@ -102,7 +102,7 @@ impl<'a> RuleParser<'a> {
                     })?),
                 ))
             }
-            "purpose" | "zero" | "one" => {
+            "goal" | "zero" | "one" => {
                 if attr.degree() != 1 {
                     return Err(ParserError {
                         loc: attr.data().location.clone(),
@@ -110,10 +110,10 @@ impl<'a> RuleParser<'a> {
                     });
                 }
 
-                let purpose = TermParser::default().try_parse(attr.front().unwrap())?;
+                let goal = TermParser::default().try_parse(attr.front().unwrap())?;
                 Ok((
                     RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
-                    RuleAttrValue::Purpose(purpose),
+                    RuleAttrValue::Goal(goal),
                 ))
             }
             "id" => {
@@ -235,7 +235,7 @@ mod tests {
     #[test]
     fn rule_parse_2_test() {
         let test = r#"rule {
-                    attr level(0),purpose(proof(a/b is known));
+                    attr level(0),goal(proof(a/b is known));
                     a/b is known <=> true;
                     a is known,
                     b is known

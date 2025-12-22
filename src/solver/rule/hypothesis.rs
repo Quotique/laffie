@@ -28,8 +28,8 @@ impl Hypothesis {
 }
 
 impl HypothesisIterator {
-    pub fn new(rule: SharedRule, term: &Term, filters: &TermFilters, purpose: &Term) -> Self {
-        let hypothesis = match rule.apply(term, filters, purpose) {
+    pub fn new(rule: SharedRule, term: &Term, filters: &TermFilters, goal: &Term) -> Self {
+        let hypothesis = match rule.apply(term, filters, goal) {
             Ok(x) => x,
             Err(e) => {
                 trace!(target: "rule_selection", "rule {rule} not applied to term {term}: {e:?}");

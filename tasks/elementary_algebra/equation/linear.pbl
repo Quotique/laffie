@@ -1,5 +1,5 @@
 task {
-    purpose find(x);
+    goal find(x);
     text "Решить уравнение 2x+5=0";
     answer x == -2.5;
 
@@ -7,7 +7,7 @@ task {
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     text "Решить уравнение 2x-5=0";
     answer x == 2.5;
 
@@ -15,7 +15,7 @@ task {
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     text "Решить уравнение 2(x+4)+3(x-5)=0";
     answer x == 1.4;
 
@@ -23,7 +23,7 @@ task {
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     text "Решить уравнение 3x+5=1-x";
     answer x == -1;
 

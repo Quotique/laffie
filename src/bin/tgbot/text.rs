@@ -49,8 +49,8 @@ impl Text {
         format!(
             "<u><i>Задача</i></u> 0x{:x}\n<i>цель:</i> {}\n<i>условия:</i>\n  {}\n{}",
             task.id,
-            task.purpose,
-            task.conditions
+            task.goal,
+            task.givens
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<String>>()

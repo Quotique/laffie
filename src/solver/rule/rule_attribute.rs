@@ -8,7 +8,7 @@ use crate::{term::Term, CompactString};
 pub enum RuleAttr {
     Equivalence,
     Replace,
-    Purpose,
+    Goal,
     Level,
     Zero,
     One,
@@ -22,7 +22,7 @@ pub enum RuleAttrValue {
     None,
     UInt(u64),
     Str(CompactString),
-    Purpose(Term),
+    Goal(Term),
 }
 
 impl FromStr for RuleAttr {
@@ -33,7 +33,7 @@ impl FromStr for RuleAttr {
             "equivalence" => Ok(RuleAttr::Equivalence),
             "replace" => Ok(RuleAttr::Replace),
             "level" => Ok(RuleAttr::Level),
-            "purpose" => Ok(RuleAttr::Purpose),
+            "goal" => Ok(RuleAttr::Goal),
             "zero" => Ok(RuleAttr::Zero),
             "one" => Ok(RuleAttr::One),
             "id" => Ok(RuleAttr::Id),

@@ -3,13 +3,13 @@ symbol * {
 }
 
 rule {
-    attr replace,level(2),purpose(transform(x)),id(brackets_disclosure);
+    attr replace,level(2),goal(transform(x)),id(brackets_disclosure);
 
     (a + b)*c <=> a*c + b*c;
 }
 
 rule {
-    attr level(0),purpose(proof(a*b is known));
+    attr level(0),goal(proof(a*b is known));
 
     a*b is known <=> true;
 
@@ -18,13 +18,13 @@ rule {
 }
 
 rule {
-    attr level(0),purpose(transform(x)),replace;
+    attr level(0),goal(transform(x)),replace;
 
     -(-a) <=> a;
 }
 
 rule {
-    attr level(0),purpose(proof(-a is known));
+    attr level(0),goal(proof(-a is known));
 
     -a is known <=> true;
 
@@ -32,7 +32,7 @@ rule {
 }
 
 rule {
-    attr level(1),purpose(transform(x)),replace;
+    attr level(1),goal(transform(x)),replace;
 
     -a == -b <=> a == b;
 }

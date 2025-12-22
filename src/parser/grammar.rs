@@ -5,7 +5,7 @@ use trees::{tr, Tree};
 use crate::CompactString;
 
 pub(crate) const TOKEN_TASK: &str = "Task";
-pub(crate) const TOKEN_PURPOSE: &str = "Purpose";
+pub(crate) const TOKEN_GOAL: &str = "Goal";
 pub(crate) const TOKEN_TEXT: &str = "Text";
 pub(crate) const TOKEN_ANSWER: &str = "Answer";
 pub(crate) const TOKEN_DECLARE: &str = "Declare";
@@ -79,14 +79,14 @@ peg::parser! {
         pub rule terms() -> Vec<Tree<Token>> = _ c:semicolonsep(<term()>) _ { c }
 
         pub rule task() -> Tree<Token> = _ pp:position!() keyword("task") _ "{"
-                _ pt:position!() keyword("purpose") _ p:eval() ";"
+                _ pt:position!() keyword("goal") _ p:eval() ";"
                 _ tt:position!() t:(keyword("text") _ t:string() ";" {t} )?
                 _ at:position!() a:(keyword("answer") _ a:commasep(<term()>) _ ";" {a} )?
                 _ c:semicolonsep(<term()>)
             _ "}"
             {
                 let mut p = Token::new(TOKEN_TASK, pp)
-                              /(Token::new(TOKEN_PURPOSE, pt) / p)
+                              /(Token::new(TOKEN_GOAL, pt) / p)
                               /(Token::new(TOKEN_TEXT, tt)
                                 /Token::new(t.unwrap_or_default().as_str(), tt));
                 if let Some(ans) = a {
@@ -459,7 +459,7 @@ mod tests {
     #[test]
     fn task_text_parse_test() {
         let test = r#"task {
-                        purpose find(x);
+                        goal find(x);
                         text "Решите уравнение 2x+5 = 0";
                         answer x == -2.5;
                         2*x+5 == 0;
@@ -468,17 +468,17 @@ mod tests {
         assert_eq!(
             states,
             Token::new("Task", 0) /
-                (Token::new("Purpose", 31) / (Token::new("find", 39) / Token::new("x", 44))) /
-                (Token::new("Text", 72) / Token::new("Решите уравнение 2x+5 = 0", 72)) /
-                (Token::new("Answer", 145) /
-                    (Token::new("==", 154) / Token::new("x", 152) / Token::new("-2.5", 158))) /
-                (Token::new("==", 193) /
-                    (Token::new("+", 190) /
-                        (Token::new("*", 188) /
-                            Token::new("2", 187) /
-                            Token::new("x", 189)) /
-                        Token::new("5", 191)) /
-                    Token::new("0", 196))
+                (Token::new("Goal", 31) / (Token::new("find", 36) / Token::new("x", 41))) /
+                (Token::new("Text", 69) / Token::new("Решите уравнение 2x+5 = 0", 69)) /
+                (Token::new("Answer", 142) /
+                    (Token::new("==", 151) / Token::new("x", 149) / Token::new("-2.5", 155))) /
+                (Token::new("==", 190) /
+                    (Token::new("+", 187) /
+                        (Token::new("*", 185) /
+                            Token::new("2", 184) /
+                            Token::new("x", 186)) /
+                        Token::new("5", 188)) /
+                    Token::new("0", 193))
         )
     }
 
@@ -511,20 +511,20 @@ mod tests {
     #[test]
     fn task_parse_test() {
         let test = r#"task {
-                        purpose find(x);
+                        goal find(x);
                         2*x+5 == 0;
                     }"#;
         let states = ra::task(test).unwrap();
         assert_eq!(
             states,
             Token::new("Task", 0) /
-                (Token::new("Purpose", 31) / (Token::new("find", 39) / Token::new("x", 44))) /
-                (Token::new("Text", 72) / Token::new("", 72)) /
-                (Token::new("==", 78) /
-                    (Token::new("+", 75) /
-                        (Token::new("*", 73) / Token::new("2", 72) / Token::new("x", 74)) /
-                        Token::new("5", 76)) /
-                    Token::new("0", 81))
+                (Token::new("Goal", 31) / (Token::new("find", 36) / Token::new("x", 41))) /
+                (Token::new("Text", 69) / Token::new("", 69)) /
+                (Token::new("==", 75) /
+                    (Token::new("+", 72) /
+                        (Token::new("*", 70) / Token::new("2", 69) / Token::new("x", 71)) /
+                        Token::new("5", 73)) /
+                    Token::new("0", 78))
         )
     }
 }

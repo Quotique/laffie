@@ -5,7 +5,7 @@ use colored::*;
 use itertools::Itertools;
 
 use solver::{
-    task::{Purpose, Solution, TermProps},
+    task::{Goal, Solution, TermProps},
     term::SharedTerm,
 };
 
@@ -16,8 +16,8 @@ pub struct Console<'a, 'b> {
 }
 
 impl Renderer for Console<'_, '_> {
-    fn display_purpose(&mut self, subtask_level: usize, purpose: &Purpose) -> fmt::Result {
-        writeln!(self.output, "{}{purpose}", "  ".repeat(subtask_level))
+    fn display_goal(&mut self, subtask_level: usize, goal: &Goal) -> fmt::Result {
+        writeln!(self.output, "{}{goal}", "  ".repeat(subtask_level))
     }
 
     fn display_term(&mut self, subtask_level: usize, term: &TermProps) -> fmt::Result {
@@ -33,7 +33,7 @@ impl Renderer for Console<'_, '_> {
                     " needed: [{}]",
                     term.inference
                         .requirements()
-                        .map(|x| &x.task.purpose.term)
+                        .map(|x| &x.task.goal.term)
                         .format(", ")
                 )
             }
@@ -42,7 +42,7 @@ impl Renderer for Console<'_, '_> {
 
     fn display_answer(
         &mut self,
-        purpose: &Purpose,
+        goal: &Goal,
         answer: Option<SharedTerm>,
         status: &Solution,
     ) -> fmt::Result {
@@ -50,11 +50,11 @@ impl Renderer for Console<'_, '_> {
             writeln!(
                 self.output,
                 "{} {}",
-                match purpose {
-                    Purpose::Find(_) | Purpose::Transform(_) => {
+                match goal {
+                    Goal::Find(_) | Goal::Transform(_) => {
                         format!("{} {answer}", "Answer:".green()).bold()
                     }
-                    Purpose::Proof(_) => {
+                    Goal::Proof(_) => {
                         "PROOFED!".bold().green()
                     }
                 },

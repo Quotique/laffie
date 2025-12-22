@@ -8,10 +8,7 @@ use ratatui::{
 
 use solver::task::{Solution, SolutionStatus, TermInference};
 
-use crate::{
-    theme::Theme,
-    widgets::{tracing_navigation::TermId},
-};
+use crate::{theme::Theme, widgets::tracing_navigation::TermId};
 
 #[derive(Clone, Debug)]
 pub struct TracingWindow {
@@ -38,7 +35,7 @@ impl Widget for TracingWindow {
 impl TracingWindow {
     fn task_lines<'a>(&'a self, solution: &Solution) -> Vec<Line<'a>> {
         vec![
-            self.key_value_line("Task: ", &solution.purpose),
+            self.key_value_line("Task: ", &solution.goal),
             Line::default(),
             self.key_value_line(
                 "Answer: ",
@@ -84,13 +81,11 @@ impl TracingWindow {
                 let unproven = self.theme().unproven_requirement();
                 let skipped = self.theme().skipped_requirement();
                 for i in requirements {
-                    let purpose = &i.task.purpose.term;
+                    let goal = &i.task.goal.term;
                     result.push(Line::from(match i.status {
-                        SolutionStatus::Answer(_) => {
-                            Span::styled(format!("  ☑  {purpose}"), proven)
-                        }
-                        SolutionStatus::Err(_) => Span::styled(format!("  ☒  {purpose}"), unproven),
-                        SolutionStatus::NotDone => Span::styled(format!("  ☐  {purpose}"), skipped),
+                        SolutionStatus::Answer(_) => Span::styled(format!("  ☑  {goal}"), proven),
+                        SolutionStatus::Err(_) => Span::styled(format!("  ☒  {goal}"), unproven),
+                        SolutionStatus::NotDone => Span::styled(format!("  ☐  {goal}"), skipped),
                     }));
                 }
                 result.push(Line::default());

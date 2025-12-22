@@ -5,8 +5,8 @@ use crate::term::Term;
 
 #[derive(Clone, Debug)]
 pub enum TaskBuilderError {
-    OnlyOnePurposeAllowed,
-    NoPurposeFound,
+    OnlyOneGoalAllowed,
+    NoGoalFound,
 }
 
 #[derive(Default)]
@@ -14,7 +14,7 @@ pub struct TaskBuilder {
     id:          u64,
     text:        String,
     conditions:  Vec<TermProps>,
-    purpose:     Option<TermProps>,
+    goal:        Option<TermProps>,
     term_id_map: HashMap<usize, usize>,
 
     possible_answers: Vec<Term>,
@@ -33,9 +33,9 @@ impl TaskBuilder {
         self
     }
 
-    pub fn with_purpose(mut self, purpose: TermProps) -> Result<Self, TaskBuilderError> {
-        if let Some(_x) = self.purpose.replace(purpose) {
-            Err(TaskBuilderError::OnlyOnePurposeAllowed)
+    pub fn with_goal(mut self, goal: TermProps) -> Result<Self, TaskBuilderError> {
+        if let Some(_x) = self.goal.replace(goal) {
+            Err(TaskBuilderError::OnlyOneGoalAllowed)
         } else {
             Ok(self)
         }
@@ -85,8 +85,8 @@ impl TaskBuilder {
             id:               self.id,
             text:             self.text,
             group:            "".to_owned(),
-            conditions:       self.conditions,
-            purpose:          self.purpose.ok_or(TaskBuilderError::NoPurposeFound)?,
+            givens:           self.conditions,
+            goal:             self.goal.ok_or(TaskBuilderError::NoGoalFound)?,
             subtask_level:    self.subtask_level,
             possible_answers: self.possible_answers,
         })
@@ -96,8 +96,8 @@ impl TaskBuilder {
 impl fmt::Display for TaskBuilderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::OnlyOnePurposeAllowed => write!(f, "Duplicate purpose"),
-            Self::NoPurposeFound => write!(f, "No purpose found"),
+            Self::OnlyOneGoalAllowed => write!(f, "Duplicate goal"),
+            Self::NoGoalFound => write!(f, "No goal found"),
         }
     }
 }

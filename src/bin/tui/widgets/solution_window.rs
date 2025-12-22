@@ -65,11 +65,11 @@ impl<'a> SolutionWindow<'a> {
             ]),
             Line::default(),
             Line::from(Span::styled(
-                task.purpose.to_string(),
-                self.theme().solution_purpose(),
+                task.goal.to_string(),
+                self.theme().solution_goal(),
             )),
         ];
-        for condition in &task.conditions {
+        for condition in &task.givens {
             lines.push(Line::from(Span::styled(
                 format!("  {condition}"),
                 self.theme().solution_term(),
@@ -87,8 +87,8 @@ impl<'a> SolutionWindow<'a> {
             match step {
                 Visit::Subtask(t) => {
                     lines.push(Line::from(Span::styled(
-                        format!("{}{}", "  ".repeat(depth), t.purpose),
-                        self.theme().solution_purpose(),
+                        format!("{}{}", "  ".repeat(depth), t.goal),
+                        self.theme().solution_goal(),
                     )));
                     depth += 1;
                 }

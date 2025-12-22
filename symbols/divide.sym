@@ -3,7 +3,7 @@ symbol / {
 }
 
 rule {
-    attr level(0),purpose(proof(a/b is known));
+    attr level(0),goal(proof(a/b is known));
 
     a/b is known <=> true;
 
@@ -12,31 +12,31 @@ rule {
 }
 
 rule {
-    attr level(0),purpose(transform(x)),replace;
+    attr level(0),goal(transform(x)),replace;
 
     -a/b => (-a)/b;
 }
 
 rule {
-    attr level(2),purpose(transform(x)),replace,zero(e);
+    attr level(2),goal(transform(x)),replace,zero(e);
 
     a/b + c/d + e <=> (a*d + b*c)/(b*d) + e;
 }
 
 rule {
-    attr level(3),purpose(transform(x)),replace;
+    attr level(3),goal(transform(x)),replace;
 
     a/b + c <=> (a + b*c)/b;
 }
 
 rule {
-    attr level(1),purpose(transform(x)),replace;
+    attr level(1),goal(transform(x)),replace;
 
     c * (a/b) <=> (a*c)/b;
 }
 
 rule {
-    attr level(2),purpose(proof(a/b != 0));
+    attr level(2),goal(proof(a/b != 0));
 
     a/b != 0 <=> a != 0;
 
@@ -44,7 +44,7 @@ rule {
 }
 
 rule {
-    attr level(3),purpose(proof(a/b != c));
+    attr level(3),goal(proof(a/b != c));
 
     a/b != c <=> a != c*b;
 
@@ -52,13 +52,13 @@ rule {
 }
 
 rule {
-    attr level(2),purpose(find(x));
+    attr level(2),goal(find(x));
 
     a/b == 0 => a == 0 && b != 0;
 }
 
 rule {
-    attr level(0),purpose(proof(a/b <= 0));
+    attr level(0),goal(proof(a/b <= 0));
 
     a/b <= 0 <=> a*b <= 0;
 
@@ -66,7 +66,7 @@ rule {
 }
 
 rule {
-    attr level(0),purpose(proof(a/b > 0));
+    attr level(0),goal(proof(a/b > 0));
 
     a/b >= 0 <=> a*b >= 0;
 
@@ -74,7 +74,7 @@ rule {
 }
 
 rule {
-    attr level(0),purpose(proof(a/b > 0));
+    attr level(0),goal(proof(a/b > 0));
 
     a/b > 0 <=> a*b > 0;
 }

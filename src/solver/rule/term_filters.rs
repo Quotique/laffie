@@ -11,7 +11,7 @@ bitflags! {
     pub struct TermFlags: u32 {
         const REPLACED   = 0b0001;
         const SIMPLIFIED = 0b0010;
-        const PURPOSE    = 0b0100;
+        const GOAL       = 0b0100;
     }
 }
 
@@ -42,8 +42,8 @@ impl TermFilters {
         self.flags & TermFlags::SIMPLIFIED == TermFlags::SIMPLIFIED
     }
 
-    pub fn is_purpose(&self) -> bool {
-        self.flags & TermFlags::PURPOSE == TermFlags::PURPOSE
+    pub fn is_goal(&self) -> bool {
+        self.flags & TermFlags::GOAL == TermFlags::GOAL
     }
 
     pub fn mark_replaced(&mut self) {
@@ -54,7 +54,7 @@ impl TermFilters {
         self.flags |= TermFlags::SIMPLIFIED;
     }
 
-    pub fn mark_purpose(&mut self) {
-        self.flags |= TermFlags::PURPOSE;
+    pub fn mark_goal(&mut self) {
+        self.flags |= TermFlags::GOAL;
     }
 }

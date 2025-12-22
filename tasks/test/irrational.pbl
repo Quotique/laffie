@@ -1,5 +1,5 @@
 task {
-    purpose find(x);
+    goal find(x);
     text "Решить уравнение sqrt(x) == 2";
     answer x == 4;
 
@@ -7,7 +7,7 @@ task {
 }
 
 task {
-    purpose find(x);
+    goal find(x);
     text "Найти x";
     answer x in empty_set;
 
@@ -15,13 +15,13 @@ task {
 }
 
 task {
-    purpose proof( (-sqrt(29)+5)/(-2) > 0 );
+    goal proof( (-sqrt(29)+5)/(-2) > 0 );
 
 	x == 2;
 }
 
 task {
-    purpose proof( !((-sqrt(29)+5)/(-2) <= 0) );
+    goal proof( !((-sqrt(29)+5)/(-2) <= 0) );
 
 	x == 2;
 }

@@ -24,9 +24,9 @@ pub mod old {
     pub struct TaskRecord {
         pub version: u64,
 
-        pub id:         u128,
-        pub conditions: Vec<Term>,
-        pub purpose:    Term,
+        pub id:     u128,
+        pub givens: Vec<Term>,
+        pub goal:   Term,
 
         pub answer:  Term,
         pub runs:    Vec<usize>,
@@ -38,11 +38,11 @@ pub mod old {
 pub struct TaskRecord {
     pub version: u64,
 
-    pub id:         u128,
-    pub text:       String,
-    pub group:      String,
-    pub conditions: Vec<Term>,
-    pub purpose:    Term,
+    pub id:     u128,
+    pub text:   String,
+    pub group:  String,
+    pub givens: Vec<Term>,
+    pub goal:   Term,
 
     pub answer:  Vec<Term>,
     pub runs:    Vec<usize>,
@@ -57,12 +57,12 @@ pub struct TaskDb {
 impl From<old::TaskRecord> for TaskRecord {
     fn from(value: old::TaskRecord) -> Self {
         Self {
-            version:    VERSION,
-            id:         value.id,
-            text:       Default::default(),
-            group:      Default::default(),
-            conditions: value.conditions,
-            purpose:    value.purpose,
+            version: VERSION,
+            id:      value.id,
+            text:    Default::default(),
+            group:   Default::default(),
+            givens:  value.givens,
+            goal:    value.goal,
 
             answer:  vec![value.answer],
             runs:    value.runs,
@@ -74,12 +74,12 @@ impl From<old::TaskRecord> for TaskRecord {
 impl From<&Task> for TaskRecord {
     fn from(value: &Task) -> Self {
         Self {
-            version:    VERSION,
-            id:         value.id as u128,
-            text:       value.text.clone(),
-            group:      value.group.clone(),
-            conditions: Vec::from_iter(value.conditions.iter().map(|x| (*x.term).clone())),
-            purpose:    (*value.purpose.term).clone(),
+            version: VERSION,
+            id:      value.id as u128,
+            text:    value.text.clone(),
+            group:   value.group.clone(),
+            givens:  Vec::from_iter(value.givens.iter().map(|x| (*x.term).clone())),
+            goal:    (*value.goal.term).clone(),
 
             answer:  value.possible_answers.clone(),
             runs:    Default::default(),
@@ -95,9 +95,9 @@ impl Into<Task> for TaskRecord {
             id:               self.id as u64,
             text:             self.text,
             group:            "".to_string(),
-            conditions:       Vec::from_iter(self.conditions.into_iter().map(TermProps::from)),
+            givens:           Vec::from_iter(self.givens.into_iter().map(TermProps::from)),
             possible_answers: self.answer,
-            purpose:          TermProps::from(self.purpose),
+            goal:             TermProps::from(self.goal),
             subtask_level:    0,
         }
     }
@@ -105,16 +105,16 @@ impl Into<Task> for TaskRecord {
 
 impl TaskRecord {
     fn is_same(&self, other: &Self) -> bool {
-        if self.purpose != other.purpose {
+        if self.goal != other.goal {
             return false;
         }
-        for i in self.conditions.iter() {
-            if !other.conditions.iter().any(|x| x == i) {
+        for i in self.givens.iter() {
+            if !other.givens.iter().any(|x| x == i) {
                 return false;
             }
         }
-        for i in other.conditions.iter() {
-            if !self.conditions.iter().any(|x| x == i) {
+        for i in other.givens.iter() {
+            if !self.givens.iter().any(|x| x == i) {
                 return false;
             }
         }

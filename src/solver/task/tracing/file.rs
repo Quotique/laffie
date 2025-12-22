@@ -39,8 +39,8 @@ impl Tracer for FileDumpTracer {
                 format!(
                     "{} {} [{}]\n",
                     self.idention(),
-                    task.purpose,
-                    task.conditions
+                    task.goal,
+                    task.givens
                         .iter()
                         .map(|x| x.term.to_string())
                         .collect::<Vec<String>>()
@@ -59,7 +59,7 @@ impl Tracer for FileDumpTracer {
                     "{} [{} cycles] {} Answer: {}\n",
                     self.idention(),
                     status.cycles(),
-                    status.task.purpose.to_string().replace("\n", "; "),
+                    status.task.goal.to_string().replace("\n", "; "),
                     status
                         .answer()
                         .map(|x| x.to_string())

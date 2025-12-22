@@ -65,8 +65,8 @@ impl DirectoryParser {
                         trace!(
                             "New task: [{:x}] {} [{}]",
                             t.id,
-                            t.purpose,
-                            t.conditions.iter().format(", ")
+                            t.goal,
+                            t.givens.iter().format(", ")
                         );
                         t.group = path.with_extension("").display().to_string();
                         result.push(t)
