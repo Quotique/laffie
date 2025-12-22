@@ -134,6 +134,19 @@ impl<'a> Subterm<'a> {
             .unwrap_or(u64::MIN);
         weight > parent_weight || (weight == parent_weight && !parent_associative)
     }
+
+    pub fn contains(&self, target: &Subterm) -> bool {
+        if *self == *target {
+            return true;
+        }
+
+        for child in self.iter() {
+            if child.contains(target) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl<'a> Subterm<'a> {
@@ -357,6 +370,33 @@ mod tests {
     use itertools::Itertools;
 
     use crate::term::{term_with_params, term_with_vars};
+
+    #[test]
+    fn subterm_contains_direct_term() {
+        let term = term_with_vars("x");
+        assert!(term.as_subterm().contains(&term.as_subterm()));
+    }
+
+    #[test]
+    fn subterm_does_not_contain_absent_term() {
+        let term = term_with_vars("set(1, 2, 3) is known");
+        let missing = term_with_vars("4");
+        assert!(!term.as_subterm().contains(&missing.as_subterm()));
+    }
+
+    #[test]
+    fn subterm_contains_in_multi_arity() {
+        let term = term_with_vars("set(3, 5, 7) is known");
+        let target = term_with_vars("5");
+        assert!(term.as_subterm().contains(&target.as_subterm()));
+    }
+
+    #[test]
+    fn subterm_contains_complex_term() {
+        let term = term_with_vars("a*x^2 + b*x + c == 0");
+        let subterm = term_with_vars("a*x^2");
+        assert!(term.as_subterm().contains(&subterm.as_subterm()));
+    }
 
     #[test]
     fn symbol_display_test() {
