@@ -43,8 +43,8 @@ impl Renderer for Html<'_> {
                     Goal::Find(_) | Goal::Transform(_) => {
                         format!("<b>Answer:</b> {}", encode_text(&answer.to_string()))
                     }
-                    Goal::Proof(_) => {
-                        "<b>PROOFED!</b>".to_owned()
+                    Goal::Prove(_) => {
+                        "<b>PROVEN!</b>".to_owned()
                     }
                 },
                 format_args!("[{} cycles, ]", status.cycles())

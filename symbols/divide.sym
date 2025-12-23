@@ -3,7 +3,7 @@ symbol / {
 }
 
 rule {
-    attr level(0),goal(proof(a/b is known));
+    attr level(0),goal(prove(a/b is known));
 
     a/b is known <=> true;
 
@@ -36,7 +36,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(proof(a/b != 0));
+    attr level(2),goal(prove(a/b != 0));
 
     a/b != 0 <=> a != 0;
 
@@ -44,7 +44,7 @@ rule {
 }
 
 rule {
-    attr level(3),goal(proof(a/b != c));
+    attr level(3),goal(prove(a/b != c));
 
     a/b != c <=> a != c*b;
 
@@ -58,7 +58,7 @@ rule {
 }
 
 rule {
-    attr level(0),goal(proof(a/b <= 0));
+    attr level(0),goal(prove(a/b <= 0));
 
     a/b <= 0 <=> a*b <= 0;
 
@@ -66,7 +66,7 @@ rule {
 }
 
 rule {
-    attr level(0),goal(proof(a/b > 0));
+    attr level(0),goal(prove(a/b > 0));
 
     a/b >= 0 <=> a*b >= 0;
 
@@ -74,7 +74,7 @@ rule {
 }
 
 rule {
-    attr level(0),goal(proof(a/b > 0));
+    attr level(0),goal(prove(a/b > 0));
 
     a/b > 0 <=> a*b > 0;
 }

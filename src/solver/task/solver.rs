@@ -53,7 +53,7 @@ impl Solver {
     /// # Arguments
     ///
     /// * `rules` – An `Arc` pointing to a `RulesEngine` that provides the
-    ///   global rule set used during proof search.
+    ///   global rule set used during solving.
     pub fn new(rules: Arc<RulesEngine>) -> Solver {
         Solver {
             rules_engine:  rules.clone(),
@@ -234,7 +234,7 @@ impl Solver {
             .suggest_rules(&term.filters, &goal_term.term);
         let rules = rules.into_iter().chain(local_rules);
 
-        let rules: Vec<_> = if goal.is_proof() && term.filters.is_goal() {
+        let rules: Vec<_> = if goal.is_prove() && term.filters.is_goal() {
             rules
                 .filter(|rule| rule.contains_attribute(&RuleAttr::Equivalence))
                 .collect()
@@ -256,15 +256,15 @@ impl Solver {
         state: &mut SolutionState,
     ) -> Result<(), SolveError> {
         let is_goal = solution[index].filters.is_goal();
-        let proof_goal = TermProps::from(
-            Term::symbol("proof").with_child(solution[index].term.as_ref().clone()),
+        let prove_goal = TermProps::from(
+            Term::symbol("prove").with_child(solution[index].term.as_ref().clone()),
         );
 
         let mut added = false;
         for rule in self.suggest_rules(
             &solution[index],
-            if is_goal && solution.goal.is_proof() {
-                &proof_goal
+            if is_goal && solution.goal.is_prove() {
+                &prove_goal
             } else {
                 &solution.task.goal
             },
@@ -300,13 +300,13 @@ impl Solver {
         index: TermIdx,
     ) -> Option<TermProps> {
         let is_goal = s[index].filters.is_goal();
-        let proof_goal = Term::symbol("proof").with_child(s[index].term.as_ref().clone());
+        let prove_goal = Term::symbol("prove").with_child(s[index].term.as_ref().clone());
         HypothesisIterator::new(
             rule.clone(),
             &s[index].term,
             &s[index].filters,
-            if is_goal && s.goal.is_proof() {
-                &proof_goal
+            if is_goal && s.goal.is_prove() {
+                &prove_goal
             } else {
                 &s.task.goal.term
             },
@@ -358,7 +358,7 @@ impl Solver {
         let mut req_proofs = vec![];
         let mut iter = hypothesis.requirements.clone().into_iter();
         for i in iter.by_ref() {
-            req_proofs.push(self.proof(solution, i, state));
+            req_proofs.push(self.prove(solution, i, state));
             let last = req_proofs.last().unwrap();
             if last.answer().is_none() {
                 trace!(
@@ -372,7 +372,7 @@ impl Solver {
         }
         for req in iter {
             req_proofs.push(SharedSolution::new(Solution::new(Task::from(
-                TermProps::from(Term::symbol("proof").with_child(req)),
+                TermProps::from(Term::symbol("prove").with_child(req)),
             ))));
         }
         props.inference = TermInference::Rule {
@@ -396,7 +396,7 @@ impl Solver {
         props
     }
 
-    fn proof(
+    fn prove(
         &self,
         solution: &Solution,
         mut term: Term,
@@ -404,11 +404,11 @@ impl Solver {
     ) -> SharedSolution {
         is_replace(&mut term.as_subterm_mut());
         let term = term.normalize(NormalizationLevel::max());
-        let proof_goal = SharedTerm::new(Term::symbol("proof").with_child(term.clone()));
+        let prove_goal = SharedTerm::new(Term::symbol("prove").with_child(term.clone()));
 
         if term.as_subterm().truth().is_true() {
             // Build a minimal solution whose answer is the proven term
-            let mut trivial_solution = Solution::new(Task::from(TermProps::from(proof_goal)));
+            let mut trivial_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
             // Add the term to the solution and mark it as the answer
             let idx = trivial_solution
                 .add_term(TermProps::from(term.clone()))
@@ -435,14 +435,14 @@ impl Solver {
                     .iter()
                     .any(|i| first.contains(&i.as_subterm()))
                 {
-                    let mut no_solution = Solution::new(Task::from(TermProps::from(proof_goal)));
+                    let mut no_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
                     no_solution.status = SolutionStatus::Err(SolveError::NoSolutionsFound);
                     return SharedSolution::new(no_solution);
                 }
             }
         }
 
-        self.solve_subtask(solution, proof_goal, state)
+        self.solve_subtask(solution, prove_goal, state)
     }
 
     fn transform(
@@ -523,7 +523,7 @@ impl Solver {
         let subtask_solution = SharedSolution::new(subtask_solution);
         *state.cache.get_mut(&task).unwrap() = subtask_solution.clone();
         if let SolutionStatus::Err(e) = subtask_solution.status {
-            trace!("Can't proof {task}: {e}");
+            trace!("Can't prove {task}: {e}");
             if e == SolveError::MaxSubtaskLevelExceed {
                 state.cache.remove(&task);
             }
@@ -566,7 +566,7 @@ impl Solver {
 
         match solution.goal.clone() {
             Goal::Find(x) => self.check_find_answer(solution, state, index, x.term.as_ref()),
-            Goal::Proof(_) => self.check_proof_answer(solution, index),
+            Goal::Prove(_) => self.check_prove_answer(solution, index),
             Goal::Transform(_) => self.check_transform_answer(solution),
         }
     }
@@ -610,7 +610,7 @@ impl Solver {
             let is_known = Term::symbol("is")
                 .with_child(term.last_arg().unwrap().to_term())
                 .with_child(Term::symbol("known"));
-            if self.proof(solution, is_known, state).answer().is_some() {
+            if self.prove(solution, is_known, state).answer().is_some() {
                 solution.status = SolutionStatus::Answer(index);
                 return true;
             }
@@ -618,7 +618,7 @@ impl Solver {
         false
     }
 
-    fn check_proof_answer(&self, solution: &mut Solution, index: usize) -> bool {
+    fn check_prove_answer(&self, solution: &mut Solution, index: usize) -> bool {
         let term = &solution[index];
 
         // TODO: теперь тут бывают целевые термы, поэтому надо сделать две проверки:
@@ -717,8 +717,8 @@ mod solution_tests {
     }
 
     #[test]
-    fn unknown_terms_proof_goal() {
-        let task = parse_task("task { goal proof(x > 0); x == 2; }");
+    fn unknown_terms_prove_goal() {
+        let task = parse_task("task { goal prove(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules);
 
@@ -726,7 +726,7 @@ mod solution_tests {
 
         assert!(
             solver.unknown_terms.is_empty(),
-            "unknown_terms should be empty for proof goal"
+            "unknown_terms should be empty for prove goal"
         );
     }
 
@@ -757,8 +757,8 @@ mod solution_tests {
     }
 
     #[test]
-    fn check_answer_proof_test() {
-        let task = parse_task("task { goal proof(x > 0); x == 2; }");
+    fn check_answer_prove_test() {
+        let task = parse_task("task { goal prove(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules);
         let solution = solver.solve(task, Default::default(), usize::MAX);

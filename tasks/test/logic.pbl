@@ -34,19 +34,19 @@ task {
 }
 
 task {
-    goal proof(symbolic_eq(0, 0));
+    goal prove(symbolic_eq(0, 0));
 
     x == 1;
 }
 
 task {
-    goal proof(!symbolic_eq(1, 0));
+    goal prove(!symbolic_eq(1, 0));
 
     x == 1;
 }
 
 task {
-    goal proof(x == 6/5);
+    goal prove(x == 6/5);
 
     x in set(6/5, 12/5);
     answer(x in set(6/5, 12/5));

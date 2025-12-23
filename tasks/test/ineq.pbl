@@ -1,29 +1,29 @@
 task {
-	goal proof(1 > 0);
+	goal prove(1 > 0);
 
 	x == 2;
 }
 
 task {
-	goal proof(-9 < 0);
+	goal prove(-9 < 0);
 
 	x == 2;
 }
 
 task {
-	goal proof((1>0) is (true));
+	goal prove((1>0) is (true));
 
 	x == 2;
 }
 
 task {
-	goal proof(x > 0);
+	goal prove(x > 0);
 
 	x == 2;
 }
 
 task {
-	goal proof(x > 0);
+	goal prove(x > 0);
 
 	x == 2 + 2;
 }

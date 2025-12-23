@@ -9,7 +9,7 @@ rule {
 }
 
 rule {
-    attr level(0),goal(proof(a*b is known));
+    attr level(0),goal(prove(a*b is known));
 
     a*b is known <=> true;
 
@@ -24,7 +24,7 @@ rule {
 }
 
 rule {
-    attr level(0),goal(proof(-a is known));
+    attr level(0),goal(prove(-a is known));
 
     -a is known <=> true;
 

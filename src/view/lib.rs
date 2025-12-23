@@ -57,7 +57,7 @@ impl View<'_> {
         renderer.display_goal(subtask_level, goal)?;
         match goal {
             Goal::Find(_) | Goal::Transform(_) => {}
-            Goal::Proof(_) => {
+            Goal::Prove(_) => {
                 let answer_idx = self
                     .solution
                     .terms

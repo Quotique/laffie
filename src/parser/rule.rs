@@ -235,7 +235,7 @@ mod tests {
     #[test]
     fn rule_parse_2_test() {
         let test = r#"rule {
-                    attr level(0),goal(proof(a/b is known));
+                    attr level(0),goal(prove(a/b is known));
                     a/b is known <=> true;
                     a is known,
                     b is known

@@ -3,7 +3,7 @@ symbol set {
 }
 
 rule {
-    attr level(0),goal(proof(set(a) is known));
+    attr level(0),goal(prove(set(a) is known));
 
     set(a) is known <=> true;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(0),goal(proof(set(a, ..) is known));
+    attr level(0),goal(prove(set(a, ..) is known));
 
     set(a, .. as S) is known <=> true;
 
@@ -40,7 +40,7 @@ symbol empty_set {
 }
 
 rule {
-    attr level(0),goal(proof(empty_set is known));
+    attr level(0),goal(prove(empty_set is known));
 
     empty_set is known <=> true;
 }

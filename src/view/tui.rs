@@ -60,7 +60,7 @@ impl Renderer for Tui<'_> {
                     Span::style(
                         match goal {
                             Goal::Find(_) | Goal::Transform(_) => format!("Answer: {answer}"),
-                            Goal::Proof(_) => "PROOFED!".to_owned(),
+                            Goal::Prove(_) => "PROVEN!".to_owned(),
                         }
                         .into(),
                         answer_style,

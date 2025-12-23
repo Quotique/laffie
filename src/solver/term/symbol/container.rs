@@ -71,7 +71,7 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
         add_symbol_impl(&mut result, ops::sqrt::symbol());
 
         SymbolProgram::add_with_name(&mut result, "find");
-        SymbolProgram::add_with_name(&mut result, "proof");
+        SymbolProgram::add_with_name(&mut result, "prove");
         SymbolProgram::add_with_name(&mut result, "transform");
         add_symbol_impl(&mut result, ops::replace::symbol());
         SymbolProgram::add_with_name(&mut result, "replace");

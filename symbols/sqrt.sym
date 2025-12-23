@@ -3,7 +3,7 @@ symbol sqrt {
 }
 
 rule {
-    attr level(0),goal(proof(sqrt(a) is known));
+    attr level(0),goal(prove(sqrt(a) is known));
 
     sqrt(a) is known <=> true;
 
@@ -11,7 +11,7 @@ rule {
 }
 
 rule {
-    attr level(0),goal(proof(x != 0));
+    attr level(0),goal(prove(x != 0));
 
     a*sqrt(b) + c != 0 <=> c*a > 0 || b != (c/a)^2;
 
@@ -56,7 +56,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(proof(x)),one(a);
+    attr level(2),goal(prove(x)),one(a);
 
     sqrt(a) <= b  <=> (b < 0 && a >= 0) || (b >= 0 && a >= 0 && a <= b^2);
 
@@ -64,7 +64,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(proof(x)),one(a);
+    attr level(2),goal(prove(x)),one(a);
 
     sqrt(a) >= b <=> (b < 0 && a >= 0) || (b >= 0 && a >= b^2);
 
@@ -72,7 +72,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(proof(x)),one(a);
+    attr level(2),goal(prove(x)),one(a);
 
     sqrt(a) > b <=> (b < 0 && a >= 0) || (b >= 0 && a > b^2);
 
@@ -81,7 +81,7 @@ rule {
 
 
 rule {
-    attr level(2),goal(proof(x <= 0)),one(a);
+    attr level(2),goal(prove(x <= 0)),one(a);
 
     a*sqrt(b) + c <= 0 <=> (a > 0 && sqrt(b) <= -c/a) || (a < 0 && sqrt(b) >= -c/a);
 
@@ -90,7 +90,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(proof(x > 0)),one(a);
+    attr level(2),goal(prove(x > 0)),one(a);
 
     a*sqrt(b) + c > 0 <=> (a > 0 && sqrt(b) > -c/a) || (a < 0 && sqrt(b) < -c/a);
 

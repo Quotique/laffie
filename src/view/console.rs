@@ -54,8 +54,8 @@ impl Renderer for Console<'_, '_> {
                     Goal::Find(_) | Goal::Transform(_) => {
                         format!("{} {answer}", "Answer:".green()).bold()
                     }
-                    Goal::Proof(_) => {
-                        "PROOFED!".bold().green()
+                    Goal::Prove(_) => {
+                        "PROVEN!".bold().green()
                     }
                 },
                 format!("[{} cycles]", status.cycles()).yellow()

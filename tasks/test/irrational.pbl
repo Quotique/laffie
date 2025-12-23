@@ -15,13 +15,13 @@ task {
 }
 
 task {
-    goal proof( (-sqrt(29)+5)/(-2) > 0 );
+    goal prove( (-sqrt(29)+5)/(-2) > 0 );
 
 	x == 2;
 }
 
 task {
-    goal proof( !((-sqrt(29)+5)/(-2) <= 0) );
+    goal prove( !((-sqrt(29)+5)/(-2) <= 0) );
 
 	x == 2;
 }
