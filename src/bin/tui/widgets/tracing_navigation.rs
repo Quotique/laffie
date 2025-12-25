@@ -42,21 +42,23 @@ impl TracingNavigation {
             .enumerate()
             .map(|(num, x)| {
                 let term_id = TermId::new_term(solution.clone(), num);
-                let term_line = self.term_line(x);
+                let term_line = self.term_line(x, solution.cycles());
+
+                let term_cycles: usize = x.inference.requirements().map(|x| x.cycles()).sum();
                 let children: Vec<TreeItem<'static, TermId>> = match &x.inference {
                     TermInference::Rule { requirements, .. } => requirements
                         .iter()
                         .map(|x| {
                             TreeItem::new_leaf(
                                 TermId::new_solution(x.clone()),
-                                self.subtask_line(x.clone()),
+                                self.subtask_line(x.clone(), term_cycles),
                             )
                         })
                         .collect(),
                     TermInference::Transform { solution, .. } => {
                         vec![TreeItem::new_leaf(
                             TermId::new_solution(solution.clone()),
-                            self.subtask_line(solution.clone()),
+                            self.subtask_line(solution.clone(), term_cycles),
                         )]
                     }
                     _ => vec![],
@@ -70,22 +72,22 @@ impl TracingNavigation {
             .collect()
     }
 
-    // TODO: cycles counters
-    fn term_line(&self, term: &TermProps) -> Line<'static> {
+    fn term_line(&self, term: &TermProps, total_cycles: usize) -> Line<'static> {
         let style = if term.inference.is_proven() {
             self.theme().default_tree_item()
         } else {
             self.theme().unproven_tree_item()
         };
 
+        let cycles: usize = term.inference.requirements().map(|x| x.cycles()).sum();
+
         Line::from(vec![
             Span::styled(term.term.to_string(), style),
-            Span::from(format!(" {} {}", 0, 0)),
+            Span::from(format!(" {} {}", cycles, total_cycles)),
         ])
     }
 
-    // TODO: total cycles
-    fn subtask_line(&self, solution: SharedSolution) -> Line<'static> {
+    fn subtask_line(&self, solution: SharedSolution, total_cycles: usize) -> Line<'static> {
         let style = if solution.answer().is_some() {
             self.theme().default_tree_item()
         } else {
@@ -93,7 +95,7 @@ impl TracingNavigation {
         };
         Line::from(vec![
             Span::styled(solution.task.goal.to_string(), style),
-            Span::from(format!(" {} {}", solution.cycles(), 0)),
+            Span::from(format!(" {} {}", solution.cycles(), total_cycles)),
         ])
     }
 
@@ -109,7 +111,7 @@ impl StatefulWidget for &TracingNavigation {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let panes = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Min(0)])
+            .constraints([Constraint::Length(2), Constraint::Min(0)])
             .split(area);
 
         let path = Line::from(vec![Span::styled(
@@ -121,7 +123,7 @@ impl StatefulWidget for &TracingNavigation {
                 .join(" | "),
             Style::default().add_modifier(Modifier::BOLD),
         )]);
-        let path = Paragraph::new(path);
+        let path = Paragraph::new(path).block(Block::default().borders(Borders::BOTTOM));
         <Paragraph as Widget>::render(path, panes[0], buf);
 
         let panes = Layout::default()
@@ -143,8 +145,11 @@ impl StatefulWidget for &TracingNavigation {
                     ))
                     .highlight_style(self.theme().tree_cursor_style())
                     .highlight_symbol("> ")
-                    .block(Block::default().borders(Borders::LEFT | Borders::TOP));
+                    .block(Block::default().borders(Borders::LEFT));
                 <Tree<TermId> as StatefulWidget>::render(widget, panes[i], buf, &mut state.1);
+                if state.1.selected().is_empty() {
+                    state.1.select_first();
+                }
             }
         }
     }
