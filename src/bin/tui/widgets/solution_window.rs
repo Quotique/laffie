@@ -5,13 +5,14 @@ use ratatui::{
     widgets::{List, StatefulWidget},
 };
 use trees::Tree;
+use tui_scrollview::{ScrollView, ScrollbarVisibility};
 
 use solver::task::{SharedSolution, SolutionStatus, StepsSource, Task, Visit};
 use utils::TreeIndex;
 
 use crate::{
     state::{DirectoryStat, TasksNode},
-    theme::{draw_scrollbar_buf, Theme},
+    theme::Theme,
 };
 
 pub struct SolutionWindow<'a> {
@@ -43,10 +44,13 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
         };
         match self.tasks_index[selected].data_mut() {
             TasksNode::Task(tracing) => {
-                let scroll_pos = tracing.solution_pos.selected().unwrap();
-                let list_len = list.len();
-                <List as StatefulWidget>::render(list, area, buf, &mut tracing.solution_pos);
-                draw_scrollbar_buf(buf, area, list_len, scroll_pos);
+                let content_size = Size::new(area.as_size().width, list.len() as u16);
+                let mut view = ScrollView::new(content_size)
+                    .horizontal_scrollbar_visibility(ScrollbarVisibility::Never)
+                    .vertical_scrollbar_visibility(ScrollbarVisibility::Automatic);
+                <List as Widget>::render(list, view.buf().area, view.buf_mut());
+
+                view.render(area, buf, &mut tracing.solution_pos);
             }
             TasksNode::Directory(_) => {
                 <List as Widget>::render(list, area, buf);

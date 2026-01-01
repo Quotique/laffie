@@ -2,6 +2,7 @@ use std::{io, sync::Arc};
 
 use ratatui::widgets::ListState;
 use trees::{tr, Node, Tree};
+use tui_scrollview::ScrollViewState;
 use tui_tree_widget::TreeState;
 
 use parser::DirectoryParser;
@@ -36,7 +37,7 @@ pub enum TasksNode {
 #[derive(Debug)]
 pub struct TaskState {
     pub solution:      SharedSolution,
-    pub solution_pos:  ListState,
+    pub solution_pos:  ScrollViewState,
     pub tracing_state: Vec<(SharedSolution, TreeState<TermId>)>,
 }
 
@@ -137,7 +138,7 @@ impl State {
             let node = self.find_node_mut(task.group.as_str());
             node.push_back(tr(TasksNode::new_task(TaskState {
                 solution:      Solution::new(task.clone()).into(),
-                solution_pos:  default_state(),
+                solution_pos:  Default::default(),
                 tracing_state: Default::default(),
             })));
             node.id()

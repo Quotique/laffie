@@ -1,4 +1,4 @@
-use std::io;
+use std::{fmt::Display, io};
 
 use ratatui::{
     crossterm::event::{self, KeyCode, KeyEventKind},
@@ -16,6 +16,16 @@ mod widgets;
 
 use settings::Settings;
 use ui::{Command, Tab as Itab};
+
+fn help_bar_item<'b>(k: &'b str, v: impl Display) -> Vec<Span<'b>> {
+    vec![
+        Span::from("[ "),
+        Span::styled(k, Style::default().fg(Color::Red)),
+        Span::from(" "),
+        Span::from(v.to_string()),
+        Span::from(" ]"),
+    ]
+}
 
 fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
     let mut ui = ui::Ui::try_new(settings)?;
@@ -38,10 +48,17 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
 
             ui.draw(frame, vertical_layout[1]);
 
-            let help = Paragraph::new(
-                "←↑→↓ - navigation | q - quit | s - solve selected | r - reload symbols | a - solve all | Space - toggle tree node",
-            )
-            .block(Block::default().borders(Borders::LEFT | Borders::RIGHT));
+            let help = Paragraph::new(Line::from(
+                [
+                    help_bar_item("←↑→↓", "navigation"),
+                    help_bar_item("q", "quit"),
+                    help_bar_item("s", "solve selected"),
+                    help_bar_item("r", "reload symbols"),
+                    help_bar_item("a", "solve all"),
+                    help_bar_item("Space", "toggle tree node"),
+                ]
+                .concat(),
+            ));
 
             frame.render_widget(help, vertical_layout[2]);
         })?;

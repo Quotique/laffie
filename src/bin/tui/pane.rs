@@ -197,12 +197,12 @@ impl Pane {
                     }
                     Command::Down => {
                         if let Some(task_state) = state.selected_task() {
-                            task_state.solution_pos.select_next()
+                            task_state.solution_pos.scroll_down();
                         }
                     }
                     Command::Up => {
                         if let Some(task_state) = state.selected_task() {
-                            task_state.solution_pos.select_previous()
+                            task_state.solution_pos.scroll_up();
                         }
                     }
                     Command::Left => self.focused_pane = 0,

@@ -111,19 +111,19 @@ impl StatefulWidget for &TracingNavigation {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let panes = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(2), Constraint::Min(0)])
+            .constraints([Constraint::Length(1), Constraint::Min(0)])
             .split(area);
 
         let path = Line::from(vec![Span::styled(
             state
                 .tracing_state
                 .iter()
-                .map(|x| x.0.task.goal.to_string())
+                .map(|x| format!("[ {} ]", x.0.task.goal.to_string()))
                 .collect::<Vec<String>>()
-                .join(" | "),
+                .join(""),
             Style::default().add_modifier(Modifier::BOLD),
         )]);
-        let path = Paragraph::new(path).block(Block::default().borders(Borders::BOTTOM));
+        let path = Paragraph::new(path);
         <Paragraph as Widget>::render(path, panes[0], buf);
 
         let panes = Layout::default()
@@ -145,7 +145,11 @@ impl StatefulWidget for &TracingNavigation {
                     ))
                     .highlight_style(self.theme().tree_cursor_style())
                     .highlight_symbol("> ")
-                    .block(Block::default().borders(Borders::LEFT));
+                    .block(Block::default().borders(if i == 1 {
+                        Borders::LEFT
+                    } else {
+                        Borders::RIGHT
+                    }));
                 <Tree<TermId> as StatefulWidget>::render(widget, panes[i], buf, &mut state.1);
                 if state.1.selected().is_empty() {
                     state.1.select_first();
