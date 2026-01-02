@@ -114,7 +114,7 @@ impl Solution {
             .iter()
             .filter(|x| x.inference.is_proven())
             .filter(|x| !x.filters.is_replaced())
-            .min_by_key(|x| x.filters.weight)
+            .min_by_key(|x| x.filters.level)
             .map(|x| x.id)
     }
 
@@ -123,7 +123,7 @@ impl Solution {
             .iter()
             .filter(|x| x.inference.is_proven())
             .filter(|x| !x.filters.is_replaced() && x.filters.is_goal())
-            .min_by_key(|x| x.filters.weight)
+            .min_by_key(|x| x.filters.level)
             .map(|x| x.id)
     }
 

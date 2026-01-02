@@ -2,15 +2,13 @@ mod builder;
 mod hypothesis;
 mod rule;
 mod rule_attribute;
-mod rule_id;
 mod rules_engine;
 mod term_filters;
 
 pub use builder::RuleBuilder;
 pub use hypothesis::{Hypothesis, HypothesisIterator};
-pub use rule::{ApplyRule, Rule, RuleDeclineReason, SharedRule};
+pub use rule::{ApplyRule, Level, Rule, RuleDeclineReason, RuleId, SharedRule};
 pub use rule_attribute::{RuleAttr, RuleAttrValue};
-pub use rule_id::RuleId;
 pub use rules_engine::RulesEngine;
 pub use term_filters::TermFilters;
 

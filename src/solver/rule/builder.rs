@@ -150,7 +150,7 @@ impl RuleBuilder {
 
             result.push(Rule {
                 id: self.rule_id,
-                level: *level as usize,
+                level: (*level).into(),
                 symbol: self.symbol.clone(),
                 attrs: attrs.clone(),
                 block: Default::default(),

@@ -43,7 +43,7 @@ impl TaskBuilder {
 
     pub fn with_condition(mut self, mut condition: TermProps) -> Self {
         self.term_id_map.insert(condition.id, self.conditions.len());
-        condition.filters.weight = 0;
+        condition.filters.level = 0.into();
         condition.id = self.conditions.len();
 
         match &mut condition.inference {

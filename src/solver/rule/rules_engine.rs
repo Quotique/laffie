@@ -5,14 +5,11 @@ use std::{
 
 use itertools::Itertools;
 
-use super::{Rule, RuleAttr, RuleAttrValue, RuleId, SharedRule, TermFilters};
+use super::{rule::Level, Rule, RuleAttr, RuleAttrValue, RuleId, SharedRule, TermFilters};
 use crate::{
     term::{Symbol, Term},
     CompactString,
 };
-
-// TODO: move to correct place
-type Level = usize;
 
 type LevelRules = HashMap<Symbol, Vec<SharedRule>>;
 
@@ -22,12 +19,17 @@ pub struct RulesEngine {
     rule_queue: VecDeque<Rule>,
     id_map:     HashMap<CompactString, RuleId>,
     last_id:    RuleId,
+    max_level:  Level,
 }
 
 unsafe impl Send for RulesEngine {}
 unsafe impl Sync for RulesEngine {}
 
 impl RulesEngine {
+    pub fn max_level(&self) -> Level {
+        self.max_level
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = SharedRule> + '_ {
         self.all_rules
             .values()
@@ -49,7 +51,7 @@ impl RulesEngine {
         assert!(self.rule_queue.is_empty());
 
         let empty_level = LevelRules::new();
-        let level = self.all_rules.get(&filters.weight).unwrap_or(&empty_level);
+        let level = self.all_rules.get(&filters.level).unwrap_or(&empty_level);
         let result: Vec<_> = once(&Symbol::by_name("AnySymbol").unwrap())
             .chain(filters.symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
@@ -60,7 +62,7 @@ impl RulesEngine {
         if !result.is_empty() {
             trace!(
                 "[{}] Suggested rules: [{}]",
-                filters.weight,
+                filters.level,
                 result.iter().format(", ")
             );
         }
@@ -87,6 +89,7 @@ impl RulesEngine {
         {
             self.rule_queue.push_back(rule);
         } else {
+            self.max_level = std::cmp::max(self.max_level, rule.level);
             rule.block = rule
                 .attribute(&RuleAttr::Block)
                 .filter_map(RuleAttrValue::str)

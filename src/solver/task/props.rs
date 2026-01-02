@@ -6,7 +6,7 @@ use std::{
 
 use super::SharedSolution;
 use crate::{
-    rule::{RuleAttr, RuleAttrValue, RuleBuilder, RuleId, SharedRule, TermFilters},
+    rule::{Level, RuleAttr, RuleAttrValue, RuleBuilder, RuleId, SharedRule, TermFilters},
     term::{ParamsMapping, SharedTerm, Term},
 };
 
@@ -116,7 +116,7 @@ impl TermInference {
 }
 
 impl TermAsRule {
-    pub fn get_or_insert(&mut self, term: &Term, id: RuleId, level: u64) -> Option<SharedRule> {
+    pub fn get_or_insert(&mut self, term: &Term, id: RuleId, level: Level) -> Option<SharedRule> {
         match self {
             TermAsRule::None => None,
             TermAsRule::Rule(r) => Some(r.clone()),
@@ -131,10 +131,10 @@ impl TermAsRule {
         }
     }
 
-    fn build_rule(term: &Term, id: RuleId, level: u64) -> Option<SharedRule> {
+    fn build_rule(term: &Term, id: RuleId, level: Level) -> Option<SharedRule> {
         let builder = RuleBuilder::default()
             .with_id(id)
-            .with_attribute(RuleAttr::Level, RuleAttrValue::UInt(level))
+            .with_attribute(RuleAttr::Level, RuleAttrValue::UInt(level.into()))
             .with_attribute(RuleAttr::Equivalence, RuleAttrValue::None)
             .with_term(term.clone())
             .ok()?;
@@ -151,7 +151,7 @@ impl TermAsRule {
 }
 
 impl TermProps {
-    pub fn rule(&mut self, id: RuleId, level: u64) -> Option<SharedRule> {
+    pub fn rule(&mut self, id: RuleId, level: Level) -> Option<SharedRule> {
         self.rule.get_or_insert(&self.term, id, level).inspect(|r| {
             self.filters.blocked_rules.insert(r.id);
         })

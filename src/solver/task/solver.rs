@@ -19,13 +19,6 @@ use crate::{
 /// `SolveError::MaxSubtaskLevelExceed`.
 pub const MAX_SUBTASK_LEVEL: usize = 10;
 
-/// Maximum allowed weight (or "level") for a term during solving.
-///
-/// If a term’s weight exceeds this limit it is discarded from further
-/// consideration.  When all candidate terms have been discarded the solver
-/// terminates the task with `SolveError::NoSolutionsFound`.
-pub const MAX_LEVEL: usize = 20;
-
 /// Default execution deadline (in cycle counts) for a solving run.
 ///
 /// The solver stops and returns `SolveError::ExecutionDeadline` when the number
@@ -144,7 +137,7 @@ impl Solver {
         state
             .tracer
             .on_term_focus(&solution[index], state.current_cycle());
-        let level = solution[index].filters.weight;
+        let level = solution[index].filters.level;
 
         trace!(target: "subtask",
             "[{}]({}) Level: {level} -> {}",
@@ -153,7 +146,7 @@ impl Solver {
             solution[index]
         );
 
-        if level > MAX_LEVEL {
+        if level > self.rules_engine.max_level() {
             return Err(SolveError::NoSolutionsFound);
         }
         Ok(index)
@@ -204,10 +197,10 @@ impl Solver {
         if term.filters.is_goal() {
             return;
         }
-        let level = term.filters.weight;
+        let level = term.filters.level;
         if let Some(r) = term.rule(
             RuleId::new(0x80_00_00_00_00_00_00_00, self.local_rules.len() as u64 + 1),
-            (level + 1) as u64,
+            level.next(),
         ) {
             // TODO: check dups
             self.local_rules.push(r);
@@ -276,7 +269,7 @@ impl Solver {
                     self.add_term(s, solution, state)?;
                     if is_goal && solution.goal.is_transform() {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
-                        solution[index].filters.weight = MAX_LEVEL + 1;
+                        solution[index].filters.level = self.rules_engine.max_level().next();
                         break;
                     }
                     added = true;
@@ -287,7 +280,7 @@ impl Solver {
             }
         }
         if !added {
-            solution[index].filters.weight += 1;
+            solution[index].filters.level.increment();
         }
         Ok(())
     }
@@ -645,7 +638,7 @@ impl Solver {
             return false;
         };
 
-        if solution[index].filters.weight >= MAX_LEVEL {
+        if solution[index].filters.level >= self.rules_engine.max_level() {
             let mut iter = solution
                 .terms
                 .iter()

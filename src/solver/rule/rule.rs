@@ -1,30 +1,57 @@
 use std::{collections::HashSet, fmt, hash, sync::Arc};
 
-use derive_more::Display;
+use bincode::{Decode, Encode};
+use derive_more::{Display, From, Into};
 use eyre::Result;
 use itertools::Itertools;
 use multimap::MultiMap;
 
-use super::{Hypothesis, RuleAttr, RuleAttrValue, RuleId, TermFilters};
+use super::{Hypothesis, RuleAttr, RuleAttrValue, TermFilters};
 use crate::{
     term::{ParamsMapping, Subterm, SubtermId, Symbol, Term},
     NormalizationLevel,
 };
 
+/// Unique identifier for a rule.
+#[derive(Clone, Copy, Debug, Default, Display)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(From)]
+#[derive(Decode, Encode)]
+pub struct RuleId(u64);
+
+/// Represents the level (or priority) of a rule.
+/// Higher levels are applied later.
+#[derive(Clone, Copy, Debug, Default, Display)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(From, Into)]
+#[derive(Decode, Encode)]
+pub struct Level(u64);
+
+/// Reasons why a rule could not be applied.
+/// Used in `Result<…, RuleDeclineReason>`.
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub enum RuleDeclineReason {
+    /// The term’s level does not match the rule’s required level.
     LevelMissmatch,
+    /// The task goal does not match the rule’s goal pattern.
     GoalMissmatch,
+    /// The rule has already been applied to the term.
     AlreadyApplied,
+    /// The rule is explicitly blocked for the term.
     Blocked,
+    /// An error occurred while trying to map parameters;
+    /// contains a human‑readable message.
     ParamsMappingErr(String),
 }
 
+/// Convenient alias for a reference‑counted rule.
 pub type SharedRule = Arc<Rule>;
+
+/// A rewriting rule.
 #[derive(Clone, Debug)]
 pub struct Rule {
     pub id:     RuleId,
-    pub level:  usize,
+    pub level:  Level,
     pub symbol: Symbol,
 
     pub attrs: MultiMap<RuleAttr, RuleAttrValue>,
@@ -37,6 +64,30 @@ pub struct Rule {
     pub requirements: Vec<Term>,
 
     pub pattern_symbols: HashSet<Symbol>,
+}
+
+impl RuleId {
+    /// Constructs a new `RuleId` from a mask and a raw identifier.
+    pub fn new(mask: u64, id: u64) -> Self {
+        Self(mask | id)
+    }
+
+    /// Increments the inner identifier by one.
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
+}
+
+impl Level {
+    /// Returns the next higher level.
+    pub fn next(&self) -> Self {
+        Self(self.0 + 1)
+    }
+
+    /// Increments the level in‑place.
+    pub fn increment(&mut self) {
+        self.0 += 1;
+    }
 }
 
 impl Eq for Rule {}
@@ -66,15 +117,20 @@ impl fmt::Display for Rule {
 }
 
 impl Rule {
+    /// Returns an iterator over the values of a given attribute.
     pub fn attribute(&self, attr: &RuleAttr) -> impl Iterator<Item = &RuleAttrValue> {
         static EMPTY_VEC: Vec<RuleAttrValue> = Vec::new();
         self.attrs.get_vec(attr).unwrap_or(&EMPTY_VEC).iter()
     }
 
+    /// Checks whether the rule contains at least one value for the given
+    /// attribute.
     pub fn contains_attribute(&self, attr: &RuleAttr) -> bool {
         self.attrs.get(attr).is_some()
     }
 
+    /// Determines the maximal normalization level requested by the rule’s
+    /// `normalize` attributes. Max level by default.
     pub fn norm_level(&self) -> NormalizationLevel {
         self.attribute(&RuleAttr::Normalize)
             .filter_map(RuleAttrValue::uint)
@@ -82,10 +138,16 @@ impl Rule {
             .map_or(NormalizationLevel::max(), NormalizationLevel)
     }
 
+    /// Checks if the pattern and replacement are syntactically identical.
     pub fn is_tautology(&self) -> bool {
         self.pattern_node() == self.replace_node()
     }
 
+    /// Checks whether the rule can be applied under the given term filters and
+    /// goal.
+    ///
+    /// Returns `Ok(())` if the rule passes all checks, otherwise returns the
+    /// appropriate `RuleDeclineReason`.
     pub fn try_filter(&self, filters: &TermFilters, goal: &Term) -> Result<(), RuleDeclineReason> {
         self.is_term_suitable(filters).inspect_err(|e| {
             trace!(
@@ -102,8 +164,12 @@ impl Rule {
         Ok(())
     }
 
+    /// Validates that the rule matches the supplied term filters.
+    ///
+    /// Checks level compatibility, already‑applied/blocked status, and that all
+    /// symbols required by the pattern are present in the filters.
     pub fn is_term_suitable(&self, filters: &TermFilters) -> Result<(), RuleDeclineReason> {
-        if self.level != filters.weight {
+        if self.level != filters.level {
             return Err(RuleDeclineReason::LevelMissmatch);
         } else if filters.applied_rules.contains(&self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
@@ -122,6 +188,11 @@ impl Rule {
         Ok(())
     }
 
+    /// Attempts to map the rule’s goal attribute against the supplied goal
+    /// term.
+    ///
+    /// Returns a vector of `ParamsMapping` on success, or an appropriate
+    /// `RuleDeclineReason` if the goal does not match.
     pub fn goal_mapping(&self, goal: &Term) -> Result<Vec<ParamsMapping>, RuleDeclineReason> {
         // TODO: multiple goals
         if let Some(RuleAttrValue::Goal(pattern)) = self.attribute(&RuleAttr::Goal).next() {
@@ -140,11 +211,13 @@ impl Rule {
         Ok(vec![])
     }
 
+    /// Retrieves the pattern subterm of the rule.
     #[inline]
     pub fn pattern_node(&self) -> Subterm<'_> {
         self.term.get(&self.pattern).unwrap()
     }
 
+    /// Retrieves the replacement subterm of the rule.
     #[inline]
     pub fn replace_node(&self) -> Subterm<'_> {
         self.term.get(&self.replace).unwrap()
@@ -152,6 +225,11 @@ impl Rule {
 }
 
 pub trait ApplyRule {
+    /// Attempts to apply the rule to `term` under the given `term_filters` and
+    /// `goal`.
+    ///
+    /// Returns a vector of generated `Hypothesis` values on success, or a
+    /// `RuleDeclineReason` explaining why the rule could not be applied.
     fn apply(
         &self,
         term: &Term,
@@ -161,6 +239,7 @@ pub trait ApplyRule {
 }
 
 impl ApplyRule for SharedRule {
+    /// Implements the actual rewriting logic for a shared rule.
     fn apply(
         &self,
         term: &Term,
@@ -296,7 +375,7 @@ pub mod tests {
         let goal = test_goal();
         let mut filters = TermFilters::from(term.symbols());
 
-        filters.weight = 1;
+        filters.level = 1.into();
         let hypothesis = rule.apply(&term, &filters, &goal);
         assert!(hypothesis.is_ok());
         let mut hypothesis = hypothesis.unwrap();
@@ -322,7 +401,7 @@ pub mod tests {
         let goal = test_goal();
         let mut filters = TermFilters::from(term.symbols());
 
-        filters.weight = 1;
+        filters.level = 1.into();
         let hypothesis = rule.apply(&term, &filters, &goal);
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
@@ -346,7 +425,7 @@ pub mod tests {
         let term = term_with_vars(test_term);
         let goal = term_with_vars(r#"transform(a)"#);
         let mut filters = TermFilters::from(term.symbols());
-        filters.weight = 0;
+        filters.level = 0.into();
 
         let hypothesis = rule.apply(&term, &filters, &goal);
         assert!(hypothesis.is_ok());
@@ -362,7 +441,7 @@ pub mod tests {
         let goal = test_goal();
         let mut filters = TermFilters::from(term.symbols());
 
-        filters.weight = 1;
+        filters.level = 1.into();
         assert!(rule.apply(&term, &filters, &goal).is_ok());
         assert_eq!(
             rule.apply(&term, &filters, &goal).err(),
@@ -377,7 +456,7 @@ pub mod tests {
         let goal = test_goal();
         let mut filters = TermFilters::from(term.symbols());
 
-        filters.weight = 1;
+        filters.level = 1.into();
         let hypothesis = rule.apply(&term, &filters, &goal).unwrap();
         assert_eq!(hypothesis[0].requirements.len(), 0);
         assert_eq!(
@@ -399,7 +478,7 @@ pub mod tests {
         let term = term_with_vars(test_term);
         let goal = term_with_vars(r#"find(a+2)"#);
         let mut filters = TermFilters::from(term.symbols());
-        filters.weight = 0;
+        filters.level = 0.into();
 
         let hypothesis = rule.apply(&term, &filters, &goal);
         assert!(hypothesis.is_ok());

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::RuleId;
+use super::{rule::Level, RuleId};
 use crate::term::Symbol;
 
 use bitflags::bitflags;
@@ -20,7 +20,7 @@ pub struct TermFilters {
     pub symbols:       HashSet<Symbol>,
     pub applied_rules: HashSet<RuleId>,
     pub blocked_rules: HashSet<RuleId>,
-    pub weight:        usize,
+    pub level:         Level,
     flags:             TermFlags,
 }
 
