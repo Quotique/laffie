@@ -146,7 +146,10 @@ impl Solver {
             solution[index]
         );
 
-        if level > self.rules_engine.max_level() {
+        let local_levels = self.local_rules.iter().map(|x| x.level);
+        let max_local = local_levels.max().unwrap_or(0.into());
+        if level > std::cmp::max(max_local, self.rules_engine.max_level()).next() {
+            println!("level: {level}");
             return Err(SolveError::NoSolutionsFound);
         }
         Ok(index)
