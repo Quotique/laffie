@@ -118,7 +118,7 @@ impl StatefulWidget for &TracingNavigation {
             state
                 .tracing_state
                 .iter()
-                .map(|x| format!("[ {} ]", x.0.task.goal.to_string()))
+                .map(|x| format!("[ {} ]", x.0.task.goal))
                 .collect::<Vec<String>>()
                 .join(""),
             Style::default().add_modifier(Modifier::BOLD),
