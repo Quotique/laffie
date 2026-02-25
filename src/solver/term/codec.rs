@@ -61,8 +61,11 @@ impl<Context> Decode<Context> for TermNode {
             }
             4 => {
                 let s: String = Decode::decode(decoder)?;
-                // TODO: remove unwrap
-                TermNode::Number(Decimal::from_str(&s).unwrap())
+                TermNode::Number(Decimal::from_str(&s).map_err(|e| {
+                    bincode::error::DecodeError::OtherString(format!(
+                        "decimal parse error, str: '{s}': err: {e}"
+                    ))
+                })?)
             }
             5 => {
                 let p: u64 = Decode::decode(decoder)?;
@@ -96,8 +99,11 @@ impl<'de, Context> BorrowDecode<'de, Context> for TermNode {
             }
             4 => {
                 let s: String = BorrowDecode::borrow_decode(decoder)?;
-                // TODO: remove unwrap
-                TermNode::Number(Decimal::from_str(&s).unwrap())
+                TermNode::Number(Decimal::from_str(&s).map_err(|e| {
+                    bincode::error::DecodeError::OtherString(format!(
+                        "decimal parse error, str: '{s}': err: {e}"
+                    ))
+                })?)
             }
             5 => {
                 let p: u64 = BorrowDecode::borrow_decode(decoder)?;
