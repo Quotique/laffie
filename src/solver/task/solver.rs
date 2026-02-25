@@ -112,7 +112,7 @@ impl Solver {
             if self.try_simplify(index, solution, state)? {
                 continue;
             }
-            if self.check_if_answer(solution, state, index) {
+            if self.check_if_answer(solution, state, index)? {
                 let level = solution.task.subtask_level;
                 let answer = solution.answer().unwrap();
                 trace!("Solved {level}. Answer: {answer}",);
@@ -552,38 +552,41 @@ impl Solver {
         solution: &mut Solution,
         state: &mut SolutionState,
         index: usize,
-    ) -> bool {
+    ) -> Result<bool, SolveError> {
         if solution[index].filters.is_goal() {
-            return false;
+            return Ok(false);
         }
-        if self.check_answer_term(solution, index) {
-            return true;
+        if self.check_answer_term(solution, index)? {
+            return Ok(true);
         }
 
-        match solution.goal.clone() {
+        Ok(match solution.goal.clone() {
             Goal::Find(x) => self.check_find_answer(solution, state, index, x.term.as_ref()),
             Goal::Prove(_) => self.check_prove_answer(solution, index),
             Goal::Transform(_) => self.check_transform_answer(solution),
-        }
+        })
     }
 
-    fn check_answer_term(&self, solution: &mut Solution, index: usize) -> bool {
+    fn check_answer_term(
+        &self,
+        solution: &mut Solution,
+        index: usize,
+    ) -> Result<bool, SolveError> {
         let term = &solution[index];
         let term_root = term.term.as_subterm();
 
         if solution.goal.is_transform() {
-            return false;
+            return Ok(false);
         }
         if term_root.data().is_symbol_name("answer") && term_root.degree() == 1 {
             let mut resolution =
                 TermProps::from(term.term.as_subterm().first_arg().unwrap().to_term());
             resolution.inference = term.inference.clone();
-            // TODO: remove unwrap
-            let idx = solution.add_term(resolution).unwrap();
+            let idx = solution.add_term(resolution)?;
             solution.status = SolutionStatus::Answer(idx);
-            return true;
+            return Ok(true);
         }
-        false
+        Ok(false)
     }
 
     fn check_find_answer(
