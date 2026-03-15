@@ -1,58 +1,48 @@
-use std::{
-    collections::{HashMap, HashSet},
-    convert::From,
-    fmt,
-    sync::Arc,
-};
+use std::{collections::HashSet, convert::From, fmt, sync::Arc};
 
 use derive_more::From;
-use indexmap::IndexMap;
 use trees::Tree;
 
-use super::{ArgList, Param, Subterm, SubtermMut, Symbol, TermNode, Variable};
-use crate::{CompactString, Decimal, NormalizationLevel};
+use super::{Atom, ParamSubstitution, Symbol, TermMut, TermRef, sym};
+use crate::{
+    CompactString, Decimal, NormalizationLevel,
+    term::{Param, Variable},
+};
 
-type SymbolTree = Tree<TermNode>;
+type SymbolTree = Tree<Atom>;
 
-pub type SharedTerm = Arc<Term>;
-pub type VariablesMap = HashMap<Variable, Term>;
+pub type SharedTerm = Arc<TermBuf>;
 
 #[derive(Debug, Default, Clone, From, PartialEq, Eq, Hash)]
-pub struct SubtermId(pub(super) Vec<usize>);
-
-#[derive(Debug, Clone, Default)]
-pub struct ParamsMapping {
-    pub params:   IndexMap<Param, Term>,
-    pub arglists: IndexMap<ArgList, Vec<Term>>,
-}
+pub struct TermPath(pub(super) Vec<usize>);
 
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub struct Term(SymbolTree);
+pub struct TermBuf(SymbolTree);
 
-impl Term {
+impl TermBuf {
     #[inline]
     pub fn symbol(symbol: impl AsRef<str>) -> Self {
-        Self::from(TermNode::with_symbol(symbol.as_ref()))
+        Self::from(Atom::from(sym(symbol)))
     }
 
     #[inline]
     pub fn number(num: impl Into<Decimal>) -> Self {
-        Self::from(TermNode::Number(num.into()))
+        Self::from(Atom::from(num))
     }
 
     #[inline]
     pub fn variable(var: impl Into<CompactString>) -> Self {
-        Self::from(TermNode::Variable(var.into().into()))
+        Self::from(Atom::Variable(var.into().into()))
     }
 
     #[inline]
     pub fn param(param: impl Into<CompactString>) -> Self {
-        Self::from(TermNode::Param(param.into().into()))
+        Self::from(Atom::Param(param.into().into()))
     }
 
     #[inline]
-    pub fn with_child(mut self, child: Self) -> Self {
-        self.as_subterm_mut().push_last_arg(child);
+    pub fn arg(mut self, arg: impl Into<Self>) -> Self {
+        self.term_mut().push_last_arg(arg.into());
         self
     }
 
@@ -67,10 +57,10 @@ impl Term {
     }
 }
 
-impl Term {
+impl TermBuf {
     #[inline]
     pub fn normalize(mut self, level: NormalizationLevel) -> Self {
-        self.as_subterm_mut().normalize(level);
+        self.term_mut().normalize(level);
         self
     }
 
@@ -85,17 +75,16 @@ impl Term {
 
     #[inline]
     pub fn replace(&mut self, src: &Self, dst: &Self) {
-        self.as_subterm_mut()
-            .replace(src.as_subterm(), dst.as_subterm())
+        self.term_mut().replace(src.term(), dst.term())
     }
 
     #[inline]
-    pub fn data(&self) -> &TermNode {
+    pub fn data(&self) -> &Atom {
         self.0.root().data()
     }
 
     #[inline]
-    pub fn get(&self, id: &SubtermId) -> Option<Subterm<'_>> {
+    pub fn get(&self, id: &TermPath) -> Option<TermRef<'_>> {
         let mut root = self.0.root();
         for i in id.0.iter() {
             root = root.iter().nth(*i)?;
@@ -104,7 +93,7 @@ impl Term {
     }
 
     #[inline]
-    pub fn get_mut(&mut self, id: &SubtermId) -> Option<SubtermMut<'_>> {
+    pub fn get_mut(&mut self, id: &TermPath) -> Option<TermMut<'_>> {
         let mut root = self.0.root_mut().get_mut();
         for i in id.0.iter() {
             let next_root = root.iter_mut().nth(*i)?.get_mut();
@@ -115,63 +104,66 @@ impl Term {
     }
 
     #[inline]
-    pub fn as_subterm(&self) -> Subterm<'_> {
+    pub fn term(&self) -> TermRef<'_> {
         self.0.root().into()
     }
 
     #[inline]
-    pub fn as_subterm_mut(&mut self) -> SubtermMut<'_> {
+    pub fn term_mut(&mut self) -> TermMut<'_> {
         self.0.root_mut().get_mut().into()
     }
 
-    pub fn apply_map(&self, params: &ParamsMapping) -> Self {
+    pub fn apply_substitution(&self, params: &ParamSubstitution) -> Self {
         let mut result = self.clone();
-        result.as_subterm_mut().apply_param_map(params);
+        result.term_mut().apply_param_map(params);
         result
     }
 
     #[inline]
-    pub fn swap(&mut self, node: &mut SubtermMut) {
-        self.as_subterm_mut().swap(node);
+    pub fn swap(&mut self, node: &mut TermMut) {
+        self.term_mut().swap(node);
     }
 }
 
-impl From<Term> for SymbolTree {
-    fn from(value: Term) -> Self {
+impl From<Param> for TermBuf {
+    fn from(value: Param) -> Self {
+        Self::from(Atom::Param(value))
+    }
+}
+
+impl From<Variable> for TermBuf {
+    fn from(value: Variable) -> Self {
+        Self::from(Atom::Variable(value))
+    }
+}
+
+impl From<TermBuf> for SymbolTree {
+    fn from(value: TermBuf) -> Self {
         value.0
     }
 }
 
-impl FromIterator<(Param, Term)> for ParamsMapping {
-    fn from_iter<I: IntoIterator<Item = (Param, Term)>>(iter: I) -> Self {
-        ParamsMapping {
-            params:   FromIterator::from_iter(iter),
-            arglists: Default::default(),
-        }
-    }
-}
-
-impl From<TermNode> for Term {
-    fn from(value: TermNode) -> Self {
+impl From<Atom> for TermBuf {
+    fn from(value: Atom) -> Self {
         Self::from(Tree::new(value))
     }
 }
 
-impl From<SymbolTree> for Term {
+impl From<SymbolTree> for TermBuf {
     fn from(source: SymbolTree) -> Self {
         Self(source)
     }
 }
 
-impl fmt::Debug for Term {
+impl fmt::Debug for TermBuf {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl fmt::Display for Term {
+impl fmt::Display for TermBuf {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.as_subterm())
+        write!(f, "{}", self.term())
     }
 }
 
@@ -183,7 +175,7 @@ mod tests {
         rc::Rc,
     };
 
-    use crate::term::{term_with_params, ArgList};
+    use crate::term::{ArgList, Term, term_with_params};
 
     use super::*;
 
@@ -212,7 +204,7 @@ mod tests {
         let term = term_with_params(test);
 
         assert_eq!(
-            term.as_subterm()
+            term.term()
                 .first_arg()
                 .unwrap()
                 .first_arg()

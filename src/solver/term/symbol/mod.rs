@@ -4,13 +4,14 @@ mod program;
 
 use std::fmt;
 
-use parking_lot::{lock_api::MappedRwLockReadGuard, RawRwLock, RwLockReadGuard};
+use container::all_func_symbols;
+use parking_lot::{RawRwLock, RwLockReadGuard, lock_api::MappedRwLockReadGuard};
 
 pub use program::{SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
 
 use crate::{
-    term::{Subterm, SubtermMut},
     CompactString, NormalizationLevel,
+    term::{TermMut, TermRef},
 };
 
 #[derive(Default, Clone)]
@@ -19,15 +20,23 @@ use crate::{
 #[derive(PartialEq, Eq, Hash)]
 pub struct Symbol(CompactString);
 
-impl Symbol {
-    #[inline]
-    pub fn by_name(name: &str) -> Option<Self> {
-        container::all_func_symbols()
-            .read()
-            .get(&CompactString::from(name))
-            .map(|x| Symbol(x.name.clone()))
-    }
+#[inline]
+pub fn try_sym(name: impl AsRef<str>) -> Option<Symbol> {
+    all_func_symbols()
+        .read()
+        .get(&CompactString::from(name.as_ref()))
+        .map(|x| Symbol(x.name.clone()))
+}
 
+#[inline]
+pub fn sym(name: impl AsRef<str>) -> Symbol {
+    let symbol = all_func_symbols().read()[&CompactString::from(name.as_ref())]
+        .name
+        .clone();
+    Symbol(symbol)
+}
+
+impl Symbol {
     #[inline]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
@@ -50,17 +59,17 @@ impl Symbol {
         None
     }
 
-    pub fn check_truth(&self, node: Subterm) -> Truth {
+    pub fn check_truth(&self, node: TermRef) -> Truth {
         (self.program().truth_checker)(node)
     }
 
     #[inline]
-    pub fn evaluate(&self, node: &mut SubtermMut, level: NormalizationLevel) -> bool {
+    pub fn evaluate(&self, node: &mut TermMut, level: NormalizationLevel) -> bool {
         (self.program().calculator)(node, level)
     }
 
     #[inline]
-    pub fn arg_order(&self, left: Subterm, right: Subterm) -> std::cmp::Ordering {
+    pub fn arg_order(&self, left: TermRef, right: TermRef) -> std::cmp::Ordering {
         (self.program().arg_cmp)(left, right)
     }
 

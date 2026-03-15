@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::SymbolProgram;
-use crate::term::{Subterm, SymbolAttr, SymbolAttrValue, TermNode, Truth};
+use crate::term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermRef, Truth};
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
@@ -15,12 +15,12 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn is(root: Subterm) -> Truth {
+pub fn is(root: TermRef) -> Truth {
     if !root.data().is_symbol_name("is") {
         return Truth::Unknown;
     }
 
-    if let (TermNode::Number(_), TermNode::Symbol(known)) = (
+    if let (Atom::Number(_), Atom::Symbol(known)) = (
         &root.first_arg().unwrap().data(),
         &root.last_arg().unwrap().data(),
     ) {
@@ -30,7 +30,7 @@ pub fn is(root: Subterm) -> Truth {
             return Truth::Unknown;
         }
     }
-    if let (TermNode::Variable(_), TermNode::Symbol(sym_varible)) = (
+    if let (Atom::Variable(_), Atom::Symbol(sym_varible)) = (
         &root.first_arg().unwrap().data(),
         &root.last_arg().unwrap().data(),
     ) {

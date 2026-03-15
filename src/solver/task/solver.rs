@@ -3,14 +3,14 @@ use std::{collections::HashMap, sync::Arc};
 use itertools::Itertools;
 
 use super::{
-    props::TermInference, Goal, SharedSolution, Solution, SolveError, Task, TaskBuilder, TermIdx,
-    TermProps, TracerHub,
+    Goal, SharedSolution, Solution, SolveError, Task, TaskBuilder, TermIdx, TermProps, TracerHub,
+    props::TermInference,
 };
 use crate::{
-    rule::{Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine, SharedRule},
-    task::{solution::SolutionStatus, Tracer},
-    term::{SharedTerm, SubtermMut, Term},
     NormalizationLevel,
+    rule::{Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine, SharedRule},
+    task::{Tracer, solution::SolutionStatus},
+    term::{SharedTerm, Term, TermBuf, TermMut},
 };
 
 /// Maximum depth allowed for nested subtasks.
@@ -28,7 +28,7 @@ pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 struct SolutionState {
     execution_deadline: usize,
     cycle_counter:      usize,
-    cache:              HashMap<Term, SharedSolution>,
+    cache:              HashMap<TermBuf, SharedSolution>,
     tracer:             TracerHub,
 }
 
@@ -37,7 +37,7 @@ pub struct Solver {
 
     local_rules: Vec<SharedRule>,
 
-    unknown_terms: Vec<Term>,
+    unknown_terms: Vec<TermBuf>,
 }
 
 impl Solver {
@@ -185,7 +185,7 @@ impl Solver {
                 .inference
                 .parent_id()
                 .map(|parent| s[parent].clone())
-                .unwrap_or_else(|| TermProps::from(Term::zero())),
+                .unwrap_or_else(|| TermProps::from(TermBuf::zero())),
         );
 
         let is_goal = term.filters.is_goal();
@@ -252,9 +252,8 @@ impl Solver {
         state: &mut SolutionState,
     ) -> Result<(), SolveError> {
         let is_goal = solution[index].filters.is_goal();
-        let prove_goal = TermProps::from(
-            Term::symbol("prove").with_child(solution[index].term.as_ref().clone()),
-        );
+        let prove_goal =
+            TermProps::from(TermBuf::symbol("prove").arg(solution[index].term.as_ref().clone()));
 
         let mut added = false;
         for rule in self.suggest_rules(
@@ -296,7 +295,7 @@ impl Solver {
         index: TermIdx,
     ) -> Option<TermProps> {
         let is_goal = s[index].filters.is_goal();
-        let prove_goal = Term::symbol("prove").with_child(s[index].term.as_ref().clone());
+        let prove_goal = TermBuf::symbol("prove").arg(s[index].term.as_ref().clone());
         HypothesisIterator::new(
             rule.clone(),
             &s[index].term,
@@ -368,7 +367,7 @@ impl Solver {
         }
         for req in iter {
             req_proofs.push(SharedSolution::new(Solution::new(Task::from(
-                TermProps::from(Term::symbol("prove").with_child(req)),
+                TermProps::from(TermBuf::symbol("prove").arg(req)),
             ))));
         }
         props.inference = TermInference::Rule {
@@ -395,14 +394,14 @@ impl Solver {
     fn prove(
         &self,
         solution: &Solution,
-        mut term: Term,
+        mut term: TermBuf,
         state: &mut SolutionState,
     ) -> SharedSolution {
-        is_replace(&mut term.as_subterm_mut());
+        is_replace(&mut term.term_mut());
         let term = term.normalize(NormalizationLevel::max());
-        let prove_goal = SharedTerm::new(Term::symbol("prove").with_child(term.clone()));
+        let prove_goal = SharedTerm::new(TermBuf::symbol("prove").arg(term.clone()));
 
-        if term.as_subterm().truth().is_true() {
+        if term.term().truth().is_true() {
             // Build a minimal solution whose answer is the proven term
             let mut trivial_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
             // Add the term to the solution and mark it as the answer
@@ -415,7 +414,7 @@ impl Solver {
 
         // Check if argument of "term is known" doesn't contains any of unknown_terms.
         if !self.unknown_terms.is_empty() {
-            let term_root = term.as_subterm();
+            let term_root = term.term();
             if term_root.data().is_symbol_name("is") &&
                 term_root.degree() == 2 &&
                 term_root
@@ -426,11 +425,7 @@ impl Solver {
             {
                 let first = term_root.first_arg().expect("missing arg");
 
-                if self
-                    .unknown_terms
-                    .iter()
-                    .any(|i| first.contains(&i.as_subterm()))
-                {
+                if self.unknown_terms.iter().any(|i| first.contains(&i.term())) {
                     let mut no_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
                     no_solution.status = SolutionStatus::Err(SolveError::NoSolutionsFound);
                     return SharedSolution::new(no_solution);
@@ -453,18 +448,18 @@ impl Solver {
         }
         term.filters.mark_simplified();
 
-        let use_answer = term.term.as_subterm().data().is_symbol_name("answer");
+        let use_answer = term.term.term().data().is_symbol_name("answer");
         let to_transform = if use_answer {
-            term.term.as_subterm().first_arg().unwrap().to_term()
+            term.term.term().first_arg().unwrap().to_owned()
         } else {
-            term.term.as_subterm().to_term()
+            term.term.term().to_owned()
         };
-        let task = SharedTerm::new(Term::symbol("transform").with_child(to_transform));
+        let task = SharedTerm::new(TermBuf::symbol("transform").arg(to_transform));
         let subtask_solution = self.solve_subtask(solution, task.clone(), state);
 
         let mut answer = subtask_solution.answer()?.as_ref().clone();
         if use_answer {
-            answer = Term::symbol("answer").with_child(answer);
+            answer = TermBuf::symbol("answer").arg(answer);
         }
 
         if *solution[index].term == answer {
@@ -497,7 +492,7 @@ impl Solver {
             return x.clone();
         }
 
-        let goal = task.as_subterm().to_term();
+        let goal = task.term().to_owned();
         if state
             .cache
             .insert(
@@ -537,8 +532,7 @@ impl Solver {
                     .iter()
                     .filter(|x| x.inference.is_proven())
                     .filter(|x| {
-                        !(x.filters.is_goal() ||
-                            x.term.as_subterm().data().is_symbol_name("answer"))
+                        !(x.filters.is_goal() || x.term.term().data().is_symbol_name("answer"))
                     })
                     .cloned(),
             )
@@ -567,20 +561,21 @@ impl Solver {
         })
     }
 
-    fn check_answer_term(
-        &self,
-        solution: &mut Solution,
-        index: usize,
-    ) -> Result<bool, SolveError> {
+    fn check_answer_term(&self, solution: &mut Solution, index: usize) -> Result<bool, SolveError> {
         let term = &solution[index];
-        let term_root = term.term.as_subterm();
+        let term_root = term.term.term();
 
         if solution.goal.is_transform() {
             return Ok(false);
         }
         if term_root.data().is_symbol_name("answer") && term_root.degree() == 1 {
-            let mut resolution =
-                TermProps::from(term.term.as_subterm().first_arg().unwrap().to_term());
+            let first_arg = term
+                .term
+                .term()
+                .first_arg()
+                .ok_or(SolveError::NoSolutionsFound)?
+                .to_owned();
+            let mut resolution = TermProps::from(first_arg);
             resolution.inference = term.inference.clone();
             let idx = solution.add_term(resolution)?;
             solution.status = SolutionStatus::Answer(idx);
@@ -594,9 +589,9 @@ impl Solver {
         solution: &mut Solution,
         state: &mut SolutionState,
         index: usize,
-        find: &Term,
+        find: &TermBuf,
     ) -> bool {
-        let term = solution[index].term.as_subterm();
+        let term = solution[index].term.term();
 
         if term.degree() != 2 {
             return false;
@@ -605,10 +600,10 @@ impl Solver {
             return false;
         }
 
-        if term.first_arg().unwrap() == find.as_subterm() {
-            let is_known = Term::symbol("is")
-                .with_child(term.last_arg().unwrap().to_term())
-                .with_child(Term::symbol("known"));
+        if term.first_arg().unwrap() == find.term() {
+            let is_known = TermBuf::symbol("is")
+                .arg(term.last_arg().unwrap().to_owned())
+                .arg(TermBuf::symbol("known"));
             if self.prove(solution, is_known, state).answer().is_some() {
                 solution.status = SolutionStatus::Answer(index);
                 return true;
@@ -628,7 +623,7 @@ impl Solver {
                 solution.status = SolutionStatus::Answer(index);
                 return true;
             }
-            if solution[*i].term.as_subterm().truth().is_true() {
+            if solution[*i].term.term().truth().is_true() {
                 solution.status = SolutionStatus::Answer(*i);
                 // TODO: надо заполнить правильно
                 // согласовать с выводом решения по шагам
@@ -675,7 +670,7 @@ impl SolutionState {
     }
 }
 
-fn is_replace(root: &mut SubtermMut) {
+fn is_replace(root: &mut TermMut) {
     if !root.data().is_symbol_name("is") || root.degree() != 2 {
         return;
     }
@@ -683,11 +678,11 @@ fn is_replace(root: &mut SubtermMut) {
     match root.last_arg().unwrap().data().symbol() {
         Some(name) if name == "true" => {
             let mut child = root.pop_first_arg().unwrap();
-            root.swap(&mut child.as_subterm_mut());
+            root.swap(&mut child.term_mut());
         }
         Some(name) if name == "false" => {
             let child = root.pop_first_arg().unwrap();
-            root.swap(&mut Term::symbol("!").with_child(child).as_subterm_mut());
+            root.swap(&mut TermBuf::symbol("!").arg(child).term_mut());
         }
         _ => {}
     }
@@ -699,7 +694,7 @@ mod solution_tests {
 
     use crate::{
         rule::RulesEngine,
-        task::{parse_task, Solver},
+        task::{Solver, parse_task},
         term::term_with_vars,
     };
 

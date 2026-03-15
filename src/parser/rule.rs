@@ -1,14 +1,14 @@
 use std::str::FromStr;
 
 use solver::{
+    CompactString,
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
     term::Symbol,
-    CompactString,
 };
 
 use crate::ParserError;
 
-use super::{term::TermParser, Node, Tree};
+use super::{Node, Tree, term::TermParser};
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
@@ -173,7 +173,7 @@ impl<'a> RuleParser<'a> {
 mod tests {
     use solver::{
         rule::{RuleAttr, RuleAttrValue},
-        term::Term,
+        term::{TermBuf, param},
     };
 
     use crate::lang;
@@ -197,30 +197,26 @@ mod tests {
         let rule = rules.pop().unwrap();
 
         assert_eq!(
-            rule.pattern_node().to_term(),
-            Term::symbol("==")
-                .with_child(
-                    Term::symbol("+")
-                        .with_child(Term::param("a"))
-                        .with_child(Term::param("x"))
-                )
-                .with_child(Term::number(0))
+            rule.pattern_node().to_owned(),
+            TermBuf::symbol("==")
+                .arg(TermBuf::symbol("+").arg(param("a")).arg(param("x")))
+                .arg(TermBuf::number(0))
         );
 
         assert_eq!(
-            rule.replace_node().to_term(),
-            Term::symbol("==").with_child(Term::param("x")).with_child(
-                Term::symbol("*")
-                    .with_child(Term::number(-1))
-                    .with_child(Term::param("a"))
+            rule.replace_node().to_owned(),
+            TermBuf::symbol("==").arg(param("x")).arg(
+                TermBuf::symbol("*")
+                    .arg(TermBuf::number(-1))
+                    .arg(param("a"))
             )
         );
         assert_eq!(rule.requirements.len(), 1);
         assert_eq!(
             rule.requirements[0],
-            Term::symbol("!=")
-                .with_child(Term::param("a"))
-                .with_child(Term::number(0))
+            TermBuf::symbol("!=")
+                .arg(param("a"))
+                .arg(TermBuf::number(0))
         );
 
         assert_eq!(rule.attrs.len(), 2);
@@ -250,29 +246,25 @@ mod tests {
         let rule = rules.pop().unwrap();
 
         assert_eq!(
-            rule.pattern_node().to_term(),
-            Term::symbol("is")
-                .with_child(
-                    Term::symbol("/")
-                        .with_child(Term::param("a"))
-                        .with_child(Term::param("b"))
-                )
-                .with_child(Term::symbol("known"))
+            rule.pattern_node().to_owned(),
+            TermBuf::symbol("is")
+                .arg(TermBuf::symbol("/").arg(param("a")).arg(param("b")))
+                .arg(TermBuf::symbol("known"))
         );
 
-        assert_eq!(rule.replace_node().to_term(), Term::symbol("true"));
+        assert_eq!(rule.replace_node().to_owned(), TermBuf::symbol("true"));
         assert_eq!(rule.requirements.len(), 2);
         assert_eq!(
             rule.requirements[0],
-            Term::symbol("is")
-                .with_child(Term::param("a"))
-                .with_child(Term::symbol("known"))
+            TermBuf::symbol("is")
+                .arg(param("a"))
+                .arg(TermBuf::symbol("known"))
         );
         assert_eq!(
             rule.requirements[1],
-            Term::symbol("is")
-                .with_child(Term::param("b"))
-                .with_child(Term::symbol("known"))
+            TermBuf::symbol("is")
+                .arg(param("b"))
+                .arg(TermBuf::symbol("known"))
         );
 
         assert_eq!(rule.attrs.len(), 3);

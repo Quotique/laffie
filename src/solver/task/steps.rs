@@ -4,8 +4,8 @@ use std::{
     sync::Arc,
 };
 
-use super::{solution::SolutionStatus, SharedSolution, Task};
-use crate::term::{SharedTerm, Term};
+use super::{SharedSolution, Task, solution::SolutionStatus};
+use crate::term::{SharedTerm, TermBuf};
 
 pub trait StepsSource {
     fn steps(&self) -> Steps;
@@ -25,7 +25,7 @@ pub struct Steps {
     terms_queue: Vec<usize>,
 
     subtasks: VecDeque<Steps>,
-    rendered: Arc<RefCell<HashSet<Term>>>,
+    rendered: Arc<RefCell<HashSet<TermBuf>>>,
 }
 
 impl StepsSource for SharedSolution {

@@ -5,32 +5,32 @@ use std::{
 
 use bincode::{BorrowDecode, Decode, Encode};
 
-use super::{SubtermId, Term, TermNode};
-use crate::{CompactString, Decimal};
+use super::{Atom, TermBuf, TermPath};
+use crate::{CompactString, Decimal, term::try_sym};
 
-impl Encode for TermNode {
+impl Encode for Atom {
     fn encode<E: bincode::enc::Encoder>(
         &self,
         encoder: &mut E,
     ) -> core::result::Result<(), bincode::error::EncodeError> {
         match self {
-            TermNode::Symbol(s) => {
+            Atom::Symbol(s) => {
                 Encode::encode(&1i8, encoder)?;
                 Encode::encode(&s.as_str(), encoder)?;
             }
-            TermNode::Param(p) => {
+            Atom::Param(p) => {
                 Encode::encode(&2i8, encoder)?;
                 Encode::encode(&p.as_ref().as_str(), encoder)?;
             }
-            TermNode::Variable(v) => {
+            Atom::Variable(v) => {
                 Encode::encode(&3i8, encoder)?;
                 Encode::encode(&v.as_ref().as_str(), encoder)?;
             }
-            TermNode::Number(d) => {
+            Atom::Number(d) => {
                 Encode::encode(&4i8, encoder)?;
                 Encode::encode(&d.to_string().as_str(), encoder)?;
             }
-            TermNode::ArgList(p) => {
+            Atom::ArgList(p) => {
                 Encode::encode(&5i8, encoder)?;
                 Encode::encode(&u64::from(*p), encoder)?;
             }
@@ -39,7 +39,7 @@ impl Encode for TermNode {
     }
 }
 
-impl<Context> Decode<Context> for TermNode {
+impl<Context> Decode<Context> for Atom {
     fn decode<D: bincode::de::Decoder>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
@@ -47,21 +47,21 @@ impl<Context> Decode<Context> for TermNode {
         let term = match index {
             1 => {
                 let s: String = Decode::decode(decoder)?;
-                TermNode::with_symbol_opt(&s).ok_or_else(|| {
+                Atom::from(try_sym(&s).ok_or_else(|| {
                     bincode::error::DecodeError::OtherString(format!("bad symbol {s}"))
-                })?
+                })?)
             }
             2 => {
                 let s: String = Decode::decode(decoder)?;
-                TermNode::Param(CompactString::from(s).into())
+                Atom::Param(CompactString::from(s).into())
             }
             3 => {
                 let s: String = Decode::decode(decoder)?;
-                TermNode::Variable(CompactString::from(s).into())
+                Atom::Variable(CompactString::from(s).into())
             }
             4 => {
                 let s: String = Decode::decode(decoder)?;
-                TermNode::Number(Decimal::from_str(&s).map_err(|e| {
+                Atom::Number(Decimal::from_str(&s).map_err(|e| {
                     bincode::error::DecodeError::OtherString(format!(
                         "decimal parse error, str: '{s}': err: {e}"
                     ))
@@ -69,7 +69,7 @@ impl<Context> Decode<Context> for TermNode {
             }
             5 => {
                 let p: u64 = Decode::decode(decoder)?;
-                TermNode::ArgList(p.into())
+                Atom::ArgList(p.into())
             }
             _ => unreachable!(),
         };
@@ -77,7 +77,7 @@ impl<Context> Decode<Context> for TermNode {
     }
 }
 
-impl<'de, Context> BorrowDecode<'de, Context> for TermNode {
+impl<'de, Context> BorrowDecode<'de, Context> for Atom {
     fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
@@ -85,21 +85,21 @@ impl<'de, Context> BorrowDecode<'de, Context> for TermNode {
         let term = match index {
             1 => {
                 let s: String = BorrowDecode::borrow_decode(decoder)?;
-                TermNode::with_symbol_opt(&s).ok_or_else(|| {
+                Atom::from(try_sym(&s).ok_or_else(|| {
                     bincode::error::DecodeError::OtherString(format!("bad symbol {s}"))
-                })?
+                })?)
             }
             2 => {
                 let s: String = BorrowDecode::borrow_decode(decoder)?;
-                TermNode::Param(CompactString::from(s).into())
+                Atom::Param(CompactString::from(s).into())
             }
             3 => {
                 let s: String = BorrowDecode::borrow_decode(decoder)?;
-                TermNode::Variable(CompactString::from(s).into())
+                Atom::Variable(CompactString::from(s).into())
             }
             4 => {
                 let s: String = BorrowDecode::borrow_decode(decoder)?;
-                TermNode::Number(Decimal::from_str(&s).map_err(|e| {
+                Atom::Number(Decimal::from_str(&s).map_err(|e| {
                     bincode::error::DecodeError::OtherString(format!(
                         "decimal parse error, str: '{s}': err: {e}"
                     ))
@@ -107,7 +107,7 @@ impl<'de, Context> BorrowDecode<'de, Context> for TermNode {
             }
             5 => {
                 let p: u64 = BorrowDecode::borrow_decode(decoder)?;
-                TermNode::ArgList(p.into())
+                Atom::ArgList(p.into())
             }
             _ => unreachable!(),
         };
@@ -115,16 +115,16 @@ impl<'de, Context> BorrowDecode<'de, Context> for TermNode {
     }
 }
 
-impl<'de, Context> BorrowDecode<'de, Context> for Term {
+impl<'de, Context> BorrowDecode<'de, Context> for TermBuf {
     fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
         let parent_no: isize = Decode::decode(decoder)?;
         assert!(parent_no == -1, "root element must be first");
-        let data: TermNode = Decode::decode(decoder)?;
-        let mut term = Term::from(data);
-        let mut id_map: HashMap<isize, SubtermId> =
-            FromIterator::from_iter(vec![(0, term.as_subterm().id())]);
+        let data: Atom = Decode::decode(decoder)?;
+        let mut term = TermBuf::from(data);
+        let mut id_map: HashMap<isize, TermPath> =
+            FromIterator::from_iter(vec![(0, term.term().id())]);
 
         for num in 1.. {
             let parent_no: isize = Decode::decode(decoder)?;
@@ -133,12 +133,12 @@ impl<'de, Context> BorrowDecode<'de, Context> for Term {
             }
             let parent_id = id_map.get(&parent_no).expect("parent must be first");
 
-            let data: TermNode = Decode::decode(decoder)?;
+            let data: Atom = Decode::decode(decoder)?;
             id_map.insert(
                 num,
                 term.get_mut(parent_id)
                     .unwrap()
-                    .push_last_arg(Term::from(data))
+                    .push_last_arg(TermBuf::from(data))
                     .last_arg()
                     .unwrap()
                     .id(),
@@ -148,22 +148,22 @@ impl<'de, Context> BorrowDecode<'de, Context> for Term {
     }
 }
 
-impl<Context> Decode<Context> for Term {
+impl<Context> Decode<Context> for TermBuf {
     fn decode<D: bincode::de::Decoder>(
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
         let root_degree: usize = Decode::decode(decoder)?;
-        let data: TermNode = Decode::decode(decoder)?;
-        let mut root = Term::from(data);
+        let data: Atom = Decode::decode(decoder)?;
+        let mut root = TermBuf::from(data);
 
         let mut queue = VecDeque::new();
-        queue.push_back((SubtermId::default(), root_degree));
+        queue.push_back((TermPath::default(), root_degree));
 
         while let Some((id, degree)) = queue.pop_front() {
             for _ in 0..degree {
                 let node_degree: usize = Decode::decode(decoder)?;
-                let data: TermNode = Decode::decode(decoder)?;
-                let node = Term::from(data);
+                let data: Atom = Decode::decode(decoder)?;
+                let node = TermBuf::from(data);
 
                 let mut current = root.get_mut(&id).unwrap();
                 current.push_last_arg(node);
@@ -180,12 +180,12 @@ impl<Context> Decode<Context> for Term {
     }
 }
 
-impl Encode for Term {
+impl Encode for TermBuf {
     fn encode<E: bincode::enc::Encoder>(
         &self,
         encoder: &mut E,
     ) -> core::result::Result<(), bincode::error::EncodeError> {
-        for i in self.as_subterm().bfs() {
+        for i in self.term().bfs() {
             Encode::encode(&i.size.degree, encoder)?;
             Encode::encode(i.data, encoder)?;
         }
@@ -199,23 +199,23 @@ mod tests {
     use bincode::config;
 
     use crate::{
-        term::{term_with_params, Term, TermNode},
         CompactString, Decimal,
+        term::{Atom, TermBuf, sym, term_with_params},
     };
 
     #[test]
     fn symbol_codec_test() {
         for t in &[
-            TermNode::with_symbol("+"),
-            TermNode::Param(CompactString::from("a").into()),
-            TermNode::Variable(CompactString::from("x").into()),
-            TermNode::Number(Decimal::from(100)),
-            TermNode::ArgList(10.into()),
+            Atom::from(sym("+")),
+            Atom::Param(CompactString::from("a").into()),
+            Atom::Variable(CompactString::from("x").into()),
+            Atom::Number(Decimal::from(100)),
+            Atom::ArgList(10.into()),
         ] {
             let config = config::standard();
 
             let encoded: Vec<u8> = bincode::encode_to_vec(t, config).unwrap();
-            let (decoded, len): (TermNode, usize) =
+            let (decoded, len): (Atom, usize) =
                 bincode::decode_from_slice(&encoded[..], config).unwrap();
 
             assert_eq!(t, &decoded);
@@ -228,7 +228,7 @@ mod tests {
         let config = config::standard();
 
         let encoded: Vec<u8> = bincode::encode_to_vec(&term, config).unwrap();
-        let (decoded, len): (Term, usize) =
+        let (decoded, len): (TermBuf, usize) =
             bincode::decode_from_slice(&encoded[..], config).unwrap();
 
         assert_eq!(term, decoded);

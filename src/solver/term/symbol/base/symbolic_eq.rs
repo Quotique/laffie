@@ -1,5 +1,5 @@
 use super::SymbolProgram;
-use crate::term::{Subterm, Truth};
+use crate::term::{Term, TermRef, Truth};
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
@@ -9,7 +9,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn symbolic_eq(root: Subterm) -> Truth {
+pub fn symbolic_eq(root: TermRef) -> Truth {
     if !root.data().is_symbol_name("symbolic_eq") {
         return Truth::Unknown;
     }

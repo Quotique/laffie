@@ -3,8 +3,8 @@ use std::{convert::From, fmt};
 use multimap::MultiMap;
 
 use crate::{
-    term::{Symbol, Term},
     NormalizationLevel,
+    term::{Symbol, Term, TermBuf, sym},
 };
 
 use super::{Rule, RuleAttr, RuleAttrValue, RuleId};
@@ -19,16 +19,16 @@ pub enum RuleBuilderError {
 
 pub struct RuleBuilder {
     rule_id:      RuleId,
-    term:         Option<Term>,
-    requirements: Vec<Term>,
+    term:         Option<TermBuf>,
+    requirements: Vec<TermBuf>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
     symbol:       Symbol,
 
-    replaces: Vec<(RuleAttr, Term)>,
+    replaces: Vec<(RuleAttr, TermBuf)>,
 }
 
-impl From<Term> for RuleBuilder {
-    fn from(source: Term) -> Self {
+impl From<TermBuf> for RuleBuilder {
+    fn from(source: TermBuf) -> Self {
         Self::default().with_term(source).unwrap()
     }
 }
@@ -51,8 +51,7 @@ impl Default for RuleBuilder {
             term:         None,
             requirements: Default::default(),
             attributes:   Default::default(),
-            symbol:       Symbol::by_name("AnySymbol")
-                .expect("System symbol AnySymbol is not found"),
+            symbol:       sym("AnySymbol"),
             replaces:     Default::default(),
         }
     }
@@ -69,14 +68,14 @@ impl RuleBuilder {
         self
     }
 
-    pub fn with_term(mut self, term: Term) -> Result<Self, RuleBuilderError> {
+    pub fn with_term(mut self, term: TermBuf) -> Result<Self, RuleBuilderError> {
         if self.term.replace(term).is_some() {
             return Err(RuleBuilderError::OnlyOneTermIsAllowed);
         }
         Ok(self)
     }
 
-    pub fn with_require(mut self, requirement: Term) -> Self {
+    pub fn with_require(mut self, requirement: TermBuf) -> Self {
         self.requirements.push(requirement);
         self
     }
@@ -95,7 +94,7 @@ impl RuleBuilder {
         let term = self.term.take().ok_or(RuleBuilderError::BadTermRoot)?;
 
         let root_sym = term
-            .as_subterm()
+            .term()
             .data()
             .symbol()
             .ok_or(RuleBuilderError::BadTermRoot)?;
@@ -109,7 +108,7 @@ impl RuleBuilder {
             _ => return Err(RuleBuilderError::BadTermRoot),
         }
 
-        if term.as_subterm().degree() != 2 {
+        if term.term().degree() != 2 {
             return Err(RuleBuilderError::WrongArgsCount);
         }
 
@@ -130,15 +129,15 @@ impl RuleBuilder {
                 if set & elem == elem {
                     match self.replaces.get(i) {
                         Some((RuleAttr::One, src)) => {
-                            term.replace(src, &Term::one());
+                            term.replace(src, &TermBuf::one());
                             for i in reqs.iter_mut() {
-                                i.replace(src, &Term::one());
+                                i.replace(src, &TermBuf::one());
                             }
                         }
                         Some((RuleAttr::Zero, src)) => {
-                            term.replace(src, &Term::zero());
+                            term.replace(src, &TermBuf::zero());
                             for i in reqs.iter_mut() {
-                                i.replace(src, &Term::zero());
+                                i.replace(src, &TermBuf::zero());
                             }
                         }
                         _ => {}
@@ -154,9 +153,9 @@ impl RuleBuilder {
                 symbol: self.symbol.clone(),
                 attrs: attrs.clone(),
                 block: Default::default(),
-                pattern_symbols: term.as_subterm().first_arg().unwrap().symbols(),
-                pattern: term.as_subterm().first_arg().unwrap().id(),
-                replace: term.as_subterm().last_arg().unwrap().id(),
+                pattern_symbols: term.term().first_arg().unwrap().symbols(),
+                pattern: term.term().first_arg().unwrap().id(),
+                replace: term.term().last_arg().unwrap().id(),
                 term,
                 requirements: reqs,
             });

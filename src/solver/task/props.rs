@@ -7,14 +7,14 @@ use std::{
 use super::SharedSolution;
 use crate::{
     rule::{Level, RuleAttr, RuleAttrValue, RuleBuilder, RuleId, SharedRule, TermFilters},
-    term::{ParamsMapping, SharedTerm, Term},
+    term::{ParamSubstitution, SharedTerm, Term, TermBuf},
 };
 
 #[derive(Debug, Clone, Default)]
 pub enum TermInference {
     Rule {
         parent:       usize,
-        params:       ParamsMapping,
+        params:       ParamSubstitution,
         rule:         SharedRule,
         requirements: Vec<SharedSolution>,
     },
@@ -44,8 +44,8 @@ pub struct TermProps {
     rule: TermAsRule,
 }
 
-impl From<Term> for TermProps {
-    fn from(value: Term) -> Self {
+impl From<TermBuf> for TermProps {
+    fn from(value: TermBuf) -> Self {
         Self::from(SharedTerm::new(value))
     }
 }
@@ -116,7 +116,12 @@ impl TermInference {
 }
 
 impl TermAsRule {
-    pub fn get_or_insert(&mut self, term: &Term, id: RuleId, level: Level) -> Option<SharedRule> {
+    pub fn get_or_insert(
+        &mut self,
+        term: &TermBuf,
+        id: RuleId,
+        level: Level,
+    ) -> Option<SharedRule> {
         match self {
             TermAsRule::None => None,
             TermAsRule::Rule(r) => Some(r.clone()),
@@ -131,7 +136,7 @@ impl TermAsRule {
         }
     }
 
-    fn build_rule(term: &Term, id: RuleId, level: Level) -> Option<SharedRule> {
+    fn build_rule(term: &TermBuf, id: RuleId, level: Level) -> Option<SharedRule> {
         let builder = RuleBuilder::default()
             .with_id(id)
             .with_attribute(RuleAttr::Level, RuleAttrValue::UInt(level.into()))

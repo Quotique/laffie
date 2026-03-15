@@ -6,14 +6,14 @@ mod solver;
 mod steps;
 mod tracing;
 
-use crate::term::Term;
+use crate::term::TermBuf;
 use std::{fmt, iter::Iterator};
 
 pub use builder::TaskBuilder;
 pub use goal::Goal;
 pub use props::{TermInference, TermProps};
 pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError, TermIdx};
-pub use solver::{Solver, EXECUTION_DEADLINE_DEFAULT};
+pub use solver::{EXECUTION_DEADLINE_DEFAULT, Solver};
 pub use steps::{StepsSource, Visit};
 pub use tracing::{Tracer, TracerHub};
 
@@ -27,7 +27,7 @@ pub struct Task {
     pub givens:        Vec<TermProps>,
     pub subtask_level: usize,
 
-    pub possible_answers: Vec<Term>,
+    pub possible_answers: Vec<TermBuf>,
 }
 
 impl From<TermProps> for Task {

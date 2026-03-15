@@ -18,16 +18,17 @@ pub mod symbolic_eq;
 use std::cmp::Ordering;
 
 pub use super::SymbolProgram;
-use crate::term::Subterm;
+use crate::term::{Term, TermRef};
+
 #[cfg(test)]
 use crate::{
-    term::{term_with_params, SubtermMut},
     NormalizationLevel,
+    term::{TermMut, term_with_params},
 };
 
 pub const MAX_DEC_CONVERSION_EXP: i64 = 6;
 
-fn compare_numbers(left: Subterm, right: Subterm) -> Option<Ordering> {
+fn compare_numbers(left: TermRef, right: TermRef) -> Option<Ordering> {
     let left_num = left.data().number()?;
     let right_num = right.data().number()?;
 
@@ -38,13 +39,13 @@ fn compare_numbers(left: Subterm, right: Subterm) -> Option<Ordering> {
 pub fn calculator_check(
     src: &'static str,
     res: &'static str,
-    f: impl Fn(&mut SubtermMut, NormalizationLevel) -> bool,
+    f: impl Fn(&mut TermMut, NormalizationLevel) -> bool,
     level: NormalizationLevel,
 ) {
     let mut s = term_with_params(src);
     let r = term_with_params(res);
     assert_eq!(
-        f(&mut s.as_subterm_mut(), level),
+        f(&mut s.term_mut(), level),
         src != res,
         "{src} {res} l:{level}"
     );

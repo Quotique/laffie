@@ -34,7 +34,7 @@ impl Settings {
     }
 }
 
-/// Core develop/debug enviroment
+/// Core develop/debug environment
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {

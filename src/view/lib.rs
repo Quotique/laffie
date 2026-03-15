@@ -10,7 +10,7 @@ pub use tui::Tui;
 
 use solver::{
     task::{Goal, Solution, SolutionStatus, TermProps},
-    term::{SharedTerm, Term},
+    term::{SharedTerm, TermBuf},
 };
 
 pub trait Renderer {
@@ -32,7 +32,7 @@ pub trait Renderer {
 
 pub struct View<'a> {
     solution: &'a Solution,
-    rendered: Arc<RefCell<HashSet<Term>>>,
+    rendered: Arc<RefCell<HashSet<TermBuf>>>,
 }
 
 impl<'a> TryFrom<&'a Solution> for View<'a> {
@@ -50,7 +50,7 @@ impl View<'_> {
     fn display_goal(
         &self,
         goal: &Goal,
-        answer: &Term,
+        answer: &TermBuf,
         subtask_level: usize,
         renderer: &mut dyn Renderer,
     ) -> fmt::Result {

@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
-use eyre::{bail, Result};
+use eyre::{Result, bail};
 
-use crate::{term::Term, CompactString};
+use crate::{CompactString, term::TermBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum RuleAttr {
@@ -22,7 +22,7 @@ pub enum RuleAttrValue {
     None,
     UInt(u64),
     Str(CompactString),
-    Goal(Term),
+    Goal(TermBuf),
 }
 
 impl FromStr for RuleAttr {

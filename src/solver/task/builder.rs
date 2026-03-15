@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt, iter::Iterator};
 
 use super::{Task, TermInference, TermProps};
-use crate::term::Term;
+use crate::term::TermBuf;
 
 #[derive(Clone, Debug)]
 pub enum TaskBuilderError {
@@ -17,7 +17,7 @@ pub struct TaskBuilder {
     goal:        Option<TermProps>,
     term_id_map: HashMap<usize, usize>,
 
-    possible_answers: Vec<Term>,
+    possible_answers: Vec<TermBuf>,
 
     subtask_level: usize,
 }
@@ -68,7 +68,7 @@ impl TaskBuilder {
     }
 
     #[inline]
-    pub fn with_answer(mut self, answer: Term) -> Self {
+    pub fn with_answer(mut self, answer: TermBuf) -> Self {
         self.possible_answers.push(answer);
         self
     }

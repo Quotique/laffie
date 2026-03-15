@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use super::{compare_numbers, SymbolProgram};
-use crate::term::{Subterm, SymbolAttr, SymbolAttrValue, Truth};
+use super::{SymbolProgram, compare_numbers};
+use crate::term::{SymbolAttr, SymbolAttrValue, Term, TermRef, Truth};
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
@@ -12,7 +12,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn less(root: Subterm) -> Truth {
+pub fn less(root: TermRef) -> Truth {
     if !root.data().is_symbol_name("<") {
         return Truth::Unknown;
     }

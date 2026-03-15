@@ -2,10 +2,10 @@ use std::{cmp::Ordering, collections::HashMap};
 
 use bigdecimal::{BigDecimal as Decimal, Zero};
 
-use super::{power::power_argument, SymbolProgram};
+use super::{SymbolProgram, power::power_argument};
 use crate::{
-    term::{Subterm, SubtermMut, SymbolAttr, SymbolAttrValue, Term, TermNode},
     NormalizationLevel,
+    term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
 };
 
 pub fn symbol() -> SymbolProgram {
@@ -22,7 +22,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
+pub fn plus(root: &mut TermMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("+") || root.degree() < 2 {
         return false;
     }
@@ -70,7 +70,7 @@ pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     }
 
     for mut child in children {
-        let num_const = extract_mul_const(&mut child.as_subterm_mut());
+        let num_const = extract_mul_const(&mut child.term_mut());
         constant_mapping
             .entry(child)
             .and_modify(|e| {
@@ -90,11 +90,11 @@ pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     }
 
     if root.degree() == 0 {
-        *root.data_mut() = TermNode::Number(Decimal::from(0));
+        *root.data_mut() = Atom::Number(Decimal::from(0));
         result = true;
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
-        root.swap(&mut child.as_subterm_mut());
+        root.swap(&mut child.term_mut());
         result = true;
     }
 
@@ -103,49 +103,49 @@ pub fn plus(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     result
 }
 
-fn remove_unused_plus(root: &mut SubtermMut) -> bool {
+fn remove_unused_plus(root: &mut TermMut) -> bool {
     if root.degree() == 0 {
-        *root.data_mut() = TermNode::Number(Decimal::from(0));
+        *root.data_mut() = Atom::Number(Decimal::from(0));
         true
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
-        root.swap(&mut child.as_subterm_mut());
+        root.swap(&mut child.term_mut());
         true
     } else {
         false
     }
 }
 
-fn attach_constant(root: &mut SubtermMut, constant: Decimal) {
+fn attach_constant(root: &mut TermMut, constant: Decimal) {
     if !constant.is_zero() {
-        root.push_last_arg(Term::number(constant));
+        root.push_last_arg(TermBuf::number(constant));
     }
 }
 
-fn merge_mul_const(mut root: Term, d: Decimal) -> Term {
+fn merge_mul_const(mut root: TermBuf, d: Decimal) -> TermBuf {
     if d == Decimal::from(1) {
         return root;
     } else if d == Decimal::from(0) {
-        return Term::zero();
+        return TermBuf::zero();
     }
-    let constant = Term::number(d);
+    let constant = TermBuf::number(d);
 
     if root.data().is_number_value(&Decimal::from(1)) {
         return constant;
     }
 
     if root.data().is_symbol_name("*") {
-        root.as_subterm_mut().push_first_arg(constant);
+        root.term_mut().push_first_arg(constant);
         root
     } else {
-        Term::symbol("*").with_child(constant).with_child(root)
+        TermBuf::symbol("*").arg(constant).arg(root)
     }
 }
 
-fn extract_mul_const(root: &mut SubtermMut) -> Decimal {
+fn extract_mul_const(root: &mut TermMut) -> Decimal {
     if let Some(d) = root.data().number() {
         let result = d.clone();
-        root.swap(&mut Term::one().as_subterm_mut());
+        root.swap(&mut TermBuf::one().term_mut());
         return result;
     }
 
@@ -177,15 +177,15 @@ fn extract_mul_const(root: &mut SubtermMut) -> Decimal {
     // });
 
     if root.degree() == 0 {
-        *root.data_mut() = TermNode::Number(Decimal::from(1));
+        *root.data_mut() = Atom::Number(Decimal::from(1));
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
-        root.swap(&mut child.as_subterm_mut());
+        root.swap(&mut child.term_mut());
     }
     constant
 }
 
-fn cummulative_power(root: Subterm) -> Decimal {
+fn cummulative_power(root: TermRef) -> Decimal {
     if root.data().is_symbol_name("^") {
         if let Some(v) = root.last_arg().unwrap().data().number() {
             v.clone()
@@ -194,17 +194,17 @@ fn cummulative_power(root: Subterm) -> Decimal {
         }
     } else if root.data().is_symbol_name("*") {
         let mut result = Decimal::from(0);
-        for i in root.iter() {
+        for i in root.args_iter() {
             match i.data() {
-                TermNode::Number(_) | TermNode::ArgList(_) => {}
-                TermNode::Symbol(_) if i.data().is_symbol_name("^") => {
+                Atom::Number(_) | Atom::ArgList(_) => {}
+                Atom::Symbol(_) if i.data().is_symbol_name("^") => {
                     result += if let Some(v) = i.last_arg().unwrap().data().number() {
                         v.clone()
                     } else {
                         Decimal::from(1)
                     };
                 }
-                TermNode::Symbol(_) | TermNode::Variable(_) | TermNode::Param(_) => {
+                Atom::Symbol(_) | Atom::Variable(_) | Atom::Param(_) => {
                     result += Decimal::from(1);
                 }
             }
@@ -215,7 +215,7 @@ fn cummulative_power(root: Subterm) -> Decimal {
     }
 }
 
-fn mean_arg(root: Subterm) -> Subterm {
+fn mean_arg(root: TermRef) -> TermRef {
     let pa = if root.data().is_symbol_name("*") {
         // find first non-number argument and omit power
         // last number argument in non-number not found
@@ -223,7 +223,7 @@ fn mean_arg(root: Subterm) -> Subterm {
         // 2 * 4 -> 4
         // y * z^4 -> y
         power_argument(
-            root.iter()
+            root.args_iter()
                 .find(|x| {
                     let pa = power_argument(*x);
                     if pa.data().number().is_some() {
@@ -240,7 +240,7 @@ fn mean_arg(root: Subterm) -> Subterm {
     pa
 }
 
-fn ordering(left: Subterm, right: Subterm) -> Ordering {
+fn ordering(left: TermRef, right: TermRef) -> Ordering {
     match cummulative_power(left).cmp(&cummulative_power(right)) {
         Ordering::Equal => {}
         Ordering::Less => return Ordering::Greater,
@@ -249,24 +249,24 @@ fn ordering(left: Subterm, right: Subterm) -> Ordering {
 
     // Symbol < Param < Variable < Number < Placeholder
     match (mean_arg(left).data(), mean_arg(right).data()) {
-        (TermNode::Symbol(left), TermNode::Symbol(right)) => left.cmp(right),
-        (TermNode::Symbol(_), _) => Ordering::Less,
+        (Atom::Symbol(left), Atom::Symbol(right)) => left.cmp(right),
+        (Atom::Symbol(_), _) => Ordering::Less,
 
-        (TermNode::Param(left), TermNode::Param(right)) => left.cmp(right),
-        (TermNode::Param(_), TermNode::Symbol(_)) => Ordering::Greater,
-        (TermNode::Param(_), _) => Ordering::Less,
+        (Atom::Param(left), Atom::Param(right)) => left.cmp(right),
+        (Atom::Param(_), Atom::Symbol(_)) => Ordering::Greater,
+        (Atom::Param(_), _) => Ordering::Less,
 
-        (TermNode::Variable(left), TermNode::Variable(right)) => left.cmp(right),
-        (TermNode::Variable(_), TermNode::Number(_)) => Ordering::Less,
-        (TermNode::Variable(_), TermNode::ArgList(_)) => Ordering::Less,
-        (TermNode::Variable(_), _) => Ordering::Greater,
+        (Atom::Variable(left), Atom::Variable(right)) => left.cmp(right),
+        (Atom::Variable(_), Atom::Number(_)) => Ordering::Less,
+        (Atom::Variable(_), Atom::ArgList(_)) => Ordering::Less,
+        (Atom::Variable(_), _) => Ordering::Greater,
 
-        (TermNode::Number(left), TermNode::Number(right)) => left.cmp(right),
-        (TermNode::Number(_), TermNode::ArgList(_)) => Ordering::Less,
-        (TermNode::Number(_), _) => Ordering::Greater,
+        (Atom::Number(left), Atom::Number(right)) => left.cmp(right),
+        (Atom::Number(_), Atom::ArgList(_)) => Ordering::Less,
+        (Atom::Number(_), _) => Ordering::Greater,
 
-        (TermNode::ArgList(_), TermNode::ArgList(_)) => Ordering::Equal,
-        (TermNode::ArgList(_), _) => Ordering::Greater,
+        (Atom::ArgList(_), Atom::ArgList(_)) => Ordering::Equal,
+        (Atom::ArgList(_), _) => Ordering::Greater,
     }
 }
 
@@ -279,16 +279,16 @@ mod tests {
     #[test]
     fn mean_arg_test() {
         let state = term_with_vars("4*x^4");
-        assert_eq!(mean_arg(state.as_subterm()).to_string(), "x".to_owned());
+        assert_eq!(mean_arg(state.term()).to_string(), "x".to_owned());
 
         let state = term_with_vars("4");
-        assert_eq!(mean_arg(state.as_subterm()).to_string(), "4".to_owned());
+        assert_eq!(mean_arg(state.term()).to_string(), "4".to_owned());
 
         let state = term_with_vars("(-1)*y");
-        assert_eq!(mean_arg(state.as_subterm()).to_string(), "y".to_owned());
+        assert_eq!(mean_arg(state.term()).to_string(), "y".to_owned());
 
         let state = term_with_vars("-y");
-        assert_eq!(mean_arg(state.as_subterm()).to_string(), "y".to_owned());
+        assert_eq!(mean_arg(state.term()).to_string(), "y".to_owned());
     }
 
     #[test]

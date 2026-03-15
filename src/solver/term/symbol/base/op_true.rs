@@ -1,5 +1,5 @@
 use super::SymbolProgram;
-use crate::term::{Subterm, Truth};
+use crate::term::{Term, TermRef, Truth};
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
@@ -9,7 +9,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn is_true(root: Subterm) -> Truth {
+pub fn is_true(root: TermRef) -> Truth {
     if !root.data().is_symbol_name("true") {
         return Truth::Unknown;
     }

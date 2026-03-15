@@ -4,13 +4,13 @@ use std::{
 };
 
 use solver::{
-    task::{Task, TaskBuilder, TermProps},
     NormalizationLevel,
+    task::{Task, TaskBuilder, TermProps},
 };
 
 use crate::ParserError;
 
-use super::{term::TermParser, Tree};
+use super::{Tree, term::TermParser};
 
 pub struct TaskParser<'a> {
     syntax_tree: &'a Tree,
@@ -94,7 +94,7 @@ impl<'a> TaskParser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use solver::term::Term;
+    use solver::term::{TermBuf, var};
 
     use crate::lang;
 
@@ -116,17 +116,13 @@ mod tests {
         println!("{:?}", task.givens[0].term);
         assert_eq!(
             *task.givens[0].term,
-            Term::symbol("==")
-                .with_child(
-                    Term::symbol("+")
-                        .with_child(
-                            Term::symbol("*")
-                                .with_child(Term::number(2))
-                                .with_child(Term::variable("x"))
-                        )
-                        .with_child(Term::number(5))
+            TermBuf::symbol("==")
+                .arg(
+                    TermBuf::symbol("+")
+                        .arg(TermBuf::symbol("*").arg(TermBuf::number(2)).arg(var("x")))
+                        .arg(TermBuf::number(5))
                 )
-                .with_child(Term::number(0))
+                .arg(TermBuf::zero())
         );
     }
 }

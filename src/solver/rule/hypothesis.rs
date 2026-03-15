@@ -3,15 +3,15 @@ use std::fmt;
 use itertools::Itertools;
 
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
-use crate::term::{ParamsMapping, Term};
+use crate::term::{ParamSubstitution, TermBuf};
 
 #[derive(Debug)]
 pub struct Hypothesis {
     pub rule:       SharedRule,
-    pub resolution: Term,
+    pub resolution: TermBuf,
 
-    pub params:        ParamsMapping,
-    pub requirements:  Vec<Term>,
+    pub params:        ParamSubstitution,
+    pub requirements:  Vec<TermBuf>,
     pub blocked_rules: Vec<RuleId>,
 }
 
@@ -28,7 +28,7 @@ impl Hypothesis {
 }
 
 impl HypothesisIterator {
-    pub fn new(rule: SharedRule, term: &Term, filters: &TermFilters, goal: &Term) -> Self {
+    pub fn new(rule: SharedRule, term: &TermBuf, filters: &TermFilters, goal: &TermBuf) -> Self {
         let hypothesis = match rule.apply(term, filters, goal) {
             Ok(x) => x,
             Err(e) => {

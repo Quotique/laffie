@@ -1,15 +1,15 @@
 use std::{collections::HashMap, str::FromStr};
 
 use solver::{
-    term::{ArgList, Param, ParamsMapping, Symbol, Term, TermNode, Variable},
     Decimal,
+    term::{ArgList, Atom, Param, ParamSubstitution, Term, TermBuf, Variable, try_sym},
 };
 
 use crate::{Node, ParserError};
 
 #[derive(Default)]
 pub struct TermParser {
-    params:          HashMap<Param, Term>,
+    params:          HashMap<Param, TermBuf>,
     with_var:        bool,
     last_arglist_id: u64,
 }
@@ -20,20 +20,20 @@ impl TermParser {
         self
     }
 
-    pub fn with_params(mut self, params: HashMap<Param, Term>) -> Self {
+    pub fn with_params(mut self, params: HashMap<Param, TermBuf>) -> Self {
         self.params = params;
         self
     }
 
-    pub fn try_parse(&mut self, node: &Node) -> Result<Term, ParserError> {
+    pub fn try_parse(&mut self, node: &Node) -> Result<TermBuf, ParserError> {
         let mut tree = self.try_parse_node(node)?;
 
-        tree.as_subterm_mut()
-            .apply_param_map(&ParamsMapping::from_iter(self.params.clone()));
+        tree.term_mut()
+            .apply_param_map(&ParamSubstitution::from_iter(self.params.clone()));
         Ok(tree.normalize(0.into()))
     }
 
-    fn try_parse_node(&mut self, mut node: &Node) -> Result<Term, ParserError> {
+    fn try_parse_node(&mut self, mut node: &Node) -> Result<TermBuf, ParserError> {
         let mut params = vec![];
         while node.data().symbol == "as" {
             params.push(
@@ -44,12 +44,12 @@ impl TermParser {
         }
 
         let value = self.parse_term(node.data().symbol.as_str());
-        let mut tree = Term::from(value);
+        let mut tree = TermBuf::from(value);
 
-        if tree.as_subterm().data().symbol().is_some() {
+        if tree.term().data().symbol().is_some() {
             for child in node.iter() {
                 let arg = self.try_parse_node(child)?;
-                tree.as_subterm_mut().push_last_arg(arg);
+                tree.term_mut().push_last_arg(arg);
             }
         } else if node.degree() != 0 {
             return Err(ParserError {
@@ -69,24 +69,26 @@ impl TermParser {
         Ok(tree)
     }
 
-    fn parse_term(&mut self, data: &str) -> TermNode {
+    fn parse_term(&mut self, data: &str) -> Atom {
         if data == ".." {
             self.last_arglist_id += 1;
-            TermNode::ArgList(ArgList::from(self.last_arglist_id))
+            Atom::ArgList(ArgList::from(self.last_arglist_id))
         } else if let Ok(value) = Decimal::from_str(data) {
-            TermNode::Number(value)
-        } else if let Some(symbol) = Symbol::by_name(data) {
-            TermNode::Symbol(symbol)
+            Atom::Number(value)
+        } else if let Some(symbol) = try_sym(data) {
+            Atom::Symbol(symbol)
         } else if self.with_var {
-            TermNode::Variable(Variable::from_str(data).expect("unable to create variable"))
+            Atom::Variable(Variable::from_str(data).expect("unable to create variable"))
         } else {
-            TermNode::Param(Param::from_str(data).expect("unable to create param"))
+            Atom::Param(Param::from_str(data).expect("unable to create param"))
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use solver::term::param;
+
     use crate::lang;
 
     use super::*;
@@ -101,17 +103,13 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Term::symbol("==")
-                .with_child(
-                    Term::symbol("+")
-                        .with_child(
-                            Term::symbol("*")
-                                .with_child(Term::param("a"))
-                                .with_child(Term::param("x"))
-                        )
-                        .with_child(Term::param("b"))
+            TermBuf::symbol("==")
+                .arg(
+                    TermBuf::symbol("+")
+                        .arg(TermBuf::symbol("*").arg(param("a")).arg(param("x")))
+                        .arg(param("b"))
                 )
-                .with_child(Term::number(0))
+                .arg(TermBuf::zero())
         );
     }
 
@@ -125,20 +123,20 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            Term::symbol("<=>")
-                .with_child(
-                    Term::symbol("is")
-                        .with_child(
-                            Term::symbol("set")
-                                .with_child(Term::number(5))
-                                .with_child(Term::param("x"))
+            TermBuf::symbol("<=>")
+                .arg(
+                    TermBuf::symbol("is")
+                        .arg(
+                            TermBuf::symbol("set")
+                                .arg(TermBuf::number(5))
+                                .arg(param("x"))
                         )
-                        .with_child(Term::symbol("known"))
+                        .arg(TermBuf::symbol("known"))
                 )
-                .with_child(
-                    Term::symbol("is")
-                        .with_child(Term::symbol("set").with_child(Term::param("x")))
-                        .with_child(Term::symbol("known"))
+                .arg(
+                    TermBuf::symbol("is")
+                        .arg(TermBuf::symbol("set").arg(param("x")))
+                        .arg(TermBuf::symbol("known"))
                 )
         );
     }

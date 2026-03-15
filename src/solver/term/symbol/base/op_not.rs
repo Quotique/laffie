@@ -1,7 +1,7 @@
 use super::SymbolProgram;
 use crate::{
-    term::{Subterm, SubtermMut, TermNode, Truth},
     NormalizationLevel,
+    term::{Atom, Term, TermMut, TermRef, Truth, sym},
 };
 
 pub fn symbol() -> SymbolProgram {
@@ -13,7 +13,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-fn not_replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
+fn not_replace(root: &mut TermMut, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("!") || root.degree() != 1 {
         return false;
     }
@@ -21,21 +21,21 @@ fn not_replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
     match root.first_arg().unwrap().data().symbol() {
         Some(name) if name == "==" => {
             let mut child = root.pop_first_arg().unwrap();
-            root.swap(&mut child.as_subterm_mut());
-            *root.data_mut() = TermNode::with_symbol("!=");
+            root.swap(&mut child.term_mut());
+            *root.data_mut() = Atom::from(sym("!="));
             true
         }
         Some(name) if name == "!=" => {
             let mut child = root.pop_first_arg().unwrap();
-            root.swap(&mut child.as_subterm_mut());
-            *root.data_mut() = TermNode::with_symbol("==");
+            root.swap(&mut child.term_mut());
+            *root.data_mut() = Atom::from(sym("=="));
             true
         }
         _ => false,
     }
 }
 
-pub fn is_not(root: Subterm) -> Truth {
+pub fn is_not(root: TermRef) -> Truth {
     if !root.data().is_symbol_name("!") {
         return Truth::Unknown;
     }

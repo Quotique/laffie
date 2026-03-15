@@ -1,7 +1,7 @@
 use super::SymbolProgram;
 use crate::{
-    term::{SubtermMut, Term, VariablesMap},
     NormalizationLevel,
+    term::{Term, TermBuf, TermMut, VariableSubstitution},
 };
 
 pub fn symbol() -> SymbolProgram {
@@ -12,7 +12,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
+pub fn replace(root: &mut TermMut, _: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("replace") || root.degree() != 2 {
         return false;
     }
@@ -30,29 +30,29 @@ pub fn replace(root: &mut SubtermMut, _: NormalizationLevel) -> bool {
         .pop_first_arg()
         .expect("replace must have a second argument");
 
-    term.as_subterm_mut().apply_variable_map(&map);
+    term.term_mut().apply_variable_map(&map);
 
-    root.swap(&mut term.as_subterm_mut());
+    root.swap(&mut term.term_mut());
     true
 }
 
-fn into_variable_map(mut state: Term) -> VariablesMap {
-    let mut result = VariablesMap::default();
+fn into_variable_map(mut state: TermBuf) -> VariableSubstitution {
+    let mut result = VariableSubstitution::default();
 
-    if !state.data().is_symbol_name("==") || state.as_subterm().degree() != 2 {
+    if !state.data().is_symbol_name("==") || state.term().degree() != 2 {
         return result;
     }
-    let var = state.as_subterm().first_arg().expect("must be");
+    let var = state.term().first_arg().expect("must be");
 
     if let Some(v) = var.data().variable() {
-        result.insert(v.clone(), state.as_subterm_mut().pop_last_arg().unwrap());
+        result.insert(v.clone(), state.term_mut().pop_last_arg().unwrap());
     }
     result
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{term::term_with_vars, NormalizationLevel};
+    use crate::{NormalizationLevel, term::term_with_vars};
 
     #[test]
     fn replace_test() {

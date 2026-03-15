@@ -5,10 +5,10 @@ use std::{
 
 use itertools::Itertools;
 
-use super::{rule::Level, Rule, RuleAttr, RuleAttrValue, RuleId, SharedRule, TermFilters};
+use super::{Rule, RuleAttr, RuleAttrValue, RuleId, SharedRule, TermFilters, rule::Level};
 use crate::{
-    term::{Symbol, Term},
     CompactString,
+    term::{Symbol, TermBuf, sym},
 };
 
 type LevelRules = HashMap<Symbol, Vec<SharedRule>>;
@@ -47,12 +47,12 @@ impl RulesEngine {
         self.process_queue();
     }
 
-    pub fn suggest_rules(&self, filters: &TermFilters, goal: &Term) -> Vec<SharedRule> {
+    pub fn suggest_rules(&self, filters: &TermFilters, goal: &TermBuf) -> Vec<SharedRule> {
         assert!(self.rule_queue.is_empty());
 
         let empty_level = LevelRules::new();
         let level = self.all_rules.get(&filters.level).unwrap_or(&empty_level);
-        let result: Vec<_> = once(&Symbol::by_name("AnySymbol").unwrap())
+        let result: Vec<_> = once(&sym("AnySymbol"))
             .chain(filters.symbols.iter())
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())

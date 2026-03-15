@@ -1,28 +1,30 @@
 //#![warn(missing_docs)]
 
+mod atom;
+mod buffer;
 mod codec;
-mod subterm;
-mod subterm_mut;
+mod refer;
+mod refer_mut;
+mod substitution;
 mod symbol;
-mod term_node;
-mod term_tree;
 
-pub use subterm::Subterm;
-pub use subterm_mut::SubtermMut;
-pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
-pub use term_node::{ArgList, Param, TermNode, Variable};
-pub use term_tree::{ParamsMapping, SharedTerm, SubtermId, Term, VariablesMap};
+pub use atom::{ArgList, Atom, Param, Variable, param, var};
+pub use buffer::{SharedTerm, TermBuf, TermPath};
+pub use refer::{Term, TermRef};
+pub use refer_mut::TermMut;
+pub use substitution::{ParamSubstitution, VariableSubstitution};
+pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth, sym, try_sym};
 
 #[cfg(test)]
-pub fn term_with_params(text: &'static str) -> Term {
+pub fn term_with_params(text: &'static str) -> TermBuf {
     let states = parser::lang::terms(text).unwrap();
     let term = parser::TermParser::default().try_parse(&states[0]).unwrap();
 
-    unsafe { std::mem::transmute::<_, Term>(term) }
+    unsafe { std::mem::transmute::<_, TermBuf>(term) }
 }
 
 #[cfg(test)]
-pub fn term_with_vars(text: &'static str) -> Term {
+pub fn term_with_vars(text: &'static str) -> TermBuf {
     let states = parser::lang::terms(text)
         .map_err(|e| println!("parsing error {text}: {e}"))
         .unwrap();
@@ -31,5 +33,5 @@ pub fn term_with_vars(text: &'static str) -> Term {
         .try_parse(&states[0])
         .unwrap();
 
-    unsafe { std::mem::transmute::<_, Term>(term) }
+    unsafe { std::mem::transmute::<_, TermBuf>(term) }
 }

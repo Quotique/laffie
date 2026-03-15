@@ -3,11 +3,11 @@ use std::{cmp::Ordering, collections::HashMap};
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
 
 use crate::{
-    term::{Subterm, SubtermMut, SymbolAttr, SymbolAttrValue, Term, TermNode},
     NormalizationLevel,
+    term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
 };
 
-use super::{plus::plus, power::power_argument, SymbolProgram};
+use super::{SymbolProgram, plus::plus, power::power_argument};
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
@@ -23,7 +23,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn multiply(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
+pub fn multiply(root: &mut TermMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("*") {
         return false;
     }
@@ -35,7 +35,7 @@ pub fn multiply(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
                 .iter()
                 .any(|x| x.data().is_number_value(&Decimal::zero()))
             {
-                root.swap(&mut Term::zero().as_subterm_mut());
+                root.swap(&mut TermBuf::zero().term_mut());
                 return true;
             }
             let result = root.iter_mut().fold(false, |acc, mut x| {
@@ -54,31 +54,31 @@ pub fn multiply(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
         }
         _ => {
             let (constant, result) = fold_constant(root);
-            let (powers, result) =
-                root.iter_mut()
-                    .fold((HashMap::<Term, Term>::new(), result), |acc, mut x| {
-                        let power = extract_power(&mut x);
-                        let (mut powers, mut result) = acc;
-                        powers
-                            .entry(x.detach())
-                            .and_modify(|p| {
-                                let mut new_pow = Term::symbol("+")
-                                    .with_child(p.clone())
-                                    .with_child(power.clone());
-                                p.as_subterm_mut().swap(&mut new_pow.as_subterm_mut());
-                                result = true;
-                            })
-                            .or_insert(power);
-                        (powers, result)
-                    });
+            let (powers, result) = root.iter_mut().fold(
+                (HashMap::<TermBuf, TermBuf>::new(), result),
+                |acc, mut x| {
+                    let power = extract_power(&mut x);
+                    let (mut powers, mut result) = acc;
+                    powers
+                        .entry(x.detach())
+                        .and_modify(|p| {
+                            let mut new_pow =
+                                TermBuf::symbol("+").arg(p.clone()).arg(power.clone());
+                            p.term_mut().swap(&mut new_pow.term_mut());
+                            result = true;
+                        })
+                        .or_insert(power);
+                    (powers, result)
+                },
+            );
             #[cfg(test)]
             let powers = {
                 let mut powers: Vec<_> = powers.into_iter().collect();
-                powers.sort_by(|x, y| ordering(x.0.as_subterm(), y.0.as_subterm()));
+                powers.sort_by(|x, y| ordering(x.0.term(), y.0.term()));
                 powers
             };
             for (elem, mut pow) in powers.into_iter() {
-                plus(&mut pow.as_subterm_mut(), level);
+                plus(&mut pow.term_mut(), level);
                 let arg = merge_power(elem, pow);
                 if !arg.data().is_number_value(&Decimal::from(1)) {
                     root.push_last_arg(arg);
@@ -89,19 +89,19 @@ pub fn multiply(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     }
 }
 
-fn attach_constant(root: &mut SubtermMut, constant: Decimal) -> bool {
+fn attach_constant(root: &mut TermMut, constant: Decimal) -> bool {
     if constant == Decimal::zero() {
-        root.swap(&mut Term::zero().as_subterm_mut());
+        root.swap(&mut TermBuf::zero().term_mut());
         true
     } else if constant != Decimal::one() {
-        root.push_first_arg(Term::number(constant));
+        root.push_first_arg(TermBuf::number(constant));
         false
     } else {
         false
     }
 }
 
-fn fold_constant(root: &mut SubtermMut) -> (Decimal, bool) {
+fn fold_constant(root: &mut TermMut) -> (Decimal, bool) {
     root.iter_mut()
         .enumerate()
         .fold((Decimal::from(1), false), |acc, (num, mut x)| {
@@ -115,47 +115,47 @@ fn fold_constant(root: &mut SubtermMut) -> (Decimal, bool) {
         })
 }
 
-fn remove_unused_mul(root: &mut SubtermMut) -> bool {
+fn remove_unused_mul(root: &mut TermMut) -> bool {
     match root.degree() {
         0 => {
-            *root.data_mut() = TermNode::Number(Decimal::from(1));
+            *root.data_mut() = Atom::Number(Decimal::from(1));
             true
         }
         1 => {
             let mut child = root.pop_first_arg().unwrap();
-            root.swap(&mut child.as_subterm_mut());
+            root.swap(&mut child.term_mut());
             true
         }
         _ => false,
     }
 }
 
-fn merge_power(root: Term, pow: Term) -> Term {
-    if pow == Term::one() {
+fn merge_power(root: TermBuf, pow: TermBuf) -> TermBuf {
+    if pow == TermBuf::one() {
         return root;
     }
 
-    if pow == Term::zero() {
-        return Term::one();
+    if pow == TermBuf::zero() {
+        return TermBuf::one();
     }
 
-    Term::symbol("^").with_child(root).with_child(pow)
+    TermBuf::symbol("^").arg(root).arg(pow)
 }
 
-fn extract_power(root: &mut SubtermMut) -> Term {
+fn extract_power(root: &mut TermMut) -> TermBuf {
     if root.data().is_symbol_name("^") {
         let power = root.pop_last_arg().unwrap();
         let mut arg = root.pop_first_arg().unwrap();
         assert_eq!(root.degree(), 0);
 
-        root.swap(&mut arg.as_subterm_mut());
+        root.swap(&mut arg.term_mut());
         power
     } else {
-        Term::one()
+        TermBuf::one()
     }
 }
 
-fn ordering(left: Subterm, right: Subterm) -> Ordering {
+fn ordering(left: TermRef, right: TermRef) -> Ordering {
     // Number < Param < Variable < Symbol < Placeholder
     let pa_left = power_argument(left);
     let pa_right = power_argument(right);
@@ -168,24 +168,24 @@ fn ordering(left: Subterm, right: Subterm) -> Ordering {
     }
 
     match (pa_left.data(), pa_right.data()) {
-        (TermNode::Number(left), TermNode::Number(right)) => left.cmp(right),
-        (TermNode::Number(_), _) => Ordering::Less,
+        (Atom::Number(left), Atom::Number(right)) => left.cmp(right),
+        (Atom::Number(_), _) => Ordering::Less,
 
-        (TermNode::Param(left), TermNode::Param(right)) => left.cmp(right),
-        (TermNode::Param(_), TermNode::Number(_)) => Ordering::Greater,
-        (TermNode::Param(_), _) => Ordering::Less,
+        (Atom::Param(left), Atom::Param(right)) => left.cmp(right),
+        (Atom::Param(_), Atom::Number(_)) => Ordering::Greater,
+        (Atom::Param(_), _) => Ordering::Less,
 
-        (TermNode::Variable(left), TermNode::Variable(right)) => left.cmp(right),
-        (TermNode::Variable(_), TermNode::Symbol(_)) => Ordering::Less,
-        (TermNode::Variable(_), TermNode::ArgList(_)) => Ordering::Less,
-        (TermNode::Variable(_), _) => Ordering::Greater,
+        (Atom::Variable(left), Atom::Variable(right)) => left.cmp(right),
+        (Atom::Variable(_), Atom::Symbol(_)) => Ordering::Less,
+        (Atom::Variable(_), Atom::ArgList(_)) => Ordering::Less,
+        (Atom::Variable(_), _) => Ordering::Greater,
 
-        (TermNode::Symbol(left), TermNode::Symbol(right)) => left.cmp(right),
-        (TermNode::Symbol(_), TermNode::ArgList(_)) => Ordering::Less,
-        (TermNode::Symbol(_), _) => Ordering::Greater,
+        (Atom::Symbol(left), Atom::Symbol(right)) => left.cmp(right),
+        (Atom::Symbol(_), Atom::ArgList(_)) => Ordering::Less,
+        (Atom::Symbol(_), _) => Ordering::Greater,
 
-        (TermNode::ArgList(_), TermNode::ArgList(_)) => Ordering::Equal,
-        (TermNode::ArgList(_), _) => Ordering::Greater,
+        (Atom::ArgList(_), Atom::ArgList(_)) => Ordering::Equal,
+        (Atom::ArgList(_), _) => Ordering::Greater,
     }
 }
 

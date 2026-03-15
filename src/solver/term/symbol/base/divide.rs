@@ -4,10 +4,10 @@ use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use num::integer::gcd;
 use num_bigint::ToBigInt;
 
-use super::{SymbolProgram, MAX_DEC_CONVERSION_EXP};
+use super::{MAX_DEC_CONVERSION_EXP, SymbolProgram};
 use crate::{
-    term::{SubtermMut, SymbolAttr, SymbolAttrValue, Term, TermNode},
     NormalizationLevel,
+    term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut},
 };
 
 pub fn symbol() -> SymbolProgram {
@@ -19,7 +19,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn divide(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
+pub fn divide(root: &mut TermMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("/") {
         return false;
     }
@@ -27,10 +27,10 @@ pub fn divide(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
     match level {
         NormalizationLevel(0) => false,
         NormalizationLevel(1) => {
-            if let TermNode::Number(d) = &root.last_arg().unwrap().data() {
+            if let Atom::Number(d) = &root.last_arg().unwrap().data() {
                 if d.is_one() {
                     let mut child = root.pop_first_arg().unwrap();
-                    root.swap(&mut child.as_subterm_mut());
+                    root.swap(&mut child.term_mut());
                     return true;
                 }
             }
@@ -44,7 +44,7 @@ pub fn divide(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
                 (Some(d1), Some(d2)) => {
                     let (num, den) = simplify(d1.clone(), d2.clone());
                     if let Some(t) = impl_divide(&num, &den) {
-                        root.swap(&mut Term::number(t).as_subterm_mut());
+                        root.swap(&mut TermBuf::number(t).term_mut());
                         true
                     } else if *d1 != num || *d2 != den {
                         let sign = if (&num * &den) < Decimal::zero() {
@@ -55,8 +55,8 @@ pub fn divide(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
 
                         root.first_arg_mut()
                             .unwrap()
-                            .swap(&mut Term::number(sign * num.abs()).as_subterm_mut());
-                        *root.last_arg_mut().unwrap().data_mut() = TermNode::Number(den.abs());
+                            .swap(&mut TermBuf::number(sign * num.abs()).term_mut());
+                        *root.last_arg_mut().unwrap().data_mut() = Atom::Number(den.abs());
                         true
                     } else {
                         false
@@ -65,7 +65,7 @@ pub fn divide(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
                 (_, Some(d)) => {
                     if d.is_one() {
                         let mut child = root.pop_first_arg().unwrap();
-                        root.swap(&mut child.as_subterm_mut());
+                        root.swap(&mut child.term_mut());
                         true
                     } else {
                         false

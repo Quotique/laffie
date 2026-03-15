@@ -5,8 +5,8 @@ use num::traits::Pow;
 
 use super::SymbolProgram;
 use crate::{
-    term::{Subterm, SubtermMut, SymbolAttr, SymbolAttrValue, Term, TermNode},
     NormalizationLevel,
+    term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef, sym},
 };
 
 pub fn symbol() -> SymbolProgram {
@@ -18,7 +18,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn power(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
+pub fn power(root: &mut TermMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("^") {
         return false;
     }
@@ -35,13 +35,13 @@ pub fn power(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
             if let Some(e) = d2.to_i8() {
                 let (m, exp) = d1.as_bigint_and_exponent();
                 let result = Decimal::new(m.pow(e.unsigned_abs()), exp * (e.abs() as i64));
-                let mut result = Term::number(result);
+                let mut result = TermBuf::number(result);
                 while root.pop_first_arg().is_some() {}
                 if e >= 0 {
-                    root.swap(&mut result.as_subterm_mut());
+                    root.swap(&mut result.term_mut());
                 } else {
-                    *root.data_mut() = TermNode::with_symbol("/");
-                    root.push_last_arg(Term::one()).push_last_arg(result);
+                    *root.data_mut() = Atom::from(sym("/"));
+                    root.push_last_arg(TermBuf::one()).push_last_arg(result);
                     root.evaluate(level);
                 }
                 true
@@ -50,23 +50,23 @@ pub fn power(root: &mut SubtermMut, level: NormalizationLevel) -> bool {
             }
         }
         (Some(arg), _) if arg.is_one() => {
-            root.swap(&mut Term::one().as_subterm_mut());
+            root.swap(&mut TermBuf::one().term_mut());
             true
         }
         (_, Some(pow)) if pow.is_zero() => {
-            root.swap(&mut Term::one().as_subterm_mut());
+            root.swap(&mut TermBuf::one().term_mut());
             true
         }
         (_, Some(pow)) if pow.is_one() => {
             let mut arg = root.pop_first_arg().unwrap();
-            root.swap(&mut arg.as_subterm_mut());
+            root.swap(&mut arg.term_mut());
             true
         }
         _ => false,
     }
 }
 
-pub fn power_argument(root: Subterm) -> Subterm {
+pub fn power_argument(root: TermRef) -> TermRef {
     if root.data().is_symbol_name("^") {
         root.first_arg().unwrap()
     } else {

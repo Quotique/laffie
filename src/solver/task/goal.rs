@@ -1,7 +1,7 @@
 use std::{convert::TryFrom, fmt};
 
 use super::TermProps;
-use crate::term::Term;
+use crate::term::TermBuf;
 
 // TODO: remove
 #[derive(Clone, Debug)]
@@ -37,11 +37,11 @@ impl fmt::Display for Goal {
     }
 }
 
-impl TryFrom<Term> for Goal {
+impl TryFrom<TermBuf> for Goal {
     type Error = SemanticError;
 
-    fn try_from(mut value: Term) -> Result<Self, Self::Error> {
-        let mut root = value.as_subterm_mut();
+    fn try_from(mut value: TermBuf) -> Result<Self, Self::Error> {
+        let mut root = value.term_mut();
         if root.degree() != 1 {
             return Err(SemanticError::WorngArgCount(String::default()));
         }

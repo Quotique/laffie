@@ -19,7 +19,7 @@ pub struct ArgList(u64);
 
 /// Term tree element
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TermNode {
+pub enum Atom {
     /// Functional (operation) symbol
     Symbol(Symbol),
     /// Named parameter. Can be replaced during the unification procedure
@@ -32,33 +32,35 @@ pub enum TermNode {
     ArgList(ArgList),
 }
 
-impl TermNode {
-    /// Get function symbol by name
-    ///
-    /// returns None if the specified symbol name is not found in the database
-    #[inline]
-    pub fn with_symbol_opt(name: &str) -> Option<Self> {
-        Symbol::by_name(name).map(Self::Symbol)
-    }
+#[inline]
+pub fn param(p: impl AsRef<str>) -> Param {
+    Param(p.as_ref().into())
+}
 
-    /// Same as with_func_symbol_opt(arg).unwrap()
-    #[inline]
-    pub fn with_symbol(name: &str) -> Self {
-        Self::with_symbol_opt(name).unwrap()
-    }
+#[inline]
+pub fn var(v: impl AsRef<str>) -> Variable {
+    Variable(v.as_ref().into())
+}
 
-    /// Create a constant symbol
-    #[inline]
-    pub fn with_number(number: impl Into<Decimal>) -> Self {
-        Self::Number(number.into())
+impl From<Symbol> for Atom {
+    fn from(value: Symbol) -> Self {
+        Self::Symbol(value)
     }
+}
 
+impl<T: Into<Decimal>> From<T> for Atom {
+    fn from(value: T) -> Self {
+        Self::Number(value.into())
+    }
+}
+
+impl Atom {
     /// Get the contents of a function symbol
     ///
     /// returns None if the content is non a functional symbol
     #[inline]
     pub fn symbol(&self) -> Option<Symbol> {
-        if let TermNode::Symbol(s) = self {
+        if let Atom::Symbol(s) = self {
             return Some(s.clone());
         }
         None
@@ -69,7 +71,7 @@ impl TermNode {
     /// returns None if the content is non a variable symbol
     #[inline]
     pub fn variable(&self) -> Option<&Variable> {
-        if let TermNode::Variable(v) = &self {
+        if let Atom::Variable(v) = &self {
             return Some(v);
         }
         None
@@ -80,7 +82,7 @@ impl TermNode {
     /// returns None if the content is non a parameter
     #[inline]
     pub fn param(&self) -> Option<&Param> {
-        if let TermNode::Param(p) = &self {
+        if let Atom::Param(p) = &self {
             return Some(p);
         }
         None
@@ -91,7 +93,7 @@ impl TermNode {
     /// returns None if the content is non a constant
     #[inline]
     pub fn number(&self) -> Option<&Decimal> {
-        if let TermNode::Number(d) = &self {
+        if let Atom::Number(d) = &self {
             return Some(d);
         }
         None
@@ -102,7 +104,7 @@ impl TermNode {
     ///
     /// returns None if the content is non a placeholder
     pub fn placeholder(&self) -> Option<ArgList> {
-        if let TermNode::ArgList(p) = &self {
+        if let Atom::ArgList(p) = &self {
             return Some(*p);
         }
         None
@@ -111,7 +113,7 @@ impl TermNode {
     #[inline]
     /// Check if content is symbol with the name
     pub fn is_symbol_name(&self, name: &str) -> bool {
-        if let TermNode::Symbol(s) = self {
+        if let Atom::Symbol(s) = self {
             return s == name;
         }
 
@@ -121,59 +123,59 @@ impl TermNode {
     #[inline]
     /// Check if content is constant with the value
     pub fn is_number_value(&self, value: &Decimal) -> bool {
-        if let TermNode::Number(num) = &self {
+        if let Atom::Number(num) = &self {
             return num == value;
         }
         false
     }
 }
 
-impl Ord for TermNode {
+impl Ord for Atom {
     fn cmp(&self, other: &Self) -> Ordering {
         // Symbol < Param < Varible < Number < Placeholder
         match (self, other) {
-            (TermNode::Symbol(id_l), TermNode::Symbol(id_r)) => id_l.cmp(id_r),
-            (TermNode::Symbol(_), _) => Ordering::Less,
+            (Atom::Symbol(id_l), Atom::Symbol(id_r)) => id_l.cmp(id_r),
+            (Atom::Symbol(_), _) => Ordering::Less,
 
-            (TermNode::Param(id_l), TermNode::Param(id_r)) => id_l.cmp(id_r),
-            (TermNode::Param(_), TermNode::Symbol(_)) => Ordering::Greater,
-            (TermNode::Param(_), _) => Ordering::Less,
+            (Atom::Param(id_l), Atom::Param(id_r)) => id_l.cmp(id_r),
+            (Atom::Param(_), Atom::Symbol(_)) => Ordering::Greater,
+            (Atom::Param(_), _) => Ordering::Less,
 
-            (TermNode::Variable(id_l), TermNode::Variable(id_r)) => id_l.cmp(id_r),
-            (TermNode::Variable(_), TermNode::Number(_)) => Ordering::Less,
-            (TermNode::Variable(_), TermNode::ArgList(_)) => Ordering::Less,
-            (TermNode::Variable(_), _) => Ordering::Greater,
+            (Atom::Variable(id_l), Atom::Variable(id_r)) => id_l.cmp(id_r),
+            (Atom::Variable(_), Atom::Number(_)) => Ordering::Less,
+            (Atom::Variable(_), Atom::ArgList(_)) => Ordering::Less,
+            (Atom::Variable(_), _) => Ordering::Greater,
 
-            (TermNode::Number(d1), TermNode::Number(d2)) => d1.cmp(d2),
-            (TermNode::Number(_), TermNode::ArgList(_)) => Ordering::Less,
-            (TermNode::Number(_), _) => Ordering::Greater,
+            (Atom::Number(d1), Atom::Number(d2)) => d1.cmp(d2),
+            (Atom::Number(_), Atom::ArgList(_)) => Ordering::Less,
+            (Atom::Number(_), _) => Ordering::Greater,
 
-            (TermNode::ArgList(_), TermNode::ArgList(_)) => Ordering::Equal,
-            (TermNode::ArgList(_), _) => Ordering::Greater,
+            (Atom::ArgList(_), Atom::ArgList(_)) => Ordering::Equal,
+            (Atom::ArgList(_), _) => Ordering::Greater,
         }
     }
 }
 
-impl PartialOrd for TermNode {
+impl PartialOrd for Atom {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl fmt::Display for TermNode {
+impl fmt::Display for Atom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TermNode::Symbol(s) => write!(f, "{s}"),
-            TermNode::Param(id) => write!(f, "{id}"),
-            TermNode::Number(value) => {
+            Atom::Symbol(s) => write!(f, "{s}"),
+            Atom::Param(id) => write!(f, "{id}"),
+            Atom::Number(value) => {
                 if value.is_negative() {
                     write!(f, "({value})")
                 } else {
                     write!(f, "{value}")
                 }
             }
-            TermNode::Variable(id) => write!(f, "{id}"),
-            TermNode::ArgList(_) => write!(f, ".."),
+            Atom::Variable(id) => write!(f, "{id}"),
+            Atom::ArgList(_) => write!(f, ".."),
         }
     }
 }

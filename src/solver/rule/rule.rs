@@ -8,8 +8,8 @@ use multimap::MultiMap;
 
 use super::{Hypothesis, RuleAttr, RuleAttrValue, TermFilters};
 use crate::{
-    term::{ParamsMapping, Subterm, SubtermId, Symbol, Term},
     NormalizationLevel,
+    term::{ParamSubstitution, Symbol, Term, TermBuf, TermPath, TermRef},
 };
 
 /// Unique identifier for a rule.
@@ -41,7 +41,7 @@ pub enum RuleDeclineReason {
     Blocked,
     /// An error occurred while trying to map parameters;
     /// contains a human‑readable message.
-    ParamsMappingErr(String),
+    ParamSubstitutionErr(String),
 }
 
 /// Convenient alias for a reference‑counted rule.
@@ -57,11 +57,11 @@ pub struct Rule {
     pub attrs: MultiMap<RuleAttr, RuleAttrValue>,
     pub block: Vec<RuleId>,
 
-    pub term:    Term,
-    pub pattern: SubtermId,
-    pub replace: SubtermId,
+    pub term:    TermBuf,
+    pub pattern: TermPath,
+    pub replace: TermPath,
 
-    pub requirements: Vec<Term>,
+    pub requirements: Vec<TermBuf>,
 
     pub pattern_symbols: HashSet<Symbol>,
 }
@@ -148,7 +148,11 @@ impl Rule {
     ///
     /// Returns `Ok(())` if the rule passes all checks, otherwise returns the
     /// appropriate `RuleDeclineReason`.
-    pub fn try_filter(&self, filters: &TermFilters, goal: &Term) -> Result<(), RuleDeclineReason> {
+    pub fn try_filter(
+        &self,
+        filters: &TermFilters,
+        goal: &TermBuf,
+    ) -> Result<(), RuleDeclineReason> {
         self.is_term_suitable(filters).inspect_err(|e| {
             trace!(
                 target: "rule_selection",
@@ -179,7 +183,7 @@ impl Rule {
 
         for s in self.pattern_symbols.iter() {
             if !filters.symbols.contains(s) {
-                return Err(RuleDeclineReason::ParamsMappingErr(format!(
+                return Err(RuleDeclineReason::ParamSubstitutionErr(format!(
                     "symbol: {s} not found"
                 )));
             }
@@ -193,18 +197,18 @@ impl Rule {
     ///
     /// Returns a vector of `ParamsMapping` on success, or an appropriate
     /// `RuleDeclineReason` if the goal does not match.
-    pub fn goal_mapping(&self, goal: &Term) -> Result<Vec<ParamsMapping>, RuleDeclineReason> {
+    pub fn goal_mapping(
+        &self,
+        goal: &TermBuf,
+    ) -> Result<Vec<ParamSubstitution>, RuleDeclineReason> {
         // TODO: multiple goals
         if let Some(RuleAttrValue::Goal(pattern)) = self.attribute(&RuleAttr::Goal).next() {
-            return goal
-                .as_subterm()
-                .try_match(pattern.as_subterm())
-                .map_err(|_| {
-                    debug!(target: "rule_selection", "no match goal: {goal}, required: {pattern}");
-                    RuleDeclineReason::GoalMissmatch
-                });
+            return goal.term().try_match(pattern.term()).map_err(|_| {
+                debug!(target: "rule_selection", "no match goal: {goal}, required: {pattern}");
+                RuleDeclineReason::GoalMissmatch
+            });
         }
-        if goal.as_subterm().data().is_symbol_name("transform") {
+        if goal.term().data().is_symbol_name("transform") {
             // Only transform rules for transform
             return Err(RuleDeclineReason::GoalMissmatch);
         }
@@ -213,13 +217,13 @@ impl Rule {
 
     /// Retrieves the pattern subterm of the rule.
     #[inline]
-    pub fn pattern_node(&self) -> Subterm<'_> {
+    pub fn pattern_node(&self) -> TermRef<'_> {
         self.term.get(&self.pattern).unwrap()
     }
 
     /// Retrieves the replacement subterm of the rule.
     #[inline]
-    pub fn replace_node(&self) -> Subterm<'_> {
+    pub fn replace_node(&self) -> TermRef<'_> {
         self.term.get(&self.replace).unwrap()
     }
 }
@@ -232,9 +236,9 @@ pub trait ApplyRule {
     /// `RuleDeclineReason` explaining why the rule could not be applied.
     fn apply(
         &self,
-        term: &Term,
+        term: &TermBuf,
         term_filters: &TermFilters,
-        goal: &Term,
+        goal: &TermBuf,
     ) -> Result<Vec<Hypothesis>, RuleDeclineReason>;
 }
 
@@ -242,9 +246,9 @@ impl ApplyRule for SharedRule {
     /// Implements the actual rewriting logic for a shared rule.
     fn apply(
         &self,
-        term: &Term,
+        term: &TermBuf,
         term_filters: &TermFilters,
-        goal: &Term,
+        goal: &TermBuf,
     ) -> Result<Vec<Hypothesis>, RuleDeclineReason> {
         self.is_term_suitable(term_filters)?;
         let mut mapping = self.goal_mapping(goal)?;
@@ -262,21 +266,21 @@ impl ApplyRule for SharedRule {
         let maps: Vec<_> = mapping
             .into_iter()
             .flat_map(|m| {
-                term.as_subterm()
-                    .try_subterm_match_extend(self.pattern_node(), m)
+                term.term()
+                    .find_matching_subterms_extend(self.pattern_node(), m)
                     .into_iter()
             })
             .collect();
         if maps.is_empty() {
-            return Err(RuleDeclineReason::ParamsMappingErr("no match".into()));
+            return Err(RuleDeclineReason::ParamSubstitutionErr("no match".into()));
         }
 
         let mut result = vec![];
         for (maps, pos) in maps.into_iter() {
             for i in maps.into_iter() {
-                let replace = self.replace_node().to_term();
+                let replace = self.replace_node().to_owned();
 
-                let mut replace = replace.apply_map(&i);
+                let mut replace = replace.apply_substitution(&i);
                 let mut resolution = term.clone();
                 replace.swap(&mut resolution.get_mut(&pos).unwrap());
                 resolution = resolution.normalize(self.norm_level());
@@ -284,7 +288,11 @@ impl ApplyRule for SharedRule {
                 let hypothesis = Hypothesis {
                     rule: self.clone(),
                     blocked_rules: self.block.clone(),
-                    requirements: self.requirements.iter().map(|r| r.apply_map(&i)).collect(),
+                    requirements: self
+                        .requirements
+                        .iter()
+                        .map(|r| r.apply_substitution(&i))
+                        .collect(),
                     resolution,
                     params: i,
                 };
@@ -304,9 +312,9 @@ pub mod tests {
     use std::sync::Arc;
 
     use crate::{
-        rule::{parse_rule, RuleDeclineReason, TermFilters},
-        term::{term_with_params, term_with_vars, Term},
         NormalizationLevel,
+        rule::{RuleDeclineReason, TermFilters, parse_rule},
+        term::{TermBuf, term_with_params, term_with_vars},
     };
 
     use super::{ApplyRule, SharedRule};
@@ -339,19 +347,19 @@ pub mod tests {
         ))
     }
 
-    fn test_term_fraction() -> Term {
+    fn test_term_fraction() -> TermBuf {
         term_with_vars(r#"2/(x + 1) == 0"#)
     }
 
-    fn test_term() -> Term {
+    fn test_term() -> TermBuf {
         term_with_vars(r#"2 + x == 0"#)
     }
 
-    fn test_term_subtree() -> Term {
+    fn test_term_subtree() -> TermBuf {
         term_with_vars(r#"x + (-(-2)) == 0"#)
     }
 
-    fn test_goal() -> Term {
+    fn test_goal() -> TermBuf {
         term_with_params(r#"find(x)"#)
     }
 

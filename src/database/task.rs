@@ -3,12 +3,12 @@ use std::{
     path::Path,
 };
 
-use bincode::{config, config::Configuration, Decode, Encode};
+use bincode::{Decode, Encode, config, config::Configuration};
 use sled::{Db, Error};
 
 use solver::{
     task::{Task, TermProps},
-    term::Term,
+    term::TermBuf,
 };
 
 use super::err_handle;
@@ -25,10 +25,10 @@ pub mod old {
         pub version: u64,
 
         pub id:     u128,
-        pub givens: Vec<Term>,
-        pub goal:   Term,
+        pub givens: Vec<TermBuf>,
+        pub goal:   TermBuf,
 
-        pub answer:  Term,
+        pub answer:  TermBuf,
         pub runs:    Vec<usize>,
         pub reports: Vec<u64>,
     }
@@ -41,10 +41,10 @@ pub struct TaskRecord {
     pub id:     u128,
     pub text:   String,
     pub group:  String,
-    pub givens: Vec<Term>,
-    pub goal:   Term,
+    pub givens: Vec<TermBuf>,
+    pub goal:   TermBuf,
 
-    pub answer:  Vec<Term>,
+    pub answer:  Vec<TermBuf>,
     pub runs:    Vec<usize>,
     pub reports: Vec<u64>,
 }
