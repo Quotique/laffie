@@ -1,15 +1,15 @@
 use std::{io, sync::Arc};
 
 use ratatui::widgets::ListState;
-use trees::{tr, Node, Tree};
+use trees::{Node, Tree, tr};
 use tui_scrollview::ScrollViewState;
 use tui_tree_widget::TreeState;
 
 use parser::DirectoryParser;
 use solver::{
+    CompactString,
     rule::RulesEngine,
     task::{SharedSolution, Solution, SolutionStatus, Task},
-    CompactString,
 };
 use utils::{IndexedTree, TreeIndex};
 
@@ -197,7 +197,10 @@ impl State {
         };
 
         if let TasksNode::Directory { .. } = node.data_mut() {
-            self.solve_queue.extend(node.iter().map(|x| x.id()));
+            let children: Vec<_> = node.iter().map(|x| x.id()).collect();
+            for child in children {
+                self.mark_to_solve(child);
+            }
         } else {
             self.solve_queue.push(node_id);
         };

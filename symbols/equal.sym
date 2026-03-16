@@ -3,7 +3,7 @@ symbol == {
 }
 
 rule {
-    attr replace,level(0),goal(find(x)),id(move_left);
+    attr level(0),goal(find(x)),id(move_left);
 
     a == b <=> a - b == 0;
 

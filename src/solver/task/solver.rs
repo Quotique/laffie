@@ -268,6 +268,10 @@ impl Solver {
                 Some(s) => {
                     trace!("{} => {s}", solution[index]);
                     self.add_term(s, solution, state)?;
+                    if rule.contains_attribute(&RuleAttr::Replace) {
+                        solution[index].filters.mark_replaced();
+                        break;
+                    }
                     if is_goal && solution.goal.is_transform() {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
                         solution[index].filters.level = self.rules_engine.max_level().next();

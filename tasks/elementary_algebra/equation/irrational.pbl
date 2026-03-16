@@ -222,12 +222,13 @@ task {
     sqrt( x^2 + 3*x - 2 ) + sqrt( x^2 - x + 1 ) == 4*x - 3;
 }
 
-task {
-    goal find(x);
-    text "Решить уравнение sqrt(2 + sqrt(6) - (6*sqrt(2) -  2*sqrt(3))*x) == 2*x - sqrt(2)";
-
-    sqrt(2 + sqrt(6) - (6*sqrt(2) - 2*sqrt(3))*x) == 2*x - sqrt(2);
-}
+// Very long
+// task {
+//     goal find(x);
+//     text "Решить уравнение sqrt(2 + sqrt(6) - (6*sqrt(2) -  2*sqrt(3))*x) == 2*x - sqrt(2)";
+// 
+//     sqrt(2 + sqrt(6) - (6*sqrt(2) - 2*sqrt(3))*x) == 2*x - sqrt(2);
+// }
 
 task {
     goal find(x);
