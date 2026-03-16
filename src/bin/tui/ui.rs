@@ -3,7 +3,7 @@ use std::{
     io,
     iter::once,
     sync::Arc,
-    thread::{spawn, JoinHandle},
+    thread::{JoinHandle, spawn},
 };
 
 use derive_more::Display;

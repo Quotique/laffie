@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, iter::Iterator, path::Path};
 
-use bincode::{config, config::Configuration, Decode, Encode};
+use bincode::{Decode, Encode, config, config::Configuration};
 use sled::{Db, Error};
 
 use super::err_handle;

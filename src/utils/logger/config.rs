@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fs::create_dir_all, path::Path, str::FromStr};
 
-use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
-use serde::{de, Deserialize as _};
+use file_rotate::{ContentLimit, FileRotate, compression::Compression, suffix::AppendCount};
+use serde::{Deserialize as _, de};
 use serde_derive::Deserialize;
-use slog::{o, Drain, Level, Record};
+use slog::{Drain, Level, Record, o};
 use slog_async::{Async, OverflowStrategy};
 
 use super::{

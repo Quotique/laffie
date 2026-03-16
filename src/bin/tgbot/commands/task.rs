@@ -3,10 +3,10 @@ use std::{convert::TryFrom, fmt::Write, sync::Arc};
 use telegram_bot::*;
 
 use database::{TaskDb, TaskRecord, UserDb, UserRecord};
-use parser::{lang, TaskParser};
+use parser::{TaskParser, lang};
 use solver::{
     rule::RulesEngine,
-    task::{SolutionStatus, Solver, EXECUTION_DEADLINE_DEFAULT},
+    task::{EXECUTION_DEADLINE_DEFAULT, SolutionStatus, Solver},
 };
 use view::{Html, View};
 

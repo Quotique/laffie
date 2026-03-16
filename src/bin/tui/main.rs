@@ -1,10 +1,10 @@
 use std::{fmt::Display, io};
 
 use ratatui::{
+    DefaultTerminal,
     crossterm::event::{self, KeyCode, KeyEventKind},
     prelude::*,
     widgets::{Block, Borders, Paragraph, Tabs},
-    DefaultTerminal,
 };
 
 mod pane;

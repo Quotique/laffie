@@ -5,9 +5,9 @@ use telegram_bot::*;
 
 use database::{TaskDb, UserDb, UserRecord};
 use solver::{
-    rule::RulesEngine,
-    task::{SolutionStatus, Solver, EXECUTION_DEADLINE_DEFAULT},
     CompactString,
+    rule::RulesEngine,
+    task::{EXECUTION_DEADLINE_DEFAULT, SolutionStatus, Solver},
 };
 use view::{Html, View};
 

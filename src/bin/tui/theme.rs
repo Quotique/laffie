@@ -2,7 +2,7 @@ use ratatui::{
     prelude::*,
     style::{Style, Stylize},
     widgets::{
-        block::Title, Block, Borders, Gauge, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        Block, Borders, Gauge, Scrollbar, ScrollbarOrientation, ScrollbarState, block::Title,
     },
 };
 

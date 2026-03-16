@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::{rule::Level, RuleId};
+use super::{RuleId, rule::Level};
 use crate::term::Symbol;
 
 use bitflags::bitflags;

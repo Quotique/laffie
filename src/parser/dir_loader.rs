@@ -12,7 +12,7 @@ use solver::{
     term::{Symbol, SymbolProgram},
 };
 
-use crate::{lang, NodeData, RuleParser, SymbolParser, TaskParser};
+use crate::{NodeData, RuleParser, SymbolParser, TaskParser, lang};
 
 pub struct DirectoryParser {
     symbols_path: PathBuf,

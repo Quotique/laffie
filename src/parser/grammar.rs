@@ -1,6 +1,6 @@
 use std::convert::From;
 
-use trees::{tr, Tree};
+use trees::{Tree, tr};
 
 use crate::CompactString;
 
@@ -50,8 +50,10 @@ peg::parser! {
 
         rule semicolonsep<T>(x: rule<T>) -> Vec<T> = v:( (_ a:x() { a }) ** ";") ";"? {v}
 
+        // rule keyword(id: &'static str) =
+        //     ##parse_string_literal(id) !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
         rule keyword(id: &'static str) =
-            ##parse_string_literal(id) !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
+            #{|input, pos| input.parse_string_literal(pos, id)} !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
 
         rule ident() -> Tree<Token> =
             _ p:position!() s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) { Token::new(s, p) }

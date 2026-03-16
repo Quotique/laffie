@@ -9,7 +9,7 @@ use rust_i18n::t;
 use telegram_bot::*;
 
 use database::{TaskDb, UserDb};
-use solver::{rule::RulesEngine, CompactString};
+use solver::{CompactString, rule::RulesEngine};
 
 use crate::text::Text;
 
@@ -43,7 +43,7 @@ pub async fn process_update(
             }
         }
         UpdateKind::Message(message) => {
-            if let MessageKind::Text { ref data, .. } = &message.kind {
+            if let MessageKind::Text { data, .. } = &message.kind {
                 match Command::new(message.from.id, message.chat.id(), data) {
                     Ok(command) => command.handle(api, engine, tasks, users).await,
                     Err(e) => error_handler(api, message.chat.id(), e).await,

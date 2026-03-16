@@ -1,6 +1,6 @@
 use std::convert::From;
 
-use crate::{error::ParserError, grammar::ra, Location, NodeData, Tree};
+use crate::{Location, NodeData, Tree, error::ParserError, grammar::ra};
 
 pub fn symbol(text: &str) -> Result<Tree, ParserError> {
     let state = ra::symbol(text).map_err(ParserError::from)?;

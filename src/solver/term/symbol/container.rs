@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::OnceLock};
 
 use parking_lot::RwLock;
 
-use super::{base as ops, Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram};
+use super::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, base as ops};
 use crate::CompactString;
 
 pub(super) fn add_symbol_impl(

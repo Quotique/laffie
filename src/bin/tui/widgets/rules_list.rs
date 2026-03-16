@@ -7,7 +7,7 @@ use ratatui::{
 
 use solver::rule::RulesEngine;
 
-use crate::theme::{draw_scrollbar_buf, Theme};
+use crate::theme::{Theme, draw_scrollbar_buf};
 
 pub struct RulesList {
     pub engine: Arc<RulesEngine>,

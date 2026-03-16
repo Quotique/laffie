@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use itertools::{chain, Itertools};
+use itertools::{Itertools, chain};
 use ratatui::{
     prelude::*,
     widgets::{List, Widget},

@@ -1,15 +1,15 @@
 use std::{io, sync::Arc};
 
 use ratatui::widgets::ListState;
-use trees::{tr, Node, Tree};
+use trees::{Node, Tree, tr};
 use tui_scrollview::ScrollViewState;
 use tui_tree_widget::TreeState;
 
 use parser::DirectoryParser;
 use solver::{
+    CompactString,
     rule::RulesEngine,
     task::{SharedSolution, Solution, SolutionStatus, Task},
-    CompactString,
 };
 use utils::{IndexedTree, TreeIndex};
 
