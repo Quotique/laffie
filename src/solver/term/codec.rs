@@ -3,7 +3,7 @@ use std::{
     str::FromStr,
 };
 
-use bincode::{BorrowDecode, Decode, Encode};
+use bincode::{BorrowDecode, Decode, Encode, error::DecodeError};
 
 use super::{Atom, TermBuf, TermPath};
 use crate::{CompactString, Decimal, term::try_sym};
@@ -47,9 +47,10 @@ impl<Context> Decode<Context> for Atom {
         let term = match index {
             1 => {
                 let s: String = Decode::decode(decoder)?;
-                Atom::from(try_sym(&s).ok_or_else(|| {
-                    bincode::error::DecodeError::OtherString(format!("bad symbol {s}"))
-                })?)
+                Atom::from(
+                    try_sym(&s)
+                        .ok_or_else(|| DecodeError::OtherString(format!("bad symbol {s}")))?,
+                )
             }
             2 => {
                 let s: String = Decode::decode(decoder)?;
@@ -62,16 +63,18 @@ impl<Context> Decode<Context> for Atom {
             4 => {
                 let s: String = Decode::decode(decoder)?;
                 Atom::Number(Decimal::from_str(&s).map_err(|e| {
-                    bincode::error::DecodeError::OtherString(format!(
-                        "decimal parse error, str: '{s}': err: {e}"
-                    ))
+                    DecodeError::OtherString(format!("decimal parse error, str: '{s}': err: {e}"))
                 })?)
             }
             5 => {
                 let p: u64 = Decode::decode(decoder)?;
                 Atom::ArgList(p.into())
             }
-            _ => unreachable!(),
+            _ => {
+                return Err(DecodeError::OtherString(format!(
+                    "unknown Atom tag: {index}"
+                )));
+            }
         };
         Ok(term)
     }
@@ -85,9 +88,10 @@ impl<'de, Context> BorrowDecode<'de, Context> for Atom {
         let term = match index {
             1 => {
                 let s: String = BorrowDecode::borrow_decode(decoder)?;
-                Atom::from(try_sym(&s).ok_or_else(|| {
-                    bincode::error::DecodeError::OtherString(format!("bad symbol {s}"))
-                })?)
+                Atom::from(
+                    try_sym(&s)
+                        .ok_or_else(|| DecodeError::OtherString(format!("bad symbol {s}")))?,
+                )
             }
             2 => {
                 let s: String = BorrowDecode::borrow_decode(decoder)?;
@@ -100,16 +104,18 @@ impl<'de, Context> BorrowDecode<'de, Context> for Atom {
             4 => {
                 let s: String = BorrowDecode::borrow_decode(decoder)?;
                 Atom::Number(Decimal::from_str(&s).map_err(|e| {
-                    bincode::error::DecodeError::OtherString(format!(
-                        "decimal parse error, str: '{s}': err: {e}"
-                    ))
+                    DecodeError::OtherString(format!("decimal parse error, str: '{s}': err: {e}"))
                 })?)
             }
             5 => {
                 let p: u64 = BorrowDecode::borrow_decode(decoder)?;
                 Atom::ArgList(p.into())
             }
-            _ => unreachable!(),
+            _ => {
+                return Err(DecodeError::OtherString(format!(
+                    "unknown Atom tag: {index}"
+                )));
+            }
         };
         Ok(term)
     }
@@ -120,7 +126,11 @@ impl<'de, Context> BorrowDecode<'de, Context> for TermBuf {
         decoder: &mut D,
     ) -> core::result::Result<Self, bincode::error::DecodeError> {
         let parent_no: isize = Decode::decode(decoder)?;
-        assert!(parent_no == -1, "root element must be first");
+        if parent_no != -1 {
+            return Err(DecodeError::OtherString(
+                "root element must be first".into(),
+            ));
+        }
         let data: Atom = Decode::decode(decoder)?;
         let mut term = TermBuf::from(data);
         let mut id_map: HashMap<isize, TermPath> =
@@ -175,7 +185,11 @@ impl<Context> Decode<Context> for TermBuf {
             }
         }
         let finish: isize = Decode::decode(decoder)?;
-        assert_eq!(finish, -2);
+        if finish != -2 {
+            return Err(DecodeError::OtherString(format!(
+                "expected terminator -2, got {finish}"
+            )));
+        }
         Ok(root)
     }
 }
