@@ -59,6 +59,6 @@ fn main() {
     users_db.backup(&settings.users_backup).unwrap();
     if let Err(e) = update_users(users_db) {
         println!("error: {e}");
-        UserDb::restore(&settings.users_db, &settings.tasks_db).unwrap();
+        UserDb::restore(&settings.users_db, &settings.users_backup).unwrap();
     }
 }
