@@ -7,7 +7,7 @@ use crate::term::TermBuf;
 #[derive(Clone, Debug)]
 pub enum SemanticError {
     UnexpectedWord(String),
-    WorngArgCount(String),
+    WrongArgCount(String),
 }
 
 #[derive(Clone)]
@@ -43,7 +43,7 @@ impl TryFrom<TermBuf> for Goal {
     fn try_from(mut value: TermBuf) -> Result<Self, Self::Error> {
         let mut root = value.term_mut();
         if root.degree() != 1 {
-            return Err(SemanticError::WorngArgCount(String::default()));
+            return Err(SemanticError::WrongArgCount(String::default()));
         }
         let mut term = TermProps::from(root.pop_first_arg().unwrap());
         term.filters.mark_goal();

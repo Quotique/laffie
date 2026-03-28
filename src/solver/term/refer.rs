@@ -271,9 +271,9 @@ impl<'a> TermRef<'a> {
                 Ok(vec![params])
             }
             (Atom::Variable(value), Atom::Variable(other_value)) => {
-                bail!("Expect Varible {value}, found {other_value}")
+                bail!("Expect Variable {value}, found {other_value}")
             }
-            (Atom::Variable(_), _) => bail!("Expect Varible, found: {:?}", self.data()),
+            (Atom::Variable(_), _) => bail!("Expect Variable, found: {:?}", self.data()),
             (Atom::ArgList(_), _) => bail!("Mapping placeholder"),
         }
     }

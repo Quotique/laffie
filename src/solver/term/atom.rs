@@ -132,7 +132,7 @@ impl Atom {
 
 impl Ord for Atom {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Symbol < Param < Varible < Number < Placeholder
+        // Symbol < Param < Variable < Number < Placeholder
         match (self, other) {
             (Atom::Symbol(id_l), Atom::Symbol(id_r)) => id_l.cmp(id_r),
             (Atom::Symbol(_), _) => Ordering::Less,

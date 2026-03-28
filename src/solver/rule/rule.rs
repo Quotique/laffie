@@ -32,9 +32,9 @@ pub struct Level(u64);
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub enum RuleDeclineReason {
     /// The term’s level does not match the rule’s required level.
-    LevelMissmatch,
+    LevelMismatch,
     /// The task goal does not match the rule’s goal pattern.
-    GoalMissmatch,
+    GoalMismatch,
     /// The rule has already been applied to the term.
     AlreadyApplied,
     /// The rule is explicitly blocked for the term.
@@ -174,7 +174,7 @@ impl Rule {
     /// symbols required by the pattern are present in the filters.
     pub fn is_term_suitable(&self, filters: &TermFilters) -> Result<(), RuleDeclineReason> {
         if self.level != filters.level {
-            return Err(RuleDeclineReason::LevelMissmatch);
+            return Err(RuleDeclineReason::LevelMismatch);
         } else if filters.applied_rules.contains(&self.id) {
             return Err(RuleDeclineReason::AlreadyApplied);
         } else if filters.blocked_rules.contains(&self.id) {
@@ -205,12 +205,12 @@ impl Rule {
         if let Some(RuleAttrValue::Goal(pattern)) = self.attribute(&RuleAttr::Goal).next() {
             return goal.term().try_match(pattern.term()).map_err(|_| {
                 debug!(target: "rule_selection", "no match goal: {goal}, required: {pattern}");
-                RuleDeclineReason::GoalMissmatch
+                RuleDeclineReason::GoalMismatch
             });
         }
         if goal.term().data().is_symbol_name("transform") {
             // Only transform rules for transform
-            return Err(RuleDeclineReason::GoalMissmatch);
+            return Err(RuleDeclineReason::GoalMismatch);
         }
         Ok(vec![])
     }
@@ -372,7 +372,7 @@ pub mod tests {
 
         assert_eq!(
             rule.apply(&term, &filters, &goal).err(),
-            Some(RuleDeclineReason::LevelMissmatch)
+            Some(RuleDeclineReason::LevelMismatch)
         );
     }
 

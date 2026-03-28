@@ -38,7 +38,7 @@ impl fmt::Display for RuleBuilderError {
         match self {
             Self::BadTermRoot => write!(f, "Bad term root"),
             Self::WrongArgsCount => write!(f, "Wrong args count"),
-            Self::OnlyOneTermIsAllowed => write!(f, "Only one termis allowed"),
+            Self::OnlyOneTermIsAllowed => write!(f, "Only one term is allowed"),
             Self::MissingLevelAttribute => write!(f, "Missing level attribute"),
         }
     }

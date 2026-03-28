@@ -24,7 +24,7 @@ struct Args {
     #[clap(short, long, default_value = "./config/local.json")]
     config: PathBuf,
 
-    /// Runs only spcified task
+    /// Runs only specified task
     #[clap(short, long, default_value = "")]
     only: String,
 
