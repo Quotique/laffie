@@ -14,7 +14,7 @@ serde = { workspace = true }
 serde_derive = { workspace = true }
 trees = { workspace = true }
 
-itertools = "0.14"
+itertools = { workspace = true }
 derive_more = { version = "2.0", features = ["full"] }
 file-rotate = "0.8"
 patricia_tree = { version = "0.9" }

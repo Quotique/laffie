@@ -1,3 +1,4 @@
+edition = "2024"
 binop_separator = "Back"
 max_width = 100
 merge_derives = false

@@ -72,7 +72,7 @@ async fn main() {
     let parser = DirectoryParser::new(
         args.symbols
             .clone()
-            .or(settings.symbols_dir.map(|x| x.into()))
+            .or(settings.symbols_dir)
             .unwrap_or_else(|| {
                 println!("Symbols dir is not specified");
                 std::process::exit(-1);

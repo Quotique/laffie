@@ -2,10 +2,10 @@ use std::{cmp::Ordering, collections::HashMap};
 
 use bigdecimal::{BigDecimal as Decimal, Zero};
 
-use super::{power::power_argument, SymbolProgram};
+use super::{SymbolProgram, power::power_argument};
 use crate::{
-    term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
     NormalizationLevel,
+    term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
 };
 
 pub fn symbol() -> SymbolProgram {

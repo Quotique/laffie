@@ -8,7 +8,7 @@ use utils::LogConfig;
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub logger:      LogConfig,
-    pub symbols_dir: Option<String>,
+    pub symbols_dir: Option<PathBuf>,
     pub tasks_db:    PathBuf,
     pub users_db:    PathBuf,
     pub api_token:   String,
