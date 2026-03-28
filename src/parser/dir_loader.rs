@@ -39,10 +39,10 @@ impl DirectoryParser {
             &self.symbols_path,
             &["sym"],
             &mut |path, src, s: &Tree<NodeData>| {
-                if let Ok(sym) = SymbolParser::new(s).parse() {
+                if let Ok(sym) = SymbolParser::from(s).parse() {
                     let sym = SymbolProgram::register(sym);
                     last_sym.replace(sym);
-                } else if let Ok(rules) = RuleParser::with(s)
+                } else if let Ok(rules) = RuleParser::from(s)
                     .with_func_symbol(last_sym.as_ref().unwrap().clone())
                     .parse()
                     .map_err(|e| error!("Rule not parsed: {}", e.error_string(src, Some(path))))
@@ -60,7 +60,7 @@ impl DirectoryParser {
         let mut result = vec![];
         Self::load_dir(self.tasks_path.as_ref(), &["pbl"], &mut |path, src, s| {
             if s.root().data().symbol == "Task" {
-                match TaskParser::with(s).parse() {
+                match TaskParser::from(s).parse() {
                     Ok(mut t) => {
                         trace!(
                             "New task: [{:x}] {} [{}]",
@@ -83,7 +83,7 @@ impl DirectoryParser {
             &self.symbols_path,
             &["sym"],
             &mut |_, _, s: &Tree<NodeData>| {
-                let _ = SymbolParser::new(s).parse().map(|s| s.register());
+                let _ = SymbolParser::from(s).parse().map(|s| s.register());
             },
         )
     }

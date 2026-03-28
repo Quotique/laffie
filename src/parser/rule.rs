@@ -15,14 +15,16 @@ pub struct RuleParser<'a> {
     func_symbol: Symbol,
 }
 
-impl<'a> RuleParser<'a> {
-    pub fn with(syntax_tree: &'a Tree) -> Self {
+impl<'a> From<&'a Tree> for RuleParser<'a> {
+    fn from(syntax_tree: &'a Tree) -> Self {
         Self {
             syntax_tree,
             func_symbol: Default::default(),
         }
     }
+}
 
+impl<'a> RuleParser<'a> {
     pub fn with_func_symbol(mut self, func_symbol: Symbol) -> Self {
         self.func_symbol = func_symbol;
         self
@@ -189,7 +191,7 @@ mod tests {
                       }"#;
 
         let states = lang::lang_rule(test).unwrap();
-        let result = RuleParser::with(&states).parse();
+        let result = RuleParser::from(&states).parse();
         assert!(result.is_ok());
 
         let mut rules = result.unwrap();
@@ -238,7 +240,7 @@ mod tests {
                 }"#;
 
         let states = lang::lang_rule(test).unwrap();
-        let result = RuleParser::with(&states).parse();
+        let result = RuleParser::from(&states).parse();
         assert!(result.is_ok());
 
         let mut rules = result.unwrap();
@@ -285,7 +287,7 @@ mod tests {
                       }"#;
 
         let states = lang::lang_rule(test).unwrap();
-        let result = RuleParser::with(&states).parse();
+        let result = RuleParser::from(&states).parse();
         assert!(result.is_ok());
 
         let rules = result.unwrap();
@@ -301,7 +303,7 @@ mod tests {
         }"#;
 
         let states = lang::lang_rule(test).map_err(|e| println!("{e}")).unwrap();
-        let result = RuleParser::with(&states).parse();
+        let result = RuleParser::from(&states).parse();
         assert!(result.is_ok());
 
         let mut rules = result.unwrap();

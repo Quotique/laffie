@@ -2,17 +2,19 @@ use std::str::FromStr;
 
 use solver::term::{SymbolAttr, SymbolAttrValue, SymbolProgram};
 
-use super::{Node, ParserError};
+use super::{Node, ParserError, Tree};
 
 pub struct SymbolParser<'a> {
-    ast: &'a Node,
+    ast: &'a Tree,
+}
+
+impl<'a> From<&'a Tree> for SymbolParser<'a> {
+    fn from(syntax_tree: &'a Tree) -> Self {
+        Self { ast: syntax_tree }
+    }
 }
 
 impl<'a> SymbolParser<'a> {
-    pub fn new(syntax_tree: &'a Node) -> Self {
-        Self { ast: syntax_tree }
-    }
-
     pub fn parse(self) -> Result<SymbolProgram, ParserError> {
         if self.ast.data().symbol != "Declare" {
             return Err(ParserError {
@@ -87,7 +89,7 @@ pub mod tests {
         let test_str = "symbol + { attr infix(10) }";
         let states = lang::symbol(test_str).unwrap();
 
-        let sym = SymbolParser::new(&states).parse().unwrap();
+        let sym = SymbolParser::from(&states).parse().unwrap();
         assert_eq!(sym.name, "+");
         assert_eq!(
             sym.attrs.get(&SymbolAttr::Infix),

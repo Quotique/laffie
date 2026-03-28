@@ -68,7 +68,7 @@ impl fmt::Display for Task {
 #[cfg(test)]
 pub fn parse_task(text: &'static str) -> Task {
     let states = parser::lang::task(text).unwrap();
-    let task = parser::TaskParser::with(&states).parse().unwrap();
+    let task = parser::TaskParser::from(&states).parse().unwrap();
 
     unsafe { std::mem::transmute::<_, Task>(task) }
 }

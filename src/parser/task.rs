@@ -16,11 +16,13 @@ pub struct TaskParser<'a> {
     syntax_tree: &'a Tree,
 }
 
-impl<'a> TaskParser<'a> {
-    pub fn with(syntax_tree: &'a Tree) -> Self {
+impl<'a> From<&'a Tree> for TaskParser<'a> {
+    fn from(syntax_tree: &'a Tree) -> Self {
         Self { syntax_tree }
     }
+}
 
+impl<'a> TaskParser<'a> {
     pub fn parse(self) -> Result<Task, ParserError> {
         if self.syntax_tree.root().data().symbol != "Task" {
             return Err(ParserError {
@@ -108,7 +110,7 @@ mod tests {
                     }"#;
 
         let states = lang::task(test).unwrap();
-        let result = TaskParser::with(&states).parse();
+        let result = TaskParser::from(&states).parse();
         assert!(result.is_ok());
 
         let task = result.unwrap();

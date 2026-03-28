@@ -14,7 +14,7 @@ pub use term_filters::TermFilters;
 
 #[cfg(test)]
 pub fn parse_rule(text: &'static str) -> Rule {
-    let mut rules = parser::RuleParser::with(&parser::lang::lang_rule(text).unwrap())
+    let mut rules = parser::RuleParser::from(&parser::lang::lang_rule(text).unwrap())
         .parse()
         .unwrap();
     assert_eq!(rules.len(), 1);
