@@ -1,5 +1,5 @@
 symbol || {
-    attr infix(600),display("|"),associative,commutative
+    attr infix(600),display("|"),associative,commutative;
 }
 
 rule {

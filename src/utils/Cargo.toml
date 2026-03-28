@@ -25,4 +25,4 @@ slog-term = { version = "2.9" }
 slog = { version = "2.7", features = ["max_level_trace", "release_max_level_trace"] }
 
 [dev-dependencies]
-insta = "1.43"
+insta = "1.46"

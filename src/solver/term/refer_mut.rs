@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, collections::HashSet, iter::Iterator, rc::Rc};
 
-use derive_more::{Debug, From};
+use derive_more::{Debug, Display, From};
 use trees::Node;
 
 use utils::SubsetIterator;
@@ -8,7 +8,7 @@ use utils::SubsetIterator;
 use super::{Atom, ParamSubstitution, Symbol, Term, TermBuf, TermRef, Truth, VariableSubstitution};
 use crate::NormalizationLevel;
 
-#[derive(Debug, From)]
+#[derive(Debug, Display, From)]
 pub struct TermMut<'a>(&'a mut Node<Atom>);
 
 impl<'a> TermMut<'a> {

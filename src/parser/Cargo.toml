@@ -16,5 +16,8 @@ log = { workspace = true }
 smartstring = { workspace = true }
 trees = { workspace = true }
 itertools = { workspace = true }
+serde = { workspace = true }
+serde_json = { version = "1.0" }
 
 peg = "0.8"
+pyo3 = { version = "0.28", features = ["auto-initialize"] }

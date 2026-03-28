@@ -1,5 +1,5 @@
 symbol && {
-    attr infix(500),display("&"),associative,commutative
+    attr infix(500),display("&"),associative,commutative;
 }
 
 rule {

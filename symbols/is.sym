@@ -1,5 +1,5 @@
 symbol is {
-    attr infix(100),display(" is ")
+    attr infix(100),display(" is ");
 }
 
 rule {

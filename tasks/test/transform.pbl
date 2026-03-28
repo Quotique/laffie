@@ -22,3 +22,9 @@ task {
 
 	x == 2;
 }
+
+task {
+    goal find(x);
+
+    x in factorization(100);
+}

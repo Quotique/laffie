@@ -1,24 +1,33 @@
 use std::{cmp::Ordering, fmt, hash::Hash};
 
 use derive_more::{AsRef, Display, From, FromStr, Into};
+use serde_derive::{Deserialize, Serialize};
 
 use super::symbol::Symbol;
 use crate::{CompactString, Decimal, Signed};
 
-#[derive(Clone, Debug, Display)]
-#[derive(PartialEq, Eq, Hash, AsRef, From, FromStr, Into, Ord, PartialOrd)]
+#[derive(PartialEq, Eq, Hash)]
+#[derive(Ord, PartialOrd)]
+#[derive(Clone, AsRef, From, FromStr, Into)]
+#[derive(Debug, Display, Serialize, Deserialize)]
 pub struct Param(CompactString);
 
-#[derive(Clone, Debug, Display)]
-#[derive(PartialEq, Eq, Hash, AsRef, From, FromStr, Into, Ord, PartialOrd)]
+#[derive(PartialEq, Eq, Hash)]
+#[derive(Ord, PartialOrd)]
+#[derive(Clone, AsRef, From, FromStr, Into)]
+#[derive(Debug, Display, Serialize, Deserialize)]
 pub struct Variable(CompactString);
 
-#[derive(Clone, Copy, Debug, Display)]
-#[derive(PartialEq, Eq, Hash, From, FromStr, Into, Ord, PartialOrd)]
+#[derive(PartialEq, Eq, Hash)]
+#[derive(Ord, PartialOrd)]
+#[derive(Clone, Copy, AsRef, From, FromStr, Into)]
+#[derive(Debug, Display, Serialize, Deserialize)]
 pub struct ArgList(u64);
 
 /// Term tree element
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
+#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Atom {
     /// Functional (operation) symbol
     Symbol(Symbol),

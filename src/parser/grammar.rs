@@ -1,6 +1,6 @@
 use std::convert::From;
 
-use trees::{Tree, tr};
+use trees::{tr, tr, };
 
 use crate::CompactString;
 
@@ -44,14 +44,13 @@ peg::parser! {
         pub rule string() -> String =
             "\"" s:quoted_char()* "\"" { s.into_iter().collect() }
 
-        rule quoted_char() -> char = !("\"" / "\\") c:$([_]) { c.chars().next().unwrap() }
+        rule quoted_char() -> char =
+            "\\\"" { '\"' } / "\\\\" { '\\' } / !("\"" / "\\") c:$([_]) { c.chars().next().unwrap() }
 
         rule commasep<T>(x: rule<T>) -> Vec<T> = v:( (_ a:x() { a }) ** ",") ","? {v}
 
         rule semicolonsep<T>(x: rule<T>) -> Vec<T> = v:( (_ a:x() { a }) ** ";") ";"? {v}
 
-        // rule keyword(id: &'static str) =
-        //     ##parse_string_literal(id) !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
         rule keyword(id: &'static str) =
             #{|input, pos| input.parse_string_literal(pos, id)} !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
 
@@ -105,22 +104,33 @@ peg::parser! {
             }
 
         pub rule symbol() -> Tree<Token> =
-            _ ps:position!() keyword("symbol")
-                _ pn:position!() s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '*' | '/' |
+            _ ps:position!() keyword("symbol") _ pn:position!()
+                s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '*' | '/' |
                         '^' | '=' | '<' | '>' | '!' | '|' | '&' | '_' ]+)
-                _ pa:position!() a:( "{" _ a:attrs() _ "}" { a } / ";" { vec![] } )
+                _ pa:position!() a:( "{"
+                    _ at:attrs()? _ ";"?
+                    _ pr:(keyword("py") _ pr:string() ";" {pr})?
+                _ "}" { (at,pr) } )?
+                ";"?
                 {
-                    if !a.is_empty() {
-                        let mut t = Token::new("Attrs", pa);
-                        for i in a.into_iter() {
-                            t.push_back(i);
+                    let mut result = Token::new(TOKEN_DECLARE, ps)
+                        / (Token::new(TOKEN_SYMBOL, ps) / Token::new(s, pn));
+
+                    if let Some(a) = a {
+                        if let Some(attr) = a.0 {
+                            let mut t = Token::new("Attrs", pa);
+                            for i in attr.into_iter() {
+                                t.push_back(i);
+                            }
+                            result = result / t;
                         }
-                        Token::new(TOKEN_DECLARE, ps)
-                          / (Token::new(TOKEN_SYMBOL, ps) / Token::new(s, pn)) / t
-                    } else {
-                        Token::new(TOKEN_DECLARE, ps)
-                          / (Token::new(TOKEN_SYMBOL, ps) / Token::new(s, pn))
+                        if let Some(program) = a.1 {
+                            let prog = Token::new("PyProg", pa)
+                                /Token::new(program.as_str(), pa);
+                            result = result / prog;
+                        }
                     }
+                    result
                 }
 
         pub rule lang_rule() -> Tree<Token> =

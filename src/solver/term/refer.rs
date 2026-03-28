@@ -9,6 +9,7 @@ use derive_more::{Debug, From};
 use eyre::{Result, bail, ensure};
 use itertools::Itertools;
 use num::Zero;
+use serde_derive::Serialize;
 use trees::Node;
 
 use utils::SubsetIterator;
@@ -37,9 +38,9 @@ pub trait Term {
     fn truth(&self) -> Truth;
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, From)]
 #[derive(PartialEq, Eq)]
-#[derive(Debug, From)]
+#[derive(Debug, Serialize)]
 pub struct TermRef<'a>(&'a Node<Atom>);
 
 impl<'a> Term for TermRef<'a> {

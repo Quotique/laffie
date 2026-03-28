@@ -6,6 +6,7 @@ use std::fmt;
 
 use container::all_func_symbols;
 use parking_lot::{RawRwLock, RwLockReadGuard, lock_api::MappedRwLockReadGuard};
+use serde_derive::{Deserialize, Serialize};
 
 pub use program::{SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
 
@@ -15,9 +16,9 @@ use crate::{
 };
 
 #[derive(Default, Clone)]
-#[derive(Debug)]
 #[derive(PartialOrd, Ord)]
 #[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Symbol(CompactString);
 
 #[inline]

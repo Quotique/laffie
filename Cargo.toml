@@ -26,7 +26,8 @@ itertools = "0.14"
 log = { version = "0.4", features = ["kv"] }
 parking_lot = "0.12"
 serde = "1.0"
+serde_json = "1.0"
 serde_derive = "1.0"
-smartstring = "1"
-trees = { git = "https://github.com/Quotique/trees.git" }
+smartstring = { version = "1", features = ["serde"] }
+trees = { git = "https://github.com/Quotique/trees.git", branch = "serde" }
 

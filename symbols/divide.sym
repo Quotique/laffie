@@ -1,5 +1,5 @@
 symbol / {
-    attr infix(200),display("/")
+    attr infix(200),display("/");
 }
 
 rule {

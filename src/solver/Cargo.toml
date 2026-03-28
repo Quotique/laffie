@@ -14,12 +14,13 @@ eyre = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 serde_derive = { workspace = true }
 smartstring = { workspace = true }
 trees = { workspace = true }
 parking_lot = { workspace = true }
 
-bigdecimal = "0.4"
+bigdecimal = { version = "0.4", features = ["serde"] }
 bincode = "2.0"
 bitflags = "2.9"
 derive_more = { version = "2.0", features = ["full"] }
@@ -31,4 +32,4 @@ num-bigint = "0.4"
 [dev-dependencies]
 parser = { path = "../parser" }
 
-insta = "1.43"
+insta = "1.46"

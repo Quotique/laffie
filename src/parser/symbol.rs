@@ -1,6 +1,9 @@
-use std::str::FromStr;
+use std::{ffi::CString, str::FromStr};
 
-use solver::term::{SymbolAttr, SymbolAttrValue, SymbolProgram};
+use log::*;
+use pyo3::{prelude::*, types::PyDict};
+
+use solver::term::{SymbolAttr, SymbolAttrValue, SymbolProgram, TermBuf};
 
 use super::{Node, ParserError, Tree};
 
@@ -28,6 +31,51 @@ impl<'a> SymbolParser<'a> {
         for sym_child in self.ast.iter() {
             if sym_child.data().symbol == "Symbol" {
                 symbol_program.name = sym_child.front().unwrap().data().symbol.clone();
+            } else if sym_child.data().symbol == "PyProg" {
+                let program = sym_child.front().unwrap().data().symbol.clone();
+                info!("parsing py program {program}");
+
+                Python::initialize();
+
+                let (locals, calc) = Python::attach(|py| -> PyResult<(Py<PyDict>, bool)> {
+                    let locals = PyDict::new(py);
+                    let code = CString::new(program.as_str())?;
+                    py.run(&code, Some(&locals), None)?;
+
+                    let calc = locals.contains("calculator")?;
+                    Ok((locals.unbind(), calc))
+                })
+                .inspect_err(|e| error!("python program error {e}"))
+                .map_err(|e| ParserError {
+                    loc: sym_child.data().location.clone(),
+                    msg: e.to_string(),
+                })?;
+
+                if calc {
+                    symbol_program.calculator = Box::new(move |root, level| {
+                        Python::attach(|py| -> PyResult<bool> {
+                            let l = locals.bind(py);
+                            let primes = l.get_item("calculator").unwrap();
+                            let result: (String, bool) = primes
+                                .as_ref()
+                                .unwrap()
+                                .call1((
+                                    serde_json::to_string(&root.as_ref())
+                                        .expect("Unable to serialize term"),
+                                    level.to_string(),
+                                ))?
+                                .extract()?;
+                            let mut term: TermBuf = serde_json::from_str(&result.0)
+                                .expect("Unable to parse procedure result");
+                            if result.1 {
+                                root.swap(&mut term.term_mut());
+                            }
+
+                            Ok(result.1)
+                        })
+                        .expect("Unable to run command")
+                    });
+                }
             } else if sym_child.data().symbol == "Attrs" {
                 for attr in sym_child.iter() {
                     let a = Self::parse_attr(attr)?;
@@ -95,5 +143,34 @@ pub mod tests {
             sym.attrs.get(&SymbolAttr::Infix),
             Some(&SymbolAttrValue::UInt(10))
         );
+    }
+
+    #[test]
+    fn py_parser_test() {
+        let test_str = r#"symbol + {
+            attr infix(10);
+            py "print(1)";
+        }"#;
+        let _states = lang::symbol(test_str).unwrap();
+    }
+
+    #[test]
+    fn py_parser_escape_test() {
+        let test_str = r#"symbol + {
+            attr infix(10);
+            py "print(\"Hello world\")";
+        }"#;
+        let _states = lang::symbol(test_str).unwrap();
+    }
+
+    #[test]
+    fn py_parser_multiline_test() {
+        let test_str = r#"symbol + {
+            attr infix(10);
+            py "def hello():
+    print(\"Hello world\")
+";
+        }"#;
+        let _states = lang::symbol(test_str).unwrap();
     }
 }

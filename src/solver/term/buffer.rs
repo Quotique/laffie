@@ -1,6 +1,7 @@
 use std::{collections::HashSet, convert::From, fmt, sync::Arc};
 
 use derive_more::From;
+use serde_derive::Deserialize;
 use trees::Tree;
 
 use super::{Atom, ParamSubstitution, Symbol, TermMut, TermRef, sym};
@@ -17,6 +18,7 @@ pub type SharedTerm = Arc<TermBuf>;
 pub struct TermPath(pub(super) Vec<usize>);
 
 #[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Deserialize)]
 pub struct TermBuf(SymbolTree);
 
 impl TermBuf {
@@ -175,7 +177,7 @@ mod tests {
         rc::Rc,
     };
 
-    use crate::term::{ArgList, Term, term_with_params};
+    use crate::term::{ArgList, Term, term_with_params, term_with_vars};
 
     use super::*;
 
@@ -230,5 +232,16 @@ mod tests {
         let hash_2 = s.finish();
 
         assert_eq!(hash_1, hash_2);
+    }
+
+    #[test]
+    fn serde_test() {
+        let test = term_with_vars("x in set(2, 5)");
+
+        let json_text = serde_json::to_string(&test.term()).expect("");
+        insta::assert_snapshot!(
+            json_text,
+            @r#"{"data":{"Symbol":"in"},"children":[{"data":{"Variable":"x"}},{"data":{"Symbol":"set"},"children":[{"data":{"Number":"2"}},{"data":{"Number":"5"}}]}]}"#
+        );
     }
 }

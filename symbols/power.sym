@@ -1,5 +1,5 @@
 symbol ^ {
-    attr infix(100)
+    attr infix(100);
 }
 
 rule {
@@ -20,6 +20,12 @@ rule {
 
     a != 0;
 }
+
+// rule {
+//     (x^3 + b * x^2 + c * x + d) as F == 0 => (u in y && replace(F, x = u) == 0) || F == 0;
+// 
+//     y = factorization(d);
+// }
 
 rule {
     attr level(4),goal(find(x)),one(a),one(b),zero(c);
