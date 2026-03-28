@@ -25,18 +25,18 @@ pub fn sqrt(root: &mut TermMut, _: NormalizationLevel) -> bool {
     }
 
     let last = root.pop_last_arg().unwrap();
-    if let Atom::Number(d) = &last.data() {
-        if d >= &Decimal::from(0) {
-            let (mut m, mut e) = d.as_bigint_and_exponent();
-            if e.is_odd() {
-                m *= 10;
-                e -= 1;
-            }
-            let r = m.sqrt();
-            if m == &r * &r {
-                *root.data_mut() = Atom::Number(Decimal::new(r, e / 2));
-                return true;
-            }
+    if let Atom::Number(d) = &last.data() &&
+        d >= &Decimal::from(0)
+    {
+        let (mut m, mut e) = d.as_bigint_and_exponent();
+        if e.is_odd() {
+            m *= 10;
+            e -= 1;
+        }
+        let r = m.sqrt();
+        if m == &r * &r {
+            *root.data_mut() = Atom::Number(Decimal::new(r, e / 2));
+            return true;
         }
     }
     root.push_last_arg(last);

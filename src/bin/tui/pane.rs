@@ -152,13 +152,12 @@ impl Pane {
                             if let Some(term) = task_state
                                 .tracing_state
                                 .last()
-                                .and_then(|x| x.1.selected().last())
+                                .and_then(|x| x.1.selected().last()) &&
+                                term.idx == 0
                             {
-                                if term.idx == 0 {
-                                    task_state
-                                        .tracing_state
-                                        .push((term.solution.clone(), Default::default()));
-                                }
+                                task_state
+                                    .tracing_state
+                                    .push((term.solution.clone(), Default::default()));
                             }
                         }
                         _ => {}

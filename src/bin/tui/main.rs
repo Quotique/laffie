@@ -66,28 +66,28 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
         if !event::poll(std::time::Duration::from_millis(100))? {
             continue;
         }
-        if let event::Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
-                let command = match key.code {
-                    KeyCode::F(1) => Command::SwitchTab(0),
-                    KeyCode::F(2) => Command::SwitchTab(1),
-                    KeyCode::F(3) => Command::SwitchTab(2),
-                    // KeyCode::F(4) => status.current_tab = Itab::Setting,
-                    KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('о') => Command::Down,
+        if let event::Event::Key(key) = event::read()? &&
+            key.kind == KeyEventKind::Press
+        {
+            let command = match key.code {
+                KeyCode::F(1) => Command::SwitchTab(0),
+                KeyCode::F(2) => Command::SwitchTab(1),
+                KeyCode::F(3) => Command::SwitchTab(2),
+                // KeyCode::F(4) => status.current_tab = Itab::Setting,
+                KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('о') => Command::Down,
 
-                    KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('л') => Command::Up,
-                    KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('р') => Command::Left,
-                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('д') => Command::Right,
-                    KeyCode::Enter | KeyCode::Char(' ') => Command::Toggle,
-                    KeyCode::Char('s') | KeyCode::Char('ы') => Command::Solve,
-                    KeyCode::Char('a') | KeyCode::Char('ф') => Command::SolveAll,
-                    KeyCode::Char('r') | KeyCode::Char('к') => Command::Reload,
-                    KeyCode::Char('c') | KeyCode::Char('с') => Command::Cancel,
-                    KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
-                    _ => Command::None,
-                };
-                ui.process(command);
-            }
+                KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('л') => Command::Up,
+                KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('р') => Command::Left,
+                KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('д') => Command::Right,
+                KeyCode::Enter | KeyCode::Char(' ') => Command::Toggle,
+                KeyCode::Char('s') | KeyCode::Char('ы') => Command::Solve,
+                KeyCode::Char('a') | KeyCode::Char('ф') => Command::SolveAll,
+                KeyCode::Char('r') | KeyCode::Char('к') => Command::Reload,
+                KeyCode::Char('c') | KeyCode::Char('с') => Command::Cancel,
+                KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
+                _ => Command::None,
+            };
+            ui.process(command);
         }
     }
 }

@@ -2,10 +2,10 @@ use std::{cmp::Ordering, collections::HashMap};
 
 use bigdecimal::{BigDecimal as Decimal, Zero};
 
-use super::{SymbolProgram, power::power_argument};
+use super::{power::power_argument, SymbolProgram};
 use crate::{
-    NormalizationLevel,
     term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
+    NormalizationLevel,
 };
 
 pub fn symbol() -> SymbolProgram {
@@ -216,7 +216,7 @@ fn cummulative_power(root: TermRef) -> Decimal {
 }
 
 fn mean_arg(root: TermRef) -> TermRef {
-    let pa = if root.data().is_symbol_name("*") {
+    if root.data().is_symbol_name("*") {
         // find first non-number argument and omit power
         // last number argument in non-number not found
         // 4 * x^2 * y -> x
@@ -235,9 +235,7 @@ fn mean_arg(root: TermRef) -> TermRef {
         )
     } else {
         power_argument(root)
-    };
-
-    pa
+    }
 }
 
 fn ordering(left: TermRef, right: TermRef) -> Ordering {

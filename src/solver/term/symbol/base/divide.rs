@@ -27,12 +27,12 @@ pub fn divide(root: &mut TermMut, level: NormalizationLevel) -> bool {
     match level {
         NormalizationLevel(0) => false,
         NormalizationLevel(1) => {
-            if let Atom::Number(d) = &root.last_arg().unwrap().data() {
-                if d.is_one() {
-                    let mut child = root.pop_first_arg().unwrap();
-                    root.swap(&mut child.term_mut());
-                    return true;
-                }
+            if let Atom::Number(d) = &root.last_arg().unwrap().data() &&
+                d.is_one()
+            {
+                let mut child = root.pop_first_arg().unwrap();
+                root.swap(&mut child.term_mut());
+                return true;
             }
             false
         }

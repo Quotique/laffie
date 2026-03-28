@@ -237,14 +237,14 @@ impl<'a> TermMut<'a> {
             let root_degree = self.degree();
             for _ in 0..root_degree {
                 let mut child = self.pop_first_arg().unwrap();
-                if let Some(child_symbol) = &child.data().symbol() {
-                    if *child_symbol == symbol {
-                        while let Some(node) = child.term_mut().pop_first_arg() {
-                            self.push_last_arg(node);
-                        }
-                        result = true;
-                        continue;
+                if let Some(child_symbol) = &child.data().symbol() &&
+                    *child_symbol == symbol
+                {
+                    while let Some(node) = child.term_mut().pop_first_arg() {
+                        self.push_last_arg(node);
                     }
+                    result = true;
+                    continue;
                 }
                 self.push_last_arg(child);
             }
