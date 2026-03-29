@@ -1,11 +1,15 @@
 use std::{ffi::CString, str::FromStr};
 
 use log::*;
-use pyo3::{prelude::*, types::PyDict};
+use pyo3::{
+    prelude::*,
+    types::{IntoPyDict, PyDict},
+};
 
 use solver::term::{SymbolAttr, SymbolAttrValue, SymbolProgram, TermBuf};
 
 use super::{Node, ParserError, Tree};
+use crate::py_term::get_term_class;
 
 pub struct SymbolParser<'a> {
     ast: &'a Tree,
@@ -39,6 +43,8 @@ impl<'a> SymbolParser<'a> {
 
                 let (locals, calc) = Python::attach(|py| -> PyResult<(Py<PyDict>, bool)> {
                     let locals = PyDict::new(py);
+                    // Инжектируем класс Term в окружение пользовательского кода
+                    locals.set_item("Term", get_term_class(py))?;
                     let code = CString::new(program.as_str())?;
                     py.run(&code, Some(&locals), None)?;
 
@@ -55,23 +61,33 @@ impl<'a> SymbolParser<'a> {
                     symbol_program.calculator = Box::new(move |root, level| {
                         Python::attach(|py| -> PyResult<bool> {
                             let l = locals.bind(py);
-                            let primes = l.get_item("calculator").unwrap();
-                            let result: (String, bool) = primes
-                                .as_ref()
-                                .unwrap()
-                                .call1((
-                                    serde_json::to_string(&root.as_ref())
-                                        .expect("Unable to serialize term"),
-                                    level.to_string(),
-                                ))?
-                                .extract()?;
-                            let mut term: TermBuf = serde_json::from_str(&result.0)
-                                .expect("Unable to parse procedure result");
-                            if result.1 {
-                                root.swap(&mut term.term_mut());
+                            let calc_fn = l.get_item("calculator").unwrap();
+                            let calc_fn = calc_fn.as_ref().unwrap();
+
+                            // Сериализуем терм в JSON-dict и оборачиваем в Term
+                            let json_str = serde_json::to_string(&root.as_ref())
+                                .expect("Unable to serialize term");
+                            let json_mod = py.import("json")?;
+                            let json_dict = json_mod.call_method1("loads", (json_str.as_str(),))?;
+                            let term_cls = get_term_class(py);
+                            let py_term = term_cls
+                                .call((), Some(&[("_raw", json_dict)].into_py_dict(py)?))?;
+
+                            let result = calc_fn.call1((py_term, level.to_string()))?;
+
+                            // None — без изменений, Term — новый терм
+                            if result.is_none() {
+                                return Ok(false);
                             }
 
-                            Ok(result.1)
+                            let json_dict = result.call_method0("_to_json")?;
+                            let json_str: String =
+                                json_mod.call_method1("dumps", (json_dict,))?.extract()?;
+                            let mut term: TermBuf = serde_json::from_str(&json_str)
+                                .expect("Unable to parse procedure result");
+                            root.swap(&mut term.term_mut());
+
+                            Ok(true)
                         })
                         .expect("Unable to run command")
                     });

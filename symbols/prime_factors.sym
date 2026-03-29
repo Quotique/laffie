@@ -1,0 +1,25 @@
+symbol prime_factors {
+    py
+"
+def calculator(root, level):
+    if root.symbol != 'prime_factors':
+        return None
+
+    if len(root) == 1 and root[0].is_number:
+        num = root[0].value
+
+        factors = []
+        d = 2
+        while d * d <= num:
+            while num % d == 0:
+                factors.append(Term.number(d))
+                num //= d
+            d += 1
+        if num > 1:
+            factors.append(Term.number(num))
+
+        return Term('set', factors)
+
+    return None
+";
+}
