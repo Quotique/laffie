@@ -26,5 +26,5 @@ task {
 task {
     goal find(x);
 
-    x in factorization(100);
+    x in prime_factors(100);
 }

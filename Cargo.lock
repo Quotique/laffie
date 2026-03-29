@@ -2852,6 +2852,7 @@ dependencies = [
 [[package]]
 name = "trees"
 version = "0.4.2"
+source = "git+https://github.com/Quotique/trees.git?branch=serde#d2ad2beb3488b2a256d0129fe24b967c167319a0"
 dependencies = [
  "serde",
 ]

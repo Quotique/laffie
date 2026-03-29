@@ -72,7 +72,7 @@ impl<'a> TaskParser<'a> {
                             TermParser::default()
                                 .with_variables()
                                 .try_parse(i)?
-                                .normalize(NormalizationLevel::max()),
+                                .normalize(NormalizationLevel::from(0)),
                         )
                     }
                 }
@@ -81,7 +81,7 @@ impl<'a> TaskParser<'a> {
                         TermParser::default()
                             .with_variables()
                             .try_parse(child)?
-                            .normalize(NormalizationLevel::max()),
+                            .normalize(NormalizationLevel::from(0)),
                     ));
                 }
             }

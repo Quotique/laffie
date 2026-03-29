@@ -24,7 +24,7 @@ rule {
 // rule {
 //     (x^3 + b * x^2 + c * x + d) as F == 0 => (u in y && replace(F, x = u) == 0) || F == 0;
 // 
-//     y = factorization(d);
+//     y = prime_factors(d);
 // }
 
 rule {

@@ -1,6 +1,6 @@
 use std::convert::From;
 
-use trees::{tr, tr, };
+use trees::{Tree, tr};
 
 use crate::CompactString;
 

@@ -7,6 +7,7 @@ mod dir_loader;
 mod error;
 mod grammar;
 pub mod lang;
+mod py_term;
 mod rule;
 mod symbol;
 mod task;
