@@ -6,7 +6,7 @@ mod rules_engine;
 mod term_filters;
 
 pub use builder::RuleBuilder;
-pub use hypothesis::{Hypothesis, HypothesisIterator};
+pub use hypothesis::{GroundedHypothesis, Hypothesis, HypothesisIterator};
 pub use rule::{ApplyRule, Level, Rule, RuleDeclineReason, RuleId, SharedRule};
 pub use rule_attribute::{RuleAttr, RuleAttrValue};
 pub use rules_engine::RulesEngine;
