@@ -285,14 +285,28 @@ impl ApplyRule for SharedRule {
                 replace.swap(&mut resolution.get_mut(&pos).unwrap());
                 resolution = resolution.normalize(self.norm_level());
 
+                let requirements: Vec<TermBuf> = self
+                    .requirements
+                    .iter()
+                    .map(|r| r.apply_substitution(&i))
+                    .collect();
+                let free_params = requirements
+                    .iter()
+                    .flat_map(|term| {
+                        term.term()
+                            .bfs()
+                            .filter_map(|v| v.data.param())
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .into_iter()
+                    })
+                    .collect();
+
                 let hypothesis = Hypothesis {
                     rule: self.clone(),
                     blocked_rules: self.block.clone(),
-                    requirements: self
-                        .requirements
-                        .iter()
-                        .map(|r| r.apply_substitution(&i))
-                        .collect(),
+                    free_params,
+                    requirements,
                     resolution,
                     params: i,
                 };

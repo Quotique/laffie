@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     NormalizationLevel,
-    rule::{Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine, SharedRule},
+    rule::{GroundedHypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine, SharedRule},
     task::{Tracer, solution::SolutionStatus},
     term::{SharedTerm, Term, TermBuf, TermMut},
 };
@@ -305,6 +305,7 @@ impl Solver {
                 &s.task.goal.term
             },
         )
+        .flat_map(|hypothesis| hypothesis.ground())
         .filter_map(|hypothesis| {
             let is_dub = if is_goal {
                 s.goal_index.contains_key(&hypothesis.resolution)
@@ -330,7 +331,7 @@ impl Solver {
         &self,
         parent_idx: usize,
         solution: &Solution,
-        hypothesis: Hypothesis,
+        hypothesis: GroundedHypothesis,
         state: &mut SolutionState,
     ) -> TermProps {
         trace!(

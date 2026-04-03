@@ -106,4 +106,4 @@ The `claude_docs/` directory contains detailed navigation maps for each crate wi
 
 ## Language
 
-Project documentation and comments are primarily in Russian.
+Project documentation and comments are primarily in Russian. Rustdoc comments (`///`, `//!`) must always be written in English.

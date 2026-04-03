@@ -2,8 +2,8 @@ use std::{ffi::CString, sync::OnceLock};
 
 use pyo3::{prelude::*, types::PyDict};
 
-/// Python Term class definition, injected into Python environment before user code.
-/// Provides a clean API over the JSON-dict term representation.
+/// Python Term class definition, injected into Python environment before user
+/// code. Provides a clean API over the JSON-dict term representation.
 ///
 /// API (must match future PyO3 pyclass version):
 ///   Term("set", [child1, child2])   — symbol node with children
@@ -20,10 +20,10 @@ use pyo3::{prelude::*, types::PyDict};
 ///   term[i]                         — i-th child as Term
 ///   len(term)                       — number of children
 ///   term.children                   — list of children as Terms
-
 static PY_TERM_CLASS: OnceLock<Py<PyAny>> = OnceLock::new();
 
-/// Возвращает Python-класс Term, исполняя его определение один раз.
+/// Returns the Python `Term` class, executing its definition once on first
+/// call.
 pub fn get_term_class(py: Python<'_>) -> Bound<'_, PyAny> {
     PY_TERM_CLASS
         .get_or_init(|| {
