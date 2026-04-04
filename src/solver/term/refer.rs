@@ -375,11 +375,59 @@ impl<'a> fmt::Display for TermRef<'a> {
     }
 }
 
+/// Matches a term against a symbol pattern, binding children to variables.
+///
+/// Each argument position can be:
+/// - `ident` — binds one child to the variable
+/// - `"symbol"(ident)` — checks that the child is the named symbol, then binds
+///   the entire node to the variable
+///
+/// Returns `Option<(bindings...)>`.
+///
+/// # Examples
+///
+/// ```ignore
+/// let (lhs, rhs) = match_term!(term, "in"(lhs, rhs))?;
+/// let (u, s) = match_term!(term, "in"(u, "set"(s)))?;
+/// ```
+macro_rules! match_term {
+    ($term:expr, $name:literal ( $($rest:tt)* )) => {{
+        use $crate::term::Term as _;
+        let __t = $term;
+        (|| -> Option<_> {
+            if !__t.data().is_symbol_name($name) { return None; }
+            let mut __it = __t.args_iter();
+            match_term!(@arms __it [] $($rest)*)
+        })()
+    }};
+
+    (@arms $it:ident [$($acc:ident)*] $v:ident , $($rest:tt)*) => {{
+        let $v = $it.next()?;
+        match_term!(@arms $it [$($acc)* $v] $($rest)*)
+    }};
+    (@arms $it:ident [$($acc:ident)*] $v:ident) => {{
+        let $v = $it.next()?;
+        Some(($($acc,)* $v,))
+    }};
+
+    (@arms $it:ident [$($acc:ident)*] $name:literal ( $v:ident ) , $($rest:tt)*) => {{
+        let $v = $it.next()?;
+        if !$v.data().is_symbol_name($name) { return None; }
+        match_term!(@arms $it [$($acc)* $v] $($rest)*)
+    }};
+    (@arms $it:ident [$($acc:ident)*] $name:literal ( $v:ident )) => {{
+        let $v = $it.next()?;
+        if !$v.data().is_symbol_name($name) { return None; }
+        Some(($($acc,)* $v,))
+    }};
+}
+pub(crate) use match_term;
+
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
 
-    use crate::term::{term_with_params, term_with_vars};
+    use crate::term::{Term, term_with_params, term_with_vars};
 
     #[test]
     fn subterm_contains_direct_term() {
@@ -529,5 +577,74 @@ mod tests {
         let term = term_with_vars("set(3) is known");
 
         assert!(term.term().try_match(pattern.term()).is_err());
+    }
+
+    #[test]
+    fn match_term_binary() {
+        let term = term_with_vars("x + 1");
+        let result = match_term!(term.term(), "+"(a, b));
+        assert!(result.is_some());
+        let (a, b) = result.unwrap();
+        assert_eq!(a.to_string(), "x");
+        assert_eq!(b.to_string(), "1");
+    }
+
+    #[test]
+    fn match_term_wrong_symbol() {
+        let term = term_with_vars("x + 1");
+        let result = match_term!(term.term(), "*"(a, b));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn match_term_not_a_symbol() {
+        let term = term_with_vars("42");
+        let result = match_term!(term.term(), "+"(a, b));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn match_term_too_few_children() {
+        let term = term_with_vars("set(42)");
+        let result = match_term!(term.term(), "set"(a, b));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn match_term_unary() {
+        let term = term_with_vars("set(42)");
+        let result = match_term!(term.term(), "set"(a));
+        assert!(result.is_some());
+        let (a,) = result.unwrap();
+        assert_eq!(a.to_string(), "42");
+    }
+
+    #[test]
+    fn match_term_nested_symbol() {
+        let term = term_with_vars("x in set(1, 2, 3)");
+        let result = match_term!(term.term(), "in"(lhs, "set"(s)));
+        assert!(result.is_some());
+        let (lhs, s) = result.unwrap();
+        assert_eq!(lhs.to_string(), "x");
+        assert!(s.data().is_symbol_name("set"));
+        assert_eq!(s.degree(), 3);
+    }
+
+    #[test]
+    fn match_term_nested_wrong_inner() {
+        let term = term_with_vars("x in empty_set");
+        let result = match_term!(term.term(), "in"(lhs, "set"(s)));
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn match_term_triple() {
+        let term = term_with_vars("1 + 2 + 3");
+        let result = match_term!(term.term(), "+"(a, b, c));
+        assert!(result.is_some());
+        let (a, b, c) = result.unwrap();
+        assert_eq!(a.to_string(), "1");
+        assert_eq!(b.to_string(), "2");
+        assert_eq!(c.to_string(), "3");
     }
 }

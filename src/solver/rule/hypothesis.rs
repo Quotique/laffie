@@ -3,7 +3,7 @@ use std::{collections::HashSet, fmt};
 use itertools::Itertools;
 
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
-use crate::term::{Param, ParamSubstitution, TermBuf};
+use crate::term::{Param, ParamSubstitution, Term as _, TermBuf, match_term};
 
 /// A hypothesis that may contain free (unbound) parameters (non-ground).
 /// Trivially converts to [`GroundedHypothesis`] when `free_params` is empty.
@@ -42,27 +42,86 @@ impl Hypothesis {
     }
 
     /// Grounds the hypothesis into concrete instances.
-    /// Trivial conversion when no free parameters exist.
-    /// TODO: delegate to a `find(free_params)` subtask when free params are
-    /// present.
-    pub fn ground(self) -> Vec<GroundedHypothesis> {
+    ///
+    /// - No free parameters → trivial conversion.
+    /// - `<param> in set(...)` generators → cartesian product of set elements.
+    /// - No generators found → returns empty (TODO: delegate to `find`
+    ///   subtask).
+    pub fn ground(mut self) -> Vec<GroundedHypothesis> {
         if self.is_grounded() {
-            vec![GroundedHypothesis {
+            return vec![GroundedHypothesis {
                 rule:          self.rule,
                 resolution:    self.resolution,
                 params:        self.params,
                 requirements:  self.requirements,
                 blocked_rules: self.blocked_rules,
-            }]
-        } else {
-            // TODO: delegate to find(free_params) subtask with constraints
+            }];
+        }
+
+        // Extract generator requirements; remaining stay in self.requirements
+        let generators = self.extract_generators();
+
+        if generators.is_empty() {
             trace!(
                 target: "rule_selection",
-                "hypothesis has free params {:?}, grounding not yet implemented",
+                "hypothesis has free params {:?}, no set generator found",
                 self.free_params
             );
-            vec![]
+            return vec![];
         }
+
+        generators
+            .into_iter()
+            .map(|(param, elements)| {
+                elements
+                    .into_iter()
+                    .map(move |e| (param.clone(), e))
+                    .collect::<Vec<_>>()
+            })
+            .multi_cartesian_product()
+            .map(|combo| {
+                let mut subst = ParamSubstitution::default();
+                for (param, element) in combo {
+                    subst.params.insert(param, element);
+                }
+
+                let resolution = self.resolution.apply_substitution(&subst);
+                let requirements = self
+                    .requirements
+                    .iter()
+                    .map(|r| r.apply_substitution(&subst))
+                    .collect();
+
+                let mut params = self.params.clone();
+                params.params.extend(subst.params);
+
+                GroundedHypothesis {
+                    rule: self.rule.clone(),
+                    resolution,
+                    params,
+                    requirements,
+                    blocked_rules: self.blocked_rules.clone(),
+                }
+            })
+            .collect()
+    }
+
+    /// Extracts `<param> in set(...)` requirements as generators.
+    /// Matched requirements are removed from `self.requirements`.
+    fn extract_generators(&mut self) -> Vec<(Param, Vec<TermBuf>)> {
+        self.requirements
+            .extract_if(.., |req| {
+                match_term!(req.term(), "in"(lhs, "set"(s)))
+                    .and_then(|(lhs, _)| lhs.data().param().map(|_| ()))
+                    .is_some()
+            })
+            .filter_map(|req| {
+                let (lhs, set_node) = match_term!(req.term(), "in"(lhs, "set"(s)))?;
+                let param = lhs.data().param()?.clone();
+                let elements = set_node.args_iter().map(|a| a.to_owned()).collect();
+                Some((param, elements))
+            })
+            .collect()
     }
 }
 
