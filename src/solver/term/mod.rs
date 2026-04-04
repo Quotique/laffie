@@ -10,6 +10,7 @@ mod symbol;
 
 pub use atom::{ArgList, Atom, Param, Variable, param, var};
 pub use buffer::{SharedTerm, TermBuf, TermPath};
+pub(crate) use refer::match_term;
 pub use refer::{Term, TermRef};
 pub use refer_mut::TermMut;
 pub use substitution::{ParamSubstitution, VariableSubstitution};
