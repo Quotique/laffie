@@ -7,12 +7,13 @@ pub mod less_or_equal;
 pub mod more;
 pub mod more_or_equal;
 pub mod mul;
+pub mod op_in;
 pub mod op_not;
 pub mod op_true;
 pub mod plus;
 pub mod power;
-pub mod replace;
 pub mod sqrt;
+pub mod substitute;
 pub mod symbolic_eq;
 
 use std::cmp::Ordering;

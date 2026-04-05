@@ -54,11 +54,16 @@ peg::parser! {
         rule keyword(id: &'static str) =
             #{|input, pos| input.parse_string_literal(pos, id)} !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
 
+        rule reserved_word() =
+            ("in" / "is" / "as") !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
+
         rule ident() -> Tree<Token> =
-            _ p:position!() s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) { Token::new(s, p) }
+            _ p:position!() !reserved_word()
+            s:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]+) { Token::new(s, p) }
 
         rule char_first_ident() -> Tree<Token> =
-            _ p:position!() s:$(['a'..='z' | 'A'..='Z']
+            _ p:position!() !reserved_word()
+            s:$(['a'..='z' | 'A'..='Z']
                 ['a'..='z' | 'A'..='Z' | '0'..='9' | '_' ]*) {
                     Token::new(s, p)
             }
@@ -447,6 +452,18 @@ mod tests {
                 Token::new("==", 2) /
                     Token::new("x", 0) /
                     (Token::new("/", 5) / Token::new("-5", 6) / Token::new("3", 8)),
+            ],
+        );
+    }
+
+    #[test]
+    fn constant_in_test() {
+        terms_test(
+            r#"3 in set(1, 3)"#,
+            vec![
+                Token::new("in", 2) /
+                    Token::new("3", 0) /
+                    (Token::new("set", 5) / Token::new("1", 9) / Token::new("3", 12)),
             ],
         );
     }

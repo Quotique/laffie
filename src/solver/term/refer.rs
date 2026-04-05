@@ -39,9 +39,18 @@ pub trait Term {
 }
 
 #[derive(Clone, Copy, From)]
-#[derive(PartialEq, Eq)]
 #[derive(Debug, Serialize)]
 pub struct TermRef<'a>(&'a Node<Atom>);
+
+impl<'a> PartialEq for TermRef<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.data() == other.data() &&
+            self.degree() == other.degree() &&
+            self.args_iter().zip(other.args_iter()).all(|(a, b)| a == b)
+    }
+}
+
+impl<'a> Eq for TermRef<'a> {}
 
 impl<'a> Term for TermRef<'a> {
     type RefType = Self;
@@ -87,6 +96,12 @@ impl<'a> Term for TermRef<'a> {
 }
 
 impl<'a> TermRef<'a> {
+    /// Returns `true` if both references point to the same node in memory.
+    #[inline]
+    pub fn same(&self, other: &Self) -> bool {
+        std::ptr::eq(self.0, other.0)
+    }
+
     #[inline]
     pub fn id(&self) -> TermPath {
         let mut current = *self;
@@ -95,7 +110,7 @@ impl<'a> TermRef<'a> {
         while let Some(parent) = current.parent() {
             let id = parent
                 .args_iter()
-                .find_position(|x| std::ptr::eq(x.0, current.0))
+                .find_position(|x| x.same(&current))
                 .map(|(num, _)| num)
                 .expect("the parent must contains the child");
             path.push(id);

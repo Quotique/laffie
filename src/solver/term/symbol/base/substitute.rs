@@ -6,14 +6,14 @@ use crate::{
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
-        name: "replace".into(),
-        calculator: Box::new(replace),
+        name: "substitute".into(),
+        calculator: Box::new(substitute),
         ..Default::default()
     }
 }
 
-pub fn replace(root: &mut TermMut, _: NormalizationLevel) -> bool {
-    if !root.data().is_symbol_name("replace") || root.degree() != 2 {
+pub fn substitute(root: &mut TermMut, _: NormalizationLevel) -> bool {
+    if !root.data().is_symbol_name("substitute") || root.degree() != 2 {
         return false;
     }
 
@@ -23,12 +23,12 @@ pub fn replace(root: &mut TermMut, _: NormalizationLevel) -> bool {
 
     let map = root
         .pop_first_arg()
-        .expect("replace must have a first argument");
+        .expect("substitute must have a first argument");
     let map = into_variable_map(map);
 
     let mut term = root
         .pop_first_arg()
-        .expect("replace must have a second argument");
+        .expect("substitute must have a second argument");
 
     term.term_mut().apply_variable_map(&map);
 
@@ -55,9 +55,9 @@ mod tests {
     use crate::{NormalizationLevel, term::term_with_vars};
 
     #[test]
-    fn replace_test() {
+    fn substitute_test() {
         insta::assert_snapshot!(
-          term_with_vars(r#"replace(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#)
+          term_with_vars(r#"substitute(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#)
                 .normalize(NormalizationLevel::max()),
             @"264!=0");
     }

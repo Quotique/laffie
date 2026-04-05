@@ -1,3 +1,0 @@
-symbol in {
-    attr infix(100),display("∈ ");
-}

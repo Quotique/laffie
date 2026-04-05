@@ -28,3 +28,9 @@ task {
 
     x in prime_factors(100);
 }
+
+task {
+    goal find(x);
+
+    x in divisors(12);
+}
