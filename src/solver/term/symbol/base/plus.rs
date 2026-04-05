@@ -123,9 +123,9 @@ fn attach_constant(root: &mut TermMut, constant: Decimal) {
 }
 
 fn merge_mul_const(mut root: TermBuf, d: Decimal) -> TermBuf {
-    if d == Decimal::from(1) {
+    if d == 1 {
         return root;
-    } else if d == Decimal::from(0) {
+    } else if d == 0 {
         return TermBuf::zero();
     }
     let constant = TermBuf::number(d);

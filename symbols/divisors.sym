@@ -1,0 +1,30 @@
+symbol divisors {
+    py
+"
+def calculator(root, level):
+    if root.symbol != 'divisors':
+        return None
+
+    if len(root) == 1 and root[0].is_number:
+        n = abs(root[0].value)
+        if n == 0:
+            return None
+
+        divs = []
+        for i in range(1, int(n**0.5) + 1):
+            if n % i == 0:
+                divs.append(i)
+                if i != n // i:
+                    divs.append(n // i)
+
+        divs.sort()
+        result = []
+        for d in divs:
+            result.append(Term.number(-d))
+            result.append(Term.number(d))
+
+        return Term('set', result)
+
+    return None
+";
+}
