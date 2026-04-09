@@ -46,7 +46,7 @@ rule {
     F == 0 =>
         (x == u) || (Q == 0);
 
-    F is_polynomial(x),
+    is_polynomial(F, x),
     d = free_term(F, x),
     d != 0,
     u in divisors(d),

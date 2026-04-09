@@ -1,0 +1,57 @@
+symbol is_polynomial {
+    py
+"
+def calculator(root, level):
+    if root.symbol != 'is_polynomial' or len(root) != 2:
+        return None
+
+    expr = root[0]
+    var = root[1]
+
+    if not var.is_variable:
+        return None
+
+    var_name = var.name
+
+    def check(node):
+        if node.is_number:
+            return True
+        if node.is_param:
+            return True
+        if node.is_variable:
+            return True
+
+        if not node.is_symbol:
+            return False
+
+        s = node.symbol
+
+        if s == '+':
+            return all(check(c) for c in node.children)
+
+        if s == '*':
+            return all(check(c) for c in node.children)
+
+        if s == '^':
+            if len(node) != 2:
+                return False
+            base = node[0]
+            exp = node[1]
+            if not (base.is_variable and base.name == var_name):
+                return check(base) and check(exp)
+            if not exp.is_number:
+                return False
+            v = exp.value
+            return isinstance(v, int) and v >= 0
+
+        if s == 'neg':
+            return len(node) == 1 and check(node[0])
+
+        return False
+
+    if check(expr):
+        return Term('true')
+    else:
+        return Term('false')
+";
+}

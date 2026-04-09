@@ -1,0 +1,11 @@
+task {
+    goal prove(is_polynomial(x^3 - 6*x^2 + 11*x - 6, x));
+
+    y == 0;
+}
+
+task {
+    goal prove(is_polynomial(3*x^2 + 2*x + 1, x));
+
+    y == 0;
+}

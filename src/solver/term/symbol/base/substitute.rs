@@ -12,7 +12,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn substitute(root: &mut TermMut, _: NormalizationLevel) -> bool {
+pub fn substitute(root: &mut TermMut, level: NormalizationLevel) -> bool {
     if !root.data().is_symbol_name("substitute") || root.degree() != 2 {
         return false;
     }
@@ -33,6 +33,7 @@ pub fn substitute(root: &mut TermMut, _: NormalizationLevel) -> bool {
     term.term_mut().apply_variable_map(&map);
 
     root.swap(&mut term.term_mut());
+    root.normalize(level);
     true
 }
 
@@ -60,5 +61,19 @@ mod tests {
           term_with_vars(r#"substitute(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#)
                 .normalize(NormalizationLevel::max()),
             @"264!=0");
+    }
+
+    #[test]
+    fn substitute_cubic_root_test() {
+        let result = term_with_vars(r#"substitute(x == 1, x^3 - 6*x^2 + 11*x - 6) == 0"#)
+            .normalize(NormalizationLevel::max());
+        insta::assert_snapshot!(result, @"0==0");
+    }
+
+    #[test]
+    fn normalize_after_substitute_test() {
+        let result =
+            term_with_vars(r#"1^3 - 6*1^2 + 11*1 - 6 == 0"#).normalize(NormalizationLevel::max());
+        insta::assert_snapshot!(result, @"0==0");
     }
 }
