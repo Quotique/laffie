@@ -1,0 +1,47 @@
+symbol poly_div {
+    py
+"
+exec(open('symbols/py/sympy_convert.py').read())
+
+def calculator(root, level):
+    if root.symbol != 'poly_div' or len(root) != 2:
+        return None
+
+    poly_node = root[0]
+    div_node = root[1]
+
+    # Collect all variable names from both arguments
+    var_map = {}
+    for node in (poly_node, div_node):
+        for name in _collect_vars(node):
+            if name not in var_map:
+                var_map[name] = sympy.Symbol(name)
+
+    if not var_map:
+        return None
+
+    expr = to_sympy(poly_node, var_map)
+    divisor = to_sympy(div_node, var_map)
+    if expr is None or divisor is None:
+        return None
+
+    try:
+        # Let sympy figure out the generator from the divisor
+        dp = sympy.Poly(divisor)
+        gen = dp.gens[0]
+        var_name = str(gen)
+
+        p = sympy.Poly(expr, gen)
+        quotient, _ = divmod(p, dp)
+        return from_sympy(quotient.as_expr(), var_name, Term)
+    except Exception:
+        return None
+
+def _collect_vars(node):
+    if node.is_variable:
+        yield node.name
+    if node.is_symbol:
+        for c in node.children:
+            yield from _collect_vars(c)
+";
+}
