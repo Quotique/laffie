@@ -1,25 +1,30 @@
 symbol free_term {
     py
 "
+exec(open('symbols/py/sympy_convert.py').read())
+
 def calculator(root, level):
     if root.symbol != 'free_term' or len(root) != 2:
         return None
 
-    expr = root[0]
-    var = root[1]
+    expr_node = root[0]
+    var_node = root[1]
 
-    if not var.is_variable:
+    if not var_node.is_variable:
         return None
 
-    var_name = var.name
+    var_name = var_node.name
+    x = sympy.Symbol(var_name)
 
-    def subst_zero(node):
-        if node.is_variable and node.name == var_name:
-            return Term.number(0)
-        if not node.is_symbol or len(node) == 0:
-            return node
-        return Term(node.symbol, [subst_zero(c) for c in node.children])
+    expr = to_sympy(expr_node, {var_name: x})
+    if expr is None:
+        return None
 
-    return subst_zero(expr)
+    try:
+        p = sympy.Poly(expr, x)
+        c = p.nth(0)
+        return from_sympy(c, var_name, Term)
+    except (sympy.GeneratorsNeeded, sympy.PolynomialError):
+        return None
 ";
 }

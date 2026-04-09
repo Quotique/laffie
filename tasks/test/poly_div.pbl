@@ -1,0 +1,20 @@
+task {
+    goal find(r);
+    answer r == 0;
+
+    r == substitute(x == 2, poly_div(x^3 - 6*x^2 + 11*x - 6, x - 1));
+}
+
+task {
+    goal find(r);
+    answer r == 0;
+
+    r == substitute(x == 3, poly_div(x^3 - 6*x^2 + 11*x - 6, x - 1));
+}
+
+task {
+    goal find(r);
+    answer r == 0;
+
+    r == substitute(x == 1, poly_div(x^3 - 6*x^2 + 11*x - 6, x - 3));
+}
