@@ -1,0 +1,25 @@
+symbol free_term {
+    py
+"
+def calculator(root, level):
+    if root.symbol != 'free_term' or len(root) != 2:
+        return None
+
+    expr = root[0]
+    var = root[1]
+
+    if not var.is_variable:
+        return None
+
+    var_name = var.name
+
+    def subst_zero(node):
+        if node.is_variable and node.name == var_name:
+            return Term.number(0)
+        if not node.is_symbol or len(node) == 0:
+            return node
+        return Term(node.symbol, [subst_zero(c) for c in node.children])
+
+    return subst_zero(expr)
+";
+}

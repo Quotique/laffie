@@ -1,0 +1,20 @@
+task {
+    goal find(d);
+    answer d == -6;
+
+    d == free_term(x^3 - 6*x^2 + 11*x - 6, x);
+}
+
+task {
+    goal find(d);
+    answer d == 5;
+
+    d == free_term(x^2 + 5, x);
+}
+
+task {
+    goal find(d);
+    answer d == -7;
+
+    d == free_term(2*x^3 + 3*x - 7, x);
+}

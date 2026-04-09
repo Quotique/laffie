@@ -3,7 +3,10 @@ use std::{collections::HashSet, fmt};
 use itertools::Itertools;
 
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
-use crate::term::{Param, ParamSubstitution, Term as _, TermBuf, match_term};
+use crate::{
+    NormalizationLevel,
+    term::{Param, ParamSubstitution, Term as _, TermBuf, match_term},
+};
 
 /// A hypothesis that may contain free (unbound) parameters (non-ground).
 /// Trivially converts to [`GroundedHypothesis`] when `free_params` is empty.
@@ -57,6 +60,13 @@ impl Hypothesis {
                 blocked_rules: self.blocked_rules,
             }];
         }
+
+        // Normalize requirements so that e.g. `divisors(6)` becomes `set(...)`.
+        self.requirements = self
+            .requirements
+            .drain(..)
+            .map(|r| r.normalize(NormalizationLevel::max()))
+            .collect();
 
         // Extract generator requirements; remaining stay in self.requirements
         let generators = self.extract_generators();

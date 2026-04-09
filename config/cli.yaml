@@ -2,7 +2,7 @@ logger:
   filename: "logs/cli.log"
   level: "Info"
   num_files: 3
-  file_rotate_bytes: 100000000
+  file_rotate_bytes: 1000000000
   target_levels:
     solver: "Info"
     solver::task: "Trace"
@@ -10,5 +10,5 @@ logger:
     sled: "Warn"
 
 symbols_dir: "symbols"
-tasks_dir: "tasks"
+tasks_dir: "tasks/test"
 
