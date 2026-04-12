@@ -10,7 +10,7 @@ use derive_more::Display;
 use itertools::Itertools;
 
 use super::{Goal, Task, TermProps};
-use crate::term::SharedTerm;
+use crate::term::{SharedTerm, TermBuf};
 
 pub const STACK_SIZE: usize = 2048;
 
@@ -47,6 +47,7 @@ pub struct Solution {
     pub main_index:       HashMap<SharedTerm, usize>,
     pub goal_index:       HashMap<SharedTerm, usize>,
     pub terms:            Vec<TermProps>,
+    pub find_bindings:    HashMap<TermBuf, TermIdx>,
     unproven_terms_count: usize,
 }
 
@@ -62,6 +63,7 @@ impl Solution {
             main_index: Default::default(),
             goal_index: Default::default(),
             terms: Default::default(),
+            find_bindings: Default::default(),
             status: Default::default(),
             unproven_terms_count: Default::default(),
         };

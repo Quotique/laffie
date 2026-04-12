@@ -130,6 +130,23 @@ impl<'a> TermRef<'a> {
         self.0.deep_clone().into()
     }
 
+    /// Returns all permutations of this node's children, each wrapped in
+    /// a copy of the root symbol.
+    pub fn args_permutations(&self) -> Vec<TermBuf> {
+        let s = self.data().symbol().unwrap();
+        let args: Vec<_> = self.args_iter().map(|a| a.to_owned()).collect();
+        args.into_iter()
+            .permutations(self.degree())
+            .map(|perm| {
+                let mut node = TermBuf::from(Atom::Symbol(s.clone()));
+                for arg in perm {
+                    node.term_mut().push_last_arg(arg);
+                }
+                node
+            })
+            .collect()
+    }
+
     pub fn subsets(&self, count: usize) -> Box<dyn Iterator<Item = TermBuf> + '_> {
         Box::new(SubsetIterator::new(self.degree(), count).map(move |i| {
             let s = self.data().symbol().unwrap();
@@ -249,6 +266,15 @@ impl<'a> TermRef<'a> {
                             .expect("must match");
                         result.append(&mut loc_result);
                     }
+                } else if sym.is_commutative() {
+                    for perm in self.args_permutations() {
+                        let mut loc_result = vec![params.clone()];
+                        if perm.term().try_match_args(pattern, &mut loc_result).is_ok() &&
+                            !loc_result.is_empty()
+                        {
+                            result.append(&mut loc_result);
+                        }
+                    }
                 } else {
                     result.push(params);
                     self.try_match_args(pattern, &mut result)?;
@@ -301,7 +327,7 @@ impl<'a> TermRef<'a> {
             .find_map(|(pos, x)| x.data().placeholder().map(|p| (pos, p)));
         let args_delta = self.degree() as i64 - pattern.degree() as i64;
         ensure!(
-            placeholder.is_some() && args_delta >= 0 || placeholder.is_none() && args_delta == 0,
+            placeholder.is_some() && args_delta >= -1 || placeholder.is_none() && args_delta == 0,
             "Argument size missmatch: {} {}",
             pattern.degree(),
             self.degree()
@@ -587,11 +613,12 @@ mod tests {
     }
 
     #[test]
-    fn placeholder_false_test() {
+    fn placeholder_empty_arglist() {
         let pattern = term_with_params("set(a, ..) is known");
         let term = term_with_vars("set(3) is known");
 
-        assert!(term.term().try_match(pattern.term()).is_err());
+        let maps = term.term().try_match(pattern.term()).unwrap();
+        insta::assert_snapshot!(maps.iter().format(", "), @"{ a: 3, ..1: [] }");
     }
 
     #[test]
@@ -661,5 +688,20 @@ mod tests {
         assert_eq!(a.to_string(), "1");
         assert_eq!(b.to_string(), "2");
         assert_eq!(c.to_string(), "3");
+    }
+
+    #[test]
+    fn commutative_placeholder_find() {
+        let pattern = term_with_params("find(x, ..)");
+
+        // find(a, b) → find(x, ..): two substitutions
+        let goal = term_with_params("find(a, b)");
+        let maps = goal.term().try_match(pattern.term()).unwrap();
+        insta::assert_snapshot!(maps.iter().format(", "), @"{ x: a, ..1: [b] }, { x: b, ..1: [a] }");
+
+        // find(a) → find(x, ..): one substitution, arglist empty
+        let goal_single = term_with_params("find(a)");
+        let maps_single = goal_single.term().try_match(pattern.term()).unwrap();
+        insta::assert_snapshot!(maps_single.iter().format(", "), @"{ x: a, ..1: [] }");
     }
 }
