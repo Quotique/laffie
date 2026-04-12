@@ -12,7 +12,7 @@ rule {
 }
 
 rule {
-    attr level(3),goal(find(x)),one(n),block(brackets_disclosure);
+    attr level(3),goal(find(x, ..)),one(n),block(brackets_disclosure);
 
     a*x^n + b*x^n + c <=> (a+b)*x^n + c;
 }

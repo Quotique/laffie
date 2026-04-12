@@ -126,9 +126,13 @@ impl<'a> TermMut<'a> {
             Atom::ArgList(p) => {
                 if let Some(p) = params.arglists.get(&p) {
                     let mut p = p.clone();
-                    self.swap(&mut p[0].term_mut());
-                    for i in p.into_iter().skip(1).rev() {
-                        self.insert_after(i);
+                    if p.is_empty() {
+                        self.detach();
+                    } else {
+                        self.swap(&mut p[0].term_mut());
+                        for i in p.into_iter().skip(1).rev() {
+                            self.insert_after(i);
+                        }
                     }
                 }
             }

@@ -4,13 +4,13 @@ use itertools::Itertools;
 
 use super::{
     Goal, SharedSolution, Solution, SolveError, Task, TaskBuilder, TermIdx, TermProps, TracerHub,
-    props::TermInference,
+    goal::FindGoal, props::TermInference,
 };
 use crate::{
     NormalizationLevel,
     rule::{GroundedHypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine, SharedRule},
     task::{Tracer, solution::SolutionStatus},
-    term::{SharedTerm, Term, TermBuf, TermMut},
+    term::{SharedTerm, Term, TermBuf, TermMut, match_term},
 };
 
 /// Maximum depth allowed for nested subtasks.
@@ -81,9 +81,10 @@ impl Solver {
             tracer,
         };
 
-        if solution.goal.is_find() {
-            self.unknown_terms
-                .push(solution.goal.term().term.as_ref().clone());
+        if let Goal::Find(ref g) = solution.goal {
+            for target in &g.targets {
+                self.unknown_terms.push(target.clone());
+            }
         }
 
         self.solve_impl(&mut solution, &mut state);
@@ -554,8 +555,8 @@ impl Solver {
             return Ok(true);
         }
 
-        Ok(match solution.goal.clone() {
-            Goal::Find(x) => self.check_find_answer(solution, state, index, x.term.as_ref()),
+        Ok(match &solution.goal.clone() {
+            Goal::Find(g) => self.check_find_answer(solution, state, index, g),
             Goal::Prove(_) => self.check_prove_answer(solution, index),
             Goal::Transform(_) => self.check_transform_answer(solution),
         })
@@ -589,27 +590,65 @@ impl Solver {
         solution: &mut Solution,
         state: &mut SolutionState,
         index: usize,
-        find: &TermBuf,
+        find_goal: &FindGoal,
     ) -> bool {
         let term = solution[index].term.term();
 
-        if term.degree() != 2 {
+        let (lhs, rhs) = match_term!(term, "=="(lhs, rhs))
+            .or_else(|| match_term!(term, "in"(lhs, rhs)))
+            .unzip();
+        let (Some(lhs), Some(rhs)) = (lhs, rhs) else {
             return false;
-        }
-        if !term.data().is_symbol_name("==") && !term.data().is_symbol_name("in") {
+        };
+
+        let target = find_goal
+            .targets
+            .iter()
+            .find(|t| lhs == t.term() && !solution.find_bindings.contains_key(*t));
+        let Some(target) = target else {
+            return false;
+        };
+        let target = target.clone();
+
+        let is_known = TermBuf::symbol("is")
+            .arg(rhs.to_owned())
+            .arg(TermBuf::symbol("known"));
+        if self.prove(solution, is_known, state).answer().is_none() {
             return false;
         }
 
-        if term.first_arg().unwrap() == find.term() {
-            let is_known = TermBuf::symbol("is")
-                .arg(term.last_arg().unwrap().to_owned())
-                .arg(TermBuf::symbol("known"));
-            if self.prove(solution, is_known, state).answer().is_some() {
+        solution.find_bindings.insert(target, index);
+
+        if solution.find_bindings.len() == find_goal.targets.len() {
+            if find_goal.targets.len() == 1 {
                 solution.status = SolutionStatus::Answer(index);
-                return true;
+            } else {
+                let answer = self.build_multi_find_answer(solution, find_goal);
+                if let Ok(idx) = solution.add_term(answer) {
+                    solution.status = SolutionStatus::Answer(idx);
+                }
             }
+            return true;
         }
         false
+    }
+
+    fn build_multi_find_answer(&self, solution: &Solution, find_goal: &FindGoal) -> TermProps {
+        let mut iter = find_goal.targets.iter();
+        let first = iter.next().unwrap();
+        let mut result = solution[solution.find_bindings[first]]
+            .term
+            .term()
+            .to_owned();
+
+        for target in iter {
+            let binding_term = solution[solution.find_bindings[target]]
+                .term
+                .term()
+                .to_owned();
+            result = TermBuf::symbol("&&").arg(result).arg(binding_term);
+        }
+        TermProps::from(result)
     }
 
     fn check_prove_answer(&self, solution: &mut Solution, index: usize) -> bool {
@@ -757,5 +796,30 @@ mod solution_tests {
         let mut solver = Solver::new(rules);
         let solution = solver.solve(task, Default::default(), usize::MAX);
         assert!(solution.answer().is_some());
+    }
+
+    #[test]
+    fn unknown_terms_multi_var_find() {
+        let task = parse_task("task { goal find(x, y); x == 1; y == 2; }");
+        let rules = Arc::new(RulesEngine::default());
+        let mut solver = Solver::new(rules);
+
+        let _ = solver.solve(task, Default::default(), usize::MAX);
+
+        assert_eq!(solver.unknown_terms.len(), 2);
+        assert_eq!(solver.unknown_terms[0], term_with_vars("x"));
+        assert_eq!(solver.unknown_terms[1], term_with_vars("y"));
+    }
+
+    #[test]
+    fn check_answer_multi_var_find() {
+        let task = parse_task("task { goal find(x, y); x == 3; y == 4; }");
+        let rules = Arc::new(RulesEngine::default());
+        let mut solver = Solver::new(rules);
+        let solution = solver.solve(task, Default::default(), usize::MAX);
+        let answer = solution
+            .answer()
+            .expect("multi-var find task is not solved");
+        assert_eq!(*answer, term_with_vars("x == 3 && y == 4"));
     }
 }

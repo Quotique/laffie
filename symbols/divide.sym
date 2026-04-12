@@ -52,7 +52,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(find(x));
+    attr level(2),goal(find(x, ..));
 
     a/b == 0 => a == 0 && b != 0;
 }
