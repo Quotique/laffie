@@ -11,13 +11,13 @@ src/solver/
 │   ├── mod.rs                # Re-exports all rule types
 │   ├── rule.rs               # Rule, RuleId, Level, SharedRule, ApplyRule trait
 │   ├── builder.rs            # RuleBuilder — fluent API for constructing rules
-│   ├── hypothesis.rs         # Hypothesis, HypothesisIterator — rule application candidates
+│   ├── hypothesis.rs         # Hypothesis, GroundedHypothesis, HypothesisIterator — grounding pipeline
 │   ├── rule_attribute.rs     # RuleAttr enum, RuleAttrValue enum
 │   ├── rules_engine.rs       # RulesEngine — central rule registry and dispatcher
 │   └── term_filters.rs       # TermFilters, TermFlags (bitflags: REPLACED, SIMPLIFIED, GOAL)
 ├── task/
 │   ├── mod.rs                # Task struct, re-exports
-│   ├── goal.rs               # Goal enum: Find, Prove, Transform
+│   ├── goal.rs               # FindGoal, Goal enum: Find(FindGoal), Prove, Transform
 │   ├── limits.rs             # CalculationLimits — cycle budgeting with Arc<RwLock>
 │   ├── props.rs              # TermProps, TermInference enum, TermAsRule
 │   ├── solution.rs           # Solution, SolutionStatus, SolveError, SharedSolution
@@ -33,7 +33,7 @@ src/solver/
     ├── atom.rs               # Atom enum (Symbol|Param|Variable|Number|ArgList), Param, Variable, ArgList
     ├── buffer.rs             # TermBuf (owned tree), SharedTerm (Arc), TermPath
     ├── codec.rs              # bincode Encode/Decode for Atom, TermBuf
-    ├── refer.rs              # Term trait, TermRef — read-only view, pattern matching
+    ├── refer.rs              # Term trait, TermRef — read-only view, pattern matching, match_term! macro
     ├── refer_mut.rs          # TermMut — mutable view, normalization, evaluate
     ├── substitution.rs       # ParamSubstitution, VariableSubstitution
     └── symbol/
@@ -56,6 +56,8 @@ src/solver/
             ├── is.rs          # is (property assertion)
             ├── op_true.rs     # true literal
             ├── op_not.rs      # ! (logical not)
+            ├── op_in.rs       # in (set membership, truth checker + generator)
+            ├── substitute.rs  # substitute(x == val, expr) — variable substitution
             ├── replace.rs     # replace operation
             └── symbolic_eq.rs # symbolic equality
 ```
@@ -77,6 +79,21 @@ src/solver/
 |------|------|-------------|
 | 20 | `Task` | Fields: id, text, group, goal, givens, subtask_level, possible_answers |
 
+### rule/hypothesis.rs
+| Line | Type | Description |
+|------|------|-------------|
+| 14 | `Hypothesis` | Non-ground: rule, resolution, free_params, params, requirements, blocked_rules |
+| 27 | `GroundedHypothesis` | Ground instance: all params bound, ready for requirement proving |
+| 36 | `HypothesisIterator` | Iterator over hypotheses from `Rule::apply()` |
+| 53 | `ground()` | Grounds hypothesis: extract generators → cartesian product → Vec\<GroundedHypothesis\> |
+| 121 | `extract_generators()` | Extracts `<param> in set(...)` requirements as generators |
+
+### task/goal.rs
+| Line | Type | Description |
+|------|------|-------------|
+| 14 | `FindGoal` | Fields: targets(Vec\<TermBuf\>), term(TermProps) |
+| 20 | `Goal` | Enum: Find(FindGoal), Prove(TermProps), Transform(TermProps) |
+
 ### task/solver.rs
 | Line | Type | Description |
 |------|------|-------------|
@@ -85,12 +102,15 @@ src/solver/
 | 35 | `Solver` | Fields: rules_engine, local_rules, unknown_terms |
 | 50 | `Solver::new()` | Constructor |
 | 70 | `Solver::solve()` | Entry point: `(task, tracer, deadline) -> SharedSolution` |
-| 93 | `solve_impl()` | Main loop: focus term → simplify → infer → check answer |
-| 247 | `try_infer_new_terms()` | Suggests rules, produces hypotheses, adds new terms |
-| 329 | `try_prove_hypothesis()` | Proves rule requirements via subtasks |
-| 393 | `prove()` | Creates subtask for proving a term |
-| 438 | `transform()` | Handles Transform goals |
-| 484 | `solve_subtask()` | Recursive subtask solving |
+| 94 | `solve_impl()` | Main loop: focus term → simplify → infer → check answer |
+| 248 | `try_infer_new_terms()` | Suggests rules, produces hypotheses, adds new terms |
+| 290 | `produce()` | Applies rule, grounds hypotheses, proves requirements |
+| 331 | `try_prove_hypothesis()` | Proves rule requirements via subtasks |
+| 395 | `prove()` | Creates subtask for proving a term |
+| 440 | `transform()` | Handles Transform goals |
+| 486 | `solve_subtask()` | Recursive subtask solving |
+| 588 | `check_find_answer()` | Incremental multi-var find: binds targets via `==`/`in`, assembles `&&` |
+| 636 | `build_multi_find_answer()` | Builds conjunction answer from find_bindings |
 
 ### task/solution.rs
 | Line | Type | Description |
@@ -99,7 +119,7 @@ src/solver/
 | 17 | `SharedSolution` | `Arc<Solution>` |
 | 20 | `SolveError` | Enum: StackOverflow, MaxSubtaskLevelExceed, NoConditions, NoSolutionsFound, ExecutionDeadline, Canceled |
 | 30 | `SolutionStatus` | Enum: NotDone, Answer(usize), Err(SolveError) |
-| 38 | `Solution` | Fields: task, goal, status, start/end_cycle, main_index, goal_index, terms, unproven_terms_count |
+| 39 | `Solution` | Fields: task, goal, status, start/end_cycle, main_index, goal_index, terms, find_bindings, unproven_terms_count |
 
 ### task/props.rs
 | Line | Type | Description |
@@ -129,8 +149,10 @@ src/solver/
 |------|------|-------------|
 | 18 | `Term` trait | Generic interface: parent, first/last_arg, args_iter, data, degree, truth |
 | 40 | `TermRef<'a>` | Read-only term view |
+| 135 | `args_permutations()` | Returns all argument permutations for commutative symbols |
 | 176 | `try_match()` | Pattern matching: `self vs pattern → Vec<ParamSubstitution>` |
 | 180 | `find_matching_subterms()` | Finds all subterms matching a pattern |
+| 434 | `match_term!` | Macro for structural matching: `match_term!(term, "=="(lhs, rhs))` |
 
 ### term/refer_mut.rs
 | Line | Type | Description |

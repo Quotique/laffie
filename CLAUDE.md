@@ -82,8 +82,8 @@ Laffie is a **symbolic mathematical problem solver** — a rule-based reasoning 
 
 - **Term** (`solver::term`) — A formula tree: atoms, variables, parameters, symbols. Represented as `TermBuf` (owned), `SharedTerm` (Arc-wrapped), `TermRef`/`TermMut` (borrows).
 - **Symbol** (`solver::term::symbol`) — Domain operator (e.g., `plus`, `equal`, `set`) with custom normalizers. Defined in `.sym` files under `symbols/`.
-- **Rule** (`solver::rule`) — A transformation pattern with template, resolution, and requirements. Applied via unification/pattern matching.
-- **Task** (`solver::task`) — A problem with a goal (`find(x)`, `prove(s)`, `transform(s)`), givens, and optional expected answers. Defined in `.pbl` files under `tasks/`.
+- **Rule** (`solver::rule`) — A transformation pattern with template, resolution, and requirements. Applied via unification/pattern matching. Results in `Hypothesis` (may have free params) → `GroundedHypothesis` (all params bound) via grounding.
+- **Task** (`solver::task`) — A problem with a goal (`find(x)`, `find(x, y)`, `prove(s)`, `transform(s)`), givens, and optional expected answers. Multi-variable find assembles conjunction answers (`x == 3 && y == -2`). Defined in `.pbl` files under `tasks/`.
 - **Solver** (`solver::task::solver`) — Bidirectional search engine with cycle budgeting. Forward-chains rules from givens and backward-chains from the goal.
 
 ### Domain Files

@@ -162,14 +162,14 @@ rule {
     free_term(F, x) == d,
     d != 0,
     u in divisors(d),
-    substitute(F, x, u) == 0,
+    substitute(x == u, F) == 0,
     poly_div(F, x - u) == Q;
 }
 ```
 
-Новый синтаксис не нужен: `==` с несвязанным параметром в одной из сторон
-интерпретируется как связывание через find-подзадачу (`free_term(F, x) == d`
-нормализуется в `6 == d`, солвер связывает `d`).
+`==` с несвязанным параметром в одной из сторон интерпретируется как связывание
+(`free_term(F, x) == d` нормализуется в `d == -6`, grounding связывает `d`).
+Позиция параметра не важна — `==` коммутативный, проверяются обе стороны.
 
 #### Подзадача 1: FindGoal и парсинг multi-var find — ✅
 
@@ -190,34 +190,94 @@ rule {
 
 **Валидация:** линейная система `find(x, y)` решается. 64 теста, 43 задачи.
 
-#### Подзадача 3: GroundingResult и делегирование в солвер
+#### Подзадача 3: Итеративное связывание в `ground()`
 
-**Цель**: `ground()` для случаев без `in set(...)` генераторов делегирует в find-подзадачу.
+**Цель**: `ground()` связывает свободные параметры из `==` равенств и
+`in set(...)` генераторов итеративным перебором.
 
-- `src/solver/rule/hypothesis.rs` — `GroundingResult { Grounded(Vec), NeedsSolver(Hypothesis) }`
-- `src/solver/task/solver.rs` — `produce()` обрабатывает `NeedsSolver`;
-  новый метод `ground_via_find()`:
-  - Param → Variable через `ParamSubstitution`
-  - Построить `find(...)` goal с conditions из requirements
-  - Решить подзадачу, извлечь ответ → `GroundedHypothesis`
+Свободные параметры могут появляться в двух формах:
+- `value == param` или `param == value` — прямое связывание (позиция не важна,
+  `==` коммутативный, проверяем обе стороны)
+- `param in set(...)` — генератор (cartesian product)
 
-**Валидация:** кубическое правило (вариант 1) продолжает работать.
+**Алгоритм:**
 
-#### Подзадача 4: Интеграция — обобщённое правило
+1. Нормализация requirements (калькуляторы вычисляются)
+2. Итеративное связывание `==`: найти `expr == param` где `expr` не содержит
+   свободных параметров → bind param, подставить, ренормализовать. Повторять
+   до стабилизации.
+3. Извлечь генераторы `param in set(...)` → cartesian product
+4. Для каждой комбинации: подставить, нормализовать, убрать `true`.
+   Повторить шаг 2 для оставшихся свободных параметров (например, `Q`
+   после подстановки `u`).
 
-**Цель**: вариант 2 правила решает `x³ - 6x² + 11x - 6 == 0`.
+**Пример** (`F = x³ - 6x² + 11x - 6`, свободные: `d, u, Q`):
 
-- `symbols/power.sym` — добавить обобщённое правило
-- Тестовая задача
+```
+После нормализации:
+  is_polynomial(F, x)         → true                    → убрать
+  free_term(F, x) == d        → d == -6                 → bind d = -6
 
-**Валидация:** обобщённое правило решает кубическое уравнение.
+Ренормализация (d подставлен):
+  d != 0                      → -6 != 0 → true          → убрать
+  u in divisors(d)            → u in set(-6,…,6)         → генератор
+
+Cartesian product (u = 1):
+  substitute(x == u, F) == 0  → 0 == 0 → true           → убрать
+  poly_div(F, x - u) == Q     → x² - 5x + 6 == Q       → bind Q
+
+Результат: resolution = (x == 1) || (x² - 5x + 6 == 0), requirements = []
+```
+
+Для `u = -6`: `substitute` → `-504 == 0`, что не `true`.
+Requirement остаётся и отклоняется в `try_prove_hypothesis`.
+
+**Изменения:**
+
+- `src/solver/rule/hypothesis.rs`:
+  - `bind_equality_params()` — поиск `expr == param`, bind, подстановка
+  - `normalize_requirements()` — нормализация + фильтр `true`
+  - `has_free_params(term)` — проверка наличия свободных параметров в терме
+  - `into_grounded()` — конвертация Hypothesis → GroundedHypothesis
+  - Обновлённый `ground()` с итеративным связыванием до и после генераторов
+
+**Валидация:** кубическое правило (вариант 1) продолжает работать; обобщённое
+правило решает `x³ - 6x² + 11x - 6 == 0`.
+
+#### Подзадача 4: Обобщённое правило
+
+**Цель**: вариант 2 правила в `symbols/power.sym`.
+
+```
+rule {
+    attr level(5), goal(find(x, ..));
+
+    F == 0 =>
+        (x == u) || (Q == 0);
+
+    is_polynomial(F, x),
+    free_term(F, x) == d,
+    d != 0,
+    u in divisors(d),
+    substitute(x == u, F) == 0,
+    poly_div(F, x - u) == Q;
+}
+```
+
+**Валидация:** тестовая задача `x³ - 6x² + 11x - 6 == 0` → `x in set(1, 2, 3)`.
 
 #### Файлы для изменения
 
 | Файл | Подзадачи |
 |------|-----------|
-| `src/solver/task/goal.rs` | 1 |
-| `src/solver/task/solution.rs` | 2 |
-| `src/solver/task/solver.rs` | 2, 3 |
+| `src/solver/task/goal.rs` | 1 ✅ |
+| `src/solver/task/solution.rs` | 2 ✅ |
+| `src/solver/task/solver.rs` | 2 ✅ |
 | `src/solver/rule/hypothesis.rs` | 3 |
 | `symbols/power.sym` | 4 |
+
+#### Альтернатива: grounding через find-подзадачу
+
+Исследована в ветке `grounding-via-find-subtask`. Подход перспективный, но
+требует доработки `is known` механизма — см. `doc/grounding_via_find_notes.md`
+в той ветке.
