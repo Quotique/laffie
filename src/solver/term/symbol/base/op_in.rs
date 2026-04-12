@@ -39,7 +39,7 @@ fn member_of(root: TermRef) -> Truth {
 
 #[cfg(test)]
 mod tests {
-    use crate::term::{Term, term_with_vars};
+    use crate::term::term_with_vars;
 
     use super::*;
 
