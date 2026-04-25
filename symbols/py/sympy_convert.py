@@ -63,7 +63,10 @@ def from_sympy(expr, var_name, Term):
         return Term('/', [Term.number(int(expr.p)), Term.number(int(expr.q))])
 
     if isinstance(expr, sympy.Symbol):
-        return Term.variable(str(expr))
+        name = str(expr)
+        if name == var_name:
+            return Term.variable(name)
+        return Term.param(name)
 
     if isinstance(expr, sympy.Add):
         children = [from_sympy(a, var_name, Term) for a in expr.args]
