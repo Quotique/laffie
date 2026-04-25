@@ -202,6 +202,10 @@ impl<'a> TermRef<'a> {
         }
         false
     }
+
+    pub fn contains_params(&self) -> bool {
+        self.bfs().any(|v| v.data.param().is_some())
+    }
 }
 
 impl<'a> TermRef<'a> {
