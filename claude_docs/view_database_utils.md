@@ -34,36 +34,30 @@ src/view/
 
 ## Database Crate
 
-Embedded KV persistence via `sled`.
+Embedded KV persistence. **Currently being rewritten** from `sled` + bincode
+onto `redb` + JSON/zstd; the schema is in transition.
 
-### File Map
+### File Map (current)
 
 ```
 src/database/
-├── lib.rs    # Re-exports TaskDb, UserDb, records
-├── task.rs   # TaskRecord, TaskDb — task storage with versioning
-└── user.rs   # UserRecord, UserDb — user storage with task history
+├── lib.rs    # Re-exports TaskDb, TaskRecord
+└── task.rs   # TaskRecord, TaskDb — minimal task storage
 ```
 
 ### Key Types
 
 #### task.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 37 | `TaskRecord` | Fields: version, id(u128), text, group, givens, goal, answer, runs(Vec<usize>), reports(Vec<u64>) |
-| 52 | `TaskDb` | `open()`, `get()`, `get_or_insert()`, `put()`, `remove()`, `iter()`, `backup()`, `restore()` |
-| 106 | `is_same()` | Compares goals and givens (ignores answers/runs) |
-| 216 | `compose_id()` | `(number: u64, task_id: u64) -> u128` — upper 64 = run number, lower 64 = task_id |
-| 225 | `split_id()` | Reverse of compose_id |
+| Type | Description |
+|------|-------------|
+| `TaskRecord` | Fields: id(u128), text, group, givens, goal, answer, runs(Vec<usize>), reports(Vec<u64>) |
+| `TaskDb`     | `open()`, `get()`, `put()`, `remove()`, `iter()` |
 
-#### user.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 25 | `UserRecord` | Fields: version, id(u64), locale(String), tasks(BTreeSet<u128>) |
-| 34 | `UserDb` | `open()`, `get()`, `put()`, `backup()`, `restore()` |
-| 50 | `add_task_id()` | Adds task to user's history |
-
-Both `TaskDb` and `UserDb` support version migration via `iter_old()`.
+The new schema (planned): two redb tables — `tasks: TaskId([u8;16]) -> Task`,
+`runs: (TaskId, u64) -> Run` — with FIFO eviction at 10 runs per task.
+`TaskId` is `blake3(canonical(sorted_givens, goal))[..16]`. Runs carry a
+structured `SolutionTrace` mirror of `solver::task::Solution` (no `SharedRule`
+or `SharedSolution`; rules referenced via `RuleRef::Named|Anonymous`).
 
 ---
 

@@ -1,5 +1,7 @@
 # Binary Applications — Navigation Map
 
+Active workspace binaries: `cli`, `tui`. `tgbot` is archived (see bottom of this file).
+
 ## CLI (`src/bin/cli/`)
 
 Batch solver: loads symbols/tasks from disk, solves all, reports statistics.
@@ -85,54 +87,9 @@ src/bin/tui/
 
 ---
 
-## Telegram Bot (`src/bin/tgbot/`)
+## Telegram Bot (`src/bin/tgbot/`) — **archived**
 
-Async Telegram interface for task submission and solving.
-
-### Files
-```
-src/bin/tgbot/
-├── main.rs             # Tokio async entry, bot stream processing
-├── settings.rs         # Config: api_token, db paths, symbols_dir
-├── text.rs             # Message templates: system(), version(), task_text()
-├── pagination.rs       # Paginator — splits long messages into pages
-└── commands/
-    ├── mod.rs          # Command routing, start_handler, static handlers
-    ├── task.rs         # Inline task parsing → solve → HTML response
-    ├── tasks_list.rs   # User's task history with Rerun/Report buttons
-    ├── rerun.rs        # Re-solve existing task by ID
-    └── report.rs       # Report issue with a task
-```
-
-### Commands
-| Command | Handler | Description |
-|---------|---------|-------------|
-| `/start` | `start_handler` (mod.rs:59) | Welcome message with buttons |
-| `/help` | static (mod.rs:124) | Help text (i18n) |
-| `/guide` | static | Usage guide |
-| `/examples` | static | Example problems |
-| `/tasks` | `tasks_list_handler` | User's solved tasks |
-| (text) | `task_handler` | Parse and solve inline task |
-| (callback) `rerun:ID` | `rerun_handler` | Re-solve by task ID |
-| (callback) `report:ID` | `report_handler` | Report task issue |
-
-### Key Details
-- Uses `rust_i18n` with Russian locale
-- `Paginator` splits responses at 4096-byte Telegram limit
-- Renders via `Html` renderer
-- Stores results in `TaskDb` + `UserDb`
-
----
-
-## Database Migration (`src/bin/migrate_db/`)
-
-Upgrades database format between versions.
-
-### Files
-- `main.rs` (65 lines) — migration logic with backup/restore
-- `settings.rs` (25 lines) — paths for DBs and backups
-
-### Flow (main.rs:38-64)
-1. Backup existing DB
-2. Iterate `iter_old()` → convert to current record format → `put()`
-3. On error: `restore()` from backup
+Excluded from `[workspace.members]`; not built by `cargo build --workspace`.
+Reviving requires a `telegram-bot` crate upgrade and a rewrite onto the new
+`Db` API (and a separate decision about user-data storage, since `UserDb` was
+removed). Source remains in-tree for reference.
