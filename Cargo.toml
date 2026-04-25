@@ -9,9 +9,12 @@ members = [
     "src/utils",
 
     "src/bin/cli",
+    "src/bin/tui",
+]
+exclude = [
+    # Archived: requires telegram-bot lib upgrade and rewrite onto new Db API
+    # before it can be re-included in the workspace.
     "src/bin/tgbot",
-    "src/bin/migrate_db",
-    "src/bin/tui"
 ]
 
 [workspace.package]

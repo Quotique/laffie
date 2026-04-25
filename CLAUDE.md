@@ -13,7 +13,6 @@ cargo build --release           # Release build
 # Run binaries
 cargo run --release --bin cli -- -c config/cli.yaml
 cargo run --release --bin tui -- -c config/tui.yaml
-cargo run --release --bin tgbot -- -c config/tgbot.json
 ```
 
 ## Testing & Linting
@@ -64,9 +63,11 @@ Laffie is a **symbolic mathematical problem solver** — a rule-based reasoning 
 - **solver** — Core reasoning engine: term representation, rule system, and task-solving algorithm
 - **parser** — PEG-based grammar (`peg` crate) for parsing `.sym` (rule/symbol) and `.pbl` (task/problem) files
 - **view** — Solution rendering via a `Renderer` trait with Console, HTML, and TUI implementations
-- **database** — `sled`-based persistence for tasks and user history
+- **database** — `sled`-based persistence for tasks (in active rewrite onto `redb`)
 - **utils** — Structured logging (`slog`) and helper utilities
-- **cli**, **tui**, **tgbot**, **migrate_db** — Binary applications
+- **cli**, **tui** — Binary applications
+
+> `src/bin/tgbot/` is archived (excluded from the workspace). Reviving it requires a `telegram-bot` crate upgrade and a rewrite onto the new `Db` API.
 
 ### Core Data Flow
 
@@ -100,7 +101,7 @@ The `claude_docs/` directory contains detailed navigation maps for each crate wi
 - [`claude_docs/solver.md`](claude_docs/solver.md) — solver crate: term representation, rule system, solving algorithm
 - [`claude_docs/parser.md`](claude_docs/parser.md) — parser crate: PEG grammar, operator precedence, parsing pipeline
 - [`claude_docs/view_database_utils.md`](claude_docs/view_database_utils.md) — view, database, utils crates
-- [`claude_docs/binaries.md`](claude_docs/binaries.md) — cli, tui, tgbot, migrate_db binaries
+- [`claude_docs/binaries.md`](claude_docs/binaries.md) — cli, tui binaries
 
 **Use these docs** when navigating unfamiliar parts of the codebase. **Keep them up to date** when making structural changes (adding/removing/renaming files, types, or public API).
 
