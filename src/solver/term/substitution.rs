@@ -13,6 +13,39 @@ pub struct ParamSubstitution {
     pub arglists: IndexMap<ArgList, Vec<TermBuf>>,
 }
 
+/// Applies a [`ParamSubstitution`] to a value containing parameters.
+///
+/// Implementors provide [`Substitute::substitute`] (in-place); chainable and
+/// iterator-based variants come for free via default methods.
+pub trait Substitute: Sized {
+    fn substitute(&mut self, subst: &ParamSubstitution);
+
+    fn substituted(mut self, subst: &ParamSubstitution) -> Self {
+        self.substitute(subst);
+        self
+    }
+
+    fn substitute_iter<I>(&mut self, pairs: I)
+    where
+        I: IntoIterator<Item = (Param, TermBuf)>,
+    {
+        self.substitute(&pairs.into_iter().collect());
+    }
+
+    fn substituted_iter<I>(self, pairs: I) -> Self
+    where
+        I: IntoIterator<Item = (Param, TermBuf)>,
+    {
+        self.substituted(&pairs.into_iter().collect())
+    }
+}
+
+impl Substitute for TermBuf {
+    fn substitute(&mut self, subst: &ParamSubstitution) {
+        self.term_mut().substitute(subst);
+    }
+}
+
 impl FromIterator<(Param, TermBuf)> for ParamSubstitution {
     fn from_iter<I: IntoIterator<Item = (Param, TermBuf)>>(iter: I) -> Self {
         ParamSubstitution {

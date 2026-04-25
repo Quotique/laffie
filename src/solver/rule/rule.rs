@@ -9,7 +9,7 @@ use multimap::MultiMap;
 use super::{Hypothesis, RuleAttr, RuleAttrValue, TermFilters};
 use crate::{
     NormalizationLevel,
-    term::{ParamSubstitution, Symbol, Term, TermBuf, TermPath, TermRef},
+    term::{ParamSubstitution, Substitute, Symbol, Term, TermBuf, TermPath, TermRef},
 };
 
 /// Unique identifier for a rule.
@@ -278,9 +278,8 @@ impl ApplyRule for SharedRule {
         let mut result = vec![];
         for (maps, pos) in maps.into_iter() {
             for i in maps.into_iter() {
-                let replace = self.replace_node().to_owned();
-
-                let mut replace = replace.apply_substitution(&i);
+                let mut replace = self.replace_node().to_owned();
+                replace.substitute(&i);
                 let mut resolution = term.clone();
                 replace.swap(&mut resolution.get_mut(&pos).unwrap());
                 resolution = resolution.normalize(self.norm_level());
@@ -288,7 +287,7 @@ impl ApplyRule for SharedRule {
                 let requirements: Vec<TermBuf> = self
                     .requirements
                     .iter()
-                    .map(|r| r.apply_substitution(&i))
+                    .map(|r| r.clone().substituted(&i))
                     .collect();
                 let free_params = requirements
                     .iter()

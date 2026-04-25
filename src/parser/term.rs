@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use solver::{
     Decimal,
-    term::{ArgList, Atom, Param, ParamSubstitution, Term, TermBuf, Variable, try_sym},
+    term::{ArgList, Atom, Param, Substitute, Term, TermBuf, Variable, try_sym},
 };
 
 use crate::{Node, ParserError};
@@ -28,8 +28,7 @@ impl TermParser {
     pub fn try_parse(&mut self, node: &Node) -> Result<TermBuf, ParserError> {
         let mut tree = self.try_parse_node(node)?;
 
-        tree.term_mut()
-            .apply_param_map(&ParamSubstitution::from_iter(self.params.clone()));
+        tree.substitute_iter(self.params.clone());
         Ok(tree.normalize(0.into()))
     }
 

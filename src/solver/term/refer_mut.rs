@@ -5,7 +5,10 @@ use trees::Node;
 
 use utils::SubsetIterator;
 
-use super::{Atom, ParamSubstitution, Symbol, Term, TermBuf, TermRef, Truth, VariableSubstitution};
+use super::{
+    Atom, ParamSubstitution, Substitute, Symbol, Term, TermBuf, TermRef, Truth,
+    VariableSubstitution,
+};
 use crate::NormalizationLevel;
 
 #[derive(Debug, Display, From)]
@@ -115,8 +118,8 @@ impl<'a> TermMut<'a> {
     }
 }
 
-impl<'a> TermMut<'a> {
-    pub fn apply_param_map(&mut self, params: &ParamSubstitution) -> &mut Self {
+impl<'a> Substitute for TermMut<'a> {
+    fn substitute(&mut self, params: &ParamSubstitution) {
         match self.data().clone() {
             Atom::Param(p) => {
                 if let Some(p) = params.params.get(&p) {
@@ -138,13 +141,14 @@ impl<'a> TermMut<'a> {
             }
             _ => {
                 for mut i in self.iter_mut() {
-                    i.apply_param_map(params);
+                    i.substitute(params);
                 }
             }
         }
-        self
     }
+}
 
+impl<'a> TermMut<'a> {
     pub fn apply_variable_map(&mut self, variables: &VariableSubstitution) {
         if let Some(mut v) = self
             .data()
