@@ -13,7 +13,7 @@ pub use buffer::{SharedTerm, TermBuf, TermPath};
 pub(crate) use refer::match_term;
 pub use refer::{Term, TermRef};
 pub use refer_mut::TermMut;
-pub use substitution::{ParamSubstitution, VariableSubstitution};
+pub use substitution::{ParamSubstitution, Substitute, VariableSubstitution};
 pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth, sym, try_sym};
 
 #[cfg(test)]

@@ -4,7 +4,7 @@ use derive_more::From;
 use serde_derive::Deserialize;
 use trees::Tree;
 
-use super::{Atom, ParamSubstitution, Symbol, TermMut, TermRef, sym};
+use super::{Atom, Symbol, TermMut, TermRef, sym};
 use crate::{
     CompactString, Decimal, NormalizationLevel,
     term::{Param, Variable},
@@ -113,12 +113,6 @@ impl TermBuf {
     #[inline]
     pub fn term_mut(&mut self) -> TermMut<'_> {
         self.0.root_mut().get_mut().into()
-    }
-
-    pub fn apply_substitution(&self, params: &ParamSubstitution) -> Self {
-        let mut result = self.clone();
-        result.term_mut().apply_param_map(params);
-        result
     }
 
     #[inline]

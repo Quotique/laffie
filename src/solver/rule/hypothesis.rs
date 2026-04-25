@@ -5,7 +5,7 @@ use itertools::Itertools;
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
 use crate::{
     NormalizationLevel,
-    term::{Param, ParamSubstitution, Term as _, TermBuf, match_term},
+    term::{Param, ParamSubstitution, Substitute, Term as _, TermBuf, match_term},
 };
 
 /// A hypothesis that may contain free (unbound) parameters (non-ground).
@@ -95,11 +95,11 @@ impl Hypothesis {
                     subst.params.insert(param, element);
                 }
 
-                let resolution = self.resolution.apply_substitution(&subst);
+                let resolution = self.resolution.clone().substituted(&subst);
                 let requirements = self
                     .requirements
                     .iter()
-                    .map(|r| r.apply_substitution(&subst))
+                    .map(|r| r.clone().substituted(&subst))
                     .collect();
 
                 let mut params = self.params.clone();

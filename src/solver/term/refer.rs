@@ -468,7 +468,7 @@ pub(crate) use match_term;
 mod tests {
     use itertools::Itertools;
 
-    use crate::term::{Term, term_with_params, term_with_vars};
+    use crate::term::{Substitute, Term, term_with_params, term_with_vars};
 
     #[test]
     fn subterm_contains_direct_term() {
@@ -583,7 +583,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_param_map_test() {
+    fn substitute_test() {
         let term = term_with_vars("2*x^2 + 4 == x - 1");
         let pattern = term_with_params("a + 4 == b");
 
@@ -595,7 +595,7 @@ mod tests {
         assert_eq!(maps.len(), 1);
 
         let mut test = term_with_params("a + 1");
-        test.term_mut().apply_param_map(&maps[0]);
+        test.substitute(&maps[0]);
         insta::assert_snapshot!(test, @"2*x^2+1");
     }
 
