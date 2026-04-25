@@ -5,11 +5,10 @@ use itertools::Itertools;
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
 use crate::{
     NormalizationLevel,
-    term::{Param, ParamSubstitution, Substitute, Term as _, TermBuf, match_term},
+    term::{Atom, Param, ParamSubstitution, Substitute, Term as _, TermBuf, Truth, match_term},
 };
 
-/// A hypothesis that may contain free (unbound) parameters (non-ground).
-/// Trivially converts to [`GroundedHypothesis`] when `free_params` is empty.
+/// Hypothesis with possibly free params; grounds via [`Hypothesis::ground`].
 #[derive(Debug, Clone)]
 pub struct Hypothesis {
     pub rule:       SharedRule,
@@ -22,7 +21,7 @@ pub struct Hypothesis {
     pub blocked_rules: Vec<RuleId>,
 }
 
-/// A fully instantiated hypothesis with all parameters bound (ground instance).
+/// Fully instantiated hypothesis (no free params).
 #[derive(Debug, Clone)]
 pub struct GroundedHypothesis {
     pub rule:       SharedRule,
@@ -39,18 +38,16 @@ pub enum HypothesisIterator {
 }
 
 impl Hypothesis {
-    /// Returns `true` if all parameters are bound (ground hypothesis).
+    /// `true` iff all params bound.
     pub fn is_grounded(&self) -> bool {
         self.free_params.is_empty()
     }
 
-    /// Grounds the hypothesis into concrete instances.
-    ///
-    /// - No free parameters → trivial conversion.
-    /// - `<param> in set(...)` generators → cartesian product of set elements.
-    /// - No generators found → returns empty (TODO: delegate to `find`
-    ///   subtask).
+    /// Grounds via: bind `==`, then cartesian over `param in set(...)`
+    /// generators, then re-bind `==` per combo.
     pub fn ground(mut self) -> Vec<GroundedHypothesis> {
+        self.bind_equality_params();
+
         if self.is_grounded() {
             return vec![GroundedHypothesis {
                 rule:          self.rule,
@@ -61,16 +58,7 @@ impl Hypothesis {
             }];
         }
 
-        // Normalize requirements so that e.g. `divisors(6)` becomes `set(...)`.
-        self.requirements = self
-            .requirements
-            .drain(..)
-            .map(|r| r.normalize(NormalizationLevel::max()))
-            .collect();
-
-        // Extract generator requirements; remaining stay in self.requirements
         let generators = self.extract_generators();
-
         if generators.is_empty() {
             trace!(
                 target: "rule_selection",
@@ -89,35 +77,86 @@ impl Hypothesis {
                     .collect::<Vec<_>>()
             })
             .multi_cartesian_product()
-            .map(|combo| {
-                let mut subst = ParamSubstitution::default();
-                for (param, element) in combo {
-                    subst.params.insert(param, element);
-                }
+            .filter_map(|combo| {
+                let mut inner = self.clone();
+                inner.substitute_iter(combo);
+                inner.bind_equality_params();
 
-                let resolution = self.resolution.clone().substituted(&subst);
-                let requirements = self
-                    .requirements
-                    .iter()
-                    .map(|r| r.clone().substituted(&subst))
-                    .collect();
-
-                let mut params = self.params.clone();
-                params.params.extend(subst.params);
-
-                GroundedHypothesis {
-                    rule: self.rule.clone(),
-                    resolution,
-                    params,
-                    requirements,
-                    blocked_rules: self.blocked_rules.clone(),
+                if inner.is_grounded() {
+                    Some(GroundedHypothesis {
+                        rule:          inner.rule,
+                        resolution:    inner.resolution,
+                        params:        inner.params,
+                        requirements:  inner.requirements,
+                        blocked_rules: inner.blocked_rules,
+                    })
+                } else {
+                    trace!(
+                        target: "rule_selection",
+                        "hypothesis still has free params {:?} after generator",
+                        inner.free_params
+                    );
+                    None
                 }
             })
             .collect()
     }
 
-    /// Extracts `<param> in set(...)` requirements as generators.
-    /// Matched requirements are removed from `self.requirements`.
+    /// Normalizes requirements and drops trivially-true ones.
+    fn normalize_requirements(&mut self) {
+        self.requirements = self
+            .requirements
+            .drain(..)
+            .map(|r| r.normalize(NormalizationLevel::max()))
+            .filter(|r| r.term().truth() != Truth::True)
+            .collect();
+    }
+
+    /// Finds and applies `param == term` requirements recursively.
+    fn bind_equality_params(&mut self) {
+        self.normalize_requirements();
+
+        let mut candidates: Vec<(Param, TermBuf)> = Vec::new();
+        self.requirements.retain(|r| {
+            let Some((lhs, rhs)) = match_term!(r.term(), "=="(lhs, rhs)) else {
+                return true;
+            };
+            if let Some(p) = lhs.data().param() {
+                candidates.push((p.clone(), rhs.to_owned()));
+                false
+            } else if let Some(p) = rhs.data().param() {
+                candidates.push((p.clone(), lhs.to_owned()));
+                false
+            } else {
+                true
+            }
+        });
+
+        while let Some(idx) = candidates
+            .iter()
+            .position(|(_, v)| !v.term().contains_params())
+        {
+            let (param, value) = candidates.swap_remove(idx);
+            let subst: ParamSubstitution = [(param, value)].into_iter().collect();
+
+            self.substitute(&subst);
+            for (_, v) in &mut candidates {
+                v.substitute(&subst);
+            }
+        }
+
+        for (param, value) in candidates {
+            self.requirements.push(
+                TermBuf::symbol("==")
+                    .arg(TermBuf::from(Atom::Param(param)))
+                    .arg(value),
+            );
+        }
+
+        self.normalize_requirements();
+    }
+
+    /// Extracts `param in set(...)` requirements as `(param, elements)`.
     fn extract_generators(&mut self) -> Vec<(Param, Vec<TermBuf>)> {
         self.requirements
             .extract_if(.., |req| {
@@ -132,6 +171,21 @@ impl Hypothesis {
                 Some((param, elements))
             })
             .collect()
+    }
+}
+
+impl Substitute for Hypothesis {
+    /// Applies `subst` to resolution + requirements and updates `free_params`
+    /// / `params`.
+    fn substitute(&mut self, subst: &ParamSubstitution) {
+        self.resolution.substitute(subst);
+        for r in &mut self.requirements {
+            r.substitute(subst);
+        }
+        for (k, v) in &subst.params {
+            self.free_params.remove(k);
+            self.params.params.insert(k.clone(), v.clone());
+        }
     }
 }
 
@@ -200,5 +254,182 @@ impl fmt::Display for GroundedHypothesis {
             self.requirements.iter().format(", "),
             self.resolution,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use crate::{
+        rule::parse_rule,
+        term::{ParamSubstitution, TermBuf, param, term_with_params, term_with_vars},
+    };
+
+    use super::Hypothesis;
+
+    fn make_hypothesis(
+        resolution: TermBuf,
+        free_params: Vec<&str>,
+        requirements: Vec<TermBuf>,
+    ) -> Hypothesis {
+        let rule = Arc::new(parse_rule(
+            r#"rule { attr level(1); a + x == 0 => x == -a; a!=0; }"#,
+        ));
+
+        Hypothesis {
+            rule: rule.into(),
+            resolution,
+            free_params: free_params.into_iter().map(param).collect(),
+            params: ParamSubstitution::default(),
+            requirements,
+            blocked_rules: vec![],
+        }
+    }
+
+    fn res(g: &super::GroundedHypothesis) -> String {
+        g.resolution.to_string()
+    }
+
+    #[test]
+    fn ground_no_free_params() {
+        let h = make_hypothesis(term_with_vars("x == 1"), vec![], vec![]);
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 1);
+        assert_eq!(res(&grounded[0]), "x==1");
+        assert!(grounded[0].requirements.is_empty());
+    }
+
+    #[test]
+    fn ground_binds_equality_param() {
+        let h = make_hypothesis(
+            term_with_params("x == d"),
+            vec!["d"],
+            vec![term_with_params("-6 == d")],
+        );
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 1);
+        assert_eq!(res(&grounded[0]), "x==-6");
+        assert!(grounded[0].requirements.is_empty());
+    }
+
+    #[test]
+    fn ground_binds_equality_param_reversed() {
+        let h = make_hypothesis(
+            term_with_params("x == d"),
+            vec!["d"],
+            vec![term_with_params("d == -6")],
+        );
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 1);
+        assert_eq!(res(&grounded[0]), "x==-6");
+    }
+
+    #[test]
+    fn ground_generator_only() {
+        let h = make_hypothesis(
+            term_with_params("x == u"),
+            vec!["u"],
+            vec![term_with_params("u in set(1, 2)")],
+        );
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 2);
+
+        let mut resolutions: Vec<String> = grounded.iter().map(|g| res(g)).collect();
+        resolutions.sort();
+        assert_eq!(resolutions, vec!["x==1", "x==2"]);
+    }
+
+    #[test]
+    fn ground_equality_then_generator() {
+        let h = make_hypothesis(
+            term_with_params("x == u"),
+            vec!["d", "u"],
+            vec![
+                term_with_params("-6 == d"),
+                term_with_params("u in set(1, 2, 3, 6)"),
+            ],
+        );
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 4);
+    }
+
+    #[test]
+    fn ground_equality_after_generator() {
+        let resolution = TermBuf::symbol("||")
+            .arg(
+                TermBuf::symbol("==")
+                    .arg(TermBuf::variable("x"))
+                    .arg(TermBuf::param("u")),
+            )
+            .arg(
+                TermBuf::symbol("==")
+                    .arg(TermBuf::param("Q"))
+                    .arg(TermBuf::number(0)),
+            );
+        let in_set = TermBuf::symbol("in")
+            .arg(TermBuf::param("u"))
+            .arg(TermBuf::symbol("set").arg(TermBuf::number(1)));
+        let xplus5_eq_q = TermBuf::symbol("==")
+            .arg(
+                TermBuf::symbol("+")
+                    .arg(TermBuf::variable("x"))
+                    .arg(TermBuf::number(5)),
+            )
+            .arg(TermBuf::param("Q"));
+
+        let h = make_hypothesis(resolution, vec!["u", "Q"], vec![in_set, xplus5_eq_q]);
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 1);
+        assert_eq!(res(&grounded[0]), "||(x==1, x+5==0)");
+        assert!(grounded[0].requirements.is_empty());
+    }
+
+    #[test]
+    fn ground_filters_true_requirements() {
+        let h = make_hypothesis(
+            term_with_params("x == d"),
+            vec!["d"],
+            vec![term_with_params("-6 == d"), term_with_vars("1 != 0")],
+        );
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 1);
+        assert!(grounded[0].requirements.is_empty());
+    }
+
+    #[test]
+    fn ground_keeps_non_trivial_requirements() {
+        let h = make_hypothesis(
+            term_with_params("x == d"),
+            vec!["d"],
+            vec![term_with_params("-6 == d"), term_with_vars("x != 0")],
+        );
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 1);
+        assert_eq!(grounded[0].requirements.len(), 1);
+        assert_eq!(grounded[0].requirements[0].to_string(), "x!=0");
+    }
+
+    #[test]
+    fn ground_no_generators_no_equality_returns_empty() {
+        let h = make_hypothesis(
+            term_with_params("x == d"),
+            vec!["d"],
+            vec![term_with_vars("x != 0")],
+        );
+        let grounded = h.ground();
+        assert!(grounded.is_empty());
+    }
+
+    #[test]
+    fn ground_iterative_equality_binding() {
+        let h = make_hypothesis(
+            term_with_params("x == d"),
+            vec!["d"],
+            vec![term_with_params("-6 == d"), term_with_params("d != 0")],
+        );
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 1);
+        assert!(grounded[0].requirements.is_empty());
     }
 }
