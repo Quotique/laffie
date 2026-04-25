@@ -82,11 +82,13 @@ src/solver/
 ### rule/hypothesis.rs
 | Line | Type | Description |
 |------|------|-------------|
-| 14 | `Hypothesis` | Non-ground: rule, resolution, free_params, params, requirements, blocked_rules |
-| 27 | `GroundedHypothesis` | Ground instance: all params bound, ready for requirement proving |
-| 36 | `HypothesisIterator` | Iterator over hypotheses from `Rule::apply()` |
-| 53 | `ground()` | Grounds hypothesis: extract generators → cartesian product → Vec\<GroundedHypothesis\> |
-| 121 | `extract_generators()` | Extracts `<param> in set(...)` requirements as generators |
+| 13 | `Hypothesis` | Non-ground: rule, resolution, free_params, params, requirements, blocked_rules |
+| 26 | `GroundedHypothesis` | Ground instance: all params bound, ready for requirement proving |
+| 35 | `HypothesisIterator` | Iterator over hypotheses from `Rule::apply()` |
+| 48 | `ground()` | Grounds hypothesis: bind `==` → cartesian over generators → re-bind `==` per combo |
+| 116 | `bind_equality_params()` | Iteratively binds `param == term` requirements |
+| 160 | `extract_generators()` | Extracts `<param> in set(...)` requirements as generators |
+| 177 | `Substitute for Hypothesis` | Propagates `ParamSubstitution` to resolution, requirements, free_params |
 
 ### task/goal.rs
 | Line | Type | Description |
@@ -142,7 +144,17 @@ src/solver/
 | 16 | `TermPath(Vec<usize>)` | Path to a node within a term tree |
 | 19 | `TermBuf` | Owned term tree. Factories: symbol(), number(), variable(), param(), arg() |
 | 62 | `normalize()` | Applies normalization to given level |
-| 116 | `apply_substitution()` | Substitutes params → terms |
+
+Param/arglist substitution: see `term/substitution.rs`.
+
+### term/substitution.rs
+| Line | Type | Description |
+|------|------|-------------|
+| 8 | `VariableSubstitution` | `HashMap<Variable, TermBuf>` |
+| 11 | `ParamSubstitution` | `IndexMap<Param, TermBuf>` + arglists |
+| 20 | `Substitute` trait | `substitute()` in-place; `substituted()`, `substitute_iter()` for free |
+
+Implementors: `TermBuf`, `TermMut`, `Hypothesis`.
 
 ### term/refer.rs
 | Line | Type | Description |
