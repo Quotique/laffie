@@ -278,7 +278,7 @@ mod tests {
         ));
 
         Hypothesis {
-            rule: rule.into(),
+            rule,
             resolution,
             free_params: free_params.into_iter().map(param).collect(),
             params: ParamSubstitution::default(),
@@ -335,7 +335,7 @@ mod tests {
         let grounded = h.ground();
         assert_eq!(grounded.len(), 2);
 
-        let mut resolutions: Vec<String> = grounded.iter().map(|g| res(g)).collect();
+        let mut resolutions: Vec<String> = grounded.iter().map(res).collect();
         resolutions.sort();
         assert_eq!(resolutions, vec!["x==1", "x==2"]);
     }

@@ -238,4 +238,24 @@ mod tests {
             @r#"{"data":{"Symbol":"in"},"children":[{"data":{"Variable":"x"}},{"data":{"Symbol":"set"},"children":[{"data":{"Number":"2"}},{"data":{"Number":"5"}}]}]}"#
         );
     }
+
+    #[test]
+    fn serde_roundtrip_test() {
+        for src in [
+            "x",
+            "2",
+            "a*x + b == 0",
+            "x in set(2, 5)",
+            "set(a, ..) is known",
+            "a*x + b == 0 => x == -b/a",
+            "x^2 + 2*x*y + y^2 == (x + y)^2",
+        ] {
+            let term = term_with_params(src);
+            let json = serde_json::to_string(&term.term())
+                .unwrap_or_else(|e| panic!("serialize {src:?}: {e}"));
+            let back: TermBuf = serde_json::from_str(&json)
+                .unwrap_or_else(|e| panic!("deserialize {src:?} from {json}: {e}"));
+            assert_eq!(term, back, "roundtrip mismatch for {src:?}");
+        }
+    }
 }
