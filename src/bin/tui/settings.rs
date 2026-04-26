@@ -48,11 +48,13 @@ impl Settings {
     }
 
     pub fn save(&self) -> io::Result<()> {
-        let mut value: serde_yaml::Value = if self.config_path.exists() {
-            let text = std::fs::read_to_string(&self.config_path)?;
-            serde_yaml::from_str(&text).unwrap_or(serde_yaml::Value::Mapping(Default::default()))
-        } else {
-            serde_yaml::Value::Mapping(Default::default())
+        let mut value: serde_yaml::Value = match std::fs::read_to_string(&self.config_path) {
+            Ok(text) => serde_yaml::from_str(&text)
+                .unwrap_or(serde_yaml::Value::Mapping(Default::default())),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                serde_yaml::Value::Mapping(Default::default())
+            }
+            Err(e) => return Err(e),
         };
         let map = value
             .as_mapping_mut()

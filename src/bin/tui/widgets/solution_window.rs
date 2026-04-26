@@ -167,24 +167,14 @@ impl<'a> SolutionWindow<'a> {
             return lines;
         }
         for (sig, n) in &added {
-            let prefix = if *n > 1 {
-                format!("  +{n}× ")
-            } else {
-                "  + ".to_string()
-            };
             lines.push(Line::from(Span::styled(
-                format!("{prefix}{sig}"),
+                diff_line('+', *n, sig),
                 self.theme.solved,
             )));
         }
         for (sig, n) in &removed {
-            let prefix = if *n > 1 {
-                format!("  -{n}× ")
-            } else {
-                "  - ".to_string()
-            };
             lines.push(Line::from(Span::styled(
-                format!("{prefix}{sig}"),
+                diff_line('-', *n, sig),
                 self.theme.wrong_answer,
             )));
         }
@@ -261,6 +251,14 @@ impl<'a> SolutionWindow<'a> {
             Span::styled(k, self.theme.highlighted),
             Span::styled(v.to_string(), v_style),
         ])
+    }
+}
+
+fn diff_line(sign: char, count: i32, sig: &str) -> String {
+    if count > 1 {
+        format!("  {sign}{count}× {sig}")
+    } else {
+        format!("  {sign} {sig}")
     }
 }
 

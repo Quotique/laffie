@@ -7,9 +7,13 @@ use crate::{
     strings,
     theme::{Theme, ThemeName},
     widgets::{
-        rule_window::RuleWindow, rules_list::RulesList, settings_view::SettingsView,
-        solution_window::SolutionWindow, tasks_list::TasksList,
-        tracing_navigation::TracingNavigation, tracing_window::TracingWindow,
+        rule_window::RuleWindow,
+        rules_list::RulesList,
+        settings_view::{self, SettingField, SettingsView},
+        solution_window::SolutionWindow,
+        tasks_list::TasksList,
+        tracing_navigation::TracingNavigation,
+        tracing_window::TracingWindow,
     },
 };
 
@@ -539,11 +543,15 @@ impl Pane {
 const EXEC_DEADLINE_STEP: usize = 10_000;
 
 fn adjust_setting(state: &mut State, increase: bool) {
-    let Some(idx) = state.settings_pos.selected() else {
+    let Some(field) = state
+        .settings_pos
+        .selected()
+        .and_then(|i| settings_view::FIELDS.get(i).copied())
+    else {
         return;
     };
-    match idx {
-        2 => {
+    match field {
+        SettingField::ExecDeadline => {
             state.settings.exec_deadline = if increase {
                 state
                     .settings
@@ -557,15 +565,15 @@ fn adjust_setting(state: &mut State, increase: bool) {
                     .max(EXEC_DEADLINE_STEP)
             };
         }
-        3 => {
+        SettingField::SolveParallelism => {
             state.settings.solve_parallelism = if increase {
                 state.settings.solve_parallelism.saturating_add(1)
             } else {
                 state.settings.solve_parallelism.saturating_sub(1).max(1)
             };
         }
-        4 => cycle_theme(state),
-        _ => {}
+        SettingField::Theme => cycle_theme(state),
+        SettingField::Symbols | SettingField::Tasks => {}
     }
 }
 

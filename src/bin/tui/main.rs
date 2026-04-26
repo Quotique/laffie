@@ -102,10 +102,9 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                         KeyCode::Char('u') | KeyCode::Char('г') if ctrl => Command::PageUp,
                         KeyCode::Char('d') | KeyCode::Char('в') if ctrl => Command::PageDown,
                         KeyCode::Char('s') | KeyCode::Char('ы') if ctrl => Command::SaveSettings,
-                        KeyCode::F(1) => Command::SwitchTab(0),
-                        KeyCode::F(2) => Command::SwitchTab(1),
-                        KeyCode::F(3) => Command::SwitchTab(2),
-                        KeyCode::F(4) => Command::SwitchTab(3),
+                        KeyCode::F(n) if n >= 1 && (n as usize) <= Itab::ALL.len() => {
+                            Command::SwitchTab((n - 1) as usize)
+                        }
                         KeyCode::PageDown => Command::PageDown,
                         KeyCode::PageUp => Command::PageUp,
                         KeyCode::Home => Command::Top,
