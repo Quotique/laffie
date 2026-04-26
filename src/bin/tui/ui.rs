@@ -195,11 +195,31 @@ impl Ui {
         }
     }
 
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn tick(&mut self) {
         while let Ok(event) = self.progress_rx.try_recv() {
             self.progress.handle(event);
         }
 
+        match self.worker.take() {
+            Some(handler) if !handler.is_finished() => {
+                self.worker = Some(handler);
+            }
+            Some(handler) => match handler.join() {
+                Ok(results) => {
+                    for (idx, solution) in results {
+                        self.state.update_task_solution(&idx, solution);
+                    }
+                }
+                Err(payload) => {
+                    let msg = panic_message(payload);
+                    self.error = format!("Solver thread crashed: {msg}");
+                }
+            },
+            None => self.process_queue(),
+        }
+    }
+
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
         if let Some(pane) = self.panes.get(&self.current_tab) {
             frame.render_stateful_widget(pane.clone(), area, &mut self.state)
         }
@@ -221,24 +241,9 @@ impl Ui {
                 .render(inner, frame.buffer_mut());
         }
 
-        match self.worker.take() {
-            Some(handler) if !handler.is_finished() => {
-                self.worker = Some(handler);
-                let cycles = self.cycles.load(Ordering::Relaxed);
-                self.progress.draw(frame, area, cycles);
-            }
-            Some(handler) => match handler.join() {
-                Ok(results) => {
-                    for (idx, solution) in results {
-                        self.state.update_task_solution(&idx, solution);
-                    }
-                }
-                Err(payload) => {
-                    let msg = panic_message(payload);
-                    self.error = format!("Solver thread crashed: {msg}");
-                }
-            },
-            None => self.process_queue(),
+        if self.has_active_worker() {
+            let cycles = self.cycles.load(Ordering::Relaxed);
+            self.progress.draw(frame, area, cycles);
         }
     }
 }

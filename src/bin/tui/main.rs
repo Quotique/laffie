@@ -31,6 +31,7 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
     let mut ui = ui::Ui::try_new(settings)?;
 
     loop {
+        ui.tick();
         terminal.draw(|frame| {
             let vertical_layout = Layout::default()
                 .direction(Direction::Vertical)
