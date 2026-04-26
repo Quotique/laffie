@@ -161,16 +161,91 @@ fn handle_mouse(ui: &mut ui::Ui, mouse: MouseEvent, tabs: Rect, body: Rect) {
         MouseEventKind::ScrollDown => ui.process(Command::Down),
         MouseEventKind::Down(MouseButton::Left) => {
             if tabs.contains(pos) {
-                let count = Itab::ALL.len().max(1);
-                let rel_x = mouse.column.saturating_sub(tabs.x) as usize;
-                let width = (tabs.width as usize).max(1);
-                let idx = (rel_x * count / width).min(count - 1);
-                ui.process(Command::SwitchTab(idx));
+                if let Some(idx) = tab_index_for_click(tabs, mouse.column) {
+                    ui.process(Command::SwitchTab(idx));
+                }
             } else if body.contains(pos) {
                 ui.click_in_body(mouse.column, mouse.row, body);
             }
         }
         _ => {}
+    }
+}
+
+// Tabs widget renders inside Borders::LEFT|RIGHT as
+// " title0 │ title1 │ title2 " — leading padding, then each title with one
+// trailing pad + divider + leading pad before the next. Returns the index
+// whose title text covers `click_col`; None if the click landed on padding
+// or a divider.
+fn tab_index_for_click(tabs: Rect, click_col: u16) -> Option<usize> {
+    let inner_start = tabs.x.saturating_add(1);
+    let inner_end = tabs.x.saturating_add(tabs.width).saturating_sub(1);
+    if click_col < inner_start || click_col >= inner_end {
+        return None;
+    }
+    let rel = (click_col - inner_start) as usize;
+    let mut cursor: usize = 1;
+    for (idx, tab) in Itab::ALL.iter().enumerate() {
+        let len = format!("F{}: {}", idx + 1, tab).chars().count();
+        if rel >= cursor && rel < cursor + len {
+            return Some(idx);
+        }
+        cursor += len + 3;
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rect(x: u16, w: u16) -> Rect {
+        Rect {
+            x,
+            y: 0,
+            width: w,
+            height: 1,
+        }
+    }
+
+    #[test]
+    fn clicks_on_each_title_match_index() {
+        let tabs = rect(0, 80);
+        // Inner starts at 1; titles "F1: Rules" (9), "F2: Tasks" (9), "F3: Tracing"
+        // (11). Layout cols: pad@1, F1@2..10, pad@11, div@12, pad@13,
+        // F2@14..22, pad@23, div@24, pad@25, F3@26..36
+        assert_eq!(tab_index_for_click(tabs, 2), Some(0));
+        assert_eq!(tab_index_for_click(tabs, 10), Some(0));
+        assert_eq!(tab_index_for_click(tabs, 14), Some(1));
+        assert_eq!(tab_index_for_click(tabs, 22), Some(1));
+        assert_eq!(tab_index_for_click(tabs, 26), Some(2));
+        assert_eq!(tab_index_for_click(tabs, 36), Some(2));
+    }
+
+    #[test]
+    fn clicks_on_padding_or_divider_return_none() {
+        let tabs = rect(0, 80);
+        assert_eq!(tab_index_for_click(tabs, 1), None); // leading padding
+        assert_eq!(tab_index_for_click(tabs, 11), None); // padding after F1
+        assert_eq!(tab_index_for_click(tabs, 12), None); // divider
+        assert_eq!(tab_index_for_click(tabs, 13), None); // padding before F2
+    }
+
+    #[test]
+    fn clicks_outside_rect_return_none() {
+        let tabs = rect(5, 50);
+        assert_eq!(tab_index_for_click(tabs, 0), None);
+        assert_eq!(tab_index_for_click(tabs, 4), None);
+        assert_eq!(tab_index_for_click(tabs, 54), None);
+    }
+
+    #[test]
+    fn offset_rect_shifts_boundaries() {
+        let tabs = rect(10, 80);
+        // Same offsets as the first test, plus 10.
+        assert_eq!(tab_index_for_click(tabs, 12), Some(0));
+        assert_eq!(tab_index_for_click(tabs, 24), Some(1));
+        assert_eq!(tab_index_for_click(tabs, 36), Some(2));
     }
 }
 
