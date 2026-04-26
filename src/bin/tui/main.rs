@@ -68,7 +68,7 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
             frame.render_widget(help, vertical_layout[2]);
         })?;
 
-        if !event::poll(std::time::Duration::from_millis(100))? {
+        if ui.has_active_worker() && !event::poll(std::time::Duration::from_millis(100))? {
             continue;
         }
         if let event::Event::Key(key) = event::read()? &&

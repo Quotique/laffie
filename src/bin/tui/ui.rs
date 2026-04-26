@@ -100,6 +100,10 @@ impl Ui {
         })
     }
 
+    pub fn has_active_worker(&self) -> bool {
+        self.worker.is_some()
+    }
+
     pub fn process_queue(&mut self) {
         if self.state.solve_queue.is_empty() {
             return;
