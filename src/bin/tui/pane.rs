@@ -14,6 +14,17 @@ use crate::{
 
 use super::ui::Command;
 
+#[derive(Debug, Clone, Copy)]
+pub struct KeyHint {
+    pub key:   &'static str,
+    pub label: &'static str,
+}
+
+pub trait WidgetCommands {
+    fn keys(&self) -> &'static [KeyHint];
+    fn handle(&self, state: &mut State, command: Command) -> bool;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WidgetType {
     RulesList,
@@ -120,93 +131,220 @@ impl StatefulWidget for Pane {
     }
 }
 
-impl Pane {
-    pub fn process(&mut self, state: &mut State, command: Command) {
-        let focused = self.layout[self.focused_pane].0;
-        match focused {
+impl WidgetCommands for WidgetType {
+    fn keys(&self) -> &'static [KeyHint] {
+        match self {
+            WidgetType::RulesList => &[
+                KeyHint {
+                    key:   "↑↓",
+                    label: "select rule",
+                },
+                KeyHint {
+                    key:   "→",
+                    label: "details",
+                },
+            ],
+            WidgetType::RuleWindow => &[
+                KeyHint {
+                    key:   "↑↓",
+                    label: "select rule",
+                },
+                KeyHint {
+                    key:   "←",
+                    label: "back to list",
+                },
+            ],
+            WidgetType::TasksList => &[
+                KeyHint {
+                    key:   "↑↓",
+                    label: "navigate",
+                },
+                KeyHint {
+                    key:   "Space",
+                    label: "toggle dir",
+                },
+                KeyHint {
+                    key:   "→",
+                    label: "solution",
+                },
+                KeyHint {
+                    key:   "s",
+                    label: "solve selected",
+                },
+                KeyHint {
+                    key:   "a",
+                    label: "solve all",
+                },
+            ],
+            WidgetType::Solution => &[
+                KeyHint {
+                    key:   "↑↓",
+                    label: "scroll",
+                },
+                KeyHint {
+                    key:   "←",
+                    label: "back to list",
+                },
+                KeyHint {
+                    key:   "s",
+                    label: "solve selected",
+                },
+                KeyHint {
+                    key:   "a",
+                    label: "solve all",
+                },
+            ],
+            WidgetType::TracingNavigation => &[
+                KeyHint {
+                    key:   "↑↓",
+                    label: "navigate",
+                },
+                KeyHint {
+                    key:   "Space",
+                    label: "toggle node",
+                },
+                KeyHint {
+                    key:   "→",
+                    label: "into",
+                },
+                KeyHint {
+                    key:   "←",
+                    label: "back",
+                },
+            ],
+            WidgetType::TracingWindow => &[],
+        }
+    }
+
+    fn handle(&self, state: &mut State, command: Command) -> bool {
+        match self {
             WidgetType::RulesList | WidgetType::RuleWindow => match command {
-                Command::Down => state.rules_pos.select_next(),
-                Command::Up => state.rules_pos.select_previous(),
-                Command::Left => self.focused_pane = 0,
-                Command::Right => self.focused_pane = 1,
-                _ => {}
+                Command::Down => {
+                    state.rules_pos.select_next();
+                    true
+                }
+                Command::Up => {
+                    state.rules_pos.select_previous();
+                    true
+                }
+                _ => false,
             },
             WidgetType::TracingNavigation => {
-                if let Some(task_state) = state.selected_task() {
-                    if let Some(state) = task_state.tracing_state.last_mut() {
-                        match command {
-                            Command::Down => state.1.key_down(),
-                            Command::Up => state.1.key_up(),
-                            Command::Toggle => state.1.toggle_selected(),
-                            _ => false,
-                        };
-                    }
+                let Some(task_state) = state.selected_task() else {
+                    return false;
+                };
+                if let Some(tracing) = task_state.tracing_state.last_mut() {
                     match command {
-                        Command::Left => {
-                            if task_state.tracing_state.len() > 1 {
-                                task_state.tracing_state.pop();
-                            }
+                        Command::Down => {
+                            tracing.1.key_down();
+                            return true;
                         }
-                        Command::Right => {
-                            if let Some(term) = task_state
-                                .tracing_state
-                                .last()
-                                .and_then(|x| x.1.selected().last()) &&
-                                term.idx == 0
-                            {
-                                task_state
-                                    .tracing_state
-                                    .push((term.solution.clone(), Default::default()));
-                            }
+                        Command::Up => {
+                            tracing.1.key_up();
+                            return true;
+                        }
+                        Command::Toggle => {
+                            tracing.1.toggle_selected();
+                            return true;
                         }
                         _ => {}
                     }
                 }
-            }
-            WidgetType::TasksList => {
                 match command {
-                    Command::SolveAll => state.mark_to_solve(state.tasks.root().id()),
-                    Command::Solve => {
-                        if let Some(selected) = state.tasks_pos.selected().last().cloned() {
-                            state.mark_to_solve(selected);
+                    Command::Left => {
+                        if task_state.tracing_state.len() > 1 {
+                            task_state.tracing_state.pop();
                         }
+                        true
                     }
-                    Command::Down => {
-                        state.tasks_pos.key_down();
+                    Command::Right => {
+                        if let Some(term) = task_state
+                            .tracing_state
+                            .last()
+                            .and_then(|x| x.1.selected().last()) &&
+                            term.idx == 0
+                        {
+                            task_state
+                                .tracing_state
+                                .push((term.solution.clone(), Default::default()));
+                        }
+                        true
                     }
-                    Command::Up => {
-                        state.tasks_pos.key_up();
-                    }
-                    Command::Left => self.focused_pane = 0,
-                    Command::Right => self.focused_pane = 1,
-                    Command::Toggle => {
-                        state.tasks_pos.toggle_selected();
-                    }
-                    _ => {}
-                };
+                    _ => false,
+                }
             }
-            WidgetType::Solution => {
-                match command {
-                    Command::SolveAll => state.mark_to_solve(state.tasks.root().id()),
-                    Command::Solve => {
-                        if let Some(selected) = state.tasks_pos.selected().last().cloned() {
-                            state.mark_to_solve(selected);
-                        }
+            WidgetType::TasksList => match command {
+                Command::SolveAll => {
+                    state.mark_to_solve(state.tasks.root().id());
+                    true
+                }
+                Command::Solve => {
+                    if let Some(selected) = state.tasks_pos.selected().last().cloned() {
+                        state.mark_to_solve(selected);
                     }
-                    Command::Down => {
-                        if let Some(task_state) = state.selected_task() {
-                            task_state.solution_pos.scroll_down();
-                        }
+                    true
+                }
+                Command::Down => {
+                    state.tasks_pos.key_down();
+                    true
+                }
+                Command::Up => {
+                    state.tasks_pos.key_up();
+                    true
+                }
+                Command::Toggle => {
+                    state.tasks_pos.toggle_selected();
+                    true
+                }
+                _ => false,
+            },
+            WidgetType::Solution => match command {
+                Command::SolveAll => {
+                    state.mark_to_solve(state.tasks.root().id());
+                    true
+                }
+                Command::Solve => {
+                    if let Some(selected) = state.tasks_pos.selected().last().cloned() {
+                        state.mark_to_solve(selected);
                     }
-                    Command::Up => {
-                        if let Some(task_state) = state.selected_task() {
-                            task_state.solution_pos.scroll_up();
-                        }
+                    true
+                }
+                Command::Down => {
+                    if let Some(task_state) = state.selected_task() {
+                        task_state.solution_pos.scroll_down();
                     }
-                    Command::Left => self.focused_pane = 0,
-                    Command::Right => self.focused_pane = 1,
-                    _ => {}
-                };
+                    true
+                }
+                Command::Up => {
+                    if let Some(task_state) = state.selected_task() {
+                        task_state.solution_pos.scroll_up();
+                    }
+                    true
+                }
+                _ => false,
+            },
+            WidgetType::TracingWindow => false,
+        }
+    }
+}
+
+impl Pane {
+    pub fn keys(&self) -> &'static [KeyHint] {
+        self.layout[self.focused_pane].0.keys()
+    }
+
+    pub fn process(&mut self, state: &mut State, command: Command) {
+        let focused = self.layout[self.focused_pane].0;
+        if focused.handle(state, command) {
+            return;
+        }
+        match command {
+            Command::Left => {
+                self.focused_pane = self.focused_pane.saturating_sub(1);
+            }
+            Command::Right => {
+                self.focused_pane =
+                    (self.focused_pane + 1).min(self.layout.len().saturating_sub(1));
             }
             _ => {}
         }

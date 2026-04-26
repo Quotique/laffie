@@ -54,17 +54,12 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
 
             ui.draw(frame, vertical_layout[1]);
 
-            let help = Paragraph::new(Line::from(
-                [
-                    help_bar_item("←↑→↓", "navigation"),
-                    help_bar_item("q", "quit"),
-                    help_bar_item("s", "solve selected"),
-                    help_bar_item("r", "reload symbols"),
-                    help_bar_item("a", "solve all"),
-                    help_bar_item("Space", "toggle tree node"),
-                ]
-                .concat(),
-            ));
+            let help_spans: Vec<Span> = ui
+                .key_hints()
+                .iter()
+                .flat_map(|h| help_bar_item(h.key, h.label))
+                .collect();
+            let help = Paragraph::new(Line::from(help_spans));
 
             frame.render_widget(help, vertical_layout[2]);
         })?;

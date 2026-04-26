@@ -24,7 +24,7 @@ use super::{
     state::{State, TasksNode},
 };
 use crate::{
-    pane::WidgetType,
+    pane::{KeyHint, WidgetType},
     widgets::{
         popup::Popup,
         solver_progress::{ProgressEvent, ProgressReporter, SolverProgress},
@@ -115,6 +115,34 @@ impl Ui {
 
     pub fn has_active_worker(&self) -> bool {
         self.worker.is_some()
+    }
+
+    pub fn key_hints(&self) -> Vec<KeyHint> {
+        if self.has_active_worker() {
+            return vec![
+                KeyHint {
+                    key:   "c",
+                    label: "cancel",
+                },
+                KeyHint {
+                    key:   "q",
+                    label: "quit",
+                },
+            ];
+        }
+        let mut hints: Vec<KeyHint> = Vec::new();
+        if let Some(pane) = self.panes.get(&self.current_tab) {
+            hints.extend(pane.keys().iter().copied());
+        }
+        hints.push(KeyHint {
+            key:   "r",
+            label: "reload",
+        });
+        hints.push(KeyHint {
+            key:   "q",
+            label: "quit",
+        });
+        hints
     }
 
     pub fn process_queue(&mut self) {
