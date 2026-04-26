@@ -63,7 +63,7 @@ impl SolverProgress {
         }
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, current_cycles: usize) {
+    pub fn draw(&self, frame: &mut Frame, area: Rect, current_cycles: usize, queued: usize) {
         let mut popup = Popup::new(Line::from("Solving in progress").centered());
         popup.draw(frame, area);
         let inner = popup.inner(area);
@@ -99,12 +99,24 @@ impl SolverProgress {
             100) /
             (self.total_tasks_count * self.exec_deadline)) as u16;
 
+        let total_label = if queued > 0 {
+            format!(
+                "Total {}/{} (+{queued} queued)",
+                self.finished_tasks_count, self.total_tasks_count
+            )
+        } else {
+            format!(
+                "Total {}/{}",
+                self.finished_tasks_count, self.total_tasks_count
+            )
+        };
+
         self.theme()
             .gauge(Line::from("Current").left_aligned())
             .percent(current_percent)
             .render(layout[1], frame.buffer_mut());
         self.theme()
-            .gauge(Line::from("Total").left_aligned())
+            .gauge(Line::from(total_label).left_aligned())
             .percent(total_percent)
             .render(layout[2], frame.buffer_mut());
 

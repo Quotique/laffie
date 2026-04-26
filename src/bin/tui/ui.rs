@@ -305,8 +305,8 @@ impl Ui {
             return;
         }
 
-        if self.worker.is_some() {
-            if matches!(command, Command::Cancel) {
+        if matches!(command, Command::Cancel) {
+            if self.worker.is_some() {
                 self.cancel.store(true, Ordering::Relaxed);
             }
             return;
@@ -389,7 +389,8 @@ impl Ui {
 
         if self.has_active_worker() {
             let cycles = self.cycles.load(Ordering::Relaxed);
-            self.progress.draw(frame, area, cycles);
+            let queued = self.state.solve_queue.len();
+            self.progress.draw(frame, area, cycles, queued);
         }
 
         if self.show_help {
