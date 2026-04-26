@@ -22,6 +22,10 @@ cargo run --release --bin cli -- -c config/cli.yaml
 
 Тематические заметки:
 
+- [Подзадачи](doc/ru/subtasks.md)
+- [База правил](doc/ru/rule_base.md)
+- [Гипотезы и конкретизация](doc/ru/hypothesis.md)
+- [Нормализация](doc/ru/normalization.md)
 - [Системы уравнений](doc/ru/systems.md)
 - [Поиск рациональных корней](doc/ru/rational_roots.md)
 
