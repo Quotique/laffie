@@ -10,7 +10,21 @@ path = "./lib.rs"
 [dependencies]
 solver = { path = "../solver" }
 
+chrono = { workspace = true }
+eyre = { workspace = true }
 log = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+serde_json = { workspace = true }
 
+blake3 = "1"
+redb = "2"
+zstd = "0.13"
+
+# Legacy `TaskDb` / `TaskRecord` still in `legacy.rs`, used by `cli` until the
+# new `Db` API takes over. Drop these once `cli` has migrated.
 bincode = "2.0"
 sled = "0.34"
+
+[dev-dependencies]
+tempfile = "3"
