@@ -34,30 +34,109 @@ src/view/
 
 ## Database Crate
 
-Embedded KV persistence. **Currently being rewritten** from `sled` + bincode
-onto `redb` + JSON/zstd; the schema is in transition.
+Single-file persistence on `redb`. Values are zstd-compressed JSON, so
+schema evolution rides on `Option`/`#[serde(default)]` rather than
+per-record version tags.
 
-### File Map (current)
+Two tables in one file:
+
+| Table | Key | Value |
+|-------|-----|-------|
+| `tasks` | `TaskId` (`[u8;16]`) | encoded [`Task`](#task) |
+| `runs`  | `TaskId ‖ seq` (`[u8;24]`, BE seq) | encoded [`Run`](#run) |
+
+### File Map
 
 ```
 src/database/
-├── lib.rs    # Re-exports TaskDb, TaskRecord
-└── task.rs   # TaskRecord, TaskDb — minimal task storage
+├── lib.rs    # Module wiring + re-exports
+├── id.rs     # TaskId, compute_task_id, id_to_hex / id_from_hex
+├── task.rs   # Task DTO, From<&solver::Task>, From<Task> for solver::Task
+├── run.rs    # Run, RunStats, Run::from_solution
+├── trace.rs  # SolutionTrace (mirror), TraceTerm, TraceInference, RuleRef, TraceParams
+├── codec.rs  # zstd + serde_json encode/decode
+└── db.rs     # Db struct, redb tables, transaction-bounded API
 ```
 
-### Key Types
+### Identifiers
 
-#### task.rs
-| Type | Description |
-|------|-------------|
-| `TaskRecord` | Fields: id(u128), text, group, givens, goal, answer, runs(Vec<usize>), reports(Vec<u64>) |
-| `TaskDb`     | `open()`, `get()`, `put()`, `remove()`, `iter()` |
+`TaskId = [u8; 16]`. Computed by `id::compute_task_id`:
 
-The new schema (planned): two redb tables — `tasks: TaskId([u8;16]) -> Task`,
-`runs: (TaskId, u64) -> Run` — with FIFO eviction at 10 runs per task.
-`TaskId` is `blake3(canonical(sorted_givens, goal))[..16]`. Runs carry a
-structured `SolutionTrace` mirror of `solver::task::Solution` (no `SharedRule`
-or `SharedSolution`; rules referenced via `RuleRef::Named|Anonymous`).
+```
+blake3(b"laffie:task:v1"
+       || (len(g) || g  for g in sort(json(givens)))
+       || b"|goal|"
+       || json(goal))[..16]
+```
+
+Equivalent tasks (same givens-multiset and goal) collapse to the same id;
+`possible_answers` is intentionally outside the hash. Convert to/from
+hex with `id_to_hex` / `id_from_hex`.
+
+### Task
+
+`task.rs` — `Task { id, text, group, givens, goal, possible_answers, hidden, created_at }`.
+`From<&solver::task::Task>` computes the id; the inverse (`From<Task> for
+solver::Task`) drops the bottom 64 bits into `solver::Task::id` (display-only
+field on the solver side).
+
+### Run
+
+`run.rs` — `Run { task_id, seq, created_at, stats, solution }`.
+`stats: RunStats { cycles, status, answer, duration_ms }` where `answer`
+duplicates the corresponding `solution.terms[idx]` for cheap lookups and
+`duration_ms` is reserved for when wall-clock timing gets wired in.
+`Run::from_solution(task_id, &Solution)` builds everything from a finished
+solver run; `seq` is overwritten by [`Db::add_run`].
+
+### SolutionTrace
+
+`trace.rs` mirrors `solver::task::Solution` for persistence. Runtime-only
+state (caches, `Arc` graphs of `SharedRule`/`SharedSolution`) is stripped;
+sub-solutions and rule references become indices into flat `Vec`s.
+
+```
+SolutionTrace
+├── status         : TraceStatus (NotDone | Answer(idx) | Err(String))
+├── terms          : Vec<TraceTerm>
+├── sub_solutions  : Vec<SolutionTrace>     // pool for recursive references
+└── find_bindings  : Vec<(TermBuf, idx)>    // multi-var find(x, y, …)
+
+TraceTerm { term, inference: TraceInference }
+
+TraceInference
+├── Condition
+├── Rule { parent, rule_ref: RuleRef, params: TraceParams,
+│          requirements: Vec<idx into sub_solutions> }
+└── Transform { parent, sub_solution: idx into sub_solutions }
+
+RuleRef
+├── Named(String)        // .sym `id` attribute
+└── Anonymous([u8; 8])   // blake3(json(rule.term))[..8]
+
+TraceParams { params: Vec<(String, TermBuf)>,
+              arglists: Vec<(u64, Vec<TermBuf>)> }
+```
+
+`From<&Solution> for SolutionTrace` walks `solution.terms` once,
+allocating sub-trace indices on first sight of each `requirements`/
+`Transform.solution`.
+
+### Db API (`db.rs`)
+
+`Db::open(path)` opens (and initializes) the redb file at `path`.
+
+| Method | Purpose |
+|--------|---------|
+| `put_task(&Task)` | Idempotent upsert keyed by `task.id` |
+| `get_task(TaskId)` / `iter_tasks()` / `task_count()` | Read |
+| `remove_task(TaskId)` | Cascades to `runs` of that task in one tx |
+| `set_hidden(TaskId, bool)` | Toggles the `hidden` flag |
+| `add_run(Run) -> Run` | Assigns next per-task `seq`, evicts down to `RUNS_PER_TASK_LIMIT` (10) |
+| `runs_of(TaskId)` / `last_run(TaskId)` | Newest-first range scan over `(id, *)` |
+
+Every method runs in its own redb transaction; writes commit before
+returning.
 
 ---
 

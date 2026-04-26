@@ -4,32 +4,36 @@ Active workspace binaries: `cli`, `tui`. `tgbot` is archived (see bottom of this
 
 ## CLI (`src/bin/cli/`)
 
-Batch solver: loads symbols/tasks from disk, solves all, reports statistics.
+Batch solver: loads symbols/tasks from disk, solves all, persists to the
+redb-backed `database::Db`, reports statistics.
 
 ### Files
-- `main.rs` (220 lines) — argument parsing, main loop, statistics
-- `settings.rs` (23 lines) — YAML config deserialization
+- `main.rs` — argument parsing, main loop, statistics
+- `settings.rs` — YAML config deserialization
 
-### CLI Arguments (main.rs:20-54)
+### CLI Arguments
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--config` | `./config/local.json` | Config file path |
-| `--only` | `""` | Filter tasks by ID prefix/suffix |
-| `--remove` | — | Remove task from DB by hex ID |
+| `--only` | `""` | Filter tasks by 32-hex `TaskId` prefix/suffix |
+| `--remove` | — | Remove task from DB by 32-hex `TaskId` (cascades to its runs) |
 | `--symbols` | — | Override symbols directory |
 | `--tasks` | — | Override tasks directory |
-| `--tasks_db` | `./db/tasks` | Tasks DB path |
-| `--trace` | false | Enable solution trace dumping |
-| `--exec_deadline` | 100000 | Max execution cycles |
+| `--db-path` | `./db/tasks.redb` | redb file path |
+| `--trace` | false | Dump solver trace into `dumps/<id>.dump` |
+| `--exec-deadline` | 100000 | Max execution cycles |
 
-### Main Flow (main.rs:78-219)
-1. Parse args → load settings → init logger
-2. `DirectoryParser::new()` → `load_rules()`, `load_tasks()`
-3. For each task (filtered by `--only`):
-   - `Solver::new(rules)` → `solve(task, tracer, deadline)`
-   - `View::display_impl(&Console)` — render to stdout
-   - Validate answer, track stats per group
-4. Print per-group and total statistics
+### Main Flow
+1. Parse args → load settings → init logger.
+2. `DirectoryParser::new()` → `load_rules()`, `load_tasks()`.
+3. `Db::open(args.db_path)` (parent dir created if missing).
+4. For each task (filtered by `--only`):
+   - `database::Task::from(&solver_task)` → `db.put_task(&task)` (idempotent).
+   - `Solver::new(rules)` → `solve(task, tracer, deadline)`.
+   - `View::display_impl(&Console)` — render to stdout.
+   - Validate answer, track stats per group.
+   - `Run::from_solution(task.id, &solution)` → `db.add_run(run)` (FIFO-evicts past `RUNS_PER_TASK_LIMIT = 10`).
+5. Print per-group and total statistics.
 
 ---
 
