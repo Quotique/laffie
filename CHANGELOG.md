@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Hypothesis grounding: `Hypothesis` / `GroundedHypothesis` split, free
+  params bound via `==` requirements and cartesian over `set(...)`
+  generators, with `match_term!` and a `Substitute` trait as supporting
+  infrastructure
+- Multi-variable `find(x, y, ...)` with conjunctive answer assembly and
+  commutative goal matching
+- Equations with rational roots can now be solved
+- `database` rewritten on `redb` + zstd-JSON: content-addressed
+  `TaskId`, per-task `Run` history (FIFO-capped at 10), structured
+  `SolutionTrace` mirror of `Solution`
+
+### Changed
+- `cli` persists every solve through the new `database::Db`; DB-path
+  flag renamed `--tasks-db` → `--db-path`, hex `TaskId` for `--remove` /
+  `--only`
+- Term codec returns structured `DecodeError`s instead of panicking
+
+### Removed
+- `tgbot` excluded from the workspace (sources kept in-tree as archived);
+  `migrate_db`, `UserDb`, and the sled/bincode-era `database` shim
+  removed along with their dependencies
+
+### Fixed
+- Workspace-wide clippy cleanup
+- `from_sympy` losing the param/variable distinction
+- Hardcoded Telegram API token replaced with a placeholder
+
+### Docs
+- `code_structure_ru.md` refreshed for the redb schema and the current
+  solver surface
+
 ## [0.5.0] - 2025-12-20
 
 ### Added
