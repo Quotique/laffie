@@ -63,7 +63,7 @@ Laffie is a **symbolic mathematical problem solver** — a rule-based reasoning 
 - **solver** — Core reasoning engine: term representation, rule system, and task-solving algorithm
 - **parser** — PEG-based grammar (`peg` crate) for parsing `.sym` (rule/symbol) and `.pbl` (task/problem) files
 - **view** — Solution rendering via a `Renderer` trait with Console, HTML, and TUI implementations
-- **database** — `sled`-based persistence for tasks (in active rewrite onto `redb`)
+- **database** — `redb`-based persistence: tasks (content-addressed `TaskId`) and per-task run history with `SolutionTrace` mirrors
 - **utils** — Structured logging (`slog`) and helper utilities
 - **cli**, **tui** — Binary applications
 
