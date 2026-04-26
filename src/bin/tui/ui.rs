@@ -26,6 +26,7 @@ use super::{
 };
 use crate::{
     pane::{KeyHint, WidgetType},
+    strings,
     theme::Theme,
     widgets::{
         popup::Popup,
@@ -396,12 +397,12 @@ impl Ui {
         match command {
             Command::Reload => {
                 if let Err(e) = self.state.reload() {
-                    self.error = format!("Reload failed: {e}");
+                    self.error = format!("{}: {e}", strings::error::RELOAD_FAILED);
                 }
             }
             Command::ReloadAll => {
                 if let Err(e) = self.state.reload_all() {
-                    self.error = format!("Reload all failed: {e}");
+                    self.error = format!("{}: {e}", strings::error::RELOAD_ALL_FAILED);
                 }
             }
             Command::SwitchTab(num) => {
@@ -412,7 +413,7 @@ impl Ui {
             }
             Command::SaveSettings => {
                 if let Err(e) = self.state.settings.save() {
-                    self.error = format!("Save settings failed: {e}");
+                    self.error = format!("{}: {e}", strings::error::SAVE_SETTINGS_FAILED);
                 }
             }
             _ => {}
@@ -436,7 +437,7 @@ impl Ui {
                 }
                 Err(payload) => {
                     let msg = panic_message(payload);
-                    self.error = format!("Solver thread crashed: {msg}");
+                    self.error = format!("{}: {msg}", strings::error::SOLVER_THREAD_CRASH);
                 }
             },
             None => self.process_queue(),
@@ -449,7 +450,7 @@ impl Ui {
         }
 
         if !self.error.is_empty() {
-            let mut popup = Popup::new(Line::from("Error"), &self.theme);
+            let mut popup = Popup::new(Line::from(strings::popup_title::ERROR), &self.theme);
             let inner = popup.inner(area);
             popup.draw(frame, area);
 
@@ -499,27 +500,6 @@ pub fn default_state() -> ListState {
     state
 }
 
-const HELP_ENTRIES: &[(&str, &str)] = &[
-    ("F1 / F2 / F3", "switch tab"),
-    ("Tab / Shift+Tab", "next / previous panel"),
-    ("← ↑ → ↓", "navigation"),
-    ("PgUp / PgDn", "page up / down"),
-    ("Ctrl+u / Ctrl+d", "page up / down"),
-    ("Home / End", "jump to top / bottom"),
-    ("Space / Enter", "toggle (tree node, etc.)"),
-    ("/", "filter (Rules)"),
-    ("s", "solve selected task"),
-    ("a", "solve all tasks"),
-    ("c", "cancel running solver"),
-    ("r", "reload rules"),
-    ("Shift+R", "reload rules + tasks"),
-    ("e", "open selected source in $EDITOR"),
-    ("Ctrl+S", "save settings (Settings tab)"),
-    ("?", "toggle help"),
-    ("Esc", "dismiss popup / cancel filter"),
-    ("q", "quit"),
-];
-
 fn draw_help(frame: &mut Frame, area: Rect) {
     let popup_area = Rect {
         x:      area.width / 8,
@@ -530,13 +510,13 @@ fn draw_help(frame: &mut Frame, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Cyan))
-        .title("Help");
+        .title(strings::popup_title::HELP);
     let inner = block.inner(popup_area);
     Clear.render(popup_area, frame.buffer_mut());
     block.render(popup_area, frame.buffer_mut());
 
     let key_style = Style::default().fg(Color::Red);
-    let lines: Vec<Line> = HELP_ENTRIES
+    let lines: Vec<Line> = strings::help::ENTRIES
         .iter()
         .map(|(k, v)| {
             Line::from(vec![

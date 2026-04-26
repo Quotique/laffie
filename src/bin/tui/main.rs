@@ -16,6 +16,7 @@ use ratatui::{
 mod pane;
 mod settings;
 mod state;
+mod strings;
 mod theme;
 mod ui;
 mod widgets;

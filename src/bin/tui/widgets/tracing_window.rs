@@ -8,7 +8,7 @@ use ratatui::{
 
 use solver::task::{Solution, SolutionStatus, TermInference};
 
-use crate::{theme::Theme, widgets::tracing_navigation::TermId};
+use crate::{strings, theme::Theme, widgets::tracing_navigation::TermId};
 
 #[derive(Clone, Debug)]
 pub struct TracingWindow<'a> {
@@ -43,7 +43,7 @@ impl<'a> TracingWindow<'a> {
                 solution
                     .answer()
                     .map(|x| Span::from(x.to_string()))
-                    .unwrap_or(Span::styled("no answer", self.theme.error)),
+                    .unwrap_or(Span::styled(strings::solution::NO_ANSWER, self.theme.error)),
             ),
             Line::default(),
             self.key_value_line("Cycles: ", solution.cycles()),

@@ -4,6 +4,7 @@ use utils::IndexedTree;
 
 use crate::{
     state::State,
+    strings,
     theme::{Theme, ThemeName},
     widgets::{
         rule_window::RuleWindow, rules_list::RulesList, settings_view::SettingsView,
@@ -73,9 +74,9 @@ impl StatefulWidget for Pane {
                 WidgetType::RulesList => {
                     let items = state.filtered_rules();
                     let title = if state.rules_filter.is_empty() {
-                        "Rules".to_string()
+                        strings::pane_title::RULES.to_string()
                     } else {
-                        format!("Rules /{}", state.rules_filter)
+                        format!("{} /{}", strings::pane_title::RULES, state.rules_filter)
                     };
                     let rules_list = RulesList { items };
                     let block = self.theme.block(is_focused, title.as_str());
@@ -84,7 +85,7 @@ impl StatefulWidget for Pane {
                     rules_list.render(inner, buf, &mut state.rules_pos);
                 }
                 WidgetType::RuleWindow => {
-                    let block = self.theme.block(is_focused, "Detailed");
+                    let block = self.theme.block(is_focused, strings::pane_title::DETAILED);
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     if let Some(idx) = state.rules_pos.selected() &&
@@ -102,13 +103,13 @@ impl StatefulWidget for Pane {
                         tasks_index: &state.tasks,
                         theme:       &self.theme,
                     };
-                    let block = self.theme.block(is_focused, "Tasks");
+                    let block = self.theme.block(is_focused, strings::pane_title::TASKS);
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     task_list.render(inner, buf, &mut state.tasks_pos);
                 }
                 WidgetType::Solution => {
-                    let block = self.theme.block(is_focused, "Detailed");
+                    let block = self.theme.block(is_focused, strings::pane_title::DETAILED);
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     let selected = state.tasks_pos.selected().last().cloned();
@@ -122,7 +123,7 @@ impl StatefulWidget for Pane {
                 }
                 WidgetType::TracingNavigation => {
                     if let Some(task_state) = state.selected_task() {
-                        let block = self.theme.block(is_focused, "Tracing");
+                        let block = self.theme.block(is_focused, strings::pane_title::TRACING);
                         let inner = block.inner(*area);
                         block.render(*area, buf);
                         let nav = TracingNavigation { theme: &self.theme };
@@ -131,7 +132,7 @@ impl StatefulWidget for Pane {
                 }
                 WidgetType::TracingWindow => {
                     if let Some(task_state) = state.selected_task() {
-                        let block = self.theme.block(is_focused, "Detailed");
+                        let block = self.theme.block(is_focused, strings::pane_title::DETAILED);
                         let inner = block.inner(*area);
                         block.render(*area, buf);
                         TracingWindow {
@@ -146,7 +147,7 @@ impl StatefulWidget for Pane {
                     }
                 }
                 WidgetType::SettingsView => {
-                    let block = self.theme.block(is_focused, "Settings");
+                    let block = self.theme.block(is_focused, strings::pane_title::SETTINGS);
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     SettingsView {

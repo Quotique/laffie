@@ -12,6 +12,7 @@ use utils::TreeIndex;
 
 use crate::{
     state::{DirectoryStat, ProblemTask, TaskStatusKind, TasksNode, collect_problem_tasks},
+    strings,
     theme::Theme,
 };
 
@@ -40,7 +41,7 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
                         lines.extend(self.diff_lines(prev, &tracing.solution));
                     }
                 } else {
-                    lines.push(Line::from(Span::from("Press s to solve".to_owned())));
+                    lines.push(Line::from(Span::from(strings::solution::PRESS_S_TO_SOLVE)));
                 };
                 (lines, false)
             }
@@ -157,16 +158,12 @@ impl<'a> SolutionWindow<'a> {
         let mut lines = vec![
             Line::default(),
             Line::from(Span::styled(
-                format!(
-                    "Diff vs previous ({} → {} steps):",
-                    prev_steps.len(),
-                    cur_steps.len(),
-                ),
+                strings::solution::diff_header(prev_steps.len(), cur_steps.len()),
                 self.theme.highlighted,
             )),
         ];
         if added.is_empty() && removed.is_empty() {
-            lines.push(Line::from(Span::raw("  identical")));
+            lines.push(Line::from(Span::raw(strings::solution::DIFF_IDENTICAL)));
             return lines;
         }
         for (sig, n) in &added {
@@ -199,15 +196,21 @@ impl<'a> SolutionWindow<'a> {
         if !problems.is_empty() {
             lines.push(Line::default());
             lines.push(Line::from(Span::styled(
-                format!("Problem tasks ({}):", problems.len()),
+                strings::solution::problem_tasks_header(problems.len()),
                 self.theme.highlighted,
             )));
             for pt in problems {
                 let (badge, badge_style) = match pt.kind {
-                    TaskStatusKind::WrongAnswer => ("[wrong]   ", self.theme.wrong_answer),
-                    TaskStatusKind::Unsolved => ("[unsolved]", self.theme.unsolved),
-                    TaskStatusKind::Solved => ("[solved]  ", self.theme.solved),
-                    TaskStatusKind::NotStarted => ("[idle]    ", self.theme.not_started),
+                    TaskStatusKind::WrongAnswer => {
+                        (strings::status_badge::WRONG, self.theme.wrong_answer)
+                    }
+                    TaskStatusKind::Unsolved => {
+                        (strings::status_badge::UNSOLVED, self.theme.unsolved)
+                    }
+                    TaskStatusKind::Solved => (strings::status_badge::SOLVED, self.theme.solved),
+                    TaskStatusKind::NotStarted => {
+                        (strings::status_badge::NOT_STARTED, self.theme.not_started)
+                    }
                 };
                 lines.push(Line::from(vec![
                     Span::styled(format!("  {badge}"), badge_style),
@@ -229,14 +232,26 @@ impl<'a> SolutionWindow<'a> {
         let default = self.theme.default;
 
         [
-            self.pair_line("Group: ", &dir.dir_name, default),
+            self.pair_line(strings::directory_summary::GROUP, &dir.dir_name, default),
             Line::default(),
-            self.pair_line("Total: ", dir.total(), default),
+            self.pair_line(strings::directory_summary::TOTAL, dir.total(), default),
             Line::default(),
-            self.pair_line("Not started: ", dir.not_started_count, not_started),
-            self.pair_line("Solved: ", dir.solved_count, solved),
-            self.pair_line("Not solved: ", dir.unsolved_count, unsolved),
-            self.pair_line("Wrong answers: ", dir.wrong_answer_count, wrong_answer),
+            self.pair_line(
+                strings::directory_summary::NOT_STARTED,
+                dir.not_started_count,
+                not_started,
+            ),
+            self.pair_line(strings::directory_summary::SOLVED, dir.solved_count, solved),
+            self.pair_line(
+                strings::directory_summary::NOT_SOLVED,
+                dir.unsolved_count,
+                unsolved,
+            ),
+            self.pair_line(
+                strings::directory_summary::WRONG_ANSWERS,
+                dir.wrong_answer_count,
+                wrong_answer,
+            ),
         ]
         .into_iter()
     }
