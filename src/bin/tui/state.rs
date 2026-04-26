@@ -45,9 +45,10 @@ pub enum TasksNode {
 
 #[derive(Debug)]
 pub struct TaskState {
-    pub solution:      SharedSolution,
-    pub solution_pos:  ScrollViewState,
-    pub tracing_state: Vec<(SharedSolution, TreeState<TermId>)>,
+    pub solution:          SharedSolution,
+    pub previous_solution: Option<SharedSolution>,
+    pub solution_pos:      ScrollViewState,
+    pub tracing_state:     Vec<(SharedSolution, TreeState<TermId>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -236,6 +237,7 @@ impl State {
             let node = self.find_node_mut(task.group.as_str());
             node.push_back(tr(TasksNode::new_task(TaskState {
                 solution,
+                previous_solution: None,
                 solution_pos: Default::default(),
                 tracing_state: Default::default(),
             })));
@@ -312,6 +314,9 @@ impl State {
         };
 
         let from = TaskStatusKind::of(&task.solution);
+        if from != TaskStatusKind::NotStarted {
+            task.previous_solution = Some(task.solution.clone());
+        }
         task.solution = solution.clone();
         task.tracing_state = vec![(solution, Default::default())];
         let to = TaskStatusKind::of(&task.solution);

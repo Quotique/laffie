@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 use ratatui::{
     prelude::*,
@@ -36,6 +36,9 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
                 let mut lines = self.task_lines(&tracing.solution.task);
                 if tracing.solution.status != SolutionStatus::NotDone {
                     lines.extend(self.solution_status_lines(tracing.solution.clone()));
+                    if let Some(prev) = &tracing.previous_solution {
+                        lines.extend(self.diff_lines(prev, &tracing.solution));
+                    }
                 } else {
                     lines.push(Line::from(Span::from("Press s to solve".to_owned())));
                 };
@@ -123,6 +126,50 @@ impl<'a> SolutionWindow<'a> {
         lines
     }
 
+    fn diff_lines(
+        &self,
+        previous: &SharedSolution,
+        current: &SharedSolution,
+    ) -> Vec<Line<'static>> {
+        let prev_terms = step_term_strings(previous);
+        let cur_terms = step_term_strings(current);
+
+        let prev_set: HashSet<&String> = prev_terms.iter().collect();
+        let cur_set: HashSet<&String> = cur_terms.iter().collect();
+
+        let added: Vec<&String> = cur_terms.iter().filter(|t| !prev_set.contains(t)).collect();
+        let removed: Vec<&String> = prev_terms.iter().filter(|t| !cur_set.contains(t)).collect();
+
+        let mut lines = vec![
+            Line::default(),
+            Line::from(Span::styled(
+                format!(
+                    "Diff vs previous ({} → {} steps):",
+                    prev_terms.len(),
+                    cur_terms.len(),
+                ),
+                self.theme.highlighted,
+            )),
+        ];
+        if added.is_empty() && removed.is_empty() {
+            lines.push(Line::from(Span::raw("  identical")));
+            return lines;
+        }
+        for t in &added {
+            lines.push(Line::from(Span::styled(
+                format!("  + {t}"),
+                self.theme.solved,
+            )));
+        }
+        for t in &removed {
+            lines.push(Line::from(Span::styled(
+                format!("  - {t}"),
+                self.theme.wrong_answer,
+            )));
+        }
+        lines
+    }
+
     fn dir_lines(&self, dir: &DirectoryStat, problems: &[ProblemTask]) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = self.dir_status_lines(dir).collect();
         if !problems.is_empty() {
@@ -176,4 +223,14 @@ impl<'a> SolutionWindow<'a> {
             Span::styled(v.to_string(), v_style),
         ])
     }
+}
+
+fn step_term_strings(solution: &SharedSolution) -> Vec<String> {
+    solution
+        .steps()
+        .filter_map(|v| match v {
+            Visit::Term(t) | Visit::Answer(t) => Some(t.to_string()),
+            Visit::Subtask(_) => None,
+        })
+        .collect()
 }
