@@ -21,12 +21,20 @@ pub struct State {
     pub rules_pos:    ListState,
     pub rules_filter: String,
 
-    pub tasks:     Tree<TasksNode>,
-    pub tasks_pos: TreeState<TreeIndex>,
+    pub tasks:            Tree<TasksNode>,
+    pub tasks_pos:        TreeState<TreeIndex>,
+    pub dir_solution_pos: ScrollViewState,
 
     pub solve_queue: Vec<TreeIndex>,
 
     pub settings: Settings,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProblemTask {
+    pub kind:    TaskStatusKind,
+    pub task_id: u64,
+    pub text:    String,
 }
 
 #[derive(Debug)]
@@ -148,6 +156,7 @@ impl State {
             rules_filter: String::new(),
             tasks: Tree::new(TasksNode::new_directory("Tasks".into())),
             tasks_pos: Default::default(),
+            dir_solution_pos: Default::default(),
             settings,
             solve_queue: Default::default(),
         };
@@ -208,6 +217,16 @@ impl State {
             return Some(tracing);
         }
         None
+    }
+
+    pub fn solution_scroll_mut(&mut self) -> &mut ScrollViewState {
+        let idx = self.tasks_pos.selected().last().cloned();
+        if let Some(idx) = idx &&
+            let TasksNode::Task(task) = self.tasks[&idx].data_mut()
+        {
+            return &mut task.solution_pos;
+        }
+        &mut self.dir_solution_pos
     }
 
     fn add_task(&mut self, task: Task) {
@@ -307,6 +326,24 @@ fn collect_task_ids(node: &Node<TasksNode>, out: &mut Vec<TreeIndex>) {
         match child.data() {
             TasksNode::Task(_) => out.push(child.id()),
             TasksNode::Directory(_) => collect_task_ids(child, out),
+        }
+    }
+}
+
+pub fn collect_problem_tasks(node: &Node<TasksNode>, out: &mut Vec<ProblemTask>) {
+    for child in node.iter() {
+        match child.data() {
+            TasksNode::Task(task) => {
+                let kind = TaskStatusKind::of(&task.solution);
+                if matches!(kind, TaskStatusKind::WrongAnswer | TaskStatusKind::Unsolved) {
+                    out.push(ProblemTask {
+                        kind,
+                        task_id: task.solution.task.id,
+                        text: task.solution.task.text.clone(),
+                    });
+                }
+            }
+            TasksNode::Directory(_) => collect_problem_tasks(child, out),
         }
     }
 }

@@ -5,18 +5,19 @@ use ratatui::{
     widgets::{List, StatefulWidget},
 };
 use trees::Tree;
-use tui_scrollview::{ScrollView, ScrollbarVisibility};
+use tui_scrollview::{ScrollView, ScrollViewState, ScrollbarVisibility};
 
 use solver::task::{SharedSolution, SolutionStatus, StepsSource, Task, Visit};
 use utils::TreeIndex;
 
 use crate::{
-    state::{DirectoryStat, TasksNode},
+    state::{DirectoryStat, ProblemTask, TaskStatusKind, TasksNode, collect_problem_tasks},
     theme::Theme,
 };
 
 pub struct SolutionWindow<'a> {
     pub tasks_index: &'a mut Tree<TasksNode>,
+    pub dir_scroll:  &'a mut ScrollViewState,
 
     pub selected: Option<TreeIndex>,
 }
@@ -29,7 +30,7 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
             return;
         };
         let list_cursor = self.theme().list_cursor_style();
-        let list = match self.tasks_index[selected].data() {
+        let (lines, is_directory) = match self.tasks_index[selected].data() {
             TasksNode::Task(tracing) => {
                 let mut lines = self.task_lines(&tracing.solution.task);
                 if tracing.solution.status != SolutionStatus::NotDone {
@@ -37,24 +38,31 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
                 } else {
                     lines.push(Line::from(Span::from("Press s to solve".to_owned())));
                 };
-                List::new(lines.iter().cloned()).highlight_style(list_cursor)
+                (lines, false)
             }
-            TasksNode::Directory(dir) => List::new(self.dir_status_lines(dir))
-                .highlight_style(self.theme().list_cursor_style()),
+            TasksNode::Directory(dir) => {
+                let mut problems = Vec::new();
+                collect_problem_tasks(&self.tasks_index[selected], &mut problems);
+                (self.dir_lines(dir, &problems), true)
+            }
         };
-        match self.tasks_index[selected].data_mut() {
-            TasksNode::Task(tracing) => {
-                let content_size = Size::new(area.as_size().width, list.len() as u16);
-                let mut view = ScrollView::new(content_size)
-                    .horizontal_scrollbar_visibility(ScrollbarVisibility::Never)
-                    .vertical_scrollbar_visibility(ScrollbarVisibility::Automatic);
-                <List as Widget>::render(list, view.buf().area, view.buf_mut());
+        let list = List::new(lines.iter().cloned()).highlight_style(list_cursor);
+        let height = lines.len() as u16;
 
-                view.render(area, buf, &mut tracing.solution_pos);
-            }
-            TasksNode::Directory(_) => {
-                <List as Widget>::render(list, area, buf);
-            }
+        if is_directory {
+            let content_size = Size::new(area.as_size().width, height);
+            let mut view = ScrollView::new(content_size)
+                .horizontal_scrollbar_visibility(ScrollbarVisibility::Never)
+                .vertical_scrollbar_visibility(ScrollbarVisibility::Automatic);
+            <List as Widget>::render(list, view.buf().area, view.buf_mut());
+            view.render(area, buf, self.dir_scroll);
+        } else if let TasksNode::Task(tracing) = self.tasks_index[selected].data_mut() {
+            let content_size = Size::new(area.as_size().width, height);
+            let mut view = ScrollView::new(content_size)
+                .horizontal_scrollbar_visibility(ScrollbarVisibility::Never)
+                .vertical_scrollbar_visibility(ScrollbarVisibility::Automatic);
+            <List as Widget>::render(list, view.buf().area, view.buf_mut());
+            view.render(area, buf, &mut tracing.solution_pos);
         }
     }
 }
@@ -109,6 +117,33 @@ impl<'a> SolutionWindow<'a> {
                     )));
                     depth -= 1;
                 }
+            }
+        }
+        lines
+    }
+
+    fn dir_lines(&self, dir: &DirectoryStat, problems: &[ProblemTask]) -> Vec<Line<'static>> {
+        let mut lines: Vec<Line<'static>> = self.dir_status_lines(dir).collect();
+        if !problems.is_empty() {
+            lines.push(Line::default());
+            lines.push(Line::from(Span::styled(
+                format!("Problem tasks ({}):", problems.len()),
+                self.theme().highlighted(),
+            )));
+            for pt in problems {
+                let (badge, badge_style) = match pt.kind {
+                    TaskStatusKind::WrongAnswer => ("[wrong]   ", self.theme().wrong_answer()),
+                    TaskStatusKind::Unsolved => ("[unsolved]", self.theme().unsolved()),
+                    TaskStatusKind::Solved => ("[solved]  ", self.theme().solved()),
+                    TaskStatusKind::NotStarted => ("[idle]    ", self.theme().not_started()),
+                };
+                lines.push(Line::from(vec![
+                    Span::styled(format!("  {badge}"), badge_style),
+                    Span::from(" "),
+                    Span::styled(format!("{:x}", pt.task_id), self.theme().highlighted()),
+                    Span::from(". "),
+                    Span::raw(pt.text.clone()),
+                ]));
             }
         }
         lines

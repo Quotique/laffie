@@ -101,12 +101,14 @@ impl StatefulWidget for Pane {
                 }
                 WidgetType::Solution => {
                     let block = self.theme().block(is_focused, "Detailed");
-                    let solution = SolutionWindow {
-                        tasks_index: &mut state.tasks,
-                        selected:    state.tasks_pos.selected().last().cloned(),
-                    };
                     let inner = block.inner(*area);
                     block.render(*area, buf);
+                    let selected = state.tasks_pos.selected().last().cloned();
+                    let solution = SolutionWindow {
+                        tasks_index: &mut state.tasks,
+                        dir_scroll: &mut state.dir_solution_pos,
+                        selected,
+                    };
                     solution.render(inner, buf, &mut ());
                 }
                 WidgetType::TracingNavigation => {
@@ -380,39 +382,27 @@ impl WidgetCommands for WidgetType {
                     true
                 }
                 Command::Down => {
-                    if let Some(task_state) = state.selected_task() {
-                        task_state.solution_pos.scroll_down();
-                    }
+                    state.solution_scroll_mut().scroll_down();
                     true
                 }
                 Command::Up => {
-                    if let Some(task_state) = state.selected_task() {
-                        task_state.solution_pos.scroll_up();
-                    }
+                    state.solution_scroll_mut().scroll_up();
                     true
                 }
                 Command::PageDown => {
-                    if let Some(task_state) = state.selected_task() {
-                        task_state.solution_pos.scroll_page_down();
-                    }
+                    state.solution_scroll_mut().scroll_page_down();
                     true
                 }
                 Command::PageUp => {
-                    if let Some(task_state) = state.selected_task() {
-                        task_state.solution_pos.scroll_page_up();
-                    }
+                    state.solution_scroll_mut().scroll_page_up();
                     true
                 }
                 Command::Top => {
-                    if let Some(task_state) = state.selected_task() {
-                        task_state.solution_pos.scroll_to_top();
-                    }
+                    state.solution_scroll_mut().scroll_to_top();
                     true
                 }
                 Command::Bottom => {
-                    if let Some(task_state) = state.selected_task() {
-                        task_state.solution_pos.scroll_to_bottom();
-                    }
+                    state.solution_scroll_mut().scroll_to_bottom();
                     true
                 }
                 _ => false,
