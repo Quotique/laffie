@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io,
+    path::PathBuf,
     sync::{
         Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -51,6 +52,7 @@ pub enum Command {
     Reload,
     ReloadAll,
     Cancel,
+    EditSelected,
     ShowHelp,
     Dismiss,
     FilterEnter,
@@ -62,10 +64,11 @@ pub enum Command {
 pub struct Ui {
     panes: HashMap<Tab, Pane>,
 
-    error:       String,
-    show_help:   bool,
-    filter_mode: bool,
-    worker:      Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
+    error:        String,
+    show_help:    bool,
+    filter_mode:  bool,
+    pending_edit: Option<PathBuf>,
+    worker:       Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
 
     progress:    SolverProgress,
     progress_tx: Sender<ProgressEvent>,
@@ -120,6 +123,7 @@ impl Ui {
             error: Default::default(),
             show_help: false,
             filter_mode: false,
+            pending_edit: None,
             worker: None,
             progress: SolverProgress::new(state.settings.exec_deadline),
             progress_tx,
@@ -136,6 +140,35 @@ impl Ui {
 
     pub fn is_filter_mode(&self) -> bool {
         self.filter_mode
+    }
+
+    pub fn take_pending_edit(&mut self) -> Option<PathBuf> {
+        self.pending_edit.take()
+    }
+
+    fn compute_edit_target(&self) -> Option<PathBuf> {
+        match self.current_tab {
+            Tab::Rules => {
+                let idx = self.state.rules_pos.selected()?;
+                let rule = self.state.filtered_rules().into_iter().nth(idx)?;
+                Some(
+                    self.state
+                        .settings
+                        .symbols
+                        .join(format!("{}.sym", rule.symbol.as_str())),
+                )
+            }
+            Tab::Tasks => {
+                let selected = self.state.tasks_pos.selected().last()?;
+                let node = self.state.tasks.get(selected)?;
+                if let TasksNode::Task(task) = node.data() {
+                    Some(PathBuf::from(format!("{}.pbl", task.solution.task.group)))
+                } else {
+                    None
+                }
+            }
+            Tab::Tracing => None,
+        }
     }
 
     pub fn click_in_body(&mut self, col: u16, row: u16, body: Rect) {
@@ -353,6 +386,9 @@ impl Ui {
             Command::SwitchTab(num) => {
                 self.current_tab = Tab::from(num);
             }
+            Command::EditSelected => {
+                self.pending_edit = self.compute_edit_target();
+            }
             _ => {}
         }
     }
@@ -451,6 +487,7 @@ const HELP_ENTRIES: &[(&str, &str)] = &[
     ("c", "cancel running solver"),
     ("r", "reload rules"),
     ("Shift+R", "reload rules + tasks"),
+    ("e", "open selected source in $EDITOR"),
     ("?", "toggle help"),
     ("Esc", "dismiss popup / cancel filter"),
     ("q", "quit"),

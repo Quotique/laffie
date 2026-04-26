@@ -153,6 +153,10 @@ impl WidgetCommands for WidgetType {
                     key:   "/",
                     label: "filter",
                 },
+                KeyHint {
+                    key:   "e",
+                    label: "edit .sym",
+                },
             ],
             WidgetType::RuleWindow => &[
                 KeyHint {
@@ -188,6 +192,10 @@ impl WidgetCommands for WidgetType {
                 KeyHint {
                     key:   "a",
                     label: "solve all",
+                },
+                KeyHint {
+                    key:   "e",
+                    label: "edit .pbl",
                 },
             ],
             WidgetType::Solution => &[

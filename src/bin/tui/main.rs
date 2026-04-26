@@ -1,4 +1,4 @@
-use std::{fmt::Display, io};
+use std::{fmt::Display, io, path::Path, process::Command as ProcessCommand};
 
 use ratatui::{
     DefaultTerminal,
@@ -122,6 +122,7 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                         KeyCode::Char('a') | KeyCode::Char('ф') => Command::SolveAll,
                         KeyCode::Char('r') | KeyCode::Char('к') => Command::Reload,
                         KeyCode::Char('R') | KeyCode::Char('К') => Command::ReloadAll,
+                        KeyCode::Char('e') | KeyCode::Char('у') => Command::EditSelected,
                         KeyCode::Char('c') | KeyCode::Char('с') => Command::Cancel,
                         KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
                         _ => Command::None,
@@ -131,7 +132,26 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
             }
             _ => {}
         }
+
+        if let Some(path) = ui.take_pending_edit() {
+            run_editor(&mut terminal, &path)?;
+            ui.process(Command::ReloadAll);
+        }
     }
+}
+
+fn run_editor(terminal: &mut DefaultTerminal, path: &Path) -> io::Result<()> {
+    let editor = std::env::var("EDITOR")
+        .or_else(|_| std::env::var("VISUAL"))
+        .unwrap_or_else(|_| "vi".to_string());
+
+    let _ = execute!(io::stdout(), DisableMouseCapture);
+    ratatui::restore();
+    let _ = ProcessCommand::new(&editor).arg(path).status();
+    *terminal = ratatui::init();
+    let _ = execute!(io::stdout(), EnableMouseCapture);
+    terminal.clear()?;
+    Ok(())
 }
 
 fn handle_mouse(ui: &mut ui::Ui, mouse: MouseEvent, tabs: Rect, body: Rect) {
