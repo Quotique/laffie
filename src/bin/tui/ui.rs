@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     io,
-    iter::once,
     sync::Arc,
     thread::{JoinHandle, spawn},
 };
@@ -166,7 +165,7 @@ impl Ui {
         match command {
             Command::Reload => {
                 if let Err(e) = self.state.reload() {
-                    self.error = e.to_string();
+                    self.error = format!("Reload failed: {e}");
                 }
             }
             Command::SwitchTab(num) => {
@@ -186,11 +185,10 @@ impl Ui {
             let inner = popup.inner(area);
             popup.draw(frame, area);
 
-            let err_lines = self.error.lines().map(|x| Line::from(format!("|{x}")));
             let err_text = Paragraph::new(
-                once(Line::from("Error on rules update!"))
-                    .chain(err_lines)
-                    .chain(once(Line::from("Rules not updated!")))
+                self.error
+                    .lines()
+                    .map(|x| Line::from(format!("| {x}")))
                     .collect::<Vec<_>>(),
             );
             err_text
@@ -199,16 +197,23 @@ impl Ui {
                 .render(inner, frame.buffer_mut());
         }
 
-        if let Some(handler) = self.worker.as_mut() {
-            if !handler.is_finished() {
+        match self.worker.take() {
+            Some(handler) if !handler.is_finished() => {
+                self.worker = Some(handler);
                 self.progress.lock().draw(frame, area);
-            } else {
-                for (idx, solution) in self.worker.take().unwrap().join().unwrap() {
-                    self.state.update_task_solution(&idx, solution);
-                }
             }
-        } else {
-            self.process_queue();
+            Some(handler) => match handler.join() {
+                Ok(results) => {
+                    for (idx, solution) in results {
+                        self.state.update_task_solution(&idx, solution);
+                    }
+                }
+                Err(payload) => {
+                    let msg = panic_message(payload);
+                    self.error = format!("Solver thread crashed: {msg}");
+                }
+            },
+            None => self.process_queue(),
         }
     }
 }
@@ -231,11 +236,9 @@ impl From<Tab> for usize {
 impl From<usize> for Tab {
     fn from(value: usize) -> Self {
         match value {
-            0 => Tab::Rules,
             1 => Tab::Tasks,
             2 => Tab::Tracing,
-            _ => unimplemented!(),
-            // _ => Tab::Setting,
+            _ => Tab::Rules,
         }
     }
 }
@@ -244,4 +247,14 @@ pub fn default_state() -> ListState {
     let mut state = ListState::default();
     state.select(Some(0));
     state
+}
+
+fn panic_message(payload: Box<dyn std::any::Any + Send + 'static>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "panicked".to_string()
+    }
 }

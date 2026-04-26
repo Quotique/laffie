@@ -64,15 +64,14 @@ impl StatefulWidget for Pane {
                     rules_list.render(inner, buf, &mut state.rules_pos);
                 }
                 WidgetType::RuleWindow => {
-                    let rule_window = RuleWindow {
-                        rule: { state.rules_engine.iter() }
-                            .nth(state.rules_pos.selected().expect("missing selected"))
-                            .expect("rule not found"),
-                    };
                     let block = self.theme().block(is_focused, "Detailed");
                     let inner = block.inner(*area);
                     block.render(*area, buf);
-                    rule_window.render(inner, buf);
+                    if let Some(idx) = state.rules_pos.selected() &&
+                        let Some(rule) = state.rules_engine.iter().nth(idx)
+                    {
+                        RuleWindow { rule }.render(inner, buf);
+                    }
                 }
                 WidgetType::TasksList => {
                     let task_list = TasksList {

@@ -22,7 +22,7 @@ impl StatefulWidget for RulesList {
 
         let len = list.len();
         <List as StatefulWidget>::render(list, area, buf, state);
-        draw_scrollbar_buf(buf, area, len, state.selected().unwrap());
+        draw_scrollbar_buf(buf, area, len, state.selected().unwrap_or(0));
     }
 }
 
