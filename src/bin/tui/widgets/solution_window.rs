@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{collections::HashMap, fmt::Display};
 
 use ratatui::{
     prelude::*,
@@ -7,7 +7,7 @@ use ratatui::{
 use trees::Tree;
 use tui_scrollview::{ScrollView, ScrollViewState, ScrollbarVisibility};
 
-use solver::task::{SharedSolution, SolutionStatus, StepsSource, Task, Visit};
+use solver::task::{SharedSolution, SolutionStatus, StepsSource, Task, TermInference, Visit};
 use utils::TreeIndex;
 
 use crate::{
@@ -131,22 +131,36 @@ impl<'a> SolutionWindow<'a> {
         previous: &SharedSolution,
         current: &SharedSolution,
     ) -> Vec<Line<'static>> {
-        let prev_terms = step_term_strings(previous);
-        let cur_terms = step_term_strings(current);
+        let prev_steps = step_signatures(previous);
+        let cur_steps = step_signatures(current);
 
-        let prev_set: HashSet<&String> = prev_terms.iter().collect();
-        let cur_set: HashSet<&String> = cur_terms.iter().collect();
+        let mut counts: HashMap<&String, (i32, i32)> = HashMap::new();
+        for s in &prev_steps {
+            counts.entry(s).or_default().0 += 1;
+        }
+        for s in &cur_steps {
+            counts.entry(s).or_default().1 += 1;
+        }
 
-        let added: Vec<&String> = cur_terms.iter().filter(|t| !prev_set.contains(t)).collect();
-        let removed: Vec<&String> = prev_terms.iter().filter(|t| !cur_set.contains(t)).collect();
+        let mut added: Vec<(&String, i32)> = Vec::new();
+        let mut removed: Vec<(&String, i32)> = Vec::new();
+        for (sig, (p, c)) in &counts {
+            match c.cmp(p) {
+                std::cmp::Ordering::Greater => added.push((sig, c - p)),
+                std::cmp::Ordering::Less => removed.push((sig, p - c)),
+                std::cmp::Ordering::Equal => {}
+            }
+        }
+        added.sort_by(|a, b| a.0.cmp(b.0));
+        removed.sort_by(|a, b| a.0.cmp(b.0));
 
         let mut lines = vec![
             Line::default(),
             Line::from(Span::styled(
                 format!(
                     "Diff vs previous ({} → {} steps):",
-                    prev_terms.len(),
-                    cur_terms.len(),
+                    prev_steps.len(),
+                    cur_steps.len(),
                 ),
                 self.theme.highlighted,
             )),
@@ -155,15 +169,25 @@ impl<'a> SolutionWindow<'a> {
             lines.push(Line::from(Span::raw("  identical")));
             return lines;
         }
-        for t in &added {
+        for (sig, n) in &added {
+            let prefix = if *n > 1 {
+                format!("  +{n}× ")
+            } else {
+                "  + ".to_string()
+            };
             lines.push(Line::from(Span::styled(
-                format!("  + {t}"),
+                format!("{prefix}{sig}"),
                 self.theme.solved,
             )));
         }
-        for t in &removed {
+        for (sig, n) in &removed {
+            let prefix = if *n > 1 {
+                format!("  -{n}× ")
+            } else {
+                "  - ".to_string()
+            };
             lines.push(Line::from(Span::styled(
-                format!("  - {t}"),
+                format!("{prefix}{sig}"),
                 self.theme.wrong_answer,
             )));
         }
@@ -225,12 +249,39 @@ impl<'a> SolutionWindow<'a> {
     }
 }
 
-fn step_term_strings(solution: &SharedSolution) -> Vec<String> {
-    solution
-        .steps()
-        .filter_map(|v| match v {
-            Visit::Term(t) | Visit::Answer(t) => Some(t.to_string()),
-            Visit::Subtask(_) => None,
+fn step_signatures(solution: &SharedSolution) -> Vec<String> {
+    let answer_path = match solution.status {
+        SolutionStatus::Answer(answer_idx) => {
+            let mut q = vec![answer_idx];
+            while let Some(p) = solution.terms[*q.last().unwrap()].inference.parent_id() {
+                q.push(p);
+            }
+            Some(q)
+        }
+        _ => None,
+    };
+
+    let indices: Vec<usize> = match answer_path {
+        Some(q) => q.into_iter().rev().collect(),
+        None => solution
+            .terms
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.inference.is_proven())
+            .map(|(n, _)| n)
+            .collect(),
+    };
+
+    indices
+        .into_iter()
+        .map(|i| {
+            let t = &solution.terms[i];
+            let label = match &t.inference {
+                TermInference::Rule { rule, .. } => format!("← {}", rule.id),
+                TermInference::Transform { .. } => "← transform".to_string(),
+                TermInference::Condition => "(given)".to_string(),
+            };
+            format!("{}  {label}", t.term)
         })
         .collect()
 }
