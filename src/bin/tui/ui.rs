@@ -12,7 +12,7 @@ use std::{
 use derive_more::Display;
 use ratatui::{
     prelude::*,
-    widgets::{ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, ListState, Paragraph, Wrap},
 };
 
 use solver::task::{SharedSolution, Solution, Solver, TIME_LIMIT_DEFAULT, TracerHub};
@@ -41,16 +41,25 @@ pub enum Command {
     Up,
     Left,
     Right,
+    PageDown,
+    PageUp,
+    Top,
+    Bottom,
+    NextPane,
+    PrevPane,
     Toggle,
     Reload,
     Cancel,
+    ShowHelp,
+    Dismiss,
 }
 
 pub struct Ui {
     panes: HashMap<Tab, Pane>,
 
-    error:  String,
-    worker: Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
+    error:     String,
+    show_help: bool,
+    worker:    Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
 
     progress:    SolverProgress,
     progress_tx: Sender<ProgressEvent>,
@@ -103,6 +112,7 @@ impl Ui {
             current_tab: Tab::Rules,
             panes,
             error: Default::default(),
+            show_help: false,
             worker: None,
             progress: SolverProgress::new(state.settings.exec_deadline),
             progress_tx,
@@ -118,6 +128,24 @@ impl Ui {
     }
 
     pub fn key_hints(&self) -> Vec<KeyHint> {
+        if self.show_help {
+            return vec![KeyHint {
+                key:   "Esc/?",
+                label: "close help",
+            }];
+        }
+        if !self.error.is_empty() {
+            return vec![
+                KeyHint {
+                    key:   "Esc",
+                    label: "dismiss",
+                },
+                KeyHint {
+                    key:   "q",
+                    label: "quit",
+                },
+            ];
+        }
         if self.has_active_worker() {
             return vec![
                 KeyHint {
@@ -137,6 +165,10 @@ impl Ui {
         hints.push(KeyHint {
             key:   "r",
             label: "reload",
+        });
+        hints.push(KeyHint {
+            key:   "?",
+            label: "help",
         });
         hints.push(KeyHint {
             key:   "q",
@@ -195,7 +227,20 @@ impl Ui {
     }
 
     pub fn process(&mut self, command: Command) {
+        if self.show_help {
+            if matches!(command, Command::Dismiss | Command::ShowHelp) {
+                self.show_help = false;
+            }
+            return;
+        }
         if !self.error.is_empty() {
+            if matches!(command, Command::Dismiss) {
+                self.error.clear();
+            }
+            return;
+        }
+        if matches!(command, Command::ShowHelp) {
+            self.show_help = true;
             return;
         }
 
@@ -273,6 +318,10 @@ impl Ui {
             let cycles = self.cycles.load(Ordering::Relaxed);
             self.progress.draw(frame, area, cycles);
         }
+
+        if self.show_help {
+            draw_help(frame, area);
+        }
     }
 }
 
@@ -296,6 +345,52 @@ pub fn default_state() -> ListState {
     let mut state = ListState::default();
     state.select(Some(0));
     state
+}
+
+const HELP_ENTRIES: &[(&str, &str)] = &[
+    ("F1 / F2 / F3", "switch tab"),
+    ("Tab / Shift+Tab", "next / previous panel"),
+    ("← ↑ → ↓", "navigation"),
+    ("PgUp / PgDn", "page up / down"),
+    ("Ctrl+u / Ctrl+d", "page up / down"),
+    ("Home / End", "jump to top / bottom"),
+    ("Space / Enter", "toggle (tree node, etc.)"),
+    ("s", "solve selected task"),
+    ("a", "solve all tasks"),
+    ("c", "cancel running solver"),
+    ("r", "reload rules"),
+    ("?", "toggle help"),
+    ("Esc", "dismiss popup"),
+    ("q", "quit"),
+];
+
+fn draw_help(frame: &mut Frame, area: Rect) {
+    let popup_area = Rect {
+        x:      area.width / 8,
+        y:      area.height / 6,
+        width:  area.width * 3 / 4,
+        height: (area.height * 2 / 3).max(8),
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan))
+        .title("Help");
+    let inner = block.inner(popup_area);
+    Clear.render(popup_area, frame.buffer_mut());
+    block.render(popup_area, frame.buffer_mut());
+
+    let key_style = Style::default().fg(Color::Red);
+    let lines: Vec<Line> = HELP_ENTRIES
+        .iter()
+        .map(|(k, v)| {
+            Line::from(vec![
+                Span::styled(format!("  {k:18}"), key_style),
+                Span::raw(*v),
+            ])
+        })
+        .collect();
+
+    Paragraph::new(lines).render(inner, frame.buffer_mut());
 }
 
 fn panic_message(payload: Box<dyn std::any::Any + Send + 'static>) -> String {

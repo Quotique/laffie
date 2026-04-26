@@ -2,7 +2,7 @@ use std::{fmt::Display, io};
 
 use ratatui::{
     DefaultTerminal,
-    crossterm::event::{self, KeyCode, KeyEventKind},
+    crossterm::event::{self, KeyCode, KeyEventKind, KeyModifiers},
     prelude::*,
     widgets::{Block, Borders, Paragraph, Tabs},
 };
@@ -70,13 +70,23 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
         if let event::Event::Key(key) = event::read()? &&
             key.kind == KeyEventKind::Press
         {
+            let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
             let command = match key.code {
+                KeyCode::Char('u') | KeyCode::Char('г') if ctrl => Command::PageUp,
+                KeyCode::Char('d') | KeyCode::Char('в') if ctrl => Command::PageDown,
                 KeyCode::F(1) => Command::SwitchTab(0),
                 KeyCode::F(2) => Command::SwitchTab(1),
                 KeyCode::F(3) => Command::SwitchTab(2),
                 // KeyCode::F(4) => status.current_tab = Itab::Setting,
+                KeyCode::PageDown => Command::PageDown,
+                KeyCode::PageUp => Command::PageUp,
+                KeyCode::Home => Command::Top,
+                KeyCode::End => Command::Bottom,
+                KeyCode::Tab => Command::NextPane,
+                KeyCode::BackTab => Command::PrevPane,
+                KeyCode::Esc => Command::Dismiss,
+                KeyCode::Char('?') => Command::ShowHelp,
                 KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('о') => Command::Down,
-
                 KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('л') => Command::Up,
                 KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('р') => Command::Left,
                 KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('д') => Command::Right,

@@ -14,6 +14,8 @@ use crate::{
 
 use super::ui::Command;
 
+const PAGE_STEP: usize = 10;
+
 #[derive(Debug, Clone, Copy)]
 pub struct KeyHint {
     pub key:   &'static str,
@@ -227,6 +229,22 @@ impl WidgetCommands for WidgetType {
                     state.rules_pos.select_previous();
                     true
                 }
+                Command::PageDown => {
+                    state.rules_pos.scroll_down_by(PAGE_STEP as u16);
+                    true
+                }
+                Command::PageUp => {
+                    state.rules_pos.scroll_up_by(PAGE_STEP as u16);
+                    true
+                }
+                Command::Top => {
+                    state.rules_pos.select_first();
+                    true
+                }
+                Command::Bottom => {
+                    state.rules_pos.select_last();
+                    true
+                }
                 _ => false,
             },
             WidgetType::TracingNavigation => {
@@ -241,6 +259,22 @@ impl WidgetCommands for WidgetType {
                         }
                         Command::Up => {
                             tracing.1.key_up();
+                            return true;
+                        }
+                        Command::PageDown => {
+                            tracing.1.scroll_down(PAGE_STEP);
+                            return true;
+                        }
+                        Command::PageUp => {
+                            tracing.1.scroll_up(PAGE_STEP);
+                            return true;
+                        }
+                        Command::Top => {
+                            tracing.1.select_first();
+                            return true;
+                        }
+                        Command::Bottom => {
+                            tracing.1.select_last();
                             return true;
                         }
                         Command::Toggle => {
@@ -292,6 +326,22 @@ impl WidgetCommands for WidgetType {
                     state.tasks_pos.key_up();
                     true
                 }
+                Command::PageDown => {
+                    state.tasks_pos.scroll_down(PAGE_STEP);
+                    true
+                }
+                Command::PageUp => {
+                    state.tasks_pos.scroll_up(PAGE_STEP);
+                    true
+                }
+                Command::Top => {
+                    state.tasks_pos.select_first();
+                    true
+                }
+                Command::Bottom => {
+                    state.tasks_pos.select_last();
+                    true
+                }
                 Command::Toggle => {
                     state.tasks_pos.toggle_selected();
                     true
@@ -321,6 +371,30 @@ impl WidgetCommands for WidgetType {
                     }
                     true
                 }
+                Command::PageDown => {
+                    if let Some(task_state) = state.selected_task() {
+                        task_state.solution_pos.scroll_page_down();
+                    }
+                    true
+                }
+                Command::PageUp => {
+                    if let Some(task_state) = state.selected_task() {
+                        task_state.solution_pos.scroll_page_up();
+                    }
+                    true
+                }
+                Command::Top => {
+                    if let Some(task_state) = state.selected_task() {
+                        task_state.solution_pos.scroll_to_top();
+                    }
+                    true
+                }
+                Command::Bottom => {
+                    if let Some(task_state) = state.selected_task() {
+                        task_state.solution_pos.scroll_to_bottom();
+                    }
+                    true
+                }
                 _ => false,
             },
             WidgetType::TracingWindow => false,
@@ -334,6 +408,22 @@ impl Pane {
     }
 
     pub fn process(&mut self, state: &mut State, command: Command) {
+        let len = self.layout.len();
+        match command {
+            Command::NextPane => {
+                if len > 0 {
+                    self.focused_pane = (self.focused_pane + 1) % len;
+                }
+                return;
+            }
+            Command::PrevPane => {
+                if len > 0 {
+                    self.focused_pane = (self.focused_pane + len - 1) % len;
+                }
+                return;
+            }
+            _ => {}
+        }
         let focused = self.layout[self.focused_pane].0;
         if focused.handle(state, command) {
             return;
@@ -343,8 +433,7 @@ impl Pane {
                 self.focused_pane = self.focused_pane.saturating_sub(1);
             }
             Command::Right => {
-                self.focused_pane =
-                    (self.focused_pane + 1).min(self.layout.len().saturating_sub(1));
+                self.focused_pane = (self.focused_pane + 1).min(len.saturating_sub(1));
             }
             _ => {}
         }
