@@ -219,27 +219,18 @@ impl Ui {
 }
 
 impl Tab {
-    pub const MAX: usize = 2;
+    pub const ALL: &'static [Tab] = &[Tab::Rules, Tab::Tasks, Tab::Tracing];
 }
 
 impl From<Tab> for usize {
     fn from(val: Tab) -> Self {
-        match val {
-            Tab::Rules => 0,
-            Tab::Tasks => 1,
-            Tab::Tracing => 2,
-            // Tab::Setting => 3,
-        }
+        Tab::ALL.iter().position(|t| *t == val).unwrap_or(0)
     }
 }
 
 impl From<usize> for Tab {
     fn from(value: usize) -> Self {
-        match value {
-            1 => Tab::Tasks,
-            2 => Tab::Tracing,
-            _ => Tab::Rules,
-        }
+        Tab::ALL.get(value).copied().unwrap_or(Tab::Rules)
     }
 }
 

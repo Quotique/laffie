@@ -41,9 +41,14 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                 ])
                 .split(frame.area());
 
-            let tabs = Tabs::new((0..=Itab::MAX).map(|x| format!("F{}: {}", x + 1, Itab::from(x))))
-                .select(Some(ui.current_tab.into()))
-                .block(Block::default().borders(Borders::LEFT | Borders::RIGHT));
+            let tabs = Tabs::new(
+                Itab::ALL
+                    .iter()
+                    .enumerate()
+                    .map(|(i, tab)| format!("F{}: {}", i + 1, tab)),
+            )
+            .select(Some(ui.current_tab.into()))
+            .block(Block::default().borders(Borders::LEFT | Borders::RIGHT));
             frame.render_widget(tabs, vertical_layout[0]);
 
             ui.draw(frame, vertical_layout[1]);
