@@ -1,53 +1,69 @@
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+};
 
 use itertools::Itertools;
-use parking_lot::Mutex;
 use ratatui::{prelude::*, widgets::Paragraph};
 
 use solver::task::{Task, TermProps, Tracer};
 
 use super::popup::Popup;
-use crate::{theme::Theme, ui::Command};
+use crate::theme::Theme;
+
+pub enum ProgressEvent {
+    TaskStarted(Box<Task>),
+    TaskFinished,
+}
 
 #[derive(Clone)]
-pub struct ProgressReporter(pub Arc<Mutex<SolverProgress>>);
+pub struct ProgressReporter {
+    pub cancel: Arc<AtomicBool>,
+    pub cycles: Arc<AtomicUsize>,
+}
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug)]
 pub struct SolverProgress {
-    pub current_task: Option<Task>,
-
-    pub current_cycles:       usize,
+    pub current_task:         Option<Task>,
     pub exec_deadline:        usize,
     pub finished_tasks_count: usize,
     pub total_tasks_count:    usize,
-    pub cancel:               bool,
 }
 
 impl Tracer for ProgressReporter {
     fn on_term_focus(&mut self, _term: &TermProps, cycle: usize) {
-        self.0.lock().current_cycles = cycle;
+        self.cycles.store(cycle, Ordering::Relaxed);
     }
 
     fn is_cancelled(&self) -> bool {
-        self.0.lock().cancel
+        self.cancel.load(Ordering::Relaxed)
     }
 }
 
 impl SolverProgress {
     pub fn new(exec_deadline: usize) -> Self {
-        SolverProgress {
+        Self {
+            current_task: None,
             exec_deadline,
-            ..Default::default()
+            finished_tasks_count: 0,
+            total_tasks_count: 0,
         }
     }
 
-    pub fn process(&mut self, command: Command) {
-        if Command::Cancel == command {
-            self.cancel = true;
+    pub fn reset(&mut self, total_tasks_count: usize) {
+        self.current_task = None;
+        self.finished_tasks_count = 0;
+        self.total_tasks_count = total_tasks_count;
+    }
+
+    pub fn handle(&mut self, event: ProgressEvent) {
+        match event {
+            ProgressEvent::TaskStarted(task) => self.current_task = Some(*task),
+            ProgressEvent::TaskFinished => self.finished_tasks_count += 1,
         }
     }
 
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&self, frame: &mut Frame, area: Rect, current_cycles: usize) {
         let mut popup = Popup::new(Line::from("Solving in progress").centered());
         popup.draw(frame, area);
         let inner = popup.inner(area);
@@ -78,10 +94,10 @@ impl SolverProgress {
         };
 
         Paragraph::new(task_text).render(layout[0], frame.buffer_mut());
-        let current_percent = ((self.current_cycles * 100) / self.exec_deadline) as u16;
-        let total_percent =
-            (((self.finished_tasks_count * self.exec_deadline + self.current_cycles) * 100) /
-                (self.total_tasks_count * self.exec_deadline)) as u16;
+        let current_percent = ((current_cycles * 100) / self.exec_deadline) as u16;
+        let total_percent = (((self.finished_tasks_count * self.exec_deadline + current_cycles) *
+            100) /
+            (self.total_tasks_count * self.exec_deadline)) as u16;
 
         self.theme()
             .gauge(Line::from("Current").left_aligned())

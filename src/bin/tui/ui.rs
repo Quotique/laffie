@@ -1,12 +1,15 @@
 use std::{
     collections::HashMap,
     io,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc::{self, Receiver, Sender},
+    },
     thread::{JoinHandle, spawn},
 };
 
 use derive_more::Display;
-use parking_lot::Mutex;
 use ratatui::{
     prelude::*,
     widgets::{ListState, Paragraph, Wrap},
@@ -24,7 +27,7 @@ use crate::{
     pane::WidgetType,
     widgets::{
         popup::Popup,
-        solver_progress::{ProgressReporter, SolverProgress},
+        solver_progress::{ProgressEvent, ProgressReporter, SolverProgress},
     },
 };
 
@@ -46,9 +49,14 @@ pub enum Command {
 pub struct Ui {
     panes: HashMap<Tab, Pane>,
 
-    error:    String,
-    worker:   Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
-    progress: Arc<Mutex<SolverProgress>>,
+    error:  String,
+    worker: Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
+
+    progress:    SolverProgress,
+    progress_tx: Sender<ProgressEvent>,
+    progress_rx: Receiver<ProgressEvent>,
+    cancel:      Arc<AtomicBool>,
+    cycles:      Arc<AtomicUsize>,
 
     pub current_tab: Tab,
     state:           State,
@@ -90,12 +98,17 @@ impl Ui {
             ),
         ]);
 
+        let (progress_tx, progress_rx) = mpsc::channel();
         Ok(Ui {
             current_tab: Tab::Rules,
             panes,
             error: Default::default(),
             worker: None,
-            progress: Mutex::new(SolverProgress::new(state.settings.exec_deadline)).into(),
+            progress: SolverProgress::new(state.settings.exec_deadline),
+            progress_tx,
+            progress_rx,
+            cancel: Arc::new(AtomicBool::new(false)),
+            cycles: Arc::new(AtomicUsize::new(0)),
             state,
         })
     }
@@ -119,15 +132,16 @@ impl Ui {
             })
             .collect::<Vec<_>>();
 
-        {
-            let mut progress = self.progress.lock();
-            progress.current_cycles = 0;
-            progress.finished_tasks_count = 0;
-            progress.total_tasks_count = queue.len();
-            progress.cancel = false;
-        }
+        self.progress.reset(queue.len());
+        self.cycles.store(0, Ordering::Relaxed);
+        self.cancel.store(false, Ordering::Relaxed);
 
-        let reporter = ProgressReporter(self.progress.clone());
+        let reporter = ProgressReporter {
+            cancel: self.cancel.clone(),
+            cycles: self.cycles.clone(),
+        };
+        let tx = self.progress_tx.clone();
+        let cycles = self.cycles.clone();
         let rules = self.state.rules_engine.clone();
         let exec_deadline = self.state.settings.exec_deadline;
         self.worker = Some(spawn(move || {
@@ -137,15 +151,15 @@ impl Ui {
                     let mut hub = TracerHub::default();
                     hub.add_custom(reporter.clone());
 
-                    reporter.0.lock().current_task = Some(task.task.clone());
+                    let _ = tx.send(ProgressEvent::TaskStarted(Box::new(task.task.clone())));
                     let solution = Solver::new(rules.clone()).solve(
                         task.task,
                         hub,
                         exec_deadline,
                         TIME_LIMIT_DEFAULT,
                     );
-                    reporter.0.lock().finished_tasks_count += 1;
-                    reporter.0.lock().current_cycles = 0;
+                    let _ = tx.send(ProgressEvent::TaskFinished);
+                    cycles.store(0, Ordering::Relaxed);
                     (idx, solution)
                 })
                 .collect::<Vec<_>>()
@@ -158,7 +172,9 @@ impl Ui {
         }
 
         if self.worker.is_some() {
-            self.progress.lock().process(command);
+            if matches!(command, Command::Cancel) {
+                self.cancel.store(true, Ordering::Relaxed);
+            }
             return;
         }
 
@@ -180,6 +196,10 @@ impl Ui {
     }
 
     pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+        while let Ok(event) = self.progress_rx.try_recv() {
+            self.progress.handle(event);
+        }
+
         if let Some(pane) = self.panes.get(&self.current_tab) {
             frame.render_stateful_widget(pane.clone(), area, &mut self.state)
         }
@@ -204,7 +224,8 @@ impl Ui {
         match self.worker.take() {
             Some(handler) if !handler.is_finished() => {
                 self.worker = Some(handler);
-                self.progress.lock().draw(frame, area);
+                let cycles = self.cycles.load(Ordering::Relaxed);
+                self.progress.draw(frame, area, cycles);
             }
             Some(handler) => match handler.join() {
                 Ok(results) => {
