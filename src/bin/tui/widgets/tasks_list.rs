@@ -12,6 +12,7 @@ use crate::{
 
 pub struct TasksList<'a> {
     pub tasks_index: &'a Tree<TasksNode>,
+    pub theme:       &'a Theme,
 }
 
 impl<'a> StatefulWidget for TasksList<'a> {
@@ -22,8 +23,8 @@ impl<'a> StatefulWidget for TasksList<'a> {
 
         let widget = TuiTree::new(&items)
             .expect("all item identifiers are unique")
-            .experimental_scrollbar(Some(self.theme().scrollbar()))
-            .highlight_style(self.theme().tree_cursor_style())
+            .experimental_scrollbar(Some(self.theme.scrollbar()))
+            .highlight_style(self.theme.tree_cursor)
             .highlight_symbol(">");
 
         <TuiTree<TreeIndex> as StatefulWidget>::render(widget, area, buf, state);
@@ -32,11 +33,11 @@ impl<'a> StatefulWidget for TasksList<'a> {
 
 impl<'a> TasksList<'a> {
     fn tree(&self, tasks_node: &Node<TasksNode>) -> TreeItem<'static, TreeIndex> {
-        let wrong_answer = self.theme().wrong_answer();
-        let unsolved = self.theme().unsolved();
-        let solved = self.theme().solved();
-        let not_started = self.theme().not_started();
-        let default = self.theme().default();
+        let wrong_answer = self.theme.wrong_answer;
+        let unsolved = self.theme.unsolved;
+        let solved = self.theme.solved;
+        let not_started = self.theme.not_started;
+        let default = self.theme.default;
 
         let text = match tasks_node.data() {
             TasksNode::Task(task) => {
@@ -55,7 +56,7 @@ impl<'a> TasksList<'a> {
                 ])
             }
             TasksNode::Directory(dir) => Line::from(vec![
-                Span::styled(dir.dir_name.to_string(), self.theme().highlighted()),
+                Span::styled(dir.dir_name.to_string(), self.theme.highlighted),
                 Span::from("[".to_owned()),
                 Span::styled(format!("{}", dir.not_started_count), not_started),
                 Span::styled(format!(" {}", dir.solved_count), solved),
@@ -71,10 +72,5 @@ impl<'a> TasksList<'a> {
         } else {
             TreeItem::new(tasks_node.id(), text, children).unwrap()
         }
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
     }
 }

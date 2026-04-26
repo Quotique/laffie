@@ -11,11 +11,12 @@ use solver::task::{Solution, SolutionStatus, TermInference};
 use crate::{theme::Theme, widgets::tracing_navigation::TermId};
 
 #[derive(Clone, Debug)]
-pub struct TracingWindow {
+pub struct TracingWindow<'a> {
     pub selected: Option<TermId>,
+    pub theme:    &'a Theme,
 }
 
-impl Widget for TracingWindow {
+impl<'a> Widget for TracingWindow<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         if let Some(selected) = &self.selected {
             let text = if selected.idx == 0 {
@@ -24,7 +25,7 @@ impl Widget for TracingWindow {
                 self.term_inference_lines(selected)
             };
             <List as Widget>::render(
-                List::new(text.iter().cloned()).highlight_style(self.theme().list_cursor_style()),
+                List::new(text.iter().cloned()).highlight_style(self.theme.list_cursor),
                 area,
                 buf,
             );
@@ -32,8 +33,8 @@ impl Widget for TracingWindow {
     }
 }
 
-impl TracingWindow {
-    fn task_lines<'a>(&'a self, solution: &Solution) -> Vec<Line<'a>> {
+impl<'a> TracingWindow<'a> {
+    fn task_lines<'b>(&'b self, solution: &Solution) -> Vec<Line<'b>> {
         vec![
             self.key_value_line("Task: ", &solution.goal),
             Line::default(),
@@ -42,7 +43,7 @@ impl TracingWindow {
                 solution
                     .answer()
                     .map(|x| Span::from(x.to_string()))
-                    .unwrap_or(Span::styled("no answer", self.theme().error())),
+                    .unwrap_or(Span::styled("no answer", self.theme.error)),
             ),
             Line::default(),
             self.key_value_line("Cycles: ", solution.cycles()),
@@ -77,9 +78,9 @@ impl TracingWindow {
                 result.push(Line::default());
                 result.push(self.key_value_line("Requirements:", ""));
 
-                let proven = self.theme().proven_requirement();
-                let unproven = self.theme().unproven_requirement();
-                let skipped = self.theme().skipped_requirement();
+                let proven = self.theme.proven_requirement;
+                let unproven = self.theme.unproven_requirement;
+                let skipped = self.theme.skipped_requirement;
                 for i in requirements {
                     let goal = &i.task.goal.term;
                     result.push(Line::from(match i.status {
@@ -99,19 +100,14 @@ impl TracingWindow {
         }
     }
 
-    fn key_value_line<'a>(&self, key: &'a str, text: impl Display) -> Line<'a> {
+    fn key_value_line<'b>(&self, key: &'b str, text: impl Display) -> Line<'b> {
         Line::from(vec![
-            Span::styled(key, self.theme().highlighted()),
+            Span::styled(key, self.theme.highlighted),
             Span::from(text.to_string()),
         ])
     }
 
     fn params_line(&self, key: impl Display, text: impl Display) -> Line<'static> {
         Line::from(vec![Span::raw(format!("  {key} = {text}"))])
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
     }
 }

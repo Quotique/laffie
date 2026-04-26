@@ -9,15 +9,16 @@ use solver::rule::{RuleAttr, SharedRule};
 
 use crate::theme::Theme;
 
-pub struct RuleWindow {
-    pub rule: SharedRule,
+pub struct RuleWindow<'a> {
+    pub rule:  SharedRule,
+    pub theme: &'a Theme,
 }
 
-impl Widget for RuleWindow {
+impl<'a> Widget for RuleWindow<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let default = self.theme().default();
+        let default = self.theme.default;
         let mut lines = vec![
-            self.pair_line("", &self.rule.term, self.theme().highlighted()),
+            self.pair_line("", &self.rule.term, self.theme.highlighted),
             Line::default(),
         ];
         lines.push(self.pair_line("Requirements", "", default));
@@ -50,17 +51,11 @@ impl Widget for RuleWindow {
     }
 }
 
-impl RuleWindow {
+impl<'a> RuleWindow<'a> {
     fn pair_line<'b>(&self, k: &'b str, v: impl Display, v_style: Style) -> Line<'b> {
-        let highlighted = self.theme().highlighted();
         Line::from(vec![
-            Span::styled(k, highlighted),
+            Span::styled(k, self.theme.highlighted),
             Span::styled(v.to_string(), v_style),
         ])
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
     }
 }

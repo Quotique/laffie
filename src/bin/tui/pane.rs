@@ -41,13 +41,15 @@ pub enum WidgetType {
 pub struct Pane {
     pub layout:       Vec<(WidgetType, Constraint)>,
     pub focused_pane: usize,
+    pub theme:        Theme,
 }
 
-impl FromIterator<(WidgetType, Constraint)> for Pane {
-    fn from_iter<T: IntoIterator<Item = (WidgetType, Constraint)>>(iter: T) -> Self {
+impl Pane {
+    pub fn new(layout: Vec<(WidgetType, Constraint)>, theme: Theme) -> Self {
         Pane {
-            layout:       FromIterator::from_iter(iter),
+            layout,
             focused_pane: 0,
+            theme,
         }
     }
 }
@@ -75,53 +77,60 @@ impl StatefulWidget for Pane {
                         format!("Rules /{}", state.rules_filter)
                     };
                     let rules_list = RulesList { items };
-                    let block = self.theme().block(is_focused, title.as_str());
+                    let block = self.theme.block(is_focused, title.as_str());
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     rules_list.render(inner, buf, &mut state.rules_pos);
                 }
                 WidgetType::RuleWindow => {
-                    let block = self.theme().block(is_focused, "Detailed");
+                    let block = self.theme.block(is_focused, "Detailed");
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     if let Some(idx) = state.rules_pos.selected() &&
                         let Some(rule) = state.filtered_rules().into_iter().nth(idx)
                     {
-                        RuleWindow { rule }.render(inner, buf);
+                        RuleWindow {
+                            rule,
+                            theme: &self.theme,
+                        }
+                        .render(inner, buf);
                     }
                 }
                 WidgetType::TasksList => {
                     let task_list = TasksList {
                         tasks_index: &state.tasks,
+                        theme:       &self.theme,
                     };
-                    let block = self.theme().block(is_focused, "Tasks");
+                    let block = self.theme.block(is_focused, "Tasks");
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     task_list.render(inner, buf, &mut state.tasks_pos);
                 }
                 WidgetType::Solution => {
-                    let block = self.theme().block(is_focused, "Detailed");
+                    let block = self.theme.block(is_focused, "Detailed");
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     let selected = state.tasks_pos.selected().last().cloned();
                     let solution = SolutionWindow {
                         tasks_index: &mut state.tasks,
                         dir_scroll: &mut state.dir_solution_pos,
+                        theme: &self.theme,
                         selected,
                     };
                     solution.render(inner, buf, &mut ());
                 }
                 WidgetType::TracingNavigation => {
                     if let Some(task_state) = state.selected_task() {
-                        let block = self.theme().block(is_focused, "Tracing");
+                        let block = self.theme.block(is_focused, "Tracing");
                         let inner = block.inner(*area);
                         block.render(*area, buf);
-                        TracingNavigation::default().render(inner, buf, task_state);
+                        let nav = TracingNavigation { theme: &self.theme };
+                        (&nav).render(inner, buf, task_state);
                     }
                 }
                 WidgetType::TracingWindow => {
                     if let Some(task_state) = state.selected_task() {
-                        let block = self.theme().block(is_focused, "Detailed");
+                        let block = self.theme.block(is_focused, "Detailed");
                         let inner = block.inner(*area);
                         block.render(*area, buf);
                         TracingWindow {
@@ -130,6 +139,7 @@ impl StatefulWidget for Pane {
                                 .last()
                                 .and_then(|x| x.1.selected().last())
                                 .cloned(),
+                            theme:    &self.theme,
                         }
                         .render(inner, buf);
                     }
@@ -465,10 +475,5 @@ impl Pane {
             }
             _ => {}
         }
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
     }
 }

@@ -26,6 +26,7 @@ use super::{
 };
 use crate::{
     pane::{KeyHint, WidgetType},
+    theme::Theme,
     widgets::{
         popup::Popup,
         solver_progress::{ProgressEvent, ProgressReporter, SolverProgress},
@@ -63,6 +64,7 @@ pub enum Command {
 
 pub struct Ui {
     panes: HashMap<Tab, Pane>,
+    theme: Theme,
 
     error:        String,
     show_help:    bool,
@@ -91,28 +93,38 @@ pub enum Tab {
 impl Ui {
     pub fn try_new(settings: Settings) -> io::Result<Self> {
         let state = State::try_new(settings)?;
+        let theme = Theme::from_name(state.settings.theme);
 
         let panes = HashMap::from_iter([
             (
                 Tab::Rules,
-                Pane::from_iter([
-                    (WidgetType::RulesList, Constraint::Percentage(40)),
-                    (WidgetType::RuleWindow, Constraint::Percentage(60)),
-                ]),
+                Pane::new(
+                    vec![
+                        (WidgetType::RulesList, Constraint::Percentage(40)),
+                        (WidgetType::RuleWindow, Constraint::Percentage(60)),
+                    ],
+                    theme,
+                ),
             ),
             (
                 Tab::Tasks,
-                Pane::from_iter([
-                    (WidgetType::TasksList, Constraint::Percentage(40)),
-                    (WidgetType::Solution, Constraint::Percentage(60)),
-                ]),
+                Pane::new(
+                    vec![
+                        (WidgetType::TasksList, Constraint::Percentage(40)),
+                        (WidgetType::Solution, Constraint::Percentage(60)),
+                    ],
+                    theme,
+                ),
             ),
             (
                 Tab::Tracing,
-                Pane::from_iter([
-                    (WidgetType::TracingNavigation, Constraint::Percentage(60)),
-                    (WidgetType::TracingWindow, Constraint::Percentage(40)),
-                ]),
+                Pane::new(
+                    vec![
+                        (WidgetType::TracingNavigation, Constraint::Percentage(60)),
+                        (WidgetType::TracingWindow, Constraint::Percentage(40)),
+                    ],
+                    theme,
+                ),
             ),
         ]);
 
@@ -120,6 +132,7 @@ impl Ui {
         Ok(Ui {
             current_tab: Tab::Rules,
             panes,
+            theme,
             error: Default::default(),
             show_help: false,
             filter_mode: false,
@@ -423,7 +436,7 @@ impl Ui {
         }
 
         if !self.error.is_empty() {
-            let mut popup = Popup::new(Line::from("Error"));
+            let mut popup = Popup::new(Line::from("Error"), &self.theme);
             let inner = popup.inner(area);
             popup.draw(frame, area);
 
@@ -442,7 +455,7 @@ impl Ui {
         if self.has_active_worker() {
             let cycles = self.cycles.load(Ordering::Relaxed);
             let queued = self.state.solve_queue.len();
-            self.progress.draw(frame, area, cycles, queued);
+            self.progress.draw(frame, area, &self.theme, cycles, queued);
         }
 
         if self.show_help {

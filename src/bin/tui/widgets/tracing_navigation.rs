@@ -18,8 +18,9 @@ pub struct TermId {
     pub idx:      usize,
 }
 
-#[derive(Default)]
-pub struct TracingNavigation {}
+pub struct TracingNavigation<'a> {
+    pub theme: &'a Theme,
+}
 
 impl TermId {
     pub fn new_solution(solution: SharedSolution) -> Self {
@@ -34,7 +35,7 @@ impl TermId {
     }
 }
 
-impl TracingNavigation {
+impl<'a> TracingNavigation<'a> {
     fn tree(&self, solution: SharedSolution) -> Vec<TreeItem<'static, TermId>> {
         solution
             .terms
@@ -74,9 +75,9 @@ impl TracingNavigation {
 
     fn term_line(&self, term: &TermProps, total_cycles: usize) -> Line<'static> {
         let style = if term.inference.is_proven() {
-            self.theme().default_tree_item()
+            self.theme.default_tree_item
         } else {
-            self.theme().unproven_tree_item()
+            self.theme.unproven_tree_item
         };
 
         let cycles: usize = term.inference.requirements().map(|x| x.cycles()).sum();
@@ -89,23 +90,18 @@ impl TracingNavigation {
 
     fn subtask_line(&self, solution: SharedSolution, total_cycles: usize) -> Line<'static> {
         let style = if solution.answer().is_some() {
-            self.theme().default_tree_item()
+            self.theme.default_tree_item
         } else {
-            self.theme().unproven_tree_item()
+            self.theme.unproven_tree_item
         };
         Line::from(vec![
             Span::styled(solution.task.goal.to_string(), style),
             Span::from(format!(" {} {}", solution.cycles(), total_cycles)),
         ])
     }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
-    }
 }
 
-impl StatefulWidget for &TracingNavigation {
+impl<'a> StatefulWidget for &TracingNavigation<'a> {
     type State = TaskState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
@@ -143,7 +139,7 @@ impl StatefulWidget for &TracingNavigation {
                             .track_symbol(None)
                             .end_symbol(None),
                     ))
-                    .highlight_style(self.theme().tree_cursor_style())
+                    .highlight_style(self.theme.tree_cursor)
                     .highlight_symbol("> ")
                     .block(Block::default().borders(if i == 1 {
                         Borders::LEFT

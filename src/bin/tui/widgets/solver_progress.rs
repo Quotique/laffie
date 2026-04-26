@@ -63,8 +63,15 @@ impl SolverProgress {
         }
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, current_cycles: usize, queued: usize) {
-        let mut popup = Popup::new(Line::from("Solving in progress").centered());
+    pub fn draw(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        theme: &Theme,
+        current_cycles: usize,
+        queued: usize,
+    ) {
+        let mut popup = Popup::new(Line::from("Solving in progress").centered(), theme);
         popup.draw(frame, area);
         let inner = popup.inner(area);
         let layout = Layout::default()
@@ -79,14 +86,11 @@ impl SolverProgress {
 
         let task_text = if let Some(task) = self.current_task.as_ref() {
             vec![
-                Line::from(Span::styled(
-                    task.goal.to_string(),
-                    self.theme().highlighted(),
-                )),
+                Line::from(Span::styled(task.goal.to_string(), theme.highlighted)),
                 Line::default(),
                 Line::from(Span::styled(
                     task.givens.iter().format(", ").to_string(),
-                    self.theme().solution_term(),
+                    theme.solution_term,
                 )),
             ]
         } else {
@@ -113,26 +117,21 @@ impl SolverProgress {
             )
         };
 
-        self.theme()
+        theme
             .gauge(Line::from("Current").left_aligned())
             .percent(current_percent)
             .render(layout[1], frame.buffer_mut());
-        self.theme()
+        theme
             .gauge(Line::from(total_label).left_aligned())
             .percent(total_percent)
             .render(layout[2], frame.buffer_mut());
 
-        let cancel_block = self.theme().block(true, "");
+        let cancel_block = theme.block(true, "");
         let inner = cancel_block.inner(layout[3]);
         cancel_block.render(layout[3], frame.buffer_mut());
 
         Line::from("Press C to Cancel")
             .centered()
             .render(inner, frame.buffer_mut());
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
     }
 }

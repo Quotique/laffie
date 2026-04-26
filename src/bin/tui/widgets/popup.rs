@@ -9,11 +9,12 @@ use crate::theme::Theme;
 #[derive(Debug)]
 pub struct Popup<'a> {
     title: Line<'a>,
+    theme: &'a Theme,
 }
 
 impl<'a> Popup<'a> {
-    pub fn new(title: Line<'a>) -> Self {
-        Self { title }
+    pub fn new(title: Line<'a>, theme: &'a Theme) -> Self {
+        Self { title, theme }
     }
 
     pub fn inner(&self, area: Rect) -> Rect {
@@ -29,7 +30,7 @@ impl<'a> Popup<'a> {
     }
 
     fn block<'b>(&'b self) -> Block<'b> {
-        self.theme()
+        self.theme
             .block(true, self.title.clone())
             .padding(Padding::uniform(2))
     }
@@ -41,10 +42,5 @@ impl<'a> Popup<'a> {
             width:  area.width / 2,
             height: area.height / 3,
         }
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
     }
 }

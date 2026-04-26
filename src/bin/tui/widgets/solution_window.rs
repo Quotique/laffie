@@ -18,6 +18,7 @@ use crate::{
 pub struct SolutionWindow<'a> {
     pub tasks_index: &'a mut Tree<TasksNode>,
     pub dir_scroll:  &'a mut ScrollViewState,
+    pub theme:       &'a Theme,
 
     pub selected: Option<TreeIndex>,
 }
@@ -29,7 +30,7 @@ impl<'a> StatefulWidget for SolutionWindow<'a> {
         let Some(selected) = &self.selected else {
             return;
         };
-        let list_cursor = self.theme().list_cursor_style();
+        let list_cursor = self.theme.list_cursor;
         let (lines, is_directory) = match self.tasks_index[selected].data() {
             TasksNode::Task(tracing) => {
                 let mut lines = self.task_lines(&tracing.solution.task);
@@ -71,20 +72,20 @@ impl<'a> SolutionWindow<'a> {
     fn task_lines(&self, task: &Task) -> Vec<Line<'static>> {
         let mut lines = vec![
             Line::from(vec![
-                Span::styled(format!("{:x}", task.id), self.theme().highlighted()),
+                Span::styled(format!("{:x}", task.id), self.theme.highlighted),
                 Span::from(". "),
                 Span::from(task.text.clone()),
             ]),
             Line::default(),
             Line::from(Span::styled(
                 task.goal.to_string(),
-                self.theme().solution_goal(),
+                self.theme.solution_goal,
             )),
         ];
         for condition in &task.givens {
             lines.push(Line::from(Span::styled(
                 format!("  {condition}"),
-                self.theme().solution_term(),
+                self.theme.solution_term,
             )));
         }
         lines.push(Line::default());
@@ -100,20 +101,20 @@ impl<'a> SolutionWindow<'a> {
                 Visit::Subtask(t) => {
                     lines.push(Line::from(Span::styled(
                         format!("{}{}", "  ".repeat(depth), t.goal),
-                        self.theme().solution_goal(),
+                        self.theme.solution_goal,
                     )));
                     depth += 1;
                 }
                 Visit::Term(t) => {
                     lines.push(Line::from(Span::styled(
                         format!("{}{t}", "  ".repeat(depth)),
-                        self.theme().solution_term(),
+                        self.theme.solution_term,
                     )));
                 }
                 Visit::Answer(a) => {
                     lines.push(Line::from(Span::styled(
                         format!("{}{a}", "  ".repeat(depth)),
-                        self.theme().solution_answer(),
+                        self.theme.solution_answer,
                     )));
                     depth -= 1;
                 }
@@ -128,19 +129,19 @@ impl<'a> SolutionWindow<'a> {
             lines.push(Line::default());
             lines.push(Line::from(Span::styled(
                 format!("Problem tasks ({}):", problems.len()),
-                self.theme().highlighted(),
+                self.theme.highlighted,
             )));
             for pt in problems {
                 let (badge, badge_style) = match pt.kind {
-                    TaskStatusKind::WrongAnswer => ("[wrong]   ", self.theme().wrong_answer()),
-                    TaskStatusKind::Unsolved => ("[unsolved]", self.theme().unsolved()),
-                    TaskStatusKind::Solved => ("[solved]  ", self.theme().solved()),
-                    TaskStatusKind::NotStarted => ("[idle]    ", self.theme().not_started()),
+                    TaskStatusKind::WrongAnswer => ("[wrong]   ", self.theme.wrong_answer),
+                    TaskStatusKind::Unsolved => ("[unsolved]", self.theme.unsolved),
+                    TaskStatusKind::Solved => ("[solved]  ", self.theme.solved),
+                    TaskStatusKind::NotStarted => ("[idle]    ", self.theme.not_started),
                 };
                 lines.push(Line::from(vec![
                     Span::styled(format!("  {badge}"), badge_style),
                     Span::from(" "),
-                    Span::styled(format!("{:x}", pt.task_id), self.theme().highlighted()),
+                    Span::styled(format!("{:x}", pt.task_id), self.theme.highlighted),
                     Span::from(". "),
                     Span::raw(pt.text.clone()),
                 ]));
@@ -150,11 +151,11 @@ impl<'a> SolutionWindow<'a> {
     }
 
     fn dir_status_lines(&self, dir: &DirectoryStat) -> impl Iterator<Item = Line<'static>> {
-        let wrong_answer = self.theme().wrong_answer();
-        let unsolved = self.theme().unsolved();
-        let solved = self.theme().solved();
-        let not_started = self.theme().not_started();
-        let default = self.theme().default();
+        let wrong_answer = self.theme.wrong_answer;
+        let unsolved = self.theme.unsolved;
+        let solved = self.theme.solved;
+        let not_started = self.theme.not_started;
+        let default = self.theme.default;
 
         [
             self.pair_line("Group: ", &dir.dir_name, default),
@@ -170,15 +171,9 @@ impl<'a> SolutionWindow<'a> {
     }
 
     fn pair_line<'b>(&self, k: &'b str, v: impl Display, v_style: Style) -> Line<'b> {
-        let highlighted = self.theme().highlighted();
         Line::from(vec![
-            Span::styled(k, highlighted),
+            Span::styled(k, self.theme.highlighted),
             Span::styled(v.to_string(), v_style),
         ])
-    }
-
-    fn theme(&self) -> &Theme {
-        static THEME: Theme = Theme {};
-        &THEME
     }
 }

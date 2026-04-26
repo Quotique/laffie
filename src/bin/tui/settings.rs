@@ -6,6 +6,8 @@ use serde_derive::Deserialize;
 
 use utils::LogConfig;
 
+use crate::theme::ThemeName;
+
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub logger:            LogConfig,
@@ -13,6 +15,8 @@ pub struct Settings {
     pub tasks:             PathBuf,
     pub exec_deadline:     usize,
     pub solve_parallelism: usize,
+    #[serde(default)]
+    pub theme:             ThemeName,
 }
 
 impl Settings {
@@ -27,6 +31,7 @@ impl Settings {
             .set_default("tasks", "tasks")?
             .set_default("exec_deadline", 100000)?
             .set_default("solve_parallelism", default_parallelism)?
+            .set_default("theme", "dark")?
             .add_source(File::new(args.config.to_str().unwrap(), FileFormat::Yaml))
             .set_override_option(
                 "symbols",
