@@ -9,9 +9,9 @@ use clap::Parser;
 use colored::*;
 use itertools::Itertools;
 
-use database::{TaskDb, TaskRecord};
+use database::{Db, Run, Task as DbTask, id_from_hex, id_to_hex};
 use parser::DirectoryParser;
-use solver::task::{SolutionStatus, Solver, Task, TracerHub};
+use solver::task::{SolutionStatus, Solver, Task as SolverTask, TracerHub};
 use view::View;
 
 use crate::settings::Settings;
@@ -40,9 +40,9 @@ struct Args {
     #[clap(short = 'p', long)]
     tasks: Option<PathBuf>,
 
-    /// Specify tasks DB path
-    #[clap(short = 'd', long, default_value = "./db/tasks")]
-    tasks_db: PathBuf,
+    /// Specify DB file path
+    #[clap(short = 'd', long, default_value = "./db/tasks.redb")]
+    db_path: PathBuf,
 
     /// Dump solution trace into a file
     #[clap(short, long)]
@@ -116,38 +116,59 @@ fn main() {
     let Ok(tasks) = parser.load_tasks().inspect_err(|e| eprintln!("{e}")) else {
         return;
     };
-    let db = TaskDb::open(args.tasks_db).unwrap();
+
+    if let Some(parent) = args.db_path.parent() &&
+        !parent.as_os_str().is_empty() &&
+        let Err(e) = std::fs::create_dir_all(parent)
+    {
+        println!("Cannot create db parent dir: {e}");
+        return;
+    }
+    let db = Db::open(&args.db_path).unwrap_or_else(|e| {
+        println!("Db open error: {e:?}");
+        std::process::exit(-1);
+    });
 
     if !args.remove.is_empty() {
-        let id = i128::from_str_radix(&args.remove, 16).expect("bad task id");
-        if let Err(e) = db.remove(id) {
-            println!("task remove error: {e}");
+        let id = id_from_hex(&args.remove).expect("bad task id");
+        if let Err(e) = db.remove_task(id) {
+            println!("task remove error: {e:?}");
         }
         return;
     }
 
     let mut stats: HashMap<String, SolveStats> = Default::default();
 
-    for mut record in tasks
-        .into_iter()
-        .map(|p| TaskRecord::from(&p))
-        .filter(move |x| {
-            let id = format!("{:x}", x.id);
-            id.starts_with(&only) || id.ends_with(&only)
-        })
-    {
-        let p: Task = record.clone().into();
+    for solver_task in tasks.into_iter().filter(|task| {
+        if only.is_empty() {
+            return true;
+        }
+        let id = id_to_hex(&database::compute_task_id(
+            &task
+                .givens
+                .iter()
+                .map(|t| (*t.term).clone())
+                .collect::<Vec<_>>(),
+            &task.goal.term,
+        ));
+        id.starts_with(&only) || id.ends_with(&only)
+    }) {
+        let db_task = DbTask::from(&solver_task);
+        if let Err(e) = db.put_task(&db_task) {
+            println!("task put error: {e:?}");
+        }
 
-        println!("{} {}", "Task".bold().green(), p);
-        let p_id = p.id;
+        let solver_task: SolverTask = db_task.clone().into();
+        println!("{} {}", "Task".bold().green(), solver_task);
+        let task_id_hex = id_to_hex(&db_task.id);
         let mut solver = Solver::new(rules_engine.clone());
 
         let solution = solver.solve(
-            p,
+            solver_task,
             {
                 let mut tracer = TracerHub::default();
                 if args.trace {
-                    tracer.add_file_dumper(format!("dumps/{p_id:x}.dump"));
+                    tracer.add_file_dumper(format!("dumps/{task_id_hex}.dump"));
                 }
                 tracer
             },
@@ -155,7 +176,7 @@ fn main() {
         );
         match solution.status {
             SolutionStatus::Answer(_) => {
-                stats.entry(record.group.clone()).or_default().solved += 1;
+                stats.entry(db_task.group.clone()).or_default().solved += 1;
                 println!(
                     "{}\n{}",
                     "Solution:".italic().blue(),
@@ -163,7 +184,7 @@ fn main() {
                 );
                 if !solution.validate_answer() {
                     stats
-                        .entry(record.group.clone())
+                        .entry(db_task.group.clone())
                         .or_default()
                         .answer_changed += 1;
                     println!(
@@ -173,10 +194,9 @@ fn main() {
                         solution.answer().unwrap()
                     );
                 }
-                record.runs.push(solution.cycles());
             }
             SolutionStatus::Err(e) => {
-                stats.entry(record.group.clone()).or_default().not_solved += 1;
+                stats.entry(db_task.group.clone()).or_default().not_solved += 1;
                 println!(
                     "{} {}\n{}",
                     "Solution:".italic().blue(),
@@ -186,12 +206,10 @@ fn main() {
             }
             _ => unreachable!(),
         };
-        if !record.reports.is_empty() {
-            println!(
-                "{} [{}]",
-                "Reported:".bold().blink().red(),
-                record.reports.iter().format(", ")
-            );
+
+        let run = Run::from_solution(db_task.id, &solution);
+        if let Err(e) = db.add_run(run) {
+            println!("run add error: {e:?}");
         }
     }
 

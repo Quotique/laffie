@@ -7,7 +7,7 @@ logger:
     solver: "Info"
     solver::task: "Trace"
     solver::rule: "Trace"
-    sled: "Warn"
+    redb: "Warn"
 
 symbols_dir: "symbols"
 tasks_dir: "tasks"
