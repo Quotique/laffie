@@ -248,15 +248,20 @@ impl State {
     }
 
     pub fn mark_to_solve(&mut self, node_id: TreeIndex) {
-        let Some(node) = self.tasks.get_mut(&node_id) else {
+        let Some(node) = self.tasks.get(&node_id) else {
             return;
         };
 
-        if let TasksNode::Directory { .. } = node.data_mut() {
-            self.solve_queue.extend(node.iter().map(|x| x.id()));
-        } else {
-            self.solve_queue.push(node_id);
-        };
+        match node.data() {
+            TasksNode::Task(_) => {
+                self.solve_queue.push(node_id);
+            }
+            TasksNode::Directory(_) => {
+                let mut tasks = Vec::new();
+                collect_task_ids(node, &mut tasks);
+                self.solve_queue.extend(tasks);
+            }
+        }
     }
 
     pub fn update_task_solution(&mut self, idx: &TreeIndex, solution: SharedSolution) {
@@ -274,6 +279,15 @@ impl State {
 
         let upd = DirectoryStatUpdate::for_transition(Some(from), Some(to));
         self.counters_update(idx, upd);
+    }
+}
+
+fn collect_task_ids(node: &Node<TasksNode>, out: &mut Vec<TreeIndex>) {
+    for child in node.iter() {
+        match child.data() {
+            TasksNode::Task(_) => out.push(child.id()),
+            TasksNode::Directory(_) => collect_task_ids(child, out),
+        }
     }
 }
 

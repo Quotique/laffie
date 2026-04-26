@@ -220,6 +220,10 @@ impl Ui {
             })
             .collect::<Vec<_>>();
 
+        if queue.is_empty() {
+            return;
+        }
+
         self.progress.reset(queue.len());
         self.cycles.store(0, Ordering::Relaxed);
         self.cancel.store(false, Ordering::Relaxed);

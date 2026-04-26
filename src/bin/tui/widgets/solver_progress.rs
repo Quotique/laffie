@@ -94,10 +94,12 @@ impl SolverProgress {
         };
 
         Paragraph::new(task_text).render(layout[0], frame.buffer_mut());
-        let current_percent = ((current_cycles * 100) / self.exec_deadline) as u16;
-        let total_percent = (((self.finished_tasks_count * self.exec_deadline + current_cycles) *
-            100) /
-            (self.total_tasks_count * self.exec_deadline)) as u16;
+        let deadline = self.exec_deadline.max(1);
+        let total = self.total_tasks_count.max(1);
+        let current_percent = ((current_cycles * 100) / deadline).min(100) as u16;
+        let total_percent = (((self.finished_tasks_count * deadline + current_cycles) * 100) /
+            (total * deadline))
+            .min(100) as u16;
 
         let total_label = if queued > 0 {
             format!(
