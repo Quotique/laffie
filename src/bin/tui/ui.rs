@@ -229,28 +229,34 @@ impl Ui {
             cycles: self.cycles.clone(),
         };
         let tx = self.progress_tx.clone();
-        let cycles = self.cycles.clone();
         let rules = self.state.rules_engine.clone();
         let exec_deadline = self.state.settings.exec_deadline;
+        let parallelism = self.state.settings.solve_parallelism.max(1);
         self.worker = Some(spawn(move || {
-            queue
-                .into_iter()
-                .map(|(idx, task)| {
-                    let mut hub = TracerHub::default();
-                    hub.add_custom(reporter.clone());
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(parallelism)
+                .build()
+                .expect("failed to build rayon pool");
+            pool.install(|| {
+                use rayon::iter::{IntoParallelIterator, ParallelIterator};
+                queue
+                    .into_par_iter()
+                    .map(|(idx, task)| {
+                        let mut hub = TracerHub::default();
+                        hub.add_custom(reporter.clone());
 
-                    let _ = tx.send(ProgressEvent::TaskStarted(Box::new(task.task.clone())));
-                    let solution = Solver::new(rules.clone()).solve(
-                        task.task,
-                        hub,
-                        exec_deadline,
-                        TIME_LIMIT_DEFAULT,
-                    );
-                    let _ = tx.send(ProgressEvent::TaskFinished);
-                    cycles.store(0, Ordering::Relaxed);
-                    (idx, solution)
-                })
-                .collect::<Vec<_>>()
+                        let _ = tx.send(ProgressEvent::TaskStarted(Box::new(task.task.clone())));
+                        let solution = Solver::new(rules.clone()).solve(
+                            task.task,
+                            hub,
+                            exec_deadline,
+                            TIME_LIMIT_DEFAULT,
+                        );
+                        let _ = tx.send(ProgressEvent::TaskFinished);
+                        (idx, solution)
+                    })
+                    .collect::<Vec<_>>()
+            })
         }));
     }
 

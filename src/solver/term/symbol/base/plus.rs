@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, collections::HashMap};
 
-use bigdecimal::{BigDecimal as Decimal, Zero};
+use bigdecimal::{BigDecimal as Decimal, One, Zero};
 
 use super::{SymbolProgram, power::power_argument};
 use crate::{
@@ -123,9 +123,9 @@ fn attach_constant(root: &mut TermMut, constant: Decimal) {
 }
 
 fn merge_mul_const(mut root: TermBuf, d: Decimal) -> TermBuf {
-    if d == 1 {
+    if d.is_one() {
         return root;
-    } else if d == 0 {
+    } else if d.is_zero() {
         return TermBuf::zero();
     }
     let constant = TermBuf::number(d);
