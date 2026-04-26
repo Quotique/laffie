@@ -1,6 +1,7 @@
 use std::{collections::HashSet, convert::From, fmt, sync::Arc};
 
 use derive_more::From;
+use serde::{Serialize, Serializer};
 use serde_derive::Deserialize;
 use trees::Tree;
 
@@ -20,6 +21,12 @@ pub struct TermPath(pub(super) Vec<usize>);
 #[derive(Clone, Hash, PartialEq, Eq)]
 #[derive(Deserialize)]
 pub struct TermBuf(SymbolTree);
+
+impl Serialize for TermBuf {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.term().serialize(serializer)
+    }
+}
 
 impl TermBuf {
     #[inline]

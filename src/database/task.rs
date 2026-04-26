@@ -1,101 +1,64 @@
-use std::{
-    convert::{From, Into},
-    path::Path,
-};
-
-use bincode::{Decode, Encode, config, config::Configuration};
-use sled::{Db, Error};
+use chrono::Utc;
+use serde_derive::{Deserialize, Serialize};
 
 use solver::{
-    task::{Task, TermProps},
+    task::{Task as SolverTask, TermProps},
     term::TermBuf,
 };
 
-use super::err_handle;
+use crate::id::{TaskId, compute_task_id};
 
-#[derive(Clone, Encode, Decode)]
-pub struct TaskRecord {
-    pub id:     u128,
-    pub text:   String,
-    pub group:  String,
-    pub givens: Vec<TermBuf>,
-    pub goal:   TermBuf,
+/// Persistent description of a problem.
+///
+/// `id` is content-addressed over `(givens, goal)` (see [`compute_task_id`]),
+/// so re-inserting an equivalent task is idempotent. `possible_answers` is
+/// validation-only and intentionally **not** part of the id.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Task {
+    pub id:    TaskId,
+    pub text:  String,
+    pub group: String,
 
-    pub answer:  Vec<TermBuf>,
-    pub runs:    Vec<usize>,
-    pub reports: Vec<u64>,
+    pub givens:           Vec<TermBuf>,
+    pub goal:             TermBuf,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub possible_answers: Vec<TermBuf>,
+
+    #[serde(default)]
+    pub hidden:     bool,
+    /// Unix epoch seconds at first persistence.
+    pub created_at: i64,
 }
 
-pub struct TaskDb {
-    db:     Db,
-    config: Configuration,
-}
+impl From<&SolverTask> for Task {
+    fn from(t: &SolverTask) -> Self {
+        let givens: Vec<TermBuf> = t.givens.iter().map(|x| (*x.term).clone()).collect();
+        let goal: TermBuf = (*t.goal.term).clone();
+        let id = compute_task_id(&givens, &goal);
 
-impl From<&Task> for TaskRecord {
-    fn from(value: &Task) -> Self {
-        Self {
-            id:     value.id as u128,
-            text:   value.text.clone(),
-            group:  value.group.clone(),
-            givens: Vec::from_iter(value.givens.iter().map(|x| (*x.term).clone())),
-            goal:   (*value.goal.term).clone(),
-
-            answer:  value.possible_answers.clone(),
-            runs:    Default::default(),
-            reports: Default::default(),
+        Task {
+            id,
+            text: t.text.clone(),
+            group: t.group.clone(),
+            givens,
+            goal,
+            possible_answers: t.possible_answers.clone(),
+            hidden: false,
+            created_at: Utc::now().timestamp(),
         }
     }
 }
 
-#[allow(clippy::from_over_into)]
-impl Into<Task> for TaskRecord {
-    fn into(self) -> Task {
-        Task {
-            id:               self.id as u64,
-            text:             self.text,
-            group:            self.group,
-            givens:           Vec::from_iter(self.givens.into_iter().map(TermProps::from)),
-            possible_answers: self.answer,
-            goal:             TermProps::from(self.goal),
+impl From<Task> for SolverTask {
+    fn from(t: Task) -> Self {
+        SolverTask {
+            id:               u64::from_le_bytes(t.id[..8].try_into().expect("id is 16 bytes")),
+            text:             t.text,
+            group:            t.group,
+            givens:           t.givens.into_iter().map(TermProps::from).collect(),
+            goal:             TermProps::from(t.goal),
+            possible_answers: t.possible_answers,
             subtask_level:    0,
         }
-    }
-}
-
-impl TaskDb {
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        Ok(Self {
-            db:     sled::open(path)?,
-            config: config::standard(),
-        })
-    }
-
-    pub fn get(&self, id: u128) -> Result<Option<TaskRecord>, Error> {
-        let key = id.to_le_bytes();
-        Ok(self.db.get(key)?.map(|b| {
-            let (decoded, _): (TaskRecord, usize) =
-                bincode::decode_from_slice(&b[..], self.config).unwrap();
-            decoded
-        }))
-    }
-
-    pub fn put(&self, task: &TaskRecord) -> Result<(), Error> {
-        let key = task.id.to_le_bytes();
-        let encoded: Vec<u8> = bincode::encode_to_vec(task, self.config).unwrap();
-
-        self.db.insert(key, encoded).map(|_| ())
-    }
-
-    pub fn remove(&self, id: i128) -> Result<(), Error> {
-        let key = id.to_le_bytes();
-        self.db.remove(key).map(|_| ())
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = TaskRecord> + '_ {
-        self.db.iter().flat_map(err_handle).map(|(_, v)| {
-            let (decoded, _): (TaskRecord, usize) =
-                bincode::decode_from_slice(&v[..], self.config).unwrap();
-            decoded
-        })
     }
 }
