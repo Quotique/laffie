@@ -87,7 +87,7 @@ pub enum Tab {
     Rules,
     Tasks,
     Tracing,
-    // Setting,
+    Settings,
 }
 
 impl Ui {
@@ -123,6 +123,13 @@ impl Ui {
                         (WidgetType::TracingNavigation, Constraint::Percentage(60)),
                         (WidgetType::TracingWindow, Constraint::Percentage(40)),
                     ],
+                    theme,
+                ),
+            ),
+            (
+                Tab::Settings,
+                Pane::new(
+                    vec![(WidgetType::SettingsView, Constraint::Percentage(100))],
                     theme,
                 ),
             ),
@@ -180,7 +187,7 @@ impl Ui {
                     None
                 }
             }
-            Tab::Tracing => None,
+            Tab::Tracing | Tab::Settings => None,
         }
     }
 
@@ -465,7 +472,7 @@ impl Ui {
 }
 
 impl Tab {
-    pub const ALL: &'static [Tab] = &[Tab::Rules, Tab::Tasks, Tab::Tracing];
+    pub const ALL: &'static [Tab] = &[Tab::Rules, Tab::Tasks, Tab::Tracing, Tab::Settings];
 }
 
 impl From<Tab> for usize {

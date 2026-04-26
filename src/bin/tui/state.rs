@@ -27,7 +27,8 @@ pub struct State {
 
     pub solve_queue: Vec<TreeIndex>,
 
-    pub settings: Settings,
+    pub settings:     Settings,
+    pub settings_pos: ListState,
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +160,7 @@ impl State {
             tasks_pos: Default::default(),
             dir_solution_pos: Default::default(),
             settings,
+            settings_pos: default_state(),
             solve_queue: Default::default(),
         };
 

@@ -6,9 +6,9 @@ use crate::{
     state::State,
     theme::Theme,
     widgets::{
-        rule_window::RuleWindow, rules_list::RulesList, solution_window::SolutionWindow,
-        tasks_list::TasksList, tracing_navigation::TracingNavigation,
-        tracing_window::TracingWindow,
+        rule_window::RuleWindow, rules_list::RulesList, settings_view::SettingsView,
+        solution_window::SolutionWindow, tasks_list::TasksList,
+        tracing_navigation::TracingNavigation, tracing_window::TracingWindow,
     },
 };
 
@@ -35,6 +35,7 @@ pub enum WidgetType {
     Solution,
     TracingNavigation,
     TracingWindow,
+    SettingsView,
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +145,16 @@ impl StatefulWidget for Pane {
                         .render(inner, buf);
                     }
                 }
+                WidgetType::SettingsView => {
+                    let block = self.theme.block(is_focused, "Settings");
+                    let inner = block.inner(*area);
+                    block.render(*area, buf);
+                    SettingsView {
+                        settings: &state.settings,
+                        theme:    &self.theme,
+                    }
+                    .render(inner, buf, &mut state.settings_pos);
+                }
             }
         }
     }
@@ -247,6 +258,10 @@ impl WidgetCommands for WidgetType {
                 },
             ],
             WidgetType::TracingWindow => &[],
+            WidgetType::SettingsView => &[KeyHint {
+                key:   "↑↓",
+                label: "navigate",
+            }],
         }
     }
 
@@ -418,6 +433,25 @@ impl WidgetCommands for WidgetType {
                 _ => false,
             },
             WidgetType::TracingWindow => false,
+            WidgetType::SettingsView => match command {
+                Command::Down => {
+                    state.settings_pos.select_next();
+                    true
+                }
+                Command::Up => {
+                    state.settings_pos.select_previous();
+                    true
+                }
+                Command::Top => {
+                    state.settings_pos.select_first();
+                    true
+                }
+                Command::Bottom => {
+                    state.settings_pos.select_last();
+                    true
+                }
+                _ => false,
+            },
         }
     }
 }

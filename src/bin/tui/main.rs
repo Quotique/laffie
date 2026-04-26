@@ -103,7 +103,7 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                         KeyCode::F(1) => Command::SwitchTab(0),
                         KeyCode::F(2) => Command::SwitchTab(1),
                         KeyCode::F(3) => Command::SwitchTab(2),
-                        // KeyCode::F(4) => status.current_tab = Itab::Setting,
+                        KeyCode::F(4) => Command::SwitchTab(3),
                         KeyCode::PageDown => Command::PageDown,
                         KeyCode::PageUp => Command::PageUp,
                         KeyCode::Home => Command::Top,
@@ -211,15 +211,18 @@ mod tests {
     #[test]
     fn clicks_on_each_title_match_index() {
         let tabs = rect(0, 80);
-        // Inner starts at 1; titles "F1: Rules" (9), "F2: Tasks" (9), "F3: Tracing"
-        // (11). Layout cols: pad@1, F1@2..10, pad@11, div@12, pad@13,
-        // F2@14..22, pad@23, div@24, pad@25, F3@26..36
+        // Inner starts at 1; titles "F1: Rules" (9), "F2: Tasks" (9),
+        // "F3: Tracing" (11), "F4: Settings" (12). Layout cols:
+        // pad@1, F1@2..10, pad@11, div@12, pad@13, F2@14..22, pad@23,
+        // div@24, pad@25, F3@26..36, pad@37, div@38, pad@39, F4@40..51
         assert_eq!(tab_index_for_click(tabs, 2), Some(0));
         assert_eq!(tab_index_for_click(tabs, 10), Some(0));
         assert_eq!(tab_index_for_click(tabs, 14), Some(1));
         assert_eq!(tab_index_for_click(tabs, 22), Some(1));
         assert_eq!(tab_index_for_click(tabs, 26), Some(2));
         assert_eq!(tab_index_for_click(tabs, 36), Some(2));
+        assert_eq!(tab_index_for_click(tabs, 40), Some(3));
+        assert_eq!(tab_index_for_click(tabs, 51), Some(3));
     }
 
     #[test]
@@ -229,6 +232,7 @@ mod tests {
         assert_eq!(tab_index_for_click(tabs, 11), None); // padding after F1
         assert_eq!(tab_index_for_click(tabs, 12), None); // divider
         assert_eq!(tab_index_for_click(tabs, 13), None); // padding before F2
+        assert_eq!(tab_index_for_click(tabs, 38), None); // divider before F4
     }
 
     #[test]
@@ -246,6 +250,7 @@ mod tests {
         assert_eq!(tab_index_for_click(tabs, 12), Some(0));
         assert_eq!(tab_index_for_click(tabs, 24), Some(1));
         assert_eq!(tab_index_for_click(tabs, 36), Some(2));
+        assert_eq!(tab_index_for_click(tabs, 50), Some(3));
     }
 }
 
