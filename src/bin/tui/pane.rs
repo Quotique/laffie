@@ -68,10 +68,14 @@ impl StatefulWidget for Pane {
             let is_focused = self.focused_pane == num;
             match widget {
                 WidgetType::RulesList => {
-                    let rules_list = RulesList {
-                        engine: state.rules_engine.clone(),
+                    let items = state.filtered_rules();
+                    let title = if state.rules_filter.is_empty() {
+                        "Rules".to_string()
+                    } else {
+                        format!("Rules /{}", state.rules_filter)
                     };
-                    let block = self.theme().block(is_focused, "Rules");
+                    let rules_list = RulesList { items };
+                    let block = self.theme().block(is_focused, title.as_str());
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     rules_list.render(inner, buf, &mut state.rules_pos);
@@ -81,7 +85,7 @@ impl StatefulWidget for Pane {
                     let inner = block.inner(*area);
                     block.render(*area, buf);
                     if let Some(idx) = state.rules_pos.selected() &&
-                        let Some(rule) = state.rules_engine.iter().nth(idx)
+                        let Some(rule) = state.filtered_rules().into_iter().nth(idx)
                     {
                         RuleWindow { rule }.render(inner, buf);
                     }
@@ -145,6 +149,10 @@ impl WidgetCommands for WidgetType {
                     key:   "→",
                     label: "details",
                 },
+                KeyHint {
+                    key:   "/",
+                    label: "filter",
+                },
             ],
             WidgetType::RuleWindow => &[
                 KeyHint {
@@ -154,6 +162,10 @@ impl WidgetCommands for WidgetType {
                 KeyHint {
                     key:   "←",
                     label: "back to list",
+                },
+                KeyHint {
+                    key:   "/",
+                    label: "filter",
                 },
             ],
             WidgetType::TasksList => &[
@@ -405,6 +417,10 @@ impl WidgetCommands for WidgetType {
 impl Pane {
     pub fn keys(&self) -> &'static [KeyHint] {
         self.layout[self.focused_pane].0.keys()
+    }
+
+    pub fn focused(&self) -> WidgetType {
+        self.layout[self.focused_pane].0
     }
 
     pub fn click(&mut self, col: u16, row: u16, body: Rect) {

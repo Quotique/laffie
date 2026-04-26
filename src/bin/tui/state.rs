@@ -8,7 +8,7 @@ use tui_tree_widget::TreeState;
 use parser::DirectoryParser;
 use solver::{
     CompactString,
-    rule::RulesEngine,
+    rule::{RulesEngine, SharedRule},
     task::{SharedSolution, Solution, SolutionStatus, Task},
 };
 use utils::{IndexedTree, TreeIndex};
@@ -19,6 +19,7 @@ use crate::widgets::tracing_navigation::TermId;
 pub struct State {
     pub rules_engine: Arc<RulesEngine>,
     pub rules_pos:    ListState,
+    pub rules_filter: String,
 
     pub tasks:     Tree<TasksNode>,
     pub tasks_pos: TreeState<TreeIndex>,
@@ -144,6 +145,7 @@ impl State {
         let mut result = Self {
             rules_engine: rules,
             rules_pos: default_state(),
+            rules_filter: String::new(),
             tasks: Tree::new(TasksNode::new_directory("Tasks".into())),
             tasks_pos: Default::default(),
             settings,
@@ -155,6 +157,20 @@ impl State {
         }
 
         Ok(result)
+    }
+
+    pub fn filtered_rules(&self) -> Vec<SharedRule> {
+        if self.rules_filter.is_empty() {
+            return self.rules_engine.iter().collect();
+        }
+        let needle = self.rules_filter.to_lowercase();
+        self.rules_engine
+            .iter()
+            .filter(|r| {
+                r.id.to_string().contains(&needle) ||
+                    r.term.to_string().to_lowercase().contains(&needle)
+            })
+            .collect()
     }
 
     pub fn reload(&mut self) -> io::Result<()> {

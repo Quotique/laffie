@@ -52,14 +52,19 @@ pub enum Command {
     Cancel,
     ShowHelp,
     Dismiss,
+    FilterEnter,
+    FilterChar(char),
+    FilterBackspace,
+    FilterFinish,
 }
 
 pub struct Ui {
     panes: HashMap<Tab, Pane>,
 
-    error:     String,
-    show_help: bool,
-    worker:    Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
+    error:       String,
+    show_help:   bool,
+    filter_mode: bool,
+    worker:      Option<JoinHandle<Vec<(TreeIndex, SharedSolution)>>>,
 
     progress:    SolverProgress,
     progress_tx: Sender<ProgressEvent>,
@@ -113,6 +118,7 @@ impl Ui {
             panes,
             error: Default::default(),
             show_help: false,
+            filter_mode: false,
             worker: None,
             progress: SolverProgress::new(state.settings.exec_deadline),
             progress_tx,
@@ -127,6 +133,10 @@ impl Ui {
         self.worker.is_some()
     }
 
+    pub fn is_filter_mode(&self) -> bool {
+        self.filter_mode
+    }
+
     pub fn click_in_body(&mut self, col: u16, row: u16, body: Rect) {
         if let Some(pane) = self.panes.get_mut(&self.current_tab) {
             pane.click(col, row, body);
@@ -139,6 +149,18 @@ impl Ui {
                 key:   "Esc/?",
                 label: "close help",
             }];
+        }
+        if self.filter_mode {
+            return vec![
+                KeyHint {
+                    key:   "Esc",
+                    label: "cancel filter",
+                },
+                KeyHint {
+                    key:   "Enter",
+                    label: "apply",
+                },
+            ];
         }
         if !self.error.is_empty() {
             return vec![
@@ -250,9 +272,54 @@ impl Ui {
             return;
         }
 
+        if self.filter_mode {
+            match command {
+                Command::Dismiss => {
+                    self.filter_mode = false;
+                    self.state.rules_filter.clear();
+                    self.state.rules_pos.select(Some(0));
+                }
+                Command::FilterFinish => {
+                    self.filter_mode = false;
+                }
+                Command::FilterChar(c) => {
+                    self.state.rules_filter.push(c);
+                    self.state.rules_pos.select(Some(0));
+                }
+                Command::FilterBackspace => {
+                    self.state.rules_filter.pop();
+                    self.state.rules_pos.select(Some(0));
+                }
+                Command::Up |
+                Command::Down |
+                Command::PageUp |
+                Command::PageDown |
+                Command::Top |
+                Command::Bottom => {
+                    if let Some(pane) = self.panes.get_mut(&self.current_tab) {
+                        pane.process(&mut self.state, command);
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
+
         if self.worker.is_some() {
             if matches!(command, Command::Cancel) {
                 self.cancel.store(true, Ordering::Relaxed);
+            }
+            return;
+        }
+
+        if matches!(command, Command::FilterEnter) {
+            let supports_filter = self
+                .panes
+                .get(&self.current_tab)
+                .map(|p| matches!(p.focused(), WidgetType::RulesList | WidgetType::RuleWindow))
+                .unwrap_or(false);
+            if supports_filter {
+                self.filter_mode = true;
             }
             return;
         }
@@ -361,12 +428,13 @@ const HELP_ENTRIES: &[(&str, &str)] = &[
     ("Ctrl+u / Ctrl+d", "page up / down"),
     ("Home / End", "jump to top / bottom"),
     ("Space / Enter", "toggle (tree node, etc.)"),
+    ("/", "filter (Rules)"),
     ("s", "solve selected task"),
     ("a", "solve all tasks"),
     ("c", "cancel running solver"),
     ("r", "reload rules"),
     ("?", "toggle help"),
-    ("Esc", "dismiss popup"),
+    ("Esc", "dismiss popup / cancel filter"),
     ("q", "quit"),
 ];
 
