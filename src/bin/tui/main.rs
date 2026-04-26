@@ -121,6 +121,7 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                         KeyCode::Char('s') | KeyCode::Char('ы') => Command::Solve,
                         KeyCode::Char('a') | KeyCode::Char('ф') => Command::SolveAll,
                         KeyCode::Char('r') | KeyCode::Char('к') => Command::Reload,
+                        KeyCode::Char('R') | KeyCode::Char('К') => Command::ReloadAll,
                         KeyCode::Char('c') | KeyCode::Char('с') => Command::Cancel,
                         KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
                         _ => Command::None,

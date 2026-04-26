@@ -1,4 +1,4 @@
-use std::{io, sync::Arc};
+use std::{collections::HashSet, io, sync::Arc};
 
 use ratatui::widgets::ListState;
 use trees::{Node, Tree, tr};
@@ -180,6 +180,26 @@ impl State {
         Ok(())
     }
 
+    pub fn reload_tasks(&mut self) -> io::Result<()> {
+        let parser = DirectoryParser::new(&self.settings.symbols, &self.settings.tasks);
+        let new_tasks = parser.load_tasks()?;
+
+        let mut existing: HashSet<u64> = HashSet::new();
+        collect_known_task_ids(self.tasks.root(), &mut existing);
+
+        for task in new_tasks {
+            if !existing.contains(&task.id) {
+                self.add_task(task);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn reload_all(&mut self) -> io::Result<()> {
+        self.reload()?;
+        self.reload_tasks()
+    }
+
     #[inline]
     pub fn selected_task(&mut self) -> Option<&mut TaskState> {
         let selected = self.tasks_pos.selected().last()?;
@@ -287,6 +307,17 @@ fn collect_task_ids(node: &Node<TasksNode>, out: &mut Vec<TreeIndex>) {
         match child.data() {
             TasksNode::Task(_) => out.push(child.id()),
             TasksNode::Directory(_) => collect_task_ids(child, out),
+        }
+    }
+}
+
+fn collect_known_task_ids(node: &Node<TasksNode>, out: &mut HashSet<u64>) {
+    for child in node.iter() {
+        match child.data() {
+            TasksNode::Task(task) => {
+                out.insert(task.solution.task.id);
+            }
+            TasksNode::Directory(_) => collect_known_task_ids(child, out),
         }
     }
 }

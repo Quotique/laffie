@@ -49,6 +49,7 @@ pub enum Command {
     PrevPane,
     Toggle,
     Reload,
+    ReloadAll,
     Cancel,
     ShowHelp,
     Dismiss,
@@ -344,6 +345,11 @@ impl Ui {
                     self.error = format!("Reload failed: {e}");
                 }
             }
+            Command::ReloadAll => {
+                if let Err(e) = self.state.reload_all() {
+                    self.error = format!("Reload all failed: {e}");
+                }
+            }
             Command::SwitchTab(num) => {
                 self.current_tab = Tab::from(num);
             }
@@ -444,6 +450,7 @@ const HELP_ENTRIES: &[(&str, &str)] = &[
     ("a", "solve all tasks"),
     ("c", "cancel running solver"),
     ("r", "reload rules"),
+    ("Shift+R", "reload rules + tasks"),
     ("?", "toggle help"),
     ("Esc", "dismiss popup / cancel filter"),
     ("q", "quit"),
