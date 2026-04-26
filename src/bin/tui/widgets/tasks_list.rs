@@ -3,10 +3,12 @@ use ratatui::{prelude::*, widgets::StatefulWidget};
 use trees::{Node, Tree};
 use tui_tree_widget::{Tree as TuiTree, TreeItem, TreeState};
 
-use solver::task::SolutionStatus;
 use utils::{IndexedTree, TreeIndex};
 
-use crate::{state::TasksNode, theme::Theme};
+use crate::{
+    state::{TaskStatusKind, TasksNode},
+    theme::Theme,
+};
 
 pub struct TasksList<'a> {
     pub tasks_index: &'a Tree<TasksNode>,
@@ -38,11 +40,11 @@ impl<'a> TasksList<'a> {
 
         let text = match tasks_node.data() {
             TasksNode::Task(task) => {
-                let line_style = match task.solution.status {
-                    SolutionStatus::NotDone => not_started,
-                    SolutionStatus::Err(_) => unsolved,
-                    SolutionStatus::Answer(_) if task.solution.validate_answer() => solved,
-                    _ => wrong_answer,
+                let line_style = match TaskStatusKind::of(&task.solution) {
+                    TaskStatusKind::NotStarted => not_started,
+                    TaskStatusKind::Solved => solved,
+                    TaskStatusKind::WrongAnswer => wrong_answer,
+                    TaskStatusKind::Unsolved => unsolved,
                 };
 
                 let conditions = format!("[{}]", task.solution.task.givens.iter().format(", "),);

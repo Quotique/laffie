@@ -50,12 +50,53 @@ pub struct DirectoryStat {
     pub not_started_count:  usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskStatusKind {
+    NotStarted,
+    Solved,
+    WrongAnswer,
+    Unsolved,
+}
+
+impl TaskStatusKind {
+    pub fn of(solution: &Solution) -> Self {
+        match solution.status {
+            SolutionStatus::NotDone => Self::NotStarted,
+            SolutionStatus::Err(_) => Self::Unsolved,
+            SolutionStatus::Answer(_) if solution.validate_answer() => Self::Solved,
+            SolutionStatus::Answer(_) => Self::WrongAnswer,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 struct DirectoryStatUpdate {
     pub solved_delta:       isize,
     pub unsolved_delta:     isize,
     pub wrong_answer_delta: isize,
     pub not_started_delta:  isize,
+}
+
+impl DirectoryStatUpdate {
+    fn for_transition(from: Option<TaskStatusKind>, to: Option<TaskStatusKind>) -> Self {
+        let mut upd = Self::default();
+        if let Some(kind) = from {
+            *upd.field_mut(kind) -= 1;
+        }
+        if let Some(kind) = to {
+            *upd.field_mut(kind) += 1;
+        }
+        upd
+    }
+
+    fn field_mut(&mut self, kind: TaskStatusKind) -> &mut isize {
+        match kind {
+            TaskStatusKind::NotStarted => &mut self.not_started_delta,
+            TaskStatusKind::Solved => &mut self.solved_delta,
+            TaskStatusKind::WrongAnswer => &mut self.wrong_answer_delta,
+            TaskStatusKind::Unsolved => &mut self.unsolved_delta,
+        }
+    }
 }
 
 impl DirectoryStat {
@@ -134,19 +175,18 @@ impl State {
     }
 
     fn add_task(&mut self, task: Task) {
+        let solution: SharedSolution = Solution::new(task.clone()).into();
+        let kind = TaskStatusKind::of(&solution);
         let node_id = {
             let node = self.find_node_mut(task.group.as_str());
             node.push_back(tr(TasksNode::new_task(TaskState {
-                solution:      Solution::new(task.clone()).into(),
-                solution_pos:  Default::default(),
+                solution,
+                solution_pos: Default::default(),
                 tracing_state: Default::default(),
             })));
             node.id()
         };
-        let upd = DirectoryStatUpdate {
-            not_started_delta: 1,
-            ..Default::default()
-        };
+        let upd = DirectoryStatUpdate::for_transition(None, Some(kind));
         self.counters_update(&node_id, upd);
     }
 
@@ -211,31 +251,78 @@ impl State {
             return;
         };
 
-        let mut upd = DirectoryStatUpdate::default();
-
-        // Mark previous task status to remove
-        if task.solution.status == SolutionStatus::NotDone {
-            upd.not_started_delta -= 1;
-        } else if task.solution.answer().is_none() {
-            upd.unsolved_delta -= 1;
-        } else if !task.solution.validate_answer() {
-            upd.wrong_answer_delta -= 1;
-        } else {
-            upd.solved_delta -= 1;
-        };
+        let from = TaskStatusKind::of(&task.solution);
         task.solution = solution.clone();
         task.tracing_state = vec![(solution, Default::default())];
+        let to = TaskStatusKind::of(&task.solution);
 
-        // Add new task status to remove
-        if task.solution.answer().is_none() {
-            upd.unsolved_delta += 1;
-        } else if !task.solution.as_ref().validate_answer() {
-            upd.wrong_answer_delta += 1;
-        } else {
-            upd.solved_delta += 1;
-        };
-
-        // Propagate changes to all parent nodes
+        let upd = DirectoryStatUpdate::for_transition(Some(from), Some(to));
         self.counters_update(idx, upd);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn upd_tuple(u: &DirectoryStatUpdate) -> (isize, isize, isize, isize) {
+        (
+            u.not_started_delta,
+            u.solved_delta,
+            u.wrong_answer_delta,
+            u.unsolved_delta,
+        )
+    }
+
+    #[test]
+    fn add_new_task_increments_not_started() {
+        let upd = DirectoryStatUpdate::for_transition(None, Some(TaskStatusKind::NotStarted));
+        assert_eq!(upd_tuple(&upd), (1, 0, 0, 0));
+    }
+
+    #[test]
+    fn not_started_to_solved() {
+        let upd = DirectoryStatUpdate::for_transition(
+            Some(TaskStatusKind::NotStarted),
+            Some(TaskStatusKind::Solved),
+        );
+        assert_eq!(upd_tuple(&upd), (-1, 1, 0, 0));
+    }
+
+    #[test]
+    fn not_started_to_wrong_to_solved() {
+        let first = DirectoryStatUpdate::for_transition(
+            Some(TaskStatusKind::NotStarted),
+            Some(TaskStatusKind::WrongAnswer),
+        );
+        assert_eq!(upd_tuple(&first), (-1, 0, 1, 0));
+
+        let second = DirectoryStatUpdate::for_transition(
+            Some(TaskStatusKind::WrongAnswer),
+            Some(TaskStatusKind::Solved),
+        );
+        assert_eq!(upd_tuple(&second), (0, 1, -1, 0));
+    }
+
+    #[test]
+    fn solved_back_to_unsolved() {
+        let upd = DirectoryStatUpdate::for_transition(
+            Some(TaskStatusKind::Solved),
+            Some(TaskStatusKind::Unsolved),
+        );
+        assert_eq!(upd_tuple(&upd), (0, -1, 0, 1));
+    }
+
+    #[test]
+    fn same_kind_is_no_op() {
+        for kind in [
+            TaskStatusKind::NotStarted,
+            TaskStatusKind::Solved,
+            TaskStatusKind::WrongAnswer,
+            TaskStatusKind::Unsolved,
+        ] {
+            let upd = DirectoryStatUpdate::for_transition(Some(kind), Some(kind));
+            assert_eq!(upd_tuple(&upd), (0, 0, 0, 0), "kind={kind:?}");
+        }
     }
 }
