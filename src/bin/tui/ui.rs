@@ -127,6 +127,12 @@ impl Ui {
         self.worker.is_some()
     }
 
+    pub fn click_in_body(&mut self, col: u16, row: u16, body: Rect) {
+        if let Some(pane) = self.panes.get_mut(&self.current_tab) {
+            pane.click(col, row, body);
+        }
+    }
+
     pub fn key_hints(&self) -> Vec<KeyHint> {
         if self.show_help {
             return vec![KeyHint {

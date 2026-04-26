@@ -407,6 +407,20 @@ impl Pane {
         self.layout[self.focused_pane].0.keys()
     }
 
+    pub fn click(&mut self, col: u16, row: u16, body: Rect) {
+        let areas = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(self.layout.iter().map(|(_, c)| *c))
+            .split(body);
+        let pos = Position::new(col, row);
+        for (idx, area) in areas.iter().enumerate() {
+            if area.contains(pos) {
+                self.focused_pane = idx;
+                return;
+            }
+        }
+    }
+
     pub fn process(&mut self, state: &mut State, command: Command) {
         let len = self.layout.len();
         match command {

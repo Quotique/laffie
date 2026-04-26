@@ -2,7 +2,13 @@ use std::{fmt::Display, io};
 
 use ratatui::{
     DefaultTerminal,
-    crossterm::event::{self, KeyCode, KeyEventKind, KeyModifiers},
+    crossterm::{
+        event::{
+            self, DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEventKind, KeyModifiers,
+            MouseButton, MouseEvent, MouseEventKind,
+        },
+        execute,
+    },
     prelude::*,
     widgets::{Block, Borders, Paragraph, Tabs},
 };
@@ -29,6 +35,8 @@ fn help_bar_item<'b>(k: &'b str, v: impl Display) -> Vec<Span<'b>> {
 
 fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
     let mut ui = ui::Ui::try_new(settings)?;
+    let mut tabs_rect = Rect::default();
+    let mut body_rect = Rect::default();
 
     loop {
         ui.tick();
@@ -41,6 +49,9 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                     Constraint::Min(1),
                 ])
                 .split(frame.area());
+
+            tabs_rect = vertical_layout[0];
+            body_rect = vertical_layout[1];
 
             let tabs = Tabs::new(
                 Itab::ALL
@@ -67,39 +78,61 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
         if ui.has_active_worker() && !event::poll(std::time::Duration::from_millis(100))? {
             continue;
         }
-        if let event::Event::Key(key) = event::read()? &&
-            key.kind == KeyEventKind::Press
-        {
-            let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-            let command = match key.code {
-                KeyCode::Char('u') | KeyCode::Char('г') if ctrl => Command::PageUp,
-                KeyCode::Char('d') | KeyCode::Char('в') if ctrl => Command::PageDown,
-                KeyCode::F(1) => Command::SwitchTab(0),
-                KeyCode::F(2) => Command::SwitchTab(1),
-                KeyCode::F(3) => Command::SwitchTab(2),
-                // KeyCode::F(4) => status.current_tab = Itab::Setting,
-                KeyCode::PageDown => Command::PageDown,
-                KeyCode::PageUp => Command::PageUp,
-                KeyCode::Home => Command::Top,
-                KeyCode::End => Command::Bottom,
-                KeyCode::Tab => Command::NextPane,
-                KeyCode::BackTab => Command::PrevPane,
-                KeyCode::Esc => Command::Dismiss,
-                KeyCode::Char('?') => Command::ShowHelp,
-                KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('о') => Command::Down,
-                KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('л') => Command::Up,
-                KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('р') => Command::Left,
-                KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('д') => Command::Right,
-                KeyCode::Enter | KeyCode::Char(' ') => Command::Toggle,
-                KeyCode::Char('s') | KeyCode::Char('ы') => Command::Solve,
-                KeyCode::Char('a') | KeyCode::Char('ф') => Command::SolveAll,
-                KeyCode::Char('r') | KeyCode::Char('к') => Command::Reload,
-                KeyCode::Char('c') | KeyCode::Char('с') => Command::Cancel,
-                KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
-                _ => Command::None,
-            };
-            ui.process(command);
+        match event::read()? {
+            event::Event::Mouse(mouse) => handle_mouse(&mut ui, mouse, tabs_rect, body_rect),
+            event::Event::Key(key) if key.kind == KeyEventKind::Press => {
+                let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+                let command = match key.code {
+                    KeyCode::Char('u') | KeyCode::Char('г') if ctrl => Command::PageUp,
+                    KeyCode::Char('d') | KeyCode::Char('в') if ctrl => Command::PageDown,
+                    KeyCode::F(1) => Command::SwitchTab(0),
+                    KeyCode::F(2) => Command::SwitchTab(1),
+                    KeyCode::F(3) => Command::SwitchTab(2),
+                    // KeyCode::F(4) => status.current_tab = Itab::Setting,
+                    KeyCode::PageDown => Command::PageDown,
+                    KeyCode::PageUp => Command::PageUp,
+                    KeyCode::Home => Command::Top,
+                    KeyCode::End => Command::Bottom,
+                    KeyCode::Tab => Command::NextPane,
+                    KeyCode::BackTab => Command::PrevPane,
+                    KeyCode::Esc => Command::Dismiss,
+                    KeyCode::Char('?') => Command::ShowHelp,
+                    KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('о') => Command::Down,
+                    KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('л') => Command::Up,
+                    KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('р') => Command::Left,
+                    KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('д') => Command::Right,
+                    KeyCode::Enter | KeyCode::Char(' ') => Command::Toggle,
+                    KeyCode::Char('s') | KeyCode::Char('ы') => Command::Solve,
+                    KeyCode::Char('a') | KeyCode::Char('ф') => Command::SolveAll,
+                    KeyCode::Char('r') | KeyCode::Char('к') => Command::Reload,
+                    KeyCode::Char('c') | KeyCode::Char('с') => Command::Cancel,
+                    KeyCode::Char('q') | KeyCode::Char('й') => return Ok(()),
+                    _ => Command::None,
+                };
+                ui.process(command);
+            }
+            _ => {}
         }
+    }
+}
+
+fn handle_mouse(ui: &mut ui::Ui, mouse: MouseEvent, tabs: Rect, body: Rect) {
+    let pos = Position::new(mouse.column, mouse.row);
+    match mouse.kind {
+        MouseEventKind::ScrollUp => ui.process(Command::Up),
+        MouseEventKind::ScrollDown => ui.process(Command::Down),
+        MouseEventKind::Down(MouseButton::Left) => {
+            if tabs.contains(pos) {
+                let count = Itab::ALL.len().max(1);
+                let rel_x = mouse.column.saturating_sub(tabs.x) as usize;
+                let width = (tabs.width as usize).max(1);
+                let idx = (rel_x * count / width).min(count - 1);
+                ui.process(Command::SwitchTab(idx));
+            } else if body.contains(pos) {
+                ui.click_in_body(mouse.column, mouse.row, body);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -115,8 +148,10 @@ fn main() -> io::Result<()> {
     let _log_guard = settings.logger.init();
 
     let mut terminal = ratatui::init();
+    let _ = execute!(io::stdout(), EnableMouseCapture);
     terminal.clear()?;
     let app_result = run(terminal, settings);
+    let _ = execute!(io::stdout(), DisableMouseCapture);
     ratatui::restore();
     if let Err(e) = app_result {
         eprintln!("{e}");
