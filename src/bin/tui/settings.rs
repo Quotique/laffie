@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 
 use clap::Parser;
 use config::{Config, ConfigError, File, FileFormat};
@@ -10,6 +10,8 @@ use crate::theme::ThemeName;
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
+    #[serde(skip)]
+    pub config_path:       PathBuf,
     pub logger:            LogConfig,
     pub symbols:           PathBuf,
     pub tasks:             PathBuf,
@@ -26,7 +28,7 @@ impl Settings {
             .map(|n| n.get())
             .unwrap_or(1) as i64;
 
-        Config::builder()
+        let mut settings: Settings = Config::builder()
             .set_default("symbols", "symbols")?
             .set_default("tasks", "tasks")?
             .set_default("exec_deadline", 100000)?
@@ -40,7 +42,30 @@ impl Settings {
             .set_override_option("tasks", args.tasks.map(|x| x.to_str().unwrap().to_owned()))?
             .set_override_option("exec_deadline", args.exec_deadline)?
             .build()?
-            .try_deserialize()
+            .try_deserialize()?;
+        settings.config_path = args.config;
+        Ok(settings)
+    }
+
+    pub fn save(&self) -> io::Result<()> {
+        let mut value: serde_yaml::Value = if self.config_path.exists() {
+            let text = std::fs::read_to_string(&self.config_path)?;
+            serde_yaml::from_str(&text).unwrap_or(serde_yaml::Value::Mapping(Default::default()))
+        } else {
+            serde_yaml::Value::Mapping(Default::default())
+        };
+        let map = value
+            .as_mapping_mut()
+            .ok_or_else(|| io::Error::other("config yaml root is not a mapping"))?;
+        let theme = serde_yaml::to_value(self.theme).map_err(io::Error::other)?;
+        map.insert("exec_deadline".into(), (self.exec_deadline as u64).into());
+        map.insert(
+            "solve_parallelism".into(),
+            (self.solve_parallelism as u64).into(),
+        );
+        map.insert("theme".into(), theme);
+        let text = serde_yaml::to_string(&value).map_err(io::Error::other)?;
+        std::fs::write(&self.config_path, text)
     }
 }
 

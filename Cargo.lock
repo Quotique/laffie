@@ -1986,6 +1986,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_derive",
+ "serde_yaml",
  "solver",
  "trees",
  "tui-scrollview",

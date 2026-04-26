@@ -54,6 +54,7 @@ pub enum Command {
     ReloadAll,
     Cancel,
     EditSelected,
+    SaveSettings,
     ShowHelp,
     Dismiss,
     FilterEnter,
@@ -409,6 +410,11 @@ impl Ui {
             Command::EditSelected => {
                 self.pending_edit = self.compute_edit_target();
             }
+            Command::SaveSettings => {
+                if let Err(e) = self.state.settings.save() {
+                    self.error = format!("Save settings failed: {e}");
+                }
+            }
             _ => {}
         }
     }
@@ -508,6 +514,7 @@ const HELP_ENTRIES: &[(&str, &str)] = &[
     ("r", "reload rules"),
     ("Shift+R", "reload rules + tasks"),
     ("e", "open selected source in $EDITOR"),
+    ("Ctrl+S", "save settings (Settings tab)"),
     ("?", "toggle help"),
     ("Esc", "dismiss popup / cancel filter"),
     ("q", "quit"),

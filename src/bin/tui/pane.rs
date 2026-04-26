@@ -4,7 +4,7 @@ use utils::IndexedTree;
 
 use crate::{
     state::State,
-    theme::Theme,
+    theme::{Theme, ThemeName},
     widgets::{
         rule_window::RuleWindow, rules_list::RulesList, settings_view::SettingsView,
         solution_window::SolutionWindow, tasks_list::TasksList,
@@ -258,10 +258,24 @@ impl WidgetCommands for WidgetType {
                 },
             ],
             WidgetType::TracingWindow => &[],
-            WidgetType::SettingsView => &[KeyHint {
-                key:   "↑↓",
-                label: "navigate",
-            }],
+            WidgetType::SettingsView => &[
+                KeyHint {
+                    key:   "↑↓",
+                    label: "navigate",
+                },
+                KeyHint {
+                    key:   "←→",
+                    label: "adjust",
+                },
+                KeyHint {
+                    key:   "Space",
+                    label: "cycle",
+                },
+                KeyHint {
+                    key:   "Ctrl+S",
+                    label: "save",
+                },
+            ],
         }
     }
 
@@ -450,6 +464,15 @@ impl WidgetCommands for WidgetType {
                     state.settings_pos.select_last();
                     true
                 }
+                Command::Left | Command::Right => {
+                    let inc = matches!(command, Command::Right);
+                    adjust_setting(state, inc);
+                    true
+                }
+                Command::Toggle => {
+                    cycle_theme(state);
+                    true
+                }
                 _ => false,
             },
         }
@@ -510,4 +533,46 @@ impl Pane {
             _ => {}
         }
     }
+}
+
+const EXEC_DEADLINE_STEP: usize = 10_000;
+
+fn adjust_setting(state: &mut State, increase: bool) {
+    let Some(idx) = state.settings_pos.selected() else {
+        return;
+    };
+    match idx {
+        2 => {
+            state.settings.exec_deadline = if increase {
+                state
+                    .settings
+                    .exec_deadline
+                    .saturating_add(EXEC_DEADLINE_STEP)
+            } else {
+                state
+                    .settings
+                    .exec_deadline
+                    .saturating_sub(EXEC_DEADLINE_STEP)
+                    .max(EXEC_DEADLINE_STEP)
+            };
+        }
+        3 => {
+            state.settings.solve_parallelism = if increase {
+                state.settings.solve_parallelism.saturating_add(1)
+            } else {
+                state.settings.solve_parallelism.saturating_sub(1).max(1)
+            };
+        }
+        4 => cycle_theme(state),
+        _ => {}
+    }
+}
+
+fn cycle_theme(state: &mut State) {
+    let next = match state.settings.theme {
+        ThemeName::Dark => ThemeName::Light,
+        ThemeName::Light => ThemeName::HighContrast,
+        ThemeName::HighContrast => ThemeName::Dark,
+    };
+    state.settings.theme = next;
 }

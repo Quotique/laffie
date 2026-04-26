@@ -100,6 +100,7 @@ fn run(mut terminal: DefaultTerminal, settings: Settings) -> io::Result<()> {
                     match key.code {
                         KeyCode::Char('u') | KeyCode::Char('г') if ctrl => Command::PageUp,
                         KeyCode::Char('d') | KeyCode::Char('в') if ctrl => Command::PageDown,
+                        KeyCode::Char('s') | KeyCode::Char('ы') if ctrl => Command::SaveSettings,
                         KeyCode::F(1) => Command::SwitchTab(0),
                         KeyCode::F(2) => Command::SwitchTab(1),
                         KeyCode::F(3) => Command::SwitchTab(2),
