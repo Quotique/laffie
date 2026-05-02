@@ -1,0 +1,9 @@
+symbol Reals {
+    attr display("ℝ");
+}
+
+rule {
+    attr level(0), goal(prove(Reals is known));
+
+    Reals is known <=> true;
+}
