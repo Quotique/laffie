@@ -1,0 +1,45 @@
+// Эмуляция формы ответа case-split: три ветви с конкретными конд-параметрами.
+// Цель — убедиться, что существующая инфраструктура logic_and + logic_or
+// корректно сворачивает дизъюнкцию вида
+// (cond_1 && answer_1) || (cond_2 && answer_2) || (cond_3 && answer_3),
+// когда из трёх условий ровно одно истинно. Никаких новых правил для этого
+// добавлять не пришлось.
+
+task {
+    goal find(x);
+    text "Case-split: истинная ветвь имеет ответ x = 7";
+    answer x == 7;
+
+    (5 == 2 && x in Reals) || (5 == 5 && x == 7) || (5 == 100 && x in empty_set);
+}
+
+task {
+    goal find(x);
+    text "Case-split: истинная ветвь имеет пустое множество";
+    answer x in empty_set;
+
+    (5 == 2 && x == 1) || (5 == 5 && x in empty_set) || (5 == 100 && x in Reals);
+}
+
+task {
+    goal find(x);
+    text "Case-split: истинная ветвь имеет x ∈ Reals";
+    answer x in Reals;
+
+    (5 == 2 && x == 1) || (5 == 5 && x in Reals) || (5 == 100 && x in empty_set);
+}
+
+// TODO: параметрический case-split. Задача
+//
+//     task {
+//         goal find(x);
+//         answer (a == 0 && x in Reals) || (a != 0 && x == 1);
+//
+//         (a == 0 && x in Reals) || (a != 0 && x == 1);
+//     }
+//
+// в текущей инфраструктуре не решается — check_find_answer
+// (src/solver/task/solver.rs:588) ожидает ответ в форме `x == ...` или
+// `x in ...`, и не принимает дизъюнкцию конъюнкций. Это станет частью
+// task 5 (C1 end-to-end) — потребуется либо расширение answer-checker,
+// либо альтернативный формат ответа (например, явный `piecewise` symbol).
