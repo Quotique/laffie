@@ -1,0 +1,49 @@
+symbol sympy_solve {
+    py
+"
+exec(open('symbols/py/sympy_convert.py').read())
+
+def calculator(root, level):
+    if root.symbol != 'sympy_solve' or len(root) != 2:
+        return None
+
+    eq_node = root[0]
+    var_node = root[1]
+
+    if not var_node.is_variable:
+        return None
+
+    var_name = var_node.name
+    sympy_var = sympy.Symbol(var_name)
+    var_map = {var_name: sympy_var}
+
+    if eq_node.is_symbol and eq_node.symbol == '==' and len(eq_node) == 2:
+        lhs = to_sympy(eq_node[0], var_map)
+        rhs = to_sympy(eq_node[1], var_map)
+        if lhs is None or rhs is None:
+            return None
+        sympy_eq = sympy.Eq(lhs, rhs)
+    else:
+        expr = to_sympy(eq_node, var_map)
+        if expr is None:
+            return None
+        sympy_eq = expr
+
+    try:
+        solutions = sympy.solve(sympy_eq, sympy_var)
+    except Exception:
+        return None
+
+    if not solutions:
+        return Term('empty_set', [])
+
+    result_terms = []
+    for s in solutions:
+        t = from_sympy(s, var_name, Term)
+        if t is None:
+            return None
+        result_terms.append(t)
+
+    return Term('set', result_terms)
+";
+}
