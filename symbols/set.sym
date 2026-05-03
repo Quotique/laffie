@@ -32,6 +32,12 @@ rule {
 rule {
     attr level(3),goal(transform(x)),replace,block(move_left);
 
+    a in set(b) <=> a == b;
+}
+
+rule {
+    attr level(3),goal(transform(x)),replace,block(move_left);
+
     a in set(b, c) <=> a == b || a == c;
 }
 

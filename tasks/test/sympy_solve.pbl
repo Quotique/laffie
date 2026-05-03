@@ -1,0 +1,28 @@
+// sympy_solve(eq, x) — wrapper над sympy.solve через PyO3-bridge.
+// Возвращает set(...) для конечного множества решений или empty_set
+// при отсутствии решений.
+
+task {
+    goal find(r);
+    text "sympy_solve(x² − 4 == 0, x) → set(-2, 2)";
+    answer r in set(-2, 2), r in set(2, -2),
+           r == -2 || r == 2, r == 2 || r == -2;
+
+    r in sympy_solve(x^2 - 4 == 0, x);
+}
+
+task {
+    goal find(r);
+    text "sympy_solve(2x − 6 == 0, x) → set(3)";
+    answer r == 3, r in set(3);
+
+    r in sympy_solve(2*x - 6 == 0, x);
+}
+
+task {
+    goal find(r);
+    text "sympy_solve(0 == 1, x) → empty_set";
+    answer r in empty_set;
+
+    r in sympy_solve(0 == 1, x);
+}

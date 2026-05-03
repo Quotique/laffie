@@ -27,3 +27,25 @@ rule {
     b is known;
 }
 
+// Параметрический линейный case-split: x*a + b == 0 без assumption на знак a.
+// Ветвится по обнулению a:
+//   a == 0, b == 0  →  x ∈ ℝ (тождество)
+//   a == 0, b != 0  →  x ∈ ∅ (нет решений)
+//   a != 0          →  делегирование sympy_solve
+// Резолюция обёрнута в answer(...) — это сигнал решателю
+// (см. check_answer_term, src/solver/task/solver.rs:565), что внутренний
+// терм является ответом независимо от его формы (дизъюнкция конъюнкций).
+rule {
+    attr level(2),goal(find(x, ..));
+
+    x*a + b == 0 =>
+        answer(
+            (a == 0 && b == 0 && x in Reals) ||
+            (a == 0 && b != 0 && x in empty_set) ||
+            (a != 0 && x in sympy_solve(x*a + b == 0, x))
+        );
+
+    a is known,
+    b is known;
+}
+

@@ -44,6 +44,8 @@ def to_sympy(node, var_map):
         return args[0] / args[1]
     if s == 'neg' and len(args) == 1:
         return -args[0]
+    if s == '==' and len(args) == 2:
+        return sympy.Eq(args[0], args[1])
 
     return None
 
