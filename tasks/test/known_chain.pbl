@@ -1,0 +1,24 @@
+// Минимальная проверка: доказывается ли (a^2 - 4) is known через
+// цепочку правил из given `a is known`.
+// Цепочка: a is known → a^2 is known (multiply.sym) → -4 is known
+// (number, truth_checker) → (a^2 + (-4)) is known (plus.sym).
+
+task {
+    goal prove((a^2 - 4) is known);
+    a is known;
+}
+
+task {
+    goal prove((-a + 2) is known);
+    a is known;
+}
+
+task {
+    goal prove(a^2 is known);
+    a is known;
+}
+
+task {
+    goal prove((-a) is known);
+    a is known;
+}

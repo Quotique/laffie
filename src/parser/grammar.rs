@@ -225,6 +225,7 @@ peg::parser! {
         rule atom() -> Tree<Token> =
             n:number() p:position!() e:eval() { Token::new("*", p) /n /e }
             / "(" _ b:or() _ ")" { b }
+            / f:solve_block() { f }
             / e:eval() { e }
             / p:arg_list() { p }
             / n:number() p:position!() i:char_first_ident() { Token::new("*", p) /n /i }
@@ -239,6 +240,24 @@ peg::parser! {
             }
             t
         }
+
+        // `find(vars...) { eqs... }` → `solve(find(vars...), eqs...)`.
+        rule solve_block() -> Tree<Token> =
+            _ p:position!() keyword("find")
+            _ pf:position!() "(" _ vars:commasep(<or()>) _ ")"
+            _ "{" _ givens:terms() _ "}"
+            {
+                let mut find = Token::new("find", pf);
+                for v in vars.iter().cloned() {
+                    find.push_back(v);
+                }
+                let mut t = Token::new("solve", p);
+                t.push_back(find);
+                for g in givens.iter().cloned() {
+                    t.push_back(g);
+                }
+                t
+            }
     }
 }
 
@@ -267,6 +286,34 @@ mod tests {
                 (Token::new("+", 8) / Token::new("one", 4) / Token::new("three", 10)) /
                 Token::new("two", 17))
         );
+    }
+
+    #[test]
+    fn solve_block_single_var_test() {
+        // solve(find(x), eq).
+        let t = ra::term("find(x) { x + 1 == 0 }").unwrap();
+        assert_eq!(t.root().data().symbol, "solve");
+        assert_eq!(t.root().degree(), 2);
+        let find = t.root().iter().next().unwrap();
+        assert_eq!(find.data().symbol, "find");
+        assert_eq!(find.degree(), 1);
+    }
+
+    #[test]
+    fn solve_block_multi_var_test() {
+        // solve(find(x, y), eq1, eq2).
+        let t = ra::term("find(x, y) { x + y == 0; x - y == 2 }").unwrap();
+        assert_eq!(t.root().data().symbol, "solve");
+        assert_eq!(t.root().degree(), 3);
+        let find = t.root().iter().next().unwrap();
+        assert_eq!(find.data().symbol, "find");
+        assert_eq!(find.degree(), 2);
+    }
+
+    #[test]
+    fn solve_block_distinct_from_find_goal_test() {
+        let goal = ra::term("find(x, y)").unwrap();
+        assert_eq!(goal.root().data().symbol, "find");
     }
 
     #[test]

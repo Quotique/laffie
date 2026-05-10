@@ -10,6 +10,87 @@ rule {
     !symbolic_eq(b, 0);
 }
 
+// Обратное к move_left, но в transform-фазе и с защитой от срабатывания
+// на goal-уравнение: требование `a is known, b is known` исключает
+// срабатывание на термах с goal-переменной x внутри (для них is known
+// не доказуемо, см. solver.rs:417). Используется для канонизации условий
+// case-split-ветвей: `-a + 2 == 0` → `-a == -2` → `a == 2` (с правилом
+// `-a == -b ⟺ a == b` в multiply.sym).
+rule {
+    attr replace,level(2),goal(transform(x)),block(move_left);
+
+    a + b == 0 <=> a == -b;
+
+    a is known,
+    b is known,
+    !symbolic_eq(b, 0);
+}
+
+// Канонизация ориентации `==`: переменная/параметр должны быть слева,
+// «значение» справа. Без этого правила, например, `-a + 2 == 0` после
+// move_left-обратной даёт `2 == a` (число слева), и substitute-правило
+// в logic_and (`a is variable, b is known`) не срабатывает на нужном
+// порядке. Делаем `==` not-commutative и применяем целевой swap, чтобы
+// не плодить рекурсивные матчи в задачах с rational-roots (например,
+// кубическое x³−6x²+11x−6=0 экспоненциально размножается при общей
+// коммутативности `==`).
+rule {
+    attr replace,level(2),goal(transform(x));
+
+    c == a <=> a == c;
+
+    a is variable,
+    c is known;
+}
+
+// Аналог обратного move_left для `!=`: канонизация `a + b != 0` в
+// `a != -b`. Используется в case-split-ветви типа `a²-4 != 0`,
+// которое после этой → `a² != 4` → дальше через квадратное правило.
+rule {
+    attr replace,level(2),goal(transform(x));
+
+    a + b != 0 <=> a != -b;
+
+    a is known,
+    b is known,
+    !symbolic_eq(b, 0);
+}
+
+// Извлечение квадратного корня на параметре при `c ≥ 0`. Применяется
+// в ветвях case-split (например, `a² = 4` → `a = 2 || a = -2`).
+// Для условия `c < 0` не пишем — в реальных параметрических ветвях
+// такие случаи отдельно дают `x ∈ ∅` через другие правила.
+// Дублируется для обеих ориентаций `==` (не commutative).
+rule {
+    attr replace,level(3),goal(transform(x));
+
+    a^2 == c <=> a == sqrt(c) || a == -sqrt(c);
+
+    c is known,
+    c >= 0;
+}
+
+rule {
+    attr replace,level(3),goal(transform(x));
+
+    c == a^2 <=> a == sqrt(c) || a == -sqrt(c);
+
+    c is known,
+    c >= 0;
+}
+
+// Двойственное к квадратному корню для `!=`: `a² ≠ c ⟺ a ≠ √c ∧ a ≠ -√c`
+// при `c > 0`. Используется в branch третьего типа case-split-а
+// (`a² - 4 ≠ 0` → `a ≠ 2 ∧ a ≠ -2`).
+rule {
+    attr replace,level(3),goal(transform(x));
+
+    a^2 != c <=> a != sqrt(c) && a != -sqrt(c);
+
+    c is known,
+    c > 0;
+}
+
 rule {
     attr replace,level(5),goal(find(x, ..));
 
@@ -25,6 +106,25 @@ rule {
 
     a != 0,
     b is known;
+}
+
+// Параметрический квадратный case-split. Внутреннюю линейную ветвь
+// делегируем линейному правилу через B3 sub-solve — внутри sub-solve
+// квадратный паттерн (с `x^2`) не матчится на bare `b*x + c == 0`,
+// рекурсии нет.
+rule {
+    attr level(2),goal(find(x, ..));
+
+    a*x^2 + b*x + c == 0 =>
+        answer(
+            (a == 0 && lin) ||
+            (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x))
+        );
+
+    a is known,
+    b is known,
+    c is known,
+    lin == find(x) { b*x + c == 0; b is known; c is known };
 }
 
 // Параметрический линейный case-split: x*a + b == 0 без assumption на знак a.
@@ -48,4 +148,6 @@ rule {
     a is known,
     b is known;
 }
+
+
 

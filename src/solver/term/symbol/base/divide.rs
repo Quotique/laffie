@@ -98,6 +98,9 @@ fn simplify(num: Decimal, den: Decimal) -> (Decimal, Decimal) {
 }
 
 fn impl_divide(num: &Decimal, den: &Decimal) -> Option<Decimal> {
+    if den.is_zero() {
+        return None;
+    }
     if den.is_one() {
         Some(num.clone())
     } else {

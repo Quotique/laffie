@@ -53,7 +53,21 @@ pub struct Solution {
 
 impl Solution {
     pub fn new(task: Task) -> Self {
-        let goal = Goal::try_from((*task.goal.term).clone()).unwrap();
+        let mut goal = Goal::try_from((*task.goal.term).clone()).unwrap();
+        // Goal::try_from rebuilds TermProps from a bare TermBuf and drops the
+        // task.goal.filters payload. Carry blocked_rules across so that a
+        // `block(rule_id)` set on the parent term survives into the subtask
+        // (e.g. a transform-subtask whose goal was produced by a rule with
+        // `block(...)` must still skip the blocked rule).
+        let inherited_blocked = task.goal.filters.blocked_rules.clone();
+        if !inherited_blocked.is_empty() {
+            match &mut goal {
+                Goal::Find(g) => g.term.filters.blocked_rules.extend(inherited_blocked),
+                Goal::Prove(t) | Goal::Transform(t) => {
+                    t.filters.blocked_rules.extend(inherited_blocked);
+                }
+            }
+        }
 
         let mut solution = Self {
             task,
