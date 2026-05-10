@@ -84,6 +84,18 @@ def from_sympy(expr, var_name, Term):
 
     if isinstance(expr, sympy.Pow):
         base, exp = expr.args
+        # Normalise Pow(x, -1) → 1/x and Pow(x, -n) → 1/x^n so that the
+        # resulting Laffie term uses the canonical division form rather than
+        # a negative-exponent power. Negative-exponent powers are not parser
+        # syntax in .pbl files and force structural mismatches against
+        # answers written with division.
+        if isinstance(exp, sympy.Integer) and int(exp) < 0:
+            base_term = from_sympy(base, var_name, Term)
+            if base_term is None:
+                return None
+            n = -int(exp)
+            denom = base_term if n == 1 else Term('^', [base_term, Term.number(n)])
+            return Term('/', [Term.number(1), denom])
         return Term('^', [from_sympy(base, var_name, Term),
                           from_sympy(exp, var_name, Term)])
 

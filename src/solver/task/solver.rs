@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use itertools::Itertools;
 
@@ -8,9 +11,14 @@ use super::{
 };
 use crate::{
     NormalizationLevel,
-    rule::{GroundedHypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine, SharedRule},
+    rule::{
+        GroundedHypothesis, Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine,
+        SharedRule,
+    },
     task::{Tracer, solution::SolutionStatus},
-    term::{SharedTerm, Term, TermBuf, TermMut, match_term},
+    term::{
+        Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, match_term, var,
+    },
 };
 
 /// Maximum depth allowed for nested subtasks.
@@ -296,7 +304,7 @@ impl Solver {
     ) -> Option<TermProps> {
         let is_goal = s[index].filters.is_goal();
         let prove_goal = TermBuf::symbol("prove").arg(s[index].term.as_ref().clone());
-        HypothesisIterator::new(
+        let raw_hypotheses: Vec<Hypothesis> = HypothesisIterator::new(
             rule.clone(),
             &s[index].term,
             &s[index].filters,
@@ -306,26 +314,33 @@ impl Solver {
                 &s.task.goal.term
             },
         )
-        .flat_map(|hypothesis| hypothesis.ground())
-        .filter_map(|hypothesis| {
-            let is_dub = if is_goal {
-                s.goal_index.contains_key(&hypothesis.resolution)
-            } else {
-                s.main_index.contains_key(&hypothesis.resolution)
-            };
-            if is_dub {
-                return None;
-            }
-            let props = self.try_prove_hypothesis(index, s, hypothesis, state);
-            if props.inference.is_proven() {
-                Some(props)
-            } else {
-                // TODO: option to disable
-                s.add_term(props).expect("can't add unproven");
-                None
-            }
-        })
-        .next()
+        .collect();
+        let resolved_hypotheses: Vec<Hypothesis> = raw_hypotheses
+            .into_iter()
+            .filter_map(|h| self.resolve_solve_in_hypothesis(h, s, state))
+            .collect();
+        resolved_hypotheses
+            .into_iter()
+            .flat_map(|hypothesis| hypothesis.ground())
+            .filter_map(|hypothesis| {
+                let is_dub = if is_goal {
+                    s.goal_index.contains_key(&hypothesis.resolution)
+                } else {
+                    s.main_index.contains_key(&hypothesis.resolution)
+                };
+                if is_dub {
+                    return None;
+                }
+                let props = self.try_prove_hypothesis(index, s, hypothesis, state);
+                if props.inference.is_proven() {
+                    Some(props)
+                } else {
+                    // TODO: option to disable
+                    s.add_term(props).expect("can't add unproven");
+                    None
+                }
+            })
+            .next()
     }
 
     fn try_prove_hypothesis(
@@ -434,7 +449,7 @@ impl Solver {
             }
         }
 
-        self.solve_subtask(solution, prove_goal, state)
+        self.solve_subtask(solution, prove_goal, HashSet::new(), state)
     }
 
     fn transform(
@@ -456,7 +471,8 @@ impl Solver {
             term.term.term().to_owned()
         };
         let task = SharedTerm::new(TermBuf::symbol("transform").arg(to_transform));
-        let subtask_solution = self.solve_subtask(solution, task.clone(), state);
+        let blocked = solution[index].filters.blocked_rules.clone();
+        let subtask_solution = self.solve_subtask(solution, task.clone(), blocked, state);
 
         let mut answer = subtask_solution.answer()?.as_ref().clone();
         if use_answer {
@@ -487,6 +503,7 @@ impl Solver {
         &self,
         solution: &Solution,
         task: SharedTerm,
+        blocked_rules: HashSet<RuleId>,
         state: &mut SolutionState,
     ) -> SharedSolution {
         if let Some(x) = state.cache.get(&task) {
@@ -509,7 +526,7 @@ impl Solver {
         let mut subtask_solver = Solver::new(self.rules_engine.clone());
         subtask_solver.unknown_terms = self.unknown_terms.clone();
 
-        let subtask = Self::subtask(solution, task.clone());
+        let subtask = Self::subtask(solution, task.clone(), blocked_rules);
         let mut subtask_solution = Solution::new(subtask);
         subtask_solver.solve_impl(&mut subtask_solution, state);
         let subtask_solution = SharedSolution::new(subtask_solution);
@@ -523,9 +540,123 @@ impl Solver {
         subtask_solution
     }
 
-    fn subtask(solution: &Solution, task: SharedTerm) -> Task {
+    /// Runs `solve(find(vars...), eqs...)` as a fresh subtask, cached
+    /// by `cache_key`. Recursion on the same key hits the placeholder
+    /// and drops; a smaller form gets a fresh key and proceeds.
+    fn run_solve_block(
+        &self,
+        cache_key: TermBuf,
+        goal: TermBuf,
+        eqs: Vec<TermBuf>,
+        parent: &Solution,
+        state: &mut SolutionState,
+    ) -> SharedSolution {
+        if let Some(x) = state.cache.get(&cache_key) {
+            return x.clone();
+        }
+
+        let vars: Vec<TermBuf> = goal.term().args_iter().map(|a| a.to_owned()).collect();
+
+        // Placeholder needs a valid Goal — use the inner `find` term.
+        if state
+            .cache
+            .insert(
+                cache_key.clone(),
+                Solution::new(Task::from(TermProps::from(goal.clone()))).into(),
+            )
+            .is_some()
+        {
+            unimplemented!("solve-block recursion");
+        }
+
+        let mut goal_props = TermProps::from(goal);
+        goal_props.filters.mark_goal();
+
+        let mut builder = TaskBuilder::default()
+            .with_goal(goal_props)
+            .expect("can't build solve subtask")
+            .with_level(parent.task.subtask_level + 1)
+            .with_conditions(
+                parent
+                    .terms
+                    .iter()
+                    .filter(|x| x.inference.is_proven())
+                    .filter(|x| {
+                        !(x.filters.is_goal() || x.term.term().data().is_symbol_name("answer"))
+                    })
+                    .cloned(),
+            );
+        for eq in eqs {
+            builder = builder.with_condition(TermProps::from(eq));
+        }
+        let task = builder.build().expect("can't build solve subtask");
+
+        let mut subtask_solver = Solver::new(self.rules_engine.clone());
+        subtask_solver.unknown_terms = self.unknown_terms.clone();
+        subtask_solver.unknown_terms.extend(vars);
+
+        let mut subtask_solution = Solution::new(task);
+        subtask_solver.solve_impl(&mut subtask_solution, state);
+        let subtask_solution = SharedSolution::new(subtask_solution);
+        *state.cache.get_mut(&cache_key).unwrap() = subtask_solution.clone();
+        if let SolutionStatus::Err(SolveError::MaxSubtaskLevelExceed) = subtask_solution.status {
+            state.cache.remove(&cache_key);
+        }
+        subtask_solution
+    }
+
+    /// Replaces `solve(...) == Param` requirements with subtask answer.
+    fn resolve_solve_in_hypothesis(
+        &self,
+        mut hyp: Hypothesis,
+        parent: &Solution,
+        state: &mut SolutionState,
+    ) -> Option<Hypothesis> {
+        let mut new_reqs = Vec::with_capacity(hyp.requirements.len());
+        let mut binding: Option<(Param, TermBuf)> = None;
+        for req in hyp.requirements.drain(..) {
+            let Some((solve_call, param_atom)) = match_solve_eq_param(&req) else {
+                new_reqs.push(req);
+                continue;
+            };
+
+            let cache_key = solve_call.to_owned();
+            let goal = solve_call.first_arg()?.to_owned();
+            let eqs: Vec<TermBuf> = solve_call.args_iter().skip(1).map(|c| c.to_owned()).collect();
+
+            let result = self.run_solve_block(cache_key, goal, eqs, parent, state);
+            let answer_term = result.answer()?;
+            let mut answer_buf: TermBuf = (*answer_term).clone();
+            if answer_buf.term().data().is_symbol_name("answer") && answer_buf.term().degree() == 1
+            {
+                answer_buf = answer_buf.term_mut().pop_first_arg().unwrap();
+            }
+
+            // Sub-solve answers via `sympy_solve` introduce Param atoms
+            // for non-find-target symbols (see symbols/py/sympy_convert.py).
+            // In the outer context those names are Variables; convert
+            // back so downstream rules don't treat the answer as
+            // "contains free params" and short-circuit.
+            params_to_variables(&mut answer_buf.term_mut());
+
+            // `bind_equality_params` would still refuse a value that
+            // contains params, so substitute directly into the hypothesis.
+            binding = Some((param_atom, answer_buf));
+        }
+        hyp.requirements = new_reqs;
+        if let Some((p, value)) = binding {
+            let subst: crate::term::ParamSubstitution =
+                [(p, value)].into_iter().collect();
+            hyp.substitute(&subst);
+        }
+        Some(hyp)
+    }
+
+    fn subtask(solution: &Solution, task: SharedTerm, blocked_rules: HashSet<RuleId>) -> Task {
+        let mut goal = TermProps::from(task.clone());
+        goal.filters.blocked_rules = blocked_rules;
         TaskBuilder::default()
-            .with_goal(TermProps::from(task.clone()))
+            .with_goal(goal)
             .expect("Can't build subtask")
             .with_conditions(
                 solution
@@ -707,6 +838,33 @@ impl SolutionState {
         }
         Ok(())
     }
+}
+
+/// Converts every `Atom::Param(name)` in-place to `Atom::Variable(name)`.
+fn params_to_variables(term: &mut TermMut<'_>) {
+    if let Atom::Param(p) = term.data().clone() {
+        let name: &str = p.as_ref();
+        *term.data_mut() = Atom::Variable(var(name));
+    }
+    for mut child in term.iter_mut() {
+        params_to_variables(&mut child);
+    }
+}
+
+/// Matches `solve(...) == Param` (either argument order).
+fn match_solve_eq_param<'a>(req: &'a TermBuf) -> Option<(TermRef<'a>, Param)> {
+    let (lhs, rhs) = match_term!(req.term(), "=="(lhs, rhs))?;
+    if lhs.data().is_symbol_name("solve") &&
+        let Atom::Param(p) = rhs.data()
+    {
+        return Some((lhs, p.clone()));
+    }
+    if rhs.data().is_symbol_name("solve") &&
+        let Atom::Param(p) = lhs.data()
+    {
+        return Some((rhs, p.clone()));
+    }
+    None
 }
 
 fn is_replace(root: &mut TermMut) {

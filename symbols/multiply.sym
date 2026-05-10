@@ -6,6 +6,8 @@ rule {
     attr replace,level(2),goal(transform(x)),id(brackets_disclosure);
 
     (a + b)*c <=> a*c + b*c;
+
+    c is atom;
 }
 
 rule {
@@ -35,4 +37,10 @@ rule {
     attr level(1),goal(transform(x)),replace;
 
     -a == -b <=> a == b;
+}
+
+rule {
+    attr level(1),goal(transform(x)),replace;
+
+    -a != -b <=> a != b;
 }
