@@ -50,3 +50,10 @@ rule {
 
     empty_set is known <=> true;
 }
+
+// Terminal-wrap для `x ∈ ∅` — leaf-форма для empty-branch case-split'а.
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    x in empty_set => answer(x in empty_set);
+}

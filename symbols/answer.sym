@@ -1,0 +1,75 @@
+// Распознавание завершённости piecewise-ответа для find(x).
+// Инвариант: операнды (L1/L2, top-dominance) ДОЛЖНЫ быть уже обёрнуты в
+// `answer(...)` — иначе complement-pair принял бы за ответ любую форму
+// (например, `x^2 + 2x + c == 0`).
+
+symbol answer {}
+
+// Complement-pair: a≥b vs a<b, только пара.
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    a >= b && answer(L1) || a < b && answer(L2) => answer(a >= b && L1 || a < b && L2);
+
+    a is known,
+    b is known;
+}
+
+// Complement-pair: a≥b vs a<b, пара + rest.
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    a >= b && answer(L1) || a < b && answer(L2) || rest =>
+        answer(a >= b && L1 || a < b && L2 || rest);
+
+    a is known,
+    b is known;
+}
+
+// Complement-pair: a>b vs a≤b.
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    a > b && answer(L1) || a <= b && answer(L2) => answer(a > b && L1 || a <= b && L2);
+
+    a is known,
+    b is known;
+}
+
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    a > b && answer(L1) || a <= b && answer(L2) || rest =>
+        answer(a > b && L1 || a <= b && L2 || rest);
+
+    a is known,
+    b is known;
+}
+
+// Complement-pair: a==b vs a≠b.
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    a == b && answer(L1) || a != b && answer(L2) => answer(a == b && L1 || a != b && L2);
+
+    a is known,
+    b is known;
+}
+
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    a == b && answer(L1) || a != b && answer(L2) || rest =>
+        answer(a == b && L1 || a != b && L2 || rest);
+
+    a is known,
+    b is known;
+}
+
+// Top-dominance: два уже-обёрнутых дизъюнкта сливаются.
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    answer(t) || answer(u) => answer(t || u);
+}
+

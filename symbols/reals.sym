@@ -7,3 +7,10 @@ rule {
 
     Reals is known <=> true;
 }
+
+// Terminal-wrap для `x ∈ ℝ` — leaf-форма для identity-ветви case-split'а.
+rule {
+    attr level(0),goal(find(x)),replace;
+
+    x in Reals => answer(x in Reals);
+}

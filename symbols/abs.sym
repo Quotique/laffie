@@ -1,0 +1,45 @@
+// Модуль (absolute value). Display сейчас не поддерживает bracket-стиль
+// `|a|`, поэтому выводится как `abs(a)` через стандартный prefix-call.
+
+symbol abs {}
+
+rule {
+    attr level(0),goal(prove(abs(a) is known));
+
+    abs(a) is known <=> true;
+
+    a is known;
+}
+
+rule {
+    attr replace,level(1),goal(transform(x));
+
+    abs(a) => a;
+
+    a >= 0;
+}
+
+rule {
+    attr replace,level(1),goal(transform(x));
+
+    abs(a) => -a;
+
+    a < 0;
+}
+
+// Case-split: уравнение `y == (p + abs(t))/k`. К моменту level(2)
+// исходный set уже развёрнут set-unfold правилом в дизъюнкцию
+// `y == e1 || y == e2` — abs остаётся внутри отдельных уравнений.
+rule {
+    attr level(2),goal(find(x, ..));
+
+    y == (p + abs(t))/k =>
+        (t >= 0 && y == (p + t)/k) || (t < 0 && y == (p - t)/k);
+}
+
+rule {
+    attr level(2),goal(find(x, ..));
+
+    y == (p - abs(t))/k =>
+        (t >= 0 && y == (p - t)/k) || (t < 0 && y == (p + t)/k);
+}
