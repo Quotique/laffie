@@ -89,6 +89,32 @@ pub fn multiply(root: &mut TermMut, level: NormalizationLevel) -> bool {
     }
 }
 
+/// Multiplies `factor` into `rest`, flattening if `rest` is already `*`-rooted.
+pub(super) fn prepend_factor(factor: TermBuf, rest: TermBuf) -> TermBuf {
+    if rest.term().data().is_symbol_name("*") {
+        let mut rest = rest;
+        rest.term_mut().push_first_arg(factor);
+        rest
+    } else {
+        TermBuf::symbol("*").arg(factor).arg(rest)
+    }
+}
+
+/// Folds all numeric children of a `*`-rooted term into one factor and
+/// returns it with the remaining product. `None` if no numeric child exists.
+pub(super) fn extract_numeric_factor(node: TermRef) -> Option<(Decimal, TermBuf)> {
+    if !node.data().is_symbol_name("*") {
+        return None;
+    }
+    let mut owned = node.to_owned();
+    let (factor, changed) = fold_constant(&mut owned.term_mut());
+    if !changed && factor.is_one() {
+        return None;
+    }
+    remove_unused_mul(&mut owned.term_mut());
+    Some((factor, owned))
+}
+
 fn attach_constant(root: &mut TermMut, constant: Decimal) -> bool {
     if constant == Decimal::zero() {
         root.swap(&mut TermBuf::zero().term_mut());

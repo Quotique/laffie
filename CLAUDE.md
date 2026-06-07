@@ -28,7 +28,17 @@ cargo fmt --check                  # Check formatting
 
 Snapshot tests use `insta` — run `cargo insta review` to accept/reject snapshot changes.
 
-After completing a task, run `cargo clippy --workspace` and fix any warnings, then run `cargo +nightly fmt` before committing.
+## Pre-commit checklist
+
+Before `git commit`:
+
+1. **Format**: `cargo +nightly fmt`
+2. **Clippy clean**: `cargo clippy --workspace --release --all-targets -- -D warnings`
+3. **Tests**: `cargo test --workspace --release` + relevant CLI smoke (`config/cli*.yaml`)
+4. **File structure**: `pub` → `pub(super)` → private `fn` (top-down within each `.rs`); tests at the end
+5. **Comments**: concise; no doc-essays; Rustdoc in English
+6. **`CHANGELOG.md`**: update `[Unreleased]` section if user-visible change
+7. **Commit body**: subject + ≤5 lines; Co-Authored-By trailer without context tag
 
 ## Code Style
 

@@ -20,8 +20,13 @@ def calculator(root, level):
     if not var_map:
         return None
 
-    expr = to_sympy(poly_node, var_map)
-    divisor = to_sympy(div_node, var_map)
+    # kinds records each name's original atom kind (Variable vs Param) so the
+    # quotient comes back typed correctly: the polynomial variable stays a
+    # Variable, while a rule metavariable like the divisor root `u` (a Param,
+    # grounded later by `u in divisors(d)`) is restored as Param.
+    kinds = {}
+    expr = to_sympy(poly_node, var_map, kinds)
+    divisor = to_sympy(div_node, var_map, kinds)
     if expr is None or divisor is None:
         return None
 
@@ -33,7 +38,7 @@ def calculator(root, level):
 
         p = sympy.Poly(expr, gen)
         quotient, _ = divmod(p, dp)
-        return from_sympy(quotient.as_expr(), var_name, Term)
+        return from_sympy(quotient.as_expr(), var_name, Term, kinds)
     except Exception:
         return None
 
