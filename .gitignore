@@ -10,3 +10,4 @@ dumps*
 *.out
 *.toc
 doc/**/*.pdf
+tmp/

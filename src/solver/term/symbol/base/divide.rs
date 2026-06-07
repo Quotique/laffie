@@ -1,10 +1,13 @@
 use std::{cmp::max, collections::HashMap};
 
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
-use num::integer::gcd;
+use num::{Signed, integer::gcd};
 use num_bigint::ToBigInt;
 
-use super::{MAX_DEC_CONVERSION_EXP, SymbolProgram};
+use super::{
+    MAX_DEC_CONVERSION_EXP, SymbolProgram,
+    mul::{extract_numeric_factor, prepend_factor},
+};
 use crate::{
     NormalizationLevel,
     term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut},
@@ -47,29 +50,48 @@ pub fn divide(root: &mut TermMut, level: NormalizationLevel) -> bool {
                         root.swap(&mut TermBuf::number(t).term_mut());
                         true
                     } else if *d1 != num || *d2 != den {
-                        let sign = if (&num * &den) < Decimal::zero() {
-                            Decimal::from(-1)
-                        } else {
-                            Decimal::one()
-                        };
-
+                        let num = num * den.signum();
                         root.first_arg_mut()
                             .unwrap()
-                            .swap(&mut TermBuf::number(sign * num.abs()).term_mut());
+                            .swap(&mut TermBuf::number(num).term_mut());
                         *root.last_arg_mut().unwrap().data_mut() = Atom::Number(den.abs());
                         true
                     } else {
                         false
                     }
                 }
-                (_, Some(d)) => {
-                    if d.is_one() {
-                        let mut child = root.pop_first_arg().unwrap();
-                        root.swap(&mut child.term_mut());
-                        true
-                    } else {
-                        false
+                (_, Some(d2)) if d2.is_one() => {
+                    let mut child = root.pop_first_arg().unwrap();
+                    root.swap(&mut child.term_mut());
+                    true
+                }
+                (_, Some(d2)) if d2.is_zero() => false,
+                (_, Some(d2)) => {
+                    let first_owned = root.first_arg().unwrap().to_owned();
+                    let Some((c, rest)) = extract_numeric_factor(first_owned.term()) else {
+                        return false;
+                    };
+                    let (num, den) = simplify(c.clone(), d2.clone());
+                    if num == c && den == *d2 {
+                        return false;
                     }
+                    let signed_num = num * den.signum();
+                    let den_abs = den.abs();
+
+                    let new_num = if signed_num.is_one() {
+                        rest
+                    } else {
+                        prepend_factor(TermBuf::number(signed_num), rest)
+                    };
+                    let mut new_root = if den_abs.is_one() {
+                        new_num
+                    } else {
+                        TermBuf::symbol("/")
+                            .arg(new_num)
+                            .arg(TermBuf::number(den_abs))
+                    };
+                    root.swap(&mut new_root.term_mut());
+                    true
                 }
                 (_, _) => false,
             }
@@ -140,6 +162,16 @@ mod tests {
     }
 
     #[test]
+    fn simplify_test_negative() {
+        assert_eq!(simplify((-4).into(), 6.into()), ((-2).into(), 3.into()));
+        assert_eq!(simplify(4.into(), (-6).into()), (2.into(), (-3).into()));
+        assert_eq!(
+            simplify((-4).into(), (-6).into()),
+            ((-2).into(), (-3).into())
+        );
+    }
+
+    #[test]
     fn calculator_test() {
         for (source, level_one, level_all) in [
             ("2/3", "2/3", "2/3"),
@@ -148,6 +180,10 @@ mod tests {
             ("25/35", "25/35", "5 / 7"),
             ("2.5/3.5", "2.5/3.5", "5 / 7"),
             ("(-10)/6", "(-10)/6", "(-5)/3"),
+            ("(2*a)/(-2)", "(2*a)/(-2)", "(-1)*a"),
+            ("(6*a)/4", "(6*a)/4", "(3*a)/2"),
+            ("(2*a)/3", "(2*a)/3", "(2*a)/3"),
+            ("(2*a*b)/(-2)", "(2*a*b)/(-2)", "(-1)*a*b"),
         ] {
             calculator_check(source, source, divide, NormalizationLevel(0));
             calculator_check(source, level_one, divide, NormalizationLevel(1));

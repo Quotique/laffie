@@ -16,15 +16,16 @@ def calculator(root, level):
     var_name = var_node.name
     sympy_var = sympy.Symbol(var_name)
     var_map = {var_name: sympy_var}
+    kinds = {}
 
     if eq_node.is_symbol and eq_node.symbol == '==' and len(eq_node) == 2:
-        lhs = to_sympy(eq_node[0], var_map)
-        rhs = to_sympy(eq_node[1], var_map)
+        lhs = to_sympy(eq_node[0], var_map, kinds)
+        rhs = to_sympy(eq_node[1], var_map, kinds)
         if lhs is None or rhs is None:
             return None
         sympy_eq = sympy.Eq(lhs, rhs)
     else:
-        expr = to_sympy(eq_node, var_map)
+        expr = to_sympy(eq_node, var_map, kinds)
         if expr is None:
             return None
         sympy_eq = expr
@@ -39,7 +40,7 @@ def calculator(root, level):
 
     result_terms = []
     for s in solutions:
-        t = from_sympy(s, var_name, Term)
+        t = from_sympy(s, var_name, Term, kinds)
         if t is None:
             return None
         result_terms.append(t)

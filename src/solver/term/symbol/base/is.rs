@@ -21,7 +21,11 @@ pub fn is(root: TermRef) -> Truth {
     };
     match rhs.data() {
         Atom::Symbol(s) if s == "atom" => {
-            if lhs.degree() == 0 { Truth::True } else { Truth::False }
+            if lhs.degree() == 0 {
+                Truth::True
+            } else {
+                Truth::False
+            }
         }
         Atom::Symbol(s) if s == "known" && matches!(lhs.data(), Atom::Number(_)) => Truth::True,
         Atom::Symbol(s) if s == "variable" && matches!(lhs.data(), Atom::Variable(_)) => {

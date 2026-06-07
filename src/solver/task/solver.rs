@@ -16,9 +16,7 @@ use crate::{
         SharedRule,
     },
     task::{Tracer, solution::SolutionStatus},
-    term::{
-        Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, match_term, var,
-    },
+    term::{Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, match_term},
 };
 
 /// Maximum depth allowed for nested subtasks.
@@ -622,7 +620,11 @@ impl Solver {
 
             let cache_key = solve_call.to_owned();
             let goal = solve_call.first_arg()?.to_owned();
-            let eqs: Vec<TermBuf> = solve_call.args_iter().skip(1).map(|c| c.to_owned()).collect();
+            let eqs: Vec<TermBuf> = solve_call
+                .args_iter()
+                .skip(1)
+                .map(|c| c.to_owned())
+                .collect();
 
             let result = self.run_solve_block(cache_key, goal, eqs, parent, state);
             let answer_term = result.answer()?;
@@ -632,21 +634,13 @@ impl Solver {
                 answer_buf = answer_buf.term_mut().pop_first_arg().unwrap();
             }
 
-            // Sub-solve answers via `sympy_solve` introduce Param atoms
-            // for non-find-target symbols (see symbols/py/sympy_convert.py).
-            // In the outer context those names are Variables; convert
-            // back so downstream rules don't treat the answer as
-            // "contains free params" and short-circuit.
-            params_to_variables(&mut answer_buf.term_mut());
-
             // `bind_equality_params` would still refuse a value that
             // contains params, so substitute directly into the hypothesis.
             binding = Some((param_atom, answer_buf));
         }
         hyp.requirements = new_reqs;
         if let Some((p, value)) = binding {
-            let subst: crate::term::ParamSubstitution =
-                [(p, value)].into_iter().collect();
+            let subst: crate::term::ParamSubstitution = [(p, value)].into_iter().collect();
             hyp.substitute(&subst);
         }
         Some(hyp)
@@ -785,6 +779,13 @@ impl Solver {
     fn check_prove_answer(&self, solution: &mut Solution, index: usize) -> bool {
         let term = &solution[index];
 
+        // A candidate with unresolved requirements is not a proof — accepting it
+        // would close circular hypotheses (e.g. `[x^2=a] => x^2=a`) where a
+        // rule's own resolution proves its own requirement.
+        if !term.inference.is_proven() {
+            return false;
+        }
+
         // TODO: теперь тут бывают целевые термы, поэтому надо сделать две проверки:
         // что терм есть среди целей
         // что цель тривиальная истина
@@ -837,17 +838,6 @@ impl SolutionState {
             return Err(SolveError::ExecutionDeadline);
         }
         Ok(())
-    }
-}
-
-/// Converts every `Atom::Param(name)` in-place to `Atom::Variable(name)`.
-fn params_to_variables(term: &mut TermMut<'_>) {
-    if let Atom::Param(p) = term.data().clone() {
-        let name: &str = p.as_ref();
-        *term.data_mut() = Atom::Variable(var(name));
-    }
-    for mut child in term.iter_mut() {
-        params_to_variables(&mut child);
     }
 }
 
