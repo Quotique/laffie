@@ -85,7 +85,7 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
         SymbolProgram::add_with_name(&mut result, "variable");
         SymbolProgram::add_with_name(&mut result, "atom");
 
-        SymbolProgram::add_with_name(&mut result, "answer");
+        add_symbol_impl(&mut result, ops::answer::symbol());
 
         SymbolProgram::add_with_name(&mut result, "set");
         SymbolProgram::add_with_name(&mut result, "empty_set");

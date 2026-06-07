@@ -10,6 +10,14 @@ rule {
     a is known;
 }
 
+// sqrt квадрата — модуль. Параметрический знак не теряется (в отличие
+// от `(sqrt(a))^2 => a` с условием a >= 0).
+rule {
+    attr replace,level(1),goal(transform(x));
+
+    sqrt(a^2) => abs(a);
+}
+
 rule {
     attr level(0),goal(prove(x != 0));
 

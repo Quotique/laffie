@@ -63,7 +63,7 @@ rule {
 // порождая неограниченное переписывание (например, (a+2)^-1 →
 // (a+2)^-2·(a+2) → ... ad infinitum).
 rule {
-    attr replace,level(4),goal(transform(x)),normalize(2);
+    attr replace,level(4),goal(transform(x)),normalize(2),id(binomial_unfold);
 
     (a+b)^n <=> (a+b)^(n - 1)*(a + b);
 
@@ -82,6 +82,20 @@ rule {
     attr replace,level(1),goal(transform(x));
 
     (-a)^2 <=> a^2;
+}
+
+// Фолд perfect-square trinomial. block(binomial_unfold) — чтобы (a+b)^n не
+// развернул результат обратно. one(b) — unit-вариант (b=1) для a^2 ± 2·a + 1.
+rule {
+    attr replace,level(2),goal(transform(x)),block(binomial_unfold),one(b);
+
+    a^2 - 2*a*b + b^2 => (a - b)^2;
+}
+
+rule {
+    attr replace,level(2),goal(transform(x)),block(binomial_unfold),one(b);
+
+    a^2 + 2*a*b + b^2 => (a + b)^2;
 }
 
 rule {
