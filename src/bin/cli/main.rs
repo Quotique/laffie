@@ -143,6 +143,9 @@ fn main() {
         if only.is_empty() {
             return true;
         }
+        if task.name == only {
+            return true;
+        }
         let id = id_to_hex(&database::compute_task_id(
             &task
                 .givens

@@ -8,6 +8,7 @@ pub(crate) const TOKEN_TASK: &str = "Task";
 pub(crate) const TOKEN_GOAL: &str = "Goal";
 pub(crate) const TOKEN_TEXT: &str = "Text";
 pub(crate) const TOKEN_ANSWER: &str = "Answer";
+pub(crate) const TOKEN_ID: &str = "Id";
 pub(crate) const TOKEN_DECLARE: &str = "Declare";
 pub(crate) const TOKEN_SYMBOL: &str = "Symbol";
 pub(crate) const TOKEN_RULE: &str = "Rule";
@@ -86,6 +87,7 @@ peg::parser! {
 
         pub rule task() -> Tree<Token> = _ pp:position!() keyword("task") _ "{"
                 _ pt:position!() keyword("goal") _ p:eval() ";"
+                _ it:position!() i:(keyword("id") _ i:string() ";" {i} )?
                 _ tt:position!() t:(keyword("text") _ t:string() ";" {t} )?
                 _ at:position!() a:(keyword("answer") _ a:commasep(<term()>) _ ";" {a} )?
                 _ c:semicolonsep(<term()>)
@@ -95,6 +97,9 @@ peg::parser! {
                               /(Token::new(TOKEN_GOAL, pt) / p)
                               /(Token::new(TOKEN_TEXT, tt)
                                 /Token::new(t.unwrap_or_default().as_str(), tt));
+                if let Some(id) = i {
+                    p.push_back(Token::new(TOKEN_ID, it) / Token::new(id.as_str(), it));
+                }
                 if let Some(ans) = a {
                     let mut answers = Token::new(TOKEN_ANSWER, at);
                     for i in ans.iter().cloned() {

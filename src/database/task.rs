@@ -53,6 +53,7 @@ impl From<Task> for SolverTask {
     fn from(t: Task) -> Self {
         SolverTask {
             id:               u64::from_le_bytes(t.id[..8].try_into().expect("id is 16 bytes")),
+            name:             Default::default(),
             text:             t.text,
             group:            t.group,
             givens:           t.givens.into_iter().map(TermProps::from).collect(),

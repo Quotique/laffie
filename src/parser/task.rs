@@ -53,6 +53,19 @@ impl<'a> TaskParser<'a> {
                             msg: e.to_string(),
                         })?
                 }
+                "Id" => {
+                    builder = builder.with_name(
+                        child
+                            .front()
+                            .ok_or_else(|| ParserError {
+                                loc: child.data().location.clone(),
+                                msg: "must have one argument".to_owned(),
+                            })?
+                            .data()
+                            .symbol
+                            .to_string(),
+                    );
+                }
                 "Text" => {
                     builder = builder.with_text(
                         child
@@ -114,6 +127,7 @@ mod tests {
         assert!(result.is_ok());
 
         let task = result.unwrap();
+        assert!(task.name.is_empty());
         assert_eq!(task.givens.len(), 1);
         println!("{:?}", task.givens[0].term);
         assert_eq!(
@@ -126,5 +140,21 @@ mod tests {
                 )
                 .arg(TermBuf::zero())
         );
+    }
+
+    #[test]
+    fn task_id_parse_test() {
+        let test = r#"task {
+                        goal find(x);
+                        id "c26";
+                        text "biquadratic";
+                        2*x+5 == 0;
+                    }"#;
+
+        let states = lang::task(test).unwrap();
+        let task = TaskParser::from(&states).parse().unwrap();
+        assert_eq!(task.name, "c26");
+        assert_eq!(task.text, "biquadratic");
+        assert_eq!(task.givens.len(), 1);
     }
 }

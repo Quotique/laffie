@@ -12,6 +12,7 @@ pub enum TaskBuilderError {
 #[derive(Default)]
 pub struct TaskBuilder {
     id:          u64,
+    name:        String,
     text:        String,
     conditions:  Vec<TermProps>,
     goal:        Option<TermProps>,
@@ -25,6 +26,11 @@ pub struct TaskBuilder {
 impl TaskBuilder {
     pub fn with_id(mut self, id: u64) -> Self {
         self.id = id;
+        self
+    }
+
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = name;
         self
     }
 
@@ -83,6 +89,7 @@ impl TaskBuilder {
     pub fn build(self) -> Result<Task, TaskBuilderError> {
         Ok(Task {
             id:               self.id,
+            name:             self.name,
             text:             self.text,
             group:            "".to_owned(),
             givens:           self.conditions,
