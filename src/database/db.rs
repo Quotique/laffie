@@ -177,7 +177,7 @@ impl Db {
             let (_, v) = entry.wrap_err("runs_of: row")?;
             out.push(codec::decode::<Run>(v.value())?);
         }
-        out.sort_by(|a, b| b.seq.cmp(&a.seq));
+        out.sort_by_key(|r| std::cmp::Reverse(r.seq));
         Ok(out)
     }
 

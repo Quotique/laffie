@@ -20,6 +20,7 @@ pub use tracing::{Tracer, TracerHub};
 #[derive(Debug, Clone)]
 pub struct Task {
     pub id:    u64,
+    pub name:  String,
     pub text:  String,
     pub group: String,
 
@@ -34,6 +35,7 @@ impl From<TermProps> for Task {
     fn from(value: TermProps) -> Self {
         Self {
             id:               Default::default(),
+            name:             Default::default(),
             text:             Default::default(),
             group:            Default::default(),
             goal:             value,
