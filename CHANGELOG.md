@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `cli` persists every solve through the new `database::Db`; DB-path
   flag renamed `--tasks-db` → `--db-path`, hex `TaskId` for `--remove` /
-  `--only`
+  `--only`; `--only` accepts a comma-separated list of task ids / hex
+  prefixes
 - Term codec returns structured `DecodeError`s instead of panicking
 
 ### Removed

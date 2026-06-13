@@ -24,7 +24,7 @@ struct Args {
     #[clap(short, long, default_value = "./config/local.json")]
     config: PathBuf,
 
-    /// Runs only specified task
+    /// Runs only the specified task(s): comma-separated ids or hex prefixes
     #[clap(short, long, default_value = "")]
     only: String,
 
@@ -139,11 +139,16 @@ fn main() {
 
     let mut stats: HashMap<String, SolveStats> = Default::default();
 
+    let only_ids: Vec<&str> = only
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
     for solver_task in tasks.into_iter().filter(|task| {
-        if only.is_empty() {
+        if only_ids.is_empty() {
             return true;
         }
-        if task.name == only {
+        if only_ids.iter().any(|w| task.name == *w) {
             return true;
         }
         let id = id_to_hex(&database::compute_task_id(
@@ -154,7 +159,9 @@ fn main() {
                 .collect::<Vec<_>>(),
             &task.goal.term,
         ));
-        id.starts_with(&only) || id.ends_with(&only)
+        only_ids
+            .iter()
+            .any(|w| id.starts_with(w) || id.ends_with(w))
     }) {
         let db_task = DbTask::from(&solver_task);
         if let Err(e) = db.put_task(&db_task) {
