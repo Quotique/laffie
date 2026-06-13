@@ -2,12 +2,17 @@ symbol * {
     attr infix(200),display("·"),associative,commutative;
 }
 
+// Дистрибутивность распускает сумму только при множителе БЕЗ неизвестной
+// (`c is known`): иначе `(a+1)·x²` развалилось бы в `a·x² + x²` и сломало
+// паттерн `a·x² + b·x + c == 0` (два x²-члена). Параметрические произведения
+// (напр. дискриминант `(a-1)·(a-1)`) при этом раскрываются — нужно для
+// C26 substitute-path.
 rule {
     attr replace,level(2),goal(transform(x)),id(brackets_disclosure);
 
     (a + b)*c <=> a*c + b*c;
 
-    c is atom;
+    c is known;
 }
 
 rule {
