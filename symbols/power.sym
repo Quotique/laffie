@@ -52,6 +52,20 @@ rule {
     a != 0;
 }
 
+// Path A — биквадрат через подстановку y = x². Внутренний find(y) решает
+// квадрат (делегирует sympy/квадратной формуле), substitute возвращает корни
+// в форме `x² ∈ {...}`; дальше set-unfold + правило `a·x² == b` дают x-корни.
+rule {
+    attr level(2),goal(find(x, ..)),one(a),one(b);
+
+    a*x^4 + b*x^2 + c == 0 => substitute(y == x^2, quad);
+
+    a is known,
+    b is known,
+    c is known,
+    quad == find(y) { a*y^2 + b*y + c == 0; a is known; b is known; c is known };
+}
+
 rule {
     attr replace,level(1),goal(transform(x));
 
