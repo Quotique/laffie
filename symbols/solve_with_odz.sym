@@ -1,0 +1,89 @@
+// solve_with_odz(eq, var) — sympy.solveset(eq, var, Reals) + ОДЗ-фильтр.
+// Возвращает case-split форму `(odz_1 && x == cand_1) || (odz_2 && x == cand_2) || ...`,
+// где odz_i — упрощённая конъюнкция `arg_j >= 0` для всех sqrt-аргументов после
+// подстановки кандидата. Кандидаты, у которых ОДЗ упрощается до false, отбрасываются.
+
+symbol solve_with_odz {
+    py
+"
+exec(open('symbols/py/sympy_convert.py').read())
+
+def calculator(root, level):
+    if root.symbol != 'solve_with_odz' or len(root) != 2:
+        return None
+
+    eq_node = root[0]
+    var_node = root[1]
+
+    if not var_node.is_variable:
+        return None
+
+    var_name = var_node.name
+    sympy_var = sympy.Symbol(var_name, real=True)
+    var_map = {var_name: sympy_var}
+    kinds = {}
+
+    if eq_node.is_symbol and eq_node.symbol == '==' and len(eq_node) == 2:
+        lhs = to_sympy(eq_node[0], var_map, kinds)
+        rhs = to_sympy(eq_node[1], var_map, kinds)
+        if lhs is None or rhs is None:
+            return None
+        sympy_eq = sympy.Eq(lhs, rhs)
+        full_expr = lhs - rhs
+    else:
+        return None
+
+    # Собираем все sqrt-аргументы из обеих частей уравнения.
+    sqrt_args = []
+    for pow_node in full_expr.atoms(sympy.Pow):
+        if pow_node.exp == sympy.Rational(1, 2):
+            sqrt_args.append(pow_node.base)
+
+    try:
+        candidates = sympy.solve(sympy_eq, sympy_var)
+    except Exception:
+        return None
+
+    if not candidates:
+        return Term('in', [Term.variable(var_name), Term('empty_set', [])])
+
+    # Для каждого кандидата строим ОДЗ-предикат и упрощаем.
+    branches = []
+    for cand in candidates:
+        conds_raw = [arg.subs(sympy_var, cand) >= 0 for arg in sqrt_args]
+        # simplify умеет вырезать тривиальные `Number >= 0`.
+        conds = [sympy.simplify(c) for c in conds_raw]
+        conds = [c for c in conds if c is not sympy.true and c != True]
+        if any(c is sympy.false or c == False for c in conds):
+            continue
+        if not conds:
+            odz = sympy.true
+        elif len(conds) == 1:
+            odz = conds[0]
+        else:
+            odz = sympy.simplify(sympy.And(*conds))
+        branches.append((odz, cand))
+
+    if not branches:
+        return Term('in', [Term.variable(var_name), Term('empty_set', [])])
+
+    # Собираем дизъюнкцию (odz_i && x == cand_i).
+    clauses = []
+    for odz, cand in branches:
+        cand_term = from_sympy(cand, var_name, Term, kinds)
+        if cand_term is None:
+            return None
+        eq_term = Term('==', [Term.variable(var_name), cand_term])
+        if odz is sympy.true:
+            clauses.append(eq_term)
+        else:
+            odz_term = from_sympy(odz, var_name, Term, kinds)
+            if odz_term is None:
+                return None
+            clauses.append(Term('&&', [odz_term, eq_term]))
+
+    if len(clauses) == 1:
+        return clauses[0]
+    return Term('||', clauses)
+";
+}
