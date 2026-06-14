@@ -105,3 +105,16 @@ rule {
     a is known,
     a != 0;
 }
+
+// C29-форма: сумма двух радикалов `sqrt(x+p) + sqrt(x+q) = sqrt(r)`.
+// Делегируем `solve_with_odz`: sympy решает формально, ОДЗ-фильтр на
+// каждый кандидат подаёт `arg_i >= 0` после подстановки.
+rule {
+    attr level(2),goal(find(x, ..));
+
+    sqrt(x + p) + sqrt(x + q) == sqrt(r) =>
+        answer(solve_with_odz(sqrt(x + p) + sqrt(x + q) == sqrt(r), x));
+
+    p is known,
+    q is known;
+}
