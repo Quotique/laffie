@@ -89,7 +89,11 @@ impl<'a> SymbolParser<'a> {
 
                             Ok(true)
                         })
-                        .expect("Unable to run command")
+                        // A failing procedural symbol is a no-op, not a crash.
+                        .unwrap_or_else(|e| {
+                            error!("Procedural symbol failed, skipping: {e}");
+                            false
+                        })
                     });
                 }
             } else if sym_child.data().symbol == "Attrs" {

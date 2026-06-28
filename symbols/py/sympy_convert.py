@@ -113,8 +113,11 @@ def from_sympy(expr, var_name, Term, kinds=None):
             n = -int(exp)
             denom = base_term if n == 1 else Term('^', [base_term, Term.number(n)])
             return Term('/', [Term.number(1), denom])
-        return Term('^', [from_sympy(base, var_name, Term, kinds),
-                          from_sympy(exp, var_name, Term, kinds)])
+        base_term = from_sympy(base, var_name, Term, kinds)
+        exp_term = from_sympy(exp, var_name, Term, kinds)
+        if base_term is None or exp_term is None:
+            return None
+        return Term('^', [base_term, exp_term])
 
     # Negative number (sympy represents -3 as Mul(-1, 3) sometimes, but
     # also as Integer(-3) which is handled above)
