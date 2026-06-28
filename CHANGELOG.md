@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed along with their dependencies
 
 ### Fixed
+- More equations needing bracket/power expansion now solve
 - Equations with no real solutions now return the empty set instead of an
   unfinished answer
 - A CAS error while solving no longer crashes the run

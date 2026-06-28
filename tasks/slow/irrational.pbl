@@ -1,0 +1,6 @@
+task {
+    goal find(x);
+    text "Решить уравнение sqrt(2*x + 5) - sqrt(x+6) == 1"; 
+
+    sqrt(2*x + 5) - sqrt(x+6) == 1;
+}

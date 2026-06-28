@@ -11,8 +11,6 @@ rule {
     attr replace,level(2),goal(transform(x)),id(brackets_disclosure);
 
     (a + b)*c <=> a*c + b*c;
-
-    c is known;
 }
 
 rule {

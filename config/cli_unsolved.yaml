@@ -1,0 +1,12 @@
+# Пока не решаются (нет приёмов / падение). Цель для развития, не гейт.
+logger:
+  filename: "logs/cli.log"
+  level: "Info"
+  num_files: 3
+  file_rotate_bytes: 1000000000
+  target_levels:
+    solver: "Info"
+    redb: "Warn"
+
+symbols_dir: "symbols"
+tasks_dir: "tasks/unsolved"

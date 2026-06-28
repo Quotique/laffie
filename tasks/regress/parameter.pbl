@@ -6,7 +6,6 @@ task {
     2*x-5+t == 0;
     t is known;
 }
-
 task {
     goal find(x);
     text "Решить уравнение в зависимости от параметра 2x-t=0";
@@ -15,4 +14,3 @@ task {
     2*x-t == 0;
     t is known;
 }
-
