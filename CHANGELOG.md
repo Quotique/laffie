@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Per-problem wall-clock time limit (`cli --time-limit`, seconds)
 - Hypothesis grounding: `Hypothesis` / `GroundedHypothesis` split, free
   params bound via `==` requirements and cartesian over `set(...)`
   generators, with `match_term!` and a `Substitute` trait as supporting

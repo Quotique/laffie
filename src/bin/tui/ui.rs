@@ -13,7 +13,7 @@ use ratatui::{
     widgets::{ListState, Paragraph, Wrap},
 };
 
-use solver::task::{SharedSolution, Solution, Solver, TracerHub};
+use solver::task::{SharedSolution, Solution, Solver, TIME_LIMIT_DEFAULT, TracerHub};
 use utils::{IndexedTree, TreeIndex};
 
 use super::{
@@ -135,7 +135,12 @@ impl Ui {
                     hub.add_custom(reporter.clone());
 
                     reporter.0.lock().current_task = Some(task.task.clone());
-                    let solution = Solver::new(rules.clone()).solve(task.task, hub, exec_deadline);
+                    let solution = Solver::new(rules.clone()).solve(
+                        task.task,
+                        hub,
+                        exec_deadline,
+                        TIME_LIMIT_DEFAULT,
+                    );
                     reporter.0.lock().finished_tasks_count += 1;
                     reporter.0.lock().current_cycles = 0;
                     (idx, solution)

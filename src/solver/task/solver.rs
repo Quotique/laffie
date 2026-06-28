@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
+    time::{Duration, Instant},
 };
 
 use itertools::Itertools;
@@ -33,8 +34,13 @@ pub const MAX_SUBTASK_LEVEL: usize = 10;
 /// of performed cycles exceeds this value.
 pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 
+/// Default wall-clock budget for a solving run (effectively unlimited).
+pub const TIME_LIMIT_DEFAULT: Duration = Duration::from_secs(24 * 60 * 60);
+
 struct SolutionState {
     execution_deadline: usize,
+    /// Wall-clock deadline for the whole run.
+    deadline_at:        Instant,
     cycle_counter:      usize,
     cache:              HashMap<TermBuf, SharedSolution>,
     tracer:             TracerHub,
@@ -68,6 +74,8 @@ impl Solver {
     /// * `tracer` – A `TracerHub` used for instrumentation and cancellation.
     /// * `execution_deadline` – Maximum number of cycles the solver may execute
     ///   before aborting with `SolveError::ExecutionDeadline`.
+    /// * `time_limit` – Wall-clock budget for the run; when exceeded the solver
+    ///   aborts with `SolveError::TimeDeadline`. Pass a large value to disable.
     ///
     /// The method initializes a fresh `Solution` and `SolutionState`, and then
     /// runs the main solving loop. The resulting `SharedSolution` contains
@@ -77,10 +85,12 @@ impl Solver {
         task: Task,
         tracer: TracerHub,
         execution_deadline: usize,
+        time_limit: Duration,
     ) -> SharedSolution {
         let mut solution = Solution::new(task);
         let mut state = SolutionState {
             execution_deadline,
+            deadline_at: Instant::now() + time_limit,
             cycle_counter: Default::default(),
             cache: Default::default(),
             tracer,
@@ -810,6 +820,9 @@ impl SolutionState {
         if self.current_cycle() > self.execution_deadline {
             return Err(SolveError::ExecutionDeadline);
         }
+        if Instant::now() >= self.deadline_at {
+            return Err(SolveError::TimeDeadline);
+        }
         Ok(())
     }
 }
@@ -854,7 +867,7 @@ mod solution_tests {
 
     use crate::{
         rule::RulesEngine,
-        task::{Solver, parse_task},
+        task::{Solver, TIME_LIMIT_DEFAULT, parse_task},
         term::term_with_vars,
     };
 
@@ -863,7 +876,7 @@ mod solution_tests {
         let task = parse_task("task { goal find(x); x == 1; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules);
-        let solution = solver.solve(task, Default::default(), usize::MAX);
+        let solution = solver.solve(task, Default::default(), usize::MAX, TIME_LIMIT_DEFAULT);
         assert_eq!(
             *solution.answer().expect("task is not solved"),
             term_with_vars("x == 1")
@@ -875,7 +888,7 @@ mod solution_tests {
         let task = parse_task("task { goal prove(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules);
-        let solution = solver.solve(task, Default::default(), usize::MAX);
+        let solution = solver.solve(task, Default::default(), usize::MAX, TIME_LIMIT_DEFAULT);
         assert!(solution.answer().is_some());
     }
 
@@ -884,7 +897,7 @@ mod solution_tests {
         let task = parse_task("task { goal find(x, y); x == 3; y == 4; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules);
-        let solution = solver.solve(task, Default::default(), usize::MAX);
+        let solution = solver.solve(task, Default::default(), usize::MAX, TIME_LIMIT_DEFAULT);
         let answer = solution
             .answer()
             .expect("multi-var find task is not solved");

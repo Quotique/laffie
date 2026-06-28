@@ -28,6 +28,7 @@ pub enum SolveError {
     NoSolutionsFound,
     ExecutionDeadline,
     Canceled,
+    TimeDeadline,
 }
 
 #[derive(Debug, Display, Default, Clone, Copy, Encode, Decode, PartialEq, Eq)]

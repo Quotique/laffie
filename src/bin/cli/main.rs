@@ -51,6 +51,10 @@ struct Args {
     /// Execution deadline (in cycles) for individual problem
     #[clap(short, long, default_value = "100000")]
     exec_deadline: usize,
+
+    /// Wall-clock time limit (in seconds) per problem
+    #[clap(short = 'l', long, default_value = "86400")]
+    time_limit: u64,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -183,6 +187,7 @@ fn main() {
                 tracer
             },
             args.exec_deadline,
+            std::time::Duration::from_secs(args.time_limit),
         );
         match solution.status {
             SolutionStatus::Answer(_) => {
