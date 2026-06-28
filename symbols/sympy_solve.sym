@@ -38,6 +38,12 @@ def calculator(root, level):
     if not solutions:
         return Term('empty_set', [])
 
+    # Drop definitely-non-real roots (laffie solves over ℝ); keep symbolic
+    # solutions (is_real is None) for parametric cases.
+    solutions = [s for s in solutions if s.is_real is not False]
+    if not solutions:
+        return Term('empty_set', [])
+
     result_terms = []
     for s in solutions:
         t = from_sympy(s, var_name, Term, kinds)
