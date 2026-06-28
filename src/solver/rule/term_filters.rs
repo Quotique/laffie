@@ -17,7 +17,7 @@ bitflags! {
 
 #[derive(Debug, Clone, Default)]
 pub struct TermFilters {
-    pub symbols:       HashSet<Symbol>,
+    pub symbols:       Vec<Symbol>,
     pub applied_rules: HashSet<RuleId>,
     pub blocked_rules: HashSet<RuleId>,
     pub level:         Level,
@@ -26,8 +26,11 @@ pub struct TermFilters {
 
 impl<I: IntoIterator<Item = Symbol>> From<I> for TermFilters {
     fn from(value: I) -> Self {
+        let mut symbols: Vec<Symbol> = value.into_iter().collect();
+        symbols.sort_unstable();
+        symbols.dedup();
         Self {
-            symbols: value.into_iter().collect(),
+            symbols,
             ..Default::default()
         }
     }

@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed along with their dependencies
 
 ### Fixed
+- Solving is now deterministic — a task no longer succeeds on some runs
+  and fails on others
 - Workspace-wide clippy cleanup
 - `from_sympy` losing the param/variable distinction
 - Hardcoded Telegram API token replaced with a placeholder
