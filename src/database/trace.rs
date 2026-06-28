@@ -1,10 +1,15 @@
+use std::{collections::HashMap, sync::Arc};
+
 use serde_derive::{Deserialize, Serialize};
 
 use solver::{
     rule::{Rule, RuleAttr, RuleAttrValue},
-    task::{Solution, SolutionStatus, SolveError, TermInference, TermProps},
+    task::{SharedSolution, Solution, SolutionStatus, SolveError, TermInference, TermProps},
     term::{ParamSubstitution, TermBuf},
 };
+
+/// Sub-solution `Arc` identity → its slot in the global arena (dedup).
+type Interner = HashMap<*const Solution, usize>;
 
 /// Read-only mirror of [`solver::task::Solution`] suitable for persistence.
 ///
@@ -15,7 +20,11 @@ use solver::{
 pub struct SolutionTrace {
     pub status: TraceStatus,
 
-    pub terms:         Vec<TraceTerm>,
+    pub terms: Vec<TraceTerm>,
+
+    /// Flat sub-solution arena, populated only on the root trace; all
+    /// `requirements` / `sub_solution` indices address it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sub_solutions: Vec<SolutionTrace>,
 
     /// `(target_var, idx into self.terms)` for `find(x, y, ...)` goals.
@@ -46,12 +55,12 @@ pub enum TraceInference {
         parent:       usize,
         rule_ref:     RuleRef,
         params:       TraceParams,
-        /// Indices into [`SolutionTrace::sub_solutions`].
+        /// Indices into the root [`SolutionTrace::sub_solutions`] arena.
         requirements: Vec<usize>,
     },
     Transform {
         parent:       usize,
-        /// Index into [`SolutionTrace::sub_solutions`].
+        /// Index into the root [`SolutionTrace::sub_solutions`] arena.
         sub_solution: usize,
     },
 }
@@ -79,26 +88,11 @@ pub struct TraceParams {
 
 impl From<&Solution> for SolutionTrace {
     fn from(s: &Solution) -> Self {
-        let mut sub_solutions: Vec<SolutionTrace> = Vec::new();
-
-        let terms = s
-            .terms
-            .iter()
-            .map(|tp| TraceTerm::from_props(tp, &mut sub_solutions))
-            .collect();
-
-        let find_bindings = s
-            .find_bindings
-            .iter()
-            .map(|(t, idx)| (t.clone(), *idx))
-            .collect();
-
-        SolutionTrace {
-            status: TraceStatus::from(s.status),
-            terms,
-            sub_solutions,
-            find_bindings,
-        }
+        let mut arena: Vec<SolutionTrace> = Vec::new();
+        let mut interner: Interner = HashMap::new();
+        let mut root = SolutionTrace::build(s, &mut arena, &mut interner);
+        root.sub_solutions = arena;
+        root
     }
 }
 
@@ -132,13 +126,60 @@ impl TraceStatus {
             "NoSolutionsFound" => Some(SolveError::NoSolutionsFound),
             "ExecutionDeadline" => Some(SolveError::ExecutionDeadline),
             "Canceled" => Some(SolveError::Canceled),
+            "TimeDeadline" => Some(SolveError::TimeDeadline),
             _ => None,
         }
     }
 }
 
+impl SolutionTrace {
+    /// Builds a trace body; referenced sub-solutions are interned into `arena`.
+    fn build(s: &Solution, arena: &mut Vec<SolutionTrace>, interner: &mut Interner) -> Self {
+        let terms = s
+            .terms
+            .iter()
+            .map(|tp| TraceTerm::from_props(tp, arena, interner))
+            .collect();
+        let find_bindings = s
+            .find_bindings
+            .iter()
+            .map(|(t, idx)| (t.clone(), *idx))
+            .collect();
+        SolutionTrace {
+            status: TraceStatus::from(s.status),
+            terms,
+            sub_solutions: Vec::new(),
+            find_bindings,
+        }
+    }
+
+    /// Arena index of `sub`, built once and reused on repeat references.
+    fn intern(
+        sub: &SharedSolution,
+        arena: &mut Vec<SolutionTrace>,
+        interner: &mut Interner,
+    ) -> usize {
+        let key = Arc::as_ptr(sub);
+        if let Some(&idx) = interner.get(&key) {
+            return idx;
+        }
+        // Reserve the slot before recursing to break any self-reference.
+        let idx = arena.len();
+        arena.push(SolutionTrace {
+            status:        TraceStatus::NotDone,
+            terms:         Vec::new(),
+            sub_solutions: Vec::new(),
+            find_bindings: Vec::new(),
+        });
+        interner.insert(key, idx);
+        let body = SolutionTrace::build(sub.as_ref(), arena, interner);
+        arena[idx] = body;
+        idx
+    }
+}
+
 impl TraceTerm {
-    fn from_props(tp: &TermProps, sinks: &mut Vec<SolutionTrace>) -> Self {
+    fn from_props(tp: &TermProps, arena: &mut Vec<SolutionTrace>, interner: &mut Interner) -> Self {
         let inference = match &tp.inference {
             TermInference::Condition => TraceInference::Condition,
             TermInference::Rule {
@@ -149,11 +190,7 @@ impl TraceTerm {
             } => {
                 let req_indices = requirements
                     .iter()
-                    .map(|sub| {
-                        let idx = sinks.len();
-                        sinks.push(SolutionTrace::from(sub.as_ref()));
-                        idx
-                    })
+                    .map(|sub| SolutionTrace::intern(sub, arena, interner))
                     .collect();
                 TraceInference::Rule {
                     parent:       *parent,
@@ -163,8 +200,7 @@ impl TraceTerm {
                 }
             }
             TermInference::Transform { parent, solution } => {
-                let idx = sinks.len();
-                sinks.push(SolutionTrace::from(solution.as_ref()));
+                let idx = SolutionTrace::intern(solution, arena, interner);
                 TraceInference::Transform {
                     parent:       *parent,
                     sub_solution: idx,

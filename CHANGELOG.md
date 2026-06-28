@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed along with their dependencies
 
 ### Fixed
+- Saving a solution no longer runs out of memory on problems with
+  heavily reused sub-results
 - Solving is now deterministic — a task no longer succeeds on some runs
   and fails on others
 - Workspace-wide clippy cleanup
