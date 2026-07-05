@@ -2,16 +2,7 @@ symbol set {
     attr commutative;
 }
 
-// TODO: apply only to root
-rule {
-    attr level(0),goal(find(x)),replace,id(answer_in_set),block(answer_in_set);
-
-    x in set(a, b) => answer(x in set(a, b));
-
-    a is known,
-    b is known;
-}
-
+// Нормализация формы множества в case-split-ветвях.
 rule {
     attr level(3),goal(transform(x)),replace,block(move_left);
 
@@ -26,11 +17,4 @@ rule {
 
 symbol empty_set {
     attr display("∅ ")
-}
-
-// Terminal-wrap для `x ∈ ∅` — leaf-форма для empty-branch case-split'а.
-rule {
-    attr level(0),goal(find(x)),replace;
-
-    x in empty_set => answer(x in empty_set);
 }

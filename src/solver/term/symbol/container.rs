@@ -61,8 +61,8 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
                 ..Default::default()
             },
         );
-        SymbolProgram::add_with_name(&mut result, "&&");
-        SymbolProgram::add_with_name(&mut result, "||");
+        add_symbol_impl(&mut result, ops::logic_and::symbol());
+        add_symbol_impl(&mut result, ops::logic_or::symbol());
 
         add_symbol_impl(&mut result, ops::op_true::symbol());
         SymbolProgram::add_with_name(&mut result, "false");
@@ -89,6 +89,9 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
 
         SymbolProgram::add_with_name(&mut result, "set");
         SymbolProgram::add_with_name(&mut result, "empty_set");
+        // `parents` is inert (parsing only); resolved per-match in the solver,
+        // like `solve`.
+        SymbolProgram::add_with_name(&mut result, "parents");
         add_symbol_impl(&mut result, ops::symbolic_eq::symbol());
         add_symbol_impl(&mut result, ops::op_not::symbol());
         RwLock::new(result)

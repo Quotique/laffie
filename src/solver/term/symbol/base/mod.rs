@@ -5,6 +5,8 @@ pub mod inequal;
 pub mod is;
 pub mod less;
 pub mod less_or_equal;
+pub mod logic_and;
+pub mod logic_or;
 pub mod more;
 pub mod more_or_equal;
 pub mod mul;

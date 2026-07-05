@@ -318,6 +318,10 @@ impl Solver {
         .collect();
         let resolved_hypotheses: Vec<Hypothesis> = raw_hypotheses
             .into_iter()
+            .map(|mut h| {
+                resolve_parents_in_hypothesis(&mut h, s[index].term.as_ref());
+                h
+            })
             .filter_map(|h| self.resolve_solve_in_hypothesis(h, s, state))
             .collect();
         resolved_hypotheses
@@ -700,12 +704,23 @@ impl Solver {
         index: usize,
         find_goal: &FindGoal,
     ) -> bool {
-        let term = solution[index].term.term();
+        // Single target: the term is the answer iff it is an answer form
+        // (subsumes flat `x == k` / `x in S` and piecewise, recognized atomically).
+        if find_goal.targets.len() == 1 {
+            let target = find_goal.targets[0].term();
+            if self.is_answer_form(solution[index].term.term(), target, solution, state) {
+                solution.status = SolutionStatus::Answer(index);
+                return true;
+            }
+            return false;
+        }
 
+        // Multi target: accumulate one flat binding per target across terms.
+        let term = solution[index].term.term();
         let (lhs, rhs) = match_term!(term, "=="(lhs, rhs))
             .or_else(|| match_term!(term, "in"(lhs, rhs)))
             .unzip();
-        let (Some(lhs), Some(rhs)) = (lhs, rhs) else {
+        let (Some(lhs), Some(_)) = (lhs, rhs) else {
             return false;
         };
 
@@ -718,27 +733,95 @@ impl Solver {
         };
         let target = target.clone();
 
-        let is_known = TermBuf::symbol("is")
-            .arg(rhs.to_owned())
-            .arg(TermBuf::symbol("known"));
-        if self.prove(solution, is_known, state).answer().is_none() {
+        if !self.is_answer_leaf(solution[index].term.term(), target.term(), solution, state) {
             return false;
         }
 
         solution.find_bindings.insert(target, index);
 
         if solution.find_bindings.len() == find_goal.targets.len() {
-            if find_goal.targets.len() == 1 {
-                solution.status = SolutionStatus::Answer(index);
-            } else {
-                let answer = self.build_multi_find_answer(solution, find_goal);
-                if let Ok(idx) = solution.add_term(answer) {
-                    solution.status = SolutionStatus::Answer(idx);
-                }
+            let answer = self.build_multi_find_answer(solution, find_goal);
+            if let Ok(idx) = solution.add_term(answer) {
+                solution.status = SolutionStatus::Answer(idx);
             }
             return true;
         }
         false
+    }
+
+    /// One-level answer form for a single `target`: an answer leaf, a `&&`
+    /// branch (one leaf + `is known` guards), or a `||` of such branches.
+    fn is_answer_form(
+        &self,
+        term: TermRef,
+        target: TermRef,
+        solution: &Solution,
+        state: &mut SolutionState,
+    ) -> bool {
+        if term.data().is_symbol_name("||") {
+            return term.degree() > 0 &&
+                term.args_iter()
+                    .all(|b| self.is_answer_branch(b, target, solution, state));
+        }
+        self.is_answer_branch(term, target, solution, state)
+    }
+
+    /// An answer leaf, or `&&(guards..., leaf)` with exactly one
+    /// target-resolving leaf and every other conjunct an `is known` guard.
+    fn is_answer_branch(
+        &self,
+        branch: TermRef,
+        target: TermRef,
+        solution: &Solution,
+        state: &mut SolutionState,
+    ) -> bool {
+        if self.is_answer_leaf(branch, target, solution, state) {
+            return true;
+        }
+        if !branch.data().is_symbol_name("&&") {
+            return false;
+        }
+        let mut leaf_seen = false;
+        for conjunct in branch.args_iter() {
+            if self.is_answer_leaf(conjunct, target, solution, state) {
+                if leaf_seen {
+                    return false;
+                }
+                leaf_seen = true;
+            } else if !self.is_provably_known(conjunct, solution, state) {
+                return false;
+            }
+        }
+        leaf_seen
+    }
+
+    /// `target == <known>` or `target in <known>`.
+    fn is_answer_leaf(
+        &self,
+        term: TermRef,
+        target: TermRef,
+        solution: &Solution,
+        state: &mut SolutionState,
+    ) -> bool {
+        let Some((lhs, rhs)) =
+            match_term!(term, "=="(lhs, rhs)).or_else(|| match_term!(term, "in"(lhs, rhs)))
+        else {
+            return false;
+        };
+        lhs == target && self.is_provably_known(rhs, solution, state)
+    }
+
+    /// `true` if `term is known` is provable.
+    fn is_provably_known(
+        &self,
+        term: TermRef,
+        solution: &Solution,
+        state: &mut SolutionState,
+    ) -> bool {
+        let query = TermBuf::symbol("is")
+            .arg(term.to_owned())
+            .arg(TermBuf::symbol("known"));
+        self.prove(solution, query, state).answer().is_some()
     }
 
     fn build_multi_find_answer(&self, solution: &Solution, find_goal: &FindGoal) -> TermProps {
@@ -827,6 +910,36 @@ impl SolutionState {
     }
 }
 
+/// Resolves the `parents` requirement primitive against the match position:
+/// rewrites each `parents` marker into the `set(...)` of the matched term's
+/// ancestor head symbols. Like `solve`, this is computed here rather than by
+/// term normalization.
+fn resolve_parents_in_hypothesis(hyp: &mut Hypothesis, term: &TermBuf) {
+    let marker = TermBuf::symbol("parents");
+    if !hyp
+        .requirements
+        .iter()
+        .any(|r| r.term().contains(&marker.term()))
+    {
+        return;
+    }
+    // `set(...)` of the head symbols of the match position's strict ancestors.
+    let mut set = TermBuf::symbol("set");
+    let mut node = term.term();
+    for &i in &*hyp.pos {
+        if let Some(symbol) = node.data().symbol() {
+            set = set.arg(TermBuf::symbol(symbol.as_str()));
+        }
+        let Some(child) = node.args_iter().nth(i) else {
+            break;
+        };
+        node = child;
+    }
+    for r in &mut hyp.requirements {
+        r.replace(&marker, &set);
+    }
+}
+
 /// Matches `solve(...) == Param` (either argument order).
 fn match_solve_eq_param<'a>(req: &'a TermBuf) -> Option<(TermRef<'a>, Param)> {
     let (lhs, rhs) = match_term!(req.term(), "=="(lhs, rhs))?;
@@ -902,5 +1015,61 @@ mod solution_tests {
             .answer()
             .expect("multi-var find task is not solved");
         assert_eq!(*answer, term_with_vars("x == 3 && y == 4"));
+    }
+}
+
+#[cfg(test)]
+mod parents_tests {
+    use std::sync::Arc;
+
+    use crate::{
+        rule::{Hypothesis, parse_rule},
+        term::{ParamSubstitution, TermBuf, TermPath, term_with_vars},
+    };
+
+    use super::resolve_parents_in_hypothesis;
+
+    fn hypothesis(requirements: Vec<TermBuf>, pos: Vec<usize>) -> Hypothesis {
+        let rule = Arc::new(parse_rule(
+            r#"rule { attr level(1); a + x == 0 => x == -a; a!=0; }"#,
+        ));
+        Hypothesis {
+            rule,
+            resolution: term_with_vars("answer(x == 1)"),
+            free_params: Default::default(),
+            params: ParamSubstitution::default(),
+            requirements,
+            blocked_rules: vec![],
+            pos: TermPath::from(pos),
+        }
+    }
+
+    #[test]
+    fn rewrites_marker_into_ancestor_set() {
+        // `a` sits under `==` inside `||`: a == b || c.
+        let mut hyp = hypothesis(vec![term_with_vars("answer in parents")], vec![0, 0]);
+        resolve_parents_in_hypothesis(&mut hyp, &term_with_vars("a == b || c"));
+
+        let set = TermBuf::symbol("set")
+            .arg(TermBuf::symbol("||"))
+            .arg(TermBuf::symbol("=="));
+        let mut expected = term_with_vars("answer in parents");
+        expected.replace(&TermBuf::symbol("parents"), &set);
+        assert_eq!(hyp.requirements[0], expected);
+    }
+
+    #[test]
+    fn root_match_rewrites_into_empty_set() {
+        let mut hyp = hypothesis(vec![term_with_vars("answer in parents")], vec![]);
+        resolve_parents_in_hypothesis(&mut hyp, &term_with_vars("a == b"));
+        assert_eq!(hyp.requirements[0], term_with_vars("answer in set"));
+    }
+
+    #[test]
+    fn noop_without_marker() {
+        let mut hyp = hypothesis(vec![term_with_vars("a != 0")], vec![0]);
+        let before = hyp.requirements.clone();
+        resolve_parents_in_hypothesis(&mut hyp, &term_with_vars("a == b"));
+        assert_eq!(hyp.requirements, before);
     }
 }

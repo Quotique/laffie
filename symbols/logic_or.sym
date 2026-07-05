@@ -98,21 +98,3 @@ rule {
     a <= c;
 }
 
-rule {
-    attr level(0),goal(find(x)),replace;
-
-    x == a || x == b => answer(x in set(a, b));
-
-    a is known,
-    b is known;
-}
-
-rule {
-    attr level(0),goal(find(x)),replace;
-
-    x == a || x == b || x == c => answer(x in set(a, b, c));
-
-    a is known,
-    b is known,
-    c is known;
-}

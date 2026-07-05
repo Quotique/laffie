@@ -18,6 +18,14 @@ pub type SharedTerm = Arc<TermBuf>;
 #[derive(Debug, Default, Clone, From, PartialEq, Eq, Hash)]
 pub struct TermPath(pub(super) Vec<usize>);
 
+impl std::ops::Deref for TermPath {
+    type Target = [usize];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Clone, Hash, PartialEq, Eq)]
 #[derive(Deserialize)]
 pub struct TermBuf(SymbolTree);

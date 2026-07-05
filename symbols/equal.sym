@@ -2,12 +2,15 @@ symbol == {
     attr infix(500),display("=");
 }
 
+// Канонизация к `== 0`; гард `!(a is atom && b is known)` не трогает уже
+// решённую форму `x == known`, чтобы её распознали как ответ.
 rule {
     attr replace,level(0),goal(find(x, ..)),id(move_left);
 
     a == b <=> a - b == 0;
 
-    !symbolic_eq(b, 0);
+    !symbolic_eq(b, 0),
+    !(a is atom && b is known);
 }
 
 // Обратное к move_left, но в transform-фазе и с защитой от срабатывания
@@ -116,10 +119,8 @@ rule {
     attr level(2),goal(find(x, ..));
 
     a*x^2 + b*x + c == 0 =>
-        answer(
-            (a == 0 && lin) ||
-            (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x))
-        );
+        (a == 0 && lin) ||
+        (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x));
 
     a is known,
     b is known,
@@ -132,22 +133,15 @@ rule {
 //   a == 0, b == 0  →  x ∈ ℝ (тождество)
 //   a == 0, b != 0  →  x ∈ ∅ (нет решений)
 //   a != 0          →  делегирование sympy_solve
-// Резолюция обёрнута в answer(...) — это сигнал решателю
-// (см. check_answer_term, src/solver/task/solver.rs:565), что внутренний
-// терм является ответом независимо от его формы (дизъюнкция конъюнкций).
+// Резолюция — сырой piecewise; распознаётся check_find_answer.
 rule {
     attr level(2),goal(find(x, ..));
 
     x*a + b == 0 =>
-        answer(
-            (a == 0 && b == 0 && x in Reals) ||
-            (a == 0 && b != 0 && x in empty_set) ||
-            (a != 0 && x in sympy_solve(x*a + b == 0, x))
-        );
+        (a == 0 && b == 0 && x in Reals) ||
+        (a == 0 && b != 0 && x in empty_set) ||
+        (a != 0 && x in sympy_solve(x*a + b == 0, x));
 
     a is known,
     b is known;
 }
-
-
-

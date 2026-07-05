@@ -308,6 +308,7 @@ impl ApplyRule for SharedRule {
                     requirements,
                     resolution,
                     params: i,
+                    pos: pos.clone(),
                 };
                 trace!(target: "rule_selection", "New hypothesis: {hypothesis}");
                 result.push(hypothesis);

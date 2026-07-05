@@ -82,7 +82,7 @@ src/solver/
 ### rule/hypothesis.rs
 | Line | Type | Description |
 |------|------|-------------|
-| 13 | `Hypothesis` | Non-ground: rule, resolution, free_params, params, requirements, blocked_rules |
+| 13 | `Hypothesis` | Non-ground: rule, resolution, free_params, params, requirements, blocked_rules, pos (match position) |
 | 26 | `GroundedHypothesis` | Ground instance: all params bound, ready for requirement proving |
 | 35 | `HypothesisIterator` | Iterator over hypotheses from `Rule::apply()` |
 | 48 | `ground()` | Grounds hypothesis: bind `==` → cartesian over generators → re-bind `==` per combo |
@@ -107,6 +107,7 @@ src/solver/
 | 94 | `solve_impl()` | Main loop: focus term → simplify → infer → check answer |
 | 248 | `try_infer_new_terms()` | Suggests rules, produces hypotheses, adds new terms |
 | 290 | `produce()` | Applies rule, grounds hypotheses, proves requirements |
+| — | `resolve_parents_in_hypothesis()` | Rewrites `parents` requirement marker → `set(ancestors)` from match pos (like `resolve_solve`) |
 | 331 | `try_prove_hypothesis()` | Proves rule requirements via subtasks |
 | 395 | `prove()` | Creates subtask for proving a term |
 | 440 | `transform()` | Handles Transform goals |

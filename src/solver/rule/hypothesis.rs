@@ -5,7 +5,9 @@ use itertools::Itertools;
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
 use crate::{
     NormalizationLevel,
-    term::{Atom, Param, ParamSubstitution, Substitute, Term as _, TermBuf, Truth, match_term},
+    term::{
+        Atom, Param, ParamSubstitution, Substitute, Term as _, TermBuf, TermPath, Truth, match_term,
+    },
 };
 
 /// Hypothesis with possibly free params; grounds via [`Hypothesis::ground`].
@@ -19,6 +21,9 @@ pub struct Hypothesis {
     pub params:        ParamSubstitution,
     pub requirements:  Vec<TermBuf>,
     pub blocked_rules: Vec<RuleId>,
+
+    /// Match position in the parent term
+    pub pos: TermPath,
 }
 
 /// Fully instantiated hypothesis (no free params).
@@ -30,6 +35,9 @@ pub struct GroundedHypothesis {
     pub params:        ParamSubstitution,
     pub requirements:  Vec<TermBuf>,
     pub blocked_rules: Vec<RuleId>,
+
+    /// Match position carried from [`Hypothesis`] for context resolution.
+    pub pos: TermPath,
 }
 
 pub enum HypothesisIterator {
@@ -55,6 +63,7 @@ impl Hypothesis {
                 params:        self.params,
                 requirements:  self.requirements,
                 blocked_rules: self.blocked_rules,
+                pos:           self.pos,
             }];
         }
 
@@ -89,6 +98,7 @@ impl Hypothesis {
                         params:        inner.params,
                         requirements:  inner.requirements,
                         blocked_rules: inner.blocked_rules,
+                        pos:           inner.pos,
                     })
                 } else {
                     trace!(
@@ -284,6 +294,7 @@ mod tests {
             params: ParamSubstitution::default(),
             requirements,
             blocked_rules: vec![],
+            pos: Default::default(),
         }
     }
 
@@ -298,6 +309,24 @@ mod tests {
         assert_eq!(grounded.len(), 1);
         assert_eq!(res(&grounded[0]), "x==1");
         assert!(grounded[0].requirements.is_empty());
+    }
+
+    #[test]
+    fn ground_keeps_parents_guard() {
+        // `parents` is inert without a position → guard stays Unknown, survives
+        // grounding.
+        let h = make_hypothesis(
+            term_with_vars("answer(x == 1)"),
+            vec![],
+            vec![term_with_vars("!(answer in parents)")],
+        );
+        let grounded = h.ground();
+        assert_eq!(grounded.len(), 1);
+        assert_eq!(grounded[0].requirements.len(), 1);
+        assert_eq!(
+            grounded[0].requirements[0],
+            term_with_vars("!(answer in parents)")
+        );
     }
 
     #[test]

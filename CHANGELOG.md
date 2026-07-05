@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Atomic piecewise-answer recognition in the solver (`check_find_answer` /
+  `is_answer_form`): a single-target `find(x)` answer is accepted directly
+  when it is a leaf (`x == known` / `x in known`) or a `||` of `&&`-branches
+  (one leaf + `is known` guards). Replaces the rule-based leaf-wrap assembly
+  and removes its combinatorial blow-up on multi-branch answers
+- Kleene truth checkers for `&&` / `||` so `!(X && Y)`-style requirements
+  evaluate to a definite truth
+- `parents()` context primitive for rule requirements: resolves to the
+  `set(...)` of head symbols of the match position's ancestors, enabling
+  guards like `!(answer in parents())`; replaces the `block(...)`/
+  complement-pair machinery for piecewise-answer detection. Modeled like
+  `solve`: an inert symbol (parsing only) computed by a dedicated
+  requirement pass (`resolve_parents_in_hypothesis`) against the match
+  position carried on the hypothesis — not by term normalization
 - Per-problem wall-clock time limit (`cli --time-limit`, seconds)
 - Hypothesis grounding: `Hypothesis` / `GroundedHypothesis` split, free
   params bound via `==` requirements and cartesian over `set(...)`
@@ -21,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SolutionTrace` mirror of `Solution`
 
 ### Changed
+- `move_left` no longer canonicalizes an already-solved `x == known` (guard
+  `!(a is atom && b is known)`), so it is recognized as the answer
+- Equation-solving rules emit raw piecewise resolutions instead of wrapping
+  them in `answer(...)`; recognition is now atomic in the solver
 - `cli` persists every solve through the new `database::Db`; DB-path
   flag renamed `--tasks-db` → `--db-path`, hex `TaskId` for `--remove` /
   `--only`; `--only` accepts a comma-separated list of task ids / hex
@@ -28,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Term codec returns structured `DecodeError`s instead of panicking
 
 ### Removed
+- Rule-based answer assembly: the `L1/L2/L3` leaf-wrap/merge rules in
+  `answer.sym` and the pure leaf-wraps (`x in set/Reals/empty_set => answer`,
+  `x == a || x == b => answer(x in set)`); superseded by atomic recognition
 - `tgbot` excluded from the workspace (sources kept in-tree as archived);
   `migrate_db`, `UserDb`, and the sled/bincode-era `database` shim
   removed along with their dependencies
