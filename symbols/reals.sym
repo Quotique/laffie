@@ -2,12 +2,6 @@ symbol Reals {
     attr display("ℝ");
 }
 
-rule {
-    attr level(0), goal(prove(Reals is known));
-
-    Reals is known <=> true;
-}
-
 // Terminal-wrap для `x ∈ ℝ` — leaf-форма для identity-ветви case-split'а.
 rule {
     attr level(0),goal(find(x)),replace;

@@ -465,6 +465,17 @@ macro_rules! match_term {
         if !$v.data().is_symbol_name($name) { return None; }
         Some(($($acc,)* $v,))
     }};
+
+    (@arms $it:ident [$($acc:ident)*] $name:literal , $($rest:tt)*) => {{
+        let __a = $it.next()?;
+        if !__a.data().is_symbol_name($name) { return None; }
+        match_term!(@arms $it [$($acc)*] $($rest)*)
+    }};
+    (@arms $it:ident [$($acc:ident)*] $name:literal) => {{
+        let __a = $it.next()?;
+        if !__a.data().is_symbol_name($name) { return None; }
+        Some(($($acc,)*))
+    }};
 }
 pub(crate) use match_term;
 
@@ -473,6 +484,16 @@ mod tests {
     use itertools::Itertools;
 
     use crate::term::{Substitute, Term, term_with_params, term_with_vars};
+
+    #[test]
+    fn match_term_nullary_literal() {
+        let t = term_with_vars("x is known");
+        let (l,) = match_term!(t.term(), "is"(l, "known")).expect("should match");
+        assert_eq!(l.data(), term_with_vars("x").term().data());
+
+        let other = term_with_vars("x is variable");
+        assert!(match_term!(other.term(), "is"(l, "known")).is_none());
+    }
 
     #[test]
     fn subterm_contains_direct_term() {

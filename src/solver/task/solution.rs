@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error,
     ops::{Index, IndexMut},
     sync::Arc,
@@ -10,7 +10,10 @@ use derive_more::Display;
 use itertools::Itertools;
 
 use super::{Goal, Task, TermProps};
-use crate::term::{SharedTerm, TermBuf};
+use crate::{
+    CompactString,
+    term::{Atom, SharedTerm, Term, TermBuf, TermMut, match_term},
+};
 
 pub const STACK_SIZE: usize = 2048;
 
@@ -81,11 +84,15 @@ impl Solution {
             status: Default::default(),
             unproven_terms_count: Default::default(),
         };
+        let known = collect_known_set(&solution.task.givens);
         let conditions = solution.task.givens.clone();
-        for i in conditions.into_iter() {
+        for mut i in conditions.into_iter() {
+            stamp_known(&mut Arc::make_mut(&mut i.term).term_mut(), &known);
             let _ = solution.add_term(i);
         }
-        let _ = solution.add_term(solution.goal.term().clone());
+        let mut goal_term = solution.goal.term().clone();
+        stamp_known(&mut Arc::make_mut(&mut goal_term.term).term_mut(), &known);
+        let _ = solution.add_term(goal_term);
 
         trace!(target: "subtask", "Subtask: {}, [{}]",
             solution.goal, solution.task.givens.iter().format(", ")
@@ -193,14 +200,70 @@ impl IndexMut<TermIdx> for Solution {
 
 impl error::Error for SolveError {}
 
+/// Collect names declared known via a `V is known` given (V a bare variable).
+fn collect_known_set(givens: &[TermProps]) -> HashSet<CompactString> {
+    let mut set = HashSet::new();
+    for g in givens {
+        let Some((lhs,)) = match_term!(g.term.term(), "is"(lhs, "known")) else {
+            continue;
+        };
+        if let Atom::Variable(v) = lhs.data() {
+            set.insert(v.as_ref().clone());
+        }
+    }
+    set
+}
+
+/// Stamp `known = true` on every variable whose name was declared known.
+fn stamp_known(term: &mut TermMut<'_>, known: &HashSet<CompactString>) {
+    if let Atom::Variable(v) = term.data_mut() &&
+        known.contains(v.as_ref())
+    {
+        v.known = true;
+    }
+    for mut child in term.iter_mut() {
+        stamp_known(&mut child, known);
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use super::Solution;
+    use crate::{
+        task::parse_task,
+        term::{Atom, Term, TermRef},
+    };
 
     fn is_send_sync<T: Send + Sync>() {}
 
     #[test]
     fn test_send_sync_solution() {
         is_send_sync::<Solution>();
+    }
+
+    fn collect_var_known(term: TermRef<'_>, out: &mut HashMap<String, bool>) {
+        if let Atom::Variable(v) = term.data() {
+            *out.entry(v.as_str().to_string()).or_insert(false) |= v.known;
+        }
+        for child in term.args_iter() {
+            collect_var_known(child, out);
+        }
+    }
+
+    #[test]
+    fn stamps_known_from_givens() {
+        let task = parse_task("task { goal find(x); a*x == b; a is known; b is known; }");
+        let solution = Solution::new(task);
+
+        let mut status = HashMap::new();
+        for tp in &solution.terms {
+            collect_var_known(tp.term.term(), &mut status);
+        }
+
+        assert_eq!(status.get("a"), Some(&true));
+        assert_eq!(status.get("b"), Some(&true));
+        assert_eq!(status.get("x"), Some(&false));
     }
 }

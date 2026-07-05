@@ -101,7 +101,7 @@ src/solver/
 |------|------|-------------|
 | 20 | `MAX_SUBTASK_LEVEL` | Const: 10 |
 | 26 | `EXECUTION_DEADLINE_DEFAULT` | Const: 100_000 |
-| 35 | `Solver` | Fields: rules_engine, local_rules, unknown_terms |
+| 44 | `Solver` | Fields: rules_engine, local_rules |
 | 50 | `Solver::new()` | Constructor |
 | 70 | `Solver::solve()` | Entry point: `(task, tracer, deadline) -> SharedSolution` |
 | 94 | `solve_impl()` | Main loop: focus term → simplify → infer → check answer |
@@ -132,10 +132,10 @@ src/solver/
 ### term/atom.rs
 | Line | Type | Description |
 |------|------|-------------|
-| 8 | `Param(CompactString)` | Rule parameter placeholder |
-| 12 | `Variable(CompactString)` | Task variable (what we solve for) |
-| 16 | `ArgList(u64)` | Variadic argument placeholder `..` |
-| 20 | `Atom` | Enum: Symbol, Param, Variable, Number(Decimal), ArgList |
+| 18 | `Param(CompactString)` | Rule parameter placeholder |
+| 20 | `Variable { name, known }` | Task variable; `known` bit stamped at task load, excluded from eq/hash/serde |
+| 92 | `ArgList(u64)` | Variadic argument placeholder `..` |
+| 102 | `Atom` | Enum: Symbol, Param, Variable, Number(Decimal), ArgList |
 
 ### term/buffer.rs
 | Line | Type | Description |

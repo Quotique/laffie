@@ -16,26 +16,9 @@ rule {
 }
 
 rule {
-    attr level(0),goal(prove(a*b is known));
-
-    a*b is known <=> true;
-
-    a is known,
-    b is known;
-}
-
-rule {
     attr level(0),goal(transform(x)),replace;
 
     -(-a) <=> a;
-}
-
-rule {
-    attr level(0),goal(prove(-a is known));
-
-    -a is known <=> true;
-
-    a is known;
 }
 
 rule {

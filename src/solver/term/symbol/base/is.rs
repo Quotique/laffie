@@ -27,7 +27,18 @@ pub fn is(root: TermRef) -> Truth {
                 Truth::False
             }
         }
-        Atom::Symbol(s) if s == "known" && matches!(lhs.data(), Atom::Number(_)) => Truth::True,
+        // Known iff every leaf is a number or a variable stamped known.
+        Atom::Symbol(s) if s == "known" => {
+            if lhs.bfs().all(|v| match v.data {
+                Atom::Variable(var) => var.known,
+                Atom::Param(_) | Atom::ArgList(_) => false,
+                _ => true,
+            }) {
+                Truth::True
+            } else {
+                Truth::False
+            }
+        }
         Atom::Symbol(s) if s == "variable" && matches!(lhs.data(), Atom::Variable(_)) => {
             Truth::True
         }
@@ -38,7 +49,22 @@ pub fn is(root: TermRef) -> Truth {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term::term_with_vars;
+    use crate::term::{TermBuf, TermMut, term_with_vars};
+
+    fn stamp(mut t: TermBuf, known: &[&str]) -> TermBuf {
+        fn go(mut node: TermMut<'_>, known: &[&str]) {
+            if let Atom::Variable(v) = node.data_mut() &&
+                known.contains(&v.as_str())
+            {
+                v.known = true;
+            }
+            for child in node.iter_mut() {
+                go(child, known);
+            }
+        }
+        go(t.term_mut(), known);
+        t
+    }
 
     #[test]
     fn is_atom_true_for_number() {
@@ -71,15 +97,29 @@ mod tests {
     }
 
     #[test]
-    fn is_known_unknown_for_variable() {
+    fn is_known_false_for_unknown_variable() {
         let t = term_with_vars("x is known");
-        assert_eq!(is(t.term()), Truth::Unknown);
+        assert_eq!(is(t.term()), Truth::False);
     }
 
     #[test]
-    fn is_known_unknown_for_compound() {
+    fn is_known_false_for_unknown_compound() {
         let t = term_with_vars("x + 1 is known");
-        assert_eq!(is(t.term()), Truth::Unknown);
+        assert_eq!(is(t.term()), Truth::False);
+    }
+
+    #[test]
+    fn is_known_true_for_known_compound() {
+        let lhs = stamp(term_with_vars("a^2 - 4"), &["a"]);
+        let t = TermBuf::symbol("is").arg(lhs).arg(TermBuf::symbol("known"));
+        assert_eq!(is(t.term()), Truth::True);
+    }
+
+    #[test]
+    fn is_known_false_for_partially_unknown_compound() {
+        let lhs = term_with_vars("a^2 - 4");
+        let t = TermBuf::symbol("is").arg(lhs).arg(TermBuf::symbol("known"));
+        assert_eq!(is(t.term()), Truth::False);
     }
 
     #[test]

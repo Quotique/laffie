@@ -2,23 +2,6 @@ symbol set {
     attr commutative;
 }
 
-rule {
-    attr level(0),goal(prove(set(a) is known));
-
-    set(a) is known <=> true;
-
-    a is known;
-}
-
-rule {
-    attr level(0),goal(prove(set(a, ..) is known));
-
-    set(a, .. as S) is known <=> true;
-
-    a is known,
-    set(S) is known;
-}
-
 // TODO: apply only to root
 rule {
     attr level(0),goal(find(x)),replace,id(answer_in_set),block(answer_in_set);
@@ -43,12 +26,6 @@ rule {
 
 symbol empty_set {
     attr display("∅ ")
-}
-
-rule {
-    attr level(0),goal(prove(empty_set is known));
-
-    empty_set is known <=> true;
 }
 
 // Terminal-wrap для `x ∈ ∅` — leaf-форма для empty-branch case-split'а.

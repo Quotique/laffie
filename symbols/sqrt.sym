@@ -2,14 +2,6 @@ symbol sqrt {
     attr display("√");
 }
 
-rule {
-    attr level(0),goal(prove(sqrt(a) is known));
-
-    sqrt(a) is known <=> true;
-
-    a is known;
-}
-
 // sqrt квадрата — модуль. Параметрический знак не теряется (в отличие
 // от `(sqrt(a))^2 => a` с условием a >= 0).
 rule {

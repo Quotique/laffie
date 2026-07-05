@@ -16,7 +16,9 @@ use crate::{
         SharedRule,
     },
     task::{Tracer, solution::SolutionStatus},
-    term::{Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, match_term},
+    term::{
+        Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, match_term,
+    },
 };
 
 /// Maximum depth allowed for nested subtasks.
@@ -42,8 +44,6 @@ pub struct Solver {
     rules_engine: Arc<RulesEngine>,
 
     local_rules: Vec<SharedRule>,
-
-    unknown_terms: Vec<TermBuf>,
 }
 
 impl Solver {
@@ -55,9 +55,8 @@ impl Solver {
     ///   global rule set used during solving.
     pub fn new(rules: Arc<RulesEngine>) -> Solver {
         Solver {
-            rules_engine:  rules.clone(),
-            local_rules:   vec![],
-            unknown_terms: vec![],
+            rules_engine: rules.clone(),
+            local_rules:  vec![],
         }
     }
 
@@ -86,12 +85,6 @@ impl Solver {
             cache: Default::default(),
             tracer,
         };
-
-        if let Goal::Find(ref g) = solution.goal {
-            for target in &g.targets {
-                self.unknown_terms.push(target.clone());
-            }
-        }
 
         self.solve_impl(&mut solution, &mut state);
         solution.into()
@@ -415,39 +408,24 @@ impl Solver {
         let term = term.normalize(NormalizationLevel::max());
         let prove_goal = SharedTerm::new(TermBuf::symbol("prove").arg(term.clone()));
 
-        if term.term().truth().is_true() {
-            // Build a minimal solution whose answer is the proven term
-            let mut trivial_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
-            // Add the term to the solution and mark it as the answer
-            let idx = trivial_solution
-                .add_term(TermProps::from(term.clone()))
-                .expect("failed to add trivial term");
-            trivial_solution.status = SolutionStatus::Answer(idx);
-            return SharedSolution::new(trivial_solution);
-        }
-
-        // Check if argument of "term is known" doesn't contains any of unknown_terms.
-        if !self.unknown_terms.is_empty() {
-            let term_root = term.term();
-            if term_root.data().is_symbol_name("is") &&
-                term_root.degree() == 2 &&
-                term_root
-                    .last_arg()
-                    .expect("missing arg")
-                    .data()
-                    .is_symbol_name("known")
-            {
-                let first = term_root.first_arg().expect("missing arg");
-
-                if self.unknown_terms.iter().any(|i| first.contains(&i.term())) {
-                    let mut no_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
-                    no_solution.status = SolutionStatus::Err(SolveError::NoSolutionsFound);
-                    return SharedSolution::new(no_solution);
-                }
+        match term.term().truth() {
+            // The proven term is itself the answer.
+            Truth::True => {
+                let mut trivial_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
+                let idx = trivial_solution
+                    .add_term(TermProps::from(term.clone()))
+                    .expect("failed to add trivial term");
+                trivial_solution.status = SolutionStatus::Answer(idx);
+                SharedSolution::new(trivial_solution)
             }
+            // Unprovable — fail fast instead of searching.
+            Truth::False => {
+                let mut no_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
+                no_solution.status = SolutionStatus::Err(SolveError::NoSolutionsFound);
+                SharedSolution::new(no_solution)
+            }
+            Truth::Unknown => self.solve_subtask(solution, prove_goal, HashSet::new(), state),
         }
-
-        self.solve_subtask(solution, prove_goal, HashSet::new(), state)
     }
 
     fn transform(
@@ -522,7 +500,6 @@ impl Solver {
         }
 
         let mut subtask_solver = Solver::new(self.rules_engine.clone());
-        subtask_solver.unknown_terms = self.unknown_terms.clone();
 
         let subtask = Self::subtask(solution, task.clone(), blocked_rules);
         let mut subtask_solution = Solution::new(subtask);
@@ -552,8 +529,6 @@ impl Solver {
         if let Some(x) = state.cache.get(&cache_key) {
             return x.clone();
         }
-
-        let vars: Vec<TermBuf> = goal.term().args_iter().map(|a| a.to_owned()).collect();
 
         // Placeholder needs a valid Goal — use the inner `find` term.
         if state
@@ -590,8 +565,6 @@ impl Solver {
         let task = builder.build().expect("can't build solve subtask");
 
         let mut subtask_solver = Solver::new(self.rules_engine.clone());
-        subtask_solver.unknown_terms = self.unknown_terms.clone();
-        subtask_solver.unknown_terms.extend(vars);
 
         let mut subtask_solution = Solution::new(task);
         subtask_solver.solve_impl(&mut subtask_solution, state);
@@ -886,46 +859,6 @@ mod solution_tests {
     };
 
     #[test]
-    fn unknown_terms_find_goal() {
-        let task = parse_task("task { goal find(x); x == 1; }");
-        let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules);
-
-        let _ = solver.solve(task, Default::default(), usize::MAX);
-
-        assert_eq!(solver.unknown_terms.len(), 1);
-        assert_eq!(solver.unknown_terms[0], term_with_vars("x"));
-    }
-
-    #[test]
-    fn unknown_terms_prove_goal() {
-        let task = parse_task("task { goal prove(x > 0); x == 2; }");
-        let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules);
-
-        let _ = solver.solve(task, Default::default(), usize::MAX);
-
-        assert!(
-            solver.unknown_terms.is_empty(),
-            "unknown_terms should be empty for prove goal"
-        );
-    }
-
-    #[test]
-    fn unknown_terms_transform_goal() {
-        let task = parse_task("task { goal transform(1 + 2); }");
-        let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules);
-
-        let _ = solver.solve(task, Default::default(), usize::MAX);
-
-        assert!(
-            solver.unknown_terms.is_empty(),
-            "unknown_terms should be empty for transform goal"
-        );
-    }
-
-    #[test]
     fn check_answer_find_test() {
         let task = parse_task("task { goal find(x); x == 1; }");
         let rules = Arc::new(RulesEngine::default());
@@ -944,19 +877,6 @@ mod solution_tests {
         let mut solver = Solver::new(rules);
         let solution = solver.solve(task, Default::default(), usize::MAX);
         assert!(solution.answer().is_some());
-    }
-
-    #[test]
-    fn unknown_terms_multi_var_find() {
-        let task = parse_task("task { goal find(x, y); x == 1; y == 2; }");
-        let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules);
-
-        let _ = solver.solve(task, Default::default(), usize::MAX);
-
-        assert_eq!(solver.unknown_terms.len(), 2);
-        assert_eq!(solver.unknown_terms[0], term_with_vars("x"));
-        assert_eq!(solver.unknown_terms[1], term_with_vars("y"));
     }
 
     #[test]

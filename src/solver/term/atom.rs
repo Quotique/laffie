@@ -1,4 +1,9 @@
-use std::{cmp::Ordering, fmt, hash::Hash};
+use std::{
+    cmp::Ordering,
+    fmt,
+    hash::{Hash, Hasher},
+    str::FromStr,
+};
 
 use derive_more::{AsRef, Display, From, FromStr, Into};
 use serde_derive::{Deserialize, Serialize};
@@ -12,11 +17,77 @@ use crate::{CompactString, Decimal, Signed};
 #[derive(Debug, Display, Serialize, Deserialize)]
 pub struct Param(CompactString);
 
-#[derive(PartialEq, Eq, Hash)]
-#[derive(Ord, PartialOrd)]
-#[derive(Clone, AsRef, From, FromStr, Into)]
-#[derive(Debug, Display, Serialize, Deserialize)]
-pub struct Variable(CompactString);
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Variable {
+    name:      CompactString,
+    #[serde(skip)]
+    pub known: bool,
+}
+
+impl Variable {
+    /// The variable's name.
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl PartialEq for Variable {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl Eq for Variable {}
+
+impl Hash for Variable {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+
+impl Ord for Variable {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.name.cmp(&other.name)
+    }
+}
+
+impl PartialOrd for Variable {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl fmt::Display for Variable {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl From<CompactString> for Variable {
+    fn from(name: CompactString) -> Self {
+        Self { name, known: false }
+    }
+}
+
+impl AsRef<CompactString> for Variable {
+    fn as_ref(&self) -> &CompactString {
+        &self.name
+    }
+}
+
+impl FromStr for Variable {
+    type Err = <CompactString as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            name:  s.parse()?,
+            known: false,
+        })
+    }
+}
 
 #[derive(PartialEq, Eq, Hash)]
 #[derive(Ord, PartialOrd)]
@@ -48,7 +119,10 @@ pub fn param(p: impl AsRef<str>) -> Param {
 
 #[inline]
 pub fn var(v: impl AsRef<str>) -> Variable {
-    Variable(v.as_ref().into())
+    Variable {
+        name:  v.as_ref().into(),
+        known: false,
+    }
 }
 
 impl From<Symbol> for Atom {
