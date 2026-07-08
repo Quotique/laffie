@@ -4,3 +4,9 @@ dumps*
 /logs
 **/*.rs.bk
 /target
+
+# LaTeX build artifacts
+*.aux
+*.out
+*.toc
+doc/**/*.pdf
