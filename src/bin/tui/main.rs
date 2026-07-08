@@ -196,6 +196,30 @@ fn tab_index_for_click(tabs: Rect, click_col: u16) -> Option<usize> {
     None
 }
 
+fn main() -> io::Result<()> {
+    let settings = Settings::new()
+        .map_err(|e| {
+            println!("Config error: {e:?}");
+            e
+        })
+        .unwrap_or_else(|_| {
+            std::process::exit(-1);
+        });
+    let _log_guard = settings.logger.init();
+
+    let mut terminal = ratatui::init();
+    let _ = execute!(io::stdout(), EnableMouseCapture);
+    terminal.clear()?;
+    let app_result = run(terminal, settings);
+    let _ = execute!(io::stdout(), DisableMouseCapture);
+    ratatui::restore();
+    if let Err(e) = app_result {
+        eprintln!("{e}");
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,28 +277,4 @@ mod tests {
         assert_eq!(tab_index_for_click(tabs, 36), Some(2));
         assert_eq!(tab_index_for_click(tabs, 50), Some(3));
     }
-}
-
-fn main() -> io::Result<()> {
-    let settings = Settings::new()
-        .map_err(|e| {
-            println!("Config error: {e:?}");
-            e
-        })
-        .unwrap_or_else(|_| {
-            std::process::exit(-1);
-        });
-    let _log_guard = settings.logger.init();
-
-    let mut terminal = ratatui::init();
-    let _ = execute!(io::stdout(), EnableMouseCapture);
-    terminal.clear()?;
-    let app_result = run(terminal, settings);
-    let _ = execute!(io::stdout(), DisableMouseCapture);
-    ratatui::restore();
-    if let Err(e) = app_result {
-        eprintln!("{e}");
-    }
-
-    Ok(())
 }
