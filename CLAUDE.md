@@ -38,7 +38,7 @@ Before `git commit`:
 4. **File structure**: `pub` → `pub(super)` → private `fn` (top-down within each `.rs`); tests at the end
 5. **Comments**: concise; no doc-essays; Rustdoc in English
 6. **`CHANGELOG.md`**: update `[Unreleased]` section if user-visible change
-7. **Commit body**: subject + ≤5 lines; Co-Authored-By trailer without context tag
+7. **Commit body**: subject + ≤5 lines
 
 ## Code Style
 

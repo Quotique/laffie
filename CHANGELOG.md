@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-09
+
 ### Added
+- TUI: solve tasks in parallel with rayon; the solve queue stays alive
+  while a worker runs, and input blocks when idle
+- TUI: Settings tab (F4) showing runtime values, editable and persisted
+  back to yaml with Ctrl+S
+- TUI: diff of a solution against the previous run, with a rule-aware
+  multiset diff in the solution window
+- TUI: mouse support (wheel scroll and click) with precise tab hit-boxes;
+  expanded keymap with paging, panels, a help bar, and esc handling
+- TUI: incremental filter for the rules list; edit the selected source in
+  `$EDITOR`; Shift+R reloads tasks alongside rules; per-directory task
+  listing in the summary panel
+- TUI: theme as data with dark / light / high-contrast presets
 - Atomic piecewise-answer recognition in the solver (`check_find_answer` /
   `is_answer_form`): a single-target `find(x)` answer is accepted directly
   when it is a leaf (`x == known` / `x in known`) or a `||` of `&&`-branches
@@ -54,6 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removed along with their dependencies
 
 ### Fixed
+- TUI: removed panic sources in the render path; SolveAll on a directory
+  with sub-directories no longer panics
 - More equations needing bracket/power expansion now solve
 - Equations with no real solutions now return the empty set instead of an
   unfinished answer
