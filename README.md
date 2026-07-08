@@ -1,3 +1,5 @@
+[English](README_en.md) | **Русский**
+
 ## Сборка
 
 Для сборки требуется компилятор Rust. Инструкция по установке на оф. сайте https://www.rust-lang.org/tools/install.
@@ -10,13 +12,29 @@ cargo run --release --bin cli -- -c config/cli.yaml
 
 Рекомендуется использовать имено релизную сборку (флаг --release), так как время работы отличается существенно.
 
-## [Терминология](doc/terminology_ru.md)
+## Документация
 
-## [Принцип работы](doc/work_principle_ru.md)
+- [Терминология](doc/ru/terminology.md)
+- [Принцип работы](doc/ru/work_principle.md)
+- [Как вводить задачи](doc/ru/task_syntax.md)
+- [Как вводить правила](doc/ru/rule_syntax.md)
+- [Структура каталогов](doc/ru/code_structure.md)
 
-## [Как вводить задачи](doc/task_syntax_ru.md)
+Тематические заметки:
 
-## [Как вводить правила](doc/rule_syntax_ru.md)
+- [Подзадачи](doc/ru/subtasks.md)
+- [База правил](doc/ru/rule_base.md)
+- [Гипотезы и конкретизация](doc/ru/hypothesis.md)
+- [Нормализация](doc/ru/normalization.md)
+- [Системы уравнений](doc/ru/systems.md)
+- [Поиск рациональных корней](doc/ru/rational_roots.md)
 
-## [Структура каталогов](doc/code_structure_ru.md)
+## Статья
 
+Архитектура системы изложена в статье:
+
+А. П. Анненков. **Архитектура упрощённой системы автоматического вывода на основе подхода
+А. С. Подколзина** // Интеллектуальные системы. Теория и приложения. — 2026. — Т. 30, № 1. —
+<https://new.intsysmagazine.ru/issues/2026/1/article/9>.
+
+Опубликовано под лицензией [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

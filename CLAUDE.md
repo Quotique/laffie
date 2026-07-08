@@ -79,7 +79,7 @@ Laffie is a **symbolic mathematical problem solver** — a rule-based reasoning 
   → View (Console / HTML / TUI renderer)
 ```
 
-### Key Concepts (from doc/terminology_ru.md)
+### Key Concepts (from doc/ru/terminology.md)
 
 - **Term** (`solver::term`) — A formula tree: atoms, variables, parameters, symbols. Represented as `TermBuf` (owned), `SharedTerm` (Arc-wrapped), `TermRef`/`TermMut` (borrows).
 - **Symbol** (`solver::term::symbol`) — Domain operator (e.g., `plus`, `equal`, `set`) with custom normalizers. Defined in `.sym` files under `symbols/`.
@@ -92,7 +92,7 @@ Laffie is a **symbolic mathematical problem solver** — a rule-based reasoning 
 - `symbols/*.sym` — Symbol definitions and rules (arithmetic, logic, comparison, sets)
 - `tasks/**/*.pbl` — Problem definitions organized by category (test, elementary_algebra)
 - `config/*.yaml|json` — Per-binary configuration
-- `doc/*.md` — Russian-language documentation on terminology, syntax, and architecture
+- `doc/ru/*.md` — Russian-language documentation (source of truth) on terminology, syntax, and architecture; `doc/en/` mirrors it (when populated)
 
 ## Detailed Navigation (`claude_docs/`)
 
