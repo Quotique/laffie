@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nonnegative for any base.
 - Monotone scaling (`x*z > y*z` from `x > y, z > 0`) and bounded-above linear
   (`6 - x > 0` from `x < 5`) inequality lemmas.
+- Product of two lower bounds against a number (`x*y > 6` from `x > 2, y > 3`),
+  via a scaling lemma whose estimate `2*y >= 6` is discharged by constant
+  scaling — all requirements use multiplication, never division.
 
 ### Fixed
 - The prove-goal answer check is now stable under commutative argument order:

@@ -94,4 +94,5 @@ task { goal prove(x^4 >= 0); }
 task { goal prove(x^2 + y^2 + 1 > 0); }
 task { goal prove(x * z > y * z);  x > y; z > 0; }
 task { goal prove(6 - x > 0);      x < 5; }
+task { goal prove(x * y > 6);      x > 2; y > 3; }
 
