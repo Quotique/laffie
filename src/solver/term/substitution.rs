@@ -3,13 +3,15 @@ use std::{collections::HashMap, fmt};
 use indexmap::IndexMap;
 use itertools::{Itertools, chain};
 
-use super::{ArgList, Param, TermBuf, Variable};
+use super::{ArgList, Param, SharedTerm, TermBuf, Variable};
 
 pub type VariableSubstitution = HashMap<Variable, TermBuf>;
 
 #[derive(Debug, Clone, Default)]
 pub struct ParamSubstitution {
-    pub params:   IndexMap<Param, TermBuf>,
+    /// Shared (`Arc`) values: cloning a substitution bumps refcounts; the deep
+    /// copy happens once, at the write site in `TermMut::substitute`.
+    pub params:   IndexMap<Param, SharedTerm>,
     pub arglists: IndexMap<ArgList, Vec<TermBuf>>,
 }
 
@@ -49,7 +51,10 @@ impl Substitute for TermBuf {
 impl FromIterator<(Param, TermBuf)> for ParamSubstitution {
     fn from_iter<I: IntoIterator<Item = (Param, TermBuf)>>(iter: I) -> Self {
         ParamSubstitution {
-            params:   FromIterator::from_iter(iter),
+            params:   iter
+                .into_iter()
+                .map(|(p, t)| (p, SharedTerm::new(t)))
+                .collect(),
             arglists: Default::default(),
         }
     }

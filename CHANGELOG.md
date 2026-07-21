@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Subterm matching (`find_matching_subterms`) carries each node's path
+  incrementally down the BFS instead of recomputing it per node by walking to
+  the root and scanning siblings (which was O(n²) over a term), and skips the
+  full pattern match on nodes whose root can't match the pattern root anyway.
+  Same matches, same answers; removes an O(n²) scan that grows with term width
+- Pattern-match substitutions share their bound param values via `Arc`
+  instead of owning a deep-cloned term each: cloning a substitution across a
+  match branch (or a hypothesis) now only bumps refcounts, and the deep copy
+  happens once, at the point a value is written into a result term. ~11%
+  faster on the `slow` corpus, same answers
+- The solver picks the next term to work on from a `(level, id)` min-heap
+  instead of scanning every term each cycle, and caches each term's
+  provenness at insertion instead of re-checking its requirements on every
+  scan. Search order is unchanged (`id` breaks level ties, as before)
+- Hypothesis grounding is now lazy: the cartesian product over `param in
+  set(...)` generators is pulled on demand instead of being fully materialized,
+  so a rule application that succeeds on its first grounding no longer builds
+  every combination first. `produce` also short-circuits the per-hypothesis
+  `solve(...)` resolution and polls the wall-clock deadline while walking a
+  large product, so a generator over a huge set aborts on the time limit
+  instead of hanging
 - Commutative / associative-commutative pattern matching is now a lazy
   backtracking search instead of materializing every permutation / partition:
   it prunes incompatible candidates, deduplicates results, and is bounded by a

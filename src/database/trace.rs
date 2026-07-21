@@ -238,7 +238,7 @@ impl From<&ParamSubstitution> for TraceParams {
             params:   s
                 .params
                 .iter()
-                .map(|(k, v)| (k.as_ref().as_str().to_owned(), v.clone()))
+                .map(|(k, v)| (k.as_ref().as_str().to_owned(), v.as_ref().clone()))
                 .collect(),
             arglists: s
                 .arglists

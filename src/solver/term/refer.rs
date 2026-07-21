@@ -14,7 +14,7 @@ use trees::Node;
 
 use utils::SubsetIterator;
 
-use super::{Atom, ParamSubstitution, Symbol, TermBuf, TermPath, Truth, try_sym};
+use super::{Atom, ParamSubstitution, SharedTerm, Symbol, TermBuf, TermPath, Truth, try_sym};
 
 /// Upper bound on search nodes visited while matching one commutative operator.
 /// A pathological AC term can't blow up: on exhaustion the matcher returns the
@@ -233,18 +233,27 @@ impl<'a> TermRef<'a> {
     ) -> Vec<(Vec<ParamSubstitution>, TermPath)> {
         let mut result = vec![];
         let mut queue = VecDeque::new();
+        // The path is carried incrementally (parent path + child index) instead
+        // of recomputing it per node via `id()`, which scans siblings up to the
+        // root (O(n²) over the whole term).
         queue.push_back((*self, self.id()));
 
         while let Some((node, pos)) = queue.pop_front() {
-            if let Ok(mapping) = node
-                .try_match_extend(pattern, params.clone())
-                .map_err(|_| trace!(target: "pattern_match", "No match for {pattern} to {node}"))
+            // Cheap head discriminator before the full match: skip nodes whose
+            // root can't match the pattern root anyway. Children are still
+            // enqueued — a match may be nested inside a non-matching node.
+            if head_compatible(pattern, node) &&
+                let Ok(mapping) = node.try_match_extend(pattern, params.clone()).map_err(
+                    |_| trace!(target: "pattern_match", "No match for {pattern} to {node}"),
+                )
             {
-                result.push((mapping, pos));
+                result.push((mapping, pos.clone()));
             }
 
-            for i in node.args_iter() {
-                queue.push_back((i, i.id()));
+            for (idx, child) in node.args_iter().enumerate() {
+                let mut child_path = pos.clone();
+                child_path.0.push(idx);
+                queue.push_back((child, child_path));
             }
         }
         result
@@ -316,7 +325,9 @@ impl<'a> TermRef<'a> {
                     // Non-linear param: a repeated ?p must bind to the same term.
                     ensure!(node.term() == *self, "non-linear param {p} mismatch");
                 } else {
-                    params.params.insert(p.clone(), self.to_owned());
+                    params
+                        .params
+                        .insert(p.clone(), SharedTerm::new(self.to_owned()));
                 }
                 Ok(vec![params])
             }

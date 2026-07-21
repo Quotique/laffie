@@ -1,5 +1,6 @@
 use std::{
-    collections::{HashMap, HashSet},
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap, HashSet},
     error,
     ops::{Index, IndexMut},
     sync::Arc,
@@ -12,6 +13,7 @@ use itertools::Itertools;
 use super::{Goal, Task, TermProps};
 use crate::{
     CompactString,
+    rule::Level,
     term::{Atom, SharedTerm, Term, TermBuf, TermMut, match_term},
 };
 
@@ -54,6 +56,11 @@ pub struct Solution {
     pub terms:            Vec<TermProps>,
     pub find_bindings:    HashMap<TermBuf, TermIdx>,
     unproven_terms_count: usize,
+
+    /// Min-heap of proven, pickable terms keyed by `(level, id)` so that
+    /// `pick_next` is O(log n) instead of a full scan. Holds stale entries
+    /// (replaced terms, superseded levels) that are discarded lazily on peek.
+    agenda: BinaryHeap<Reverse<(Level, TermIdx)>>,
 }
 
 impl Solution {
@@ -85,6 +92,7 @@ impl Solution {
             find_bindings: Default::default(),
             status: Default::default(),
             unproven_terms_count: Default::default(),
+            agenda: Default::default(),
         };
         let known = collect_known_set(&solution.task.givens);
         let conditions = solution.task.givens.clone();
@@ -113,8 +121,9 @@ impl Solution {
         }
         let id = self.terms.len();
         term.id = id;
+        term.finalize_proven();
 
-        if !term.inference.is_proven() {
+        if !term.is_proven() {
             self.unproven_terms_count += 1;
             self.terms.push(term);
             return Ok(id);
@@ -130,23 +139,33 @@ impl Solution {
         }
         index.insert(term.term.clone(), id);
 
+        self.agenda.push(Reverse((term.filters.level, id)));
         self.terms.push(term);
         Ok(id)
     }
 
-    pub fn pick_next(&self) -> Option<TermIdx> {
-        self.terms
-            .iter()
-            .filter(|x| x.inference.is_proven())
-            .filter(|x| !x.filters.is_replaced())
-            .min_by_key(|x| x.filters.level)
-            .map(|x| x.id)
+    /// Re-inserts a term into the agenda after its level changed; the previous
+    /// entry is left to be discarded lazily by `pick_next`.
+    pub fn requeue(&mut self, index: TermIdx) {
+        self.agenda
+            .push(Reverse((self.terms[index].filters.level, index)));
+    }
+
+    pub fn pick_next(&mut self) -> Option<TermIdx> {
+        while let Some(&Reverse((level, id))) = self.agenda.peek() {
+            let term = &self.terms[id];
+            if !term.filters.is_replaced() && term.filters.level == level {
+                return Some(id);
+            }
+            self.agenda.pop();
+        }
+        None
     }
 
     pub fn pick_goal_term(&self) -> Option<TermIdx> {
         self.terms
             .iter()
-            .filter(|x| x.inference.is_proven())
+            .filter(|x| x.is_proven())
             .filter(|x| !x.filters.is_replaced() && x.filters.is_goal())
             .min_by_key(|x| x.filters.level)
             .map(|x| x.id)

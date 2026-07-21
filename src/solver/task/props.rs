@@ -41,7 +41,11 @@ pub struct TermProps {
     pub inference: TermInference,
     pub filters:   TermFilters,
 
-    rule: TermAsRule,
+    /// Cached `inference.is_proven()`, fixed by `Solution::add_term`. Valid
+    /// only after the term is added: before that the inference may still
+    /// change.
+    proven: bool,
+    rule:   TermAsRule,
 }
 
 impl From<TermBuf> for TermProps {
@@ -57,6 +61,7 @@ impl From<SharedTerm> for TermProps {
             inference: Default::default(),
             filters:   TermFilters::from(value.symbols()),
             term:      value,
+            proven:    false,
             rule:      Default::default(),
         }
     }
@@ -156,6 +161,16 @@ impl TermAsRule {
 }
 
 impl TermProps {
+    /// Cached provenness. Valid only after `Solution::add_term` has fixed it.
+    pub fn is_proven(&self) -> bool {
+        self.proven
+    }
+
+    /// Recomputes and caches `is_proven` from the (now final) inference.
+    pub fn finalize_proven(&mut self) {
+        self.proven = self.inference.is_proven();
+    }
+
     pub fn rule(&mut self, id: RuleId, level: Level) -> Option<SharedRule> {
         self.rule.get_or_insert(&self.term, id, level).inspect(|r| {
             self.filters.blocked_rules.insert(r.id);

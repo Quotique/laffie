@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
 use crate::{
@@ -52,19 +52,21 @@ impl Hypothesis {
     }
 
     /// Grounds via: bind `==`, then cartesian over `param in set(...)`
-    /// generators, then re-bind `==` per combo.
-    pub fn ground(mut self) -> Vec<GroundedHypothesis> {
+    /// generators, then re-bind `==` per combo. Lazy — the product is walked on
+    /// demand, never fully materialized.
+    pub fn ground(mut self) -> impl Iterator<Item = GroundedHypothesis> {
         self.bind_equality_params();
 
         if self.is_grounded() {
-            return vec![GroundedHypothesis {
+            let gh = GroundedHypothesis {
                 rule:          self.rule,
                 resolution:    self.resolution,
                 params:        self.params,
                 requirements:  self.requirements,
                 blocked_rules: self.blocked_rules,
                 pos:           self.pos,
-            }];
+            };
+            return Either::Left(Some(gh).into_iter());
         }
 
         let generators = self.extract_generators();
@@ -74,10 +76,10 @@ impl Hypothesis {
                 "hypothesis has free params {:?}, no set generator found",
                 self.free_params
             );
-            return vec![];
+            return Either::Left(None.into_iter());
         }
 
-        generators
+        let combos = generators
             .into_iter()
             .map(|(param, elements)| {
                 elements
@@ -86,7 +88,7 @@ impl Hypothesis {
                     .collect::<Vec<_>>()
             })
             .multi_cartesian_product()
-            .filter_map(|combo| {
+            .filter_map(move |combo| {
                 let mut inner = self.clone();
                 inner.substitute_iter(combo);
                 inner.bind_equality_params();
@@ -108,8 +110,8 @@ impl Hypothesis {
                     );
                     None
                 }
-            })
-            .collect()
+            });
+        Either::Right(combos)
     }
 
     /// Normalizes requirements and drops trivially-true ones.
@@ -305,7 +307,7 @@ mod tests {
     #[test]
     fn ground_no_free_params() {
         let h = make_hypothesis(term_with_vars("x == 1"), vec![], vec![]);
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 1);
         assert_eq!(res(&grounded[0]), "x==1");
         assert!(grounded[0].requirements.is_empty());
@@ -320,7 +322,7 @@ mod tests {
             vec![],
             vec![term_with_vars("!(answer in parents)")],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 1);
         assert_eq!(grounded[0].requirements.len(), 1);
         assert_eq!(
@@ -336,7 +338,7 @@ mod tests {
             vec!["d"],
             vec![term_with_params("-6 == d")],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 1);
         assert_eq!(res(&grounded[0]), "x==-6");
         assert!(grounded[0].requirements.is_empty());
@@ -349,7 +351,7 @@ mod tests {
             vec!["d"],
             vec![term_with_params("d == -6")],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 1);
         assert_eq!(res(&grounded[0]), "x==-6");
     }
@@ -361,7 +363,7 @@ mod tests {
             vec!["u"],
             vec![term_with_params("u in set(1, 2)")],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 2);
 
         let mut resolutions: Vec<String> = grounded.iter().map(res).collect();
@@ -379,7 +381,7 @@ mod tests {
                 term_with_params("u in set(1, 2, 3, 6)"),
             ],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 4);
     }
 
@@ -408,7 +410,7 @@ mod tests {
             .arg(TermBuf::param("Q"));
 
         let h = make_hypothesis(resolution, vec!["u", "Q"], vec![in_set, xplus5_eq_q]);
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 1);
         assert_eq!(res(&grounded[0]), "||(x==1, x+5==0)");
         assert!(grounded[0].requirements.is_empty());
@@ -421,7 +423,7 @@ mod tests {
             vec!["d"],
             vec![term_with_params("-6 == d"), term_with_vars("1 != 0")],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 1);
         assert!(grounded[0].requirements.is_empty());
     }
@@ -433,7 +435,7 @@ mod tests {
             vec!["d"],
             vec![term_with_params("-6 == d"), term_with_vars("x != 0")],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 1);
         assert_eq!(grounded[0].requirements.len(), 1);
         assert_eq!(grounded[0].requirements[0].to_string(), "x!=0");
@@ -446,7 +448,7 @@ mod tests {
             vec!["d"],
             vec![term_with_vars("x != 0")],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert!(grounded.is_empty());
     }
 
@@ -457,7 +459,7 @@ mod tests {
             vec!["d"],
             vec![term_with_params("-6 == d"), term_with_params("d != 0")],
         );
-        let grounded = h.ground();
+        let grounded: Vec<_> = h.ground().collect();
         assert_eq!(grounded.len(), 1);
         assert!(grounded[0].requirements.is_empty());
     }

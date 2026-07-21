@@ -38,6 +38,9 @@ pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 /// Default wall-clock budget for a solving run (effectively unlimited).
 pub const TIME_LIMIT_DEFAULT: Duration = Duration::from_secs(24 * 60 * 60);
 
+/// How often (in grounded hypotheses) `produce` polls the wall-clock deadline.
+const DEADLINE_CHECK_INTERVAL: usize = 64;
+
 struct SolutionState {
     execution_deadline: usize,
     /// Wall-clock deadline for the whole run.
@@ -141,7 +144,7 @@ impl Solver {
 
     fn try_focus_term(
         &self,
-        solution: &Solution,
+        solution: &mut Solution,
         state: &mut SolutionState,
     ) -> Result<TermIdx, SolveError> {
         let index = solution.pick_next().ok_or(SolveError::NoConditions)?;
@@ -282,6 +285,7 @@ impl Solver {
                     if is_goal && solution.goal.is_transform() {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
                         solution[index].filters.level = self.rules_engine.max_level().next();
+                        solution.requeue(index);
                         break;
                     }
                     added = true;
@@ -293,6 +297,7 @@ impl Solver {
         }
         if !added {
             solution[index].filters.level.increment();
+            solution.requeue(index);
         }
         Ok(())
     }
@@ -306,6 +311,9 @@ impl Solver {
     ) -> Result<Option<TermProps>, SolveError> {
         let is_goal = s[index].filters.is_goal();
         let prove_goal = TermBuf::symbol("prove").arg(s[index].term.as_ref().clone());
+        // Collected up front to release the `&s` borrow before the loop mutates
+        // `s`. The rest is lazy: `resolve_solve_in_hypothesis` and `ground()`
+        // run only for hypotheses actually reached, short-circuiting on proof.
         let raw_hypotheses: Vec<Hypothesis> = HypothesisIterator::new(
             rule.clone(),
             &s[index].term,
@@ -317,32 +325,34 @@ impl Solver {
             },
         )
         .collect();
-        let resolved_hypotheses: Vec<Hypothesis> = raw_hypotheses
-            .into_iter()
-            .map(|mut h| {
-                resolve_parents_in_hypothesis(&mut h, s[index].term.as_ref());
-                h
-            })
-            .filter_map(|h| self.resolve_solve_in_hypothesis(h, s, state))
-            .collect();
-        for hypothesis in resolved_hypotheses
-            .into_iter()
-            .flat_map(|hypothesis| hypothesis.ground())
-        {
-            let is_dub = if is_goal {
-                s.goal_index.contains_key(&hypothesis.resolution)
-            } else {
-                s.main_index.contains_key(&hypothesis.resolution)
-            };
-            if is_dub {
+        let mut grounded_seen = 0usize;
+        for mut h in raw_hypotheses {
+            resolve_parents_in_hypothesis(&mut h, s[index].term.as_ref());
+            let Some(h) = self.resolve_solve_in_hypothesis(h, s, state) else {
                 continue;
+            };
+            for hypothesis in h.ground() {
+                grounded_seen += 1;
+                if grounded_seen.is_multiple_of(DEADLINE_CHECK_INTERVAL) &&
+                    Instant::now() >= state.deadline_at
+                {
+                    return Err(SolveError::TimeDeadline);
+                }
+                let is_dub = if is_goal {
+                    s.goal_index.contains_key(&hypothesis.resolution)
+                } else {
+                    s.main_index.contains_key(&hypothesis.resolution)
+                };
+                if is_dub {
+                    continue;
+                }
+                let props = self.try_prove_hypothesis(index, s, hypothesis, state);
+                if props.inference.is_proven() {
+                    return Ok(Some(props));
+                }
+                // TODO: option to disable
+                s.add_term(props)?;
             }
-            let props = self.try_prove_hypothesis(index, s, hypothesis, state);
-            if props.inference.is_proven() {
-                return Ok(Some(props));
-            }
-            // TODO: option to disable
-            s.add_term(props)?;
         }
         Ok(None)
     }
@@ -574,7 +584,7 @@ impl Solver {
                         parent
                             .terms
                             .iter()
-                            .filter(|x| x.inference.is_proven())
+                            .filter(|x| x.is_proven())
                             .filter(|x| {
                                 !(x.filters.is_goal() ||
                                     x.term.term().data().is_symbol_name("answer"))
@@ -667,7 +677,7 @@ impl Solver {
                         solution
                             .terms
                             .iter()
-                            .filter(|x| x.inference.is_proven())
+                            .filter(|x| x.is_proven())
                             .filter(|x| {
                                 !(x.filters.is_goal() ||
                                     x.term.term().data().is_symbol_name("answer"))
@@ -885,7 +895,7 @@ impl Solver {
         // A candidate with unresolved requirements is not a proof — accepting it
         // would close circular hypotheses (e.g. `[x^2=a] => x^2=a`) where a
         // rule's own resolution proves its own requirement.
-        if !term.inference.is_proven() {
+        if !term.is_proven() {
             return false;
         }
 
@@ -914,11 +924,7 @@ impl Solver {
         };
 
         if solution[index].filters.level >= self.rules_engine.max_level() {
-            let mut iter = solution
-                .terms
-                .iter()
-                .rev()
-                .filter(|x| x.inference.is_proven());
+            let mut iter = solution.terms.iter().rev().filter(|x| x.is_proven());
             let res = iter.find(|x| x.filters.is_goal()).map(|x| x.id).unwrap();
             // TODO: надо заполнить правильно
             // согласовать с выводом решения по шагам
@@ -1119,7 +1125,7 @@ mod resolve_solve_tests {
     };
 
     use crate::{
-        rule::{Hypothesis, RulesEngine, parse_rule},
+        rule::{Hypothesis, RulesEngine, SharedRule, parse_rule},
         task::{Solution, Solver, TracerHub, parse_task},
         term::{ParamSubstitution, TermBuf, TermPath, term_with_vars},
     };
@@ -1167,5 +1173,47 @@ mod resolve_solve_tests {
             .expect("hypothesis dropped");
 
         assert_eq!(resolved.resolution, term_with_vars("x == 1 && y == 2"));
+    }
+
+    /// A `produce` call grounding many hypotheses past the deadline must bail
+    /// out with `TimeDeadline` instead of walking the whole product.
+    #[test]
+    fn produce_aborts_on_deadline() {
+        use crate::task::{SolveError, TermProps};
+
+        let solver = Solver::new(Arc::new(RulesEngine::default()));
+        let mut solution = Solution::new(parse_task("task { goal find(z); }"));
+        // Focus term for the rule, plus a term equal to every grounding's
+        // resolution so each hypothesis is a duplicate and the loop keeps going.
+        let index = solution
+            .add_term(TermProps::from(term_with_vars("y + 1")))
+            .unwrap();
+        solution
+            .add_term(TermProps::from(term_with_vars("y == 1")))
+            .unwrap();
+
+        // Free `p` over a 70-element set → 70 groundings (all `y == 1`).
+        let elems = (1..=70)
+            .map(|n| n.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let rule_src: &'static str = Box::leak(
+            format!("rule {{ attr level(0); a + b => a == b; p in set({elems}); }}")
+                .into_boxed_str(),
+        );
+        let rule: SharedRule = Arc::new(parse_rule(rule_src));
+
+        let mut state = SolutionState {
+            execution_deadline: usize::MAX,
+            deadline_at:        Instant::now() - Duration::from_secs(1),
+            cycle_counter:      0,
+            cache:              Default::default(),
+            tracer:             TracerHub::default(),
+        };
+
+        let err = solver
+            .produce(&rule, &mut solution, &mut state, index)
+            .expect_err("produce should abort on a passed deadline");
+        assert!(matches!(err, SolveError::TimeDeadline));
     }
 }

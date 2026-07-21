@@ -123,7 +123,7 @@ impl<'a> Substitute for TermMut<'a> {
         match self.data().clone() {
             Atom::Param(p) => {
                 if let Some(p) = params.params.get(&p) {
-                    self.swap(&mut p.clone().term_mut());
+                    self.swap(&mut p.as_ref().clone().term_mut());
                 }
             }
             Atom::ArgList(p) => {

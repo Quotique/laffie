@@ -52,7 +52,7 @@ impl From<SharedSolution> for Steps {
                 .iter()
                 .rev()
                 .enumerate()
-                .filter(|(_, x)| x.inference.is_proven())
+                .filter(|(_, x)| x.is_proven())
                 .map(|(n, _)| n)
                 .collect(),
         };
