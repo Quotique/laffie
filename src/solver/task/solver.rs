@@ -4,6 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use indexmap::IndexMap;
 use itertools::Itertools;
 
 use super::{
@@ -49,7 +50,7 @@ struct SolutionState {
 pub struct Solver {
     rules_engine: Arc<RulesEngine>,
 
-    local_rules: Vec<SharedRule>,
+    local_rules: IndexMap<RuleId, SharedRule>,
 }
 
 impl Solver {
@@ -62,7 +63,7 @@ impl Solver {
     pub fn new(rules: Arc<RulesEngine>) -> Solver {
         Solver {
             rules_engine: rules.clone(),
-            local_rules:  vec![],
+            local_rules:  IndexMap::new(),
         }
     }
 
@@ -156,7 +157,7 @@ impl Solver {
             solution[index]
         );
 
-        let local_levels = self.local_rules.iter().map(|x| x.level);
+        let local_levels = self.local_rules.values().map(|x| x.level);
         let max_local = local_levels.max().unwrap_or(0.into());
         if level > std::cmp::max(max_local, self.rules_engine.max_level()).next() {
             return Err(SolveError::NoSolutionsFound);
@@ -214,8 +215,7 @@ impl Solver {
             RuleId::new(0x80_00_00_00_00_00_00_00, self.local_rules.len() as u64 + 1),
             level.next(),
         ) {
-            // TODO: check dups
-            self.local_rules.push(r);
+            self.local_rules.entry(r.id).or_insert(r);
         }
     }
 
@@ -230,8 +230,9 @@ impl Solver {
             return vec![];
         }
 
-        let local_rules = self.local_rules.iter().unique();
-        let local_rules = local_rules
+        let local_rules = self
+            .local_rules
+            .values()
             .filter(|rule| rule.try_filter(&term.filters, &goal_term.term).is_ok())
             .cloned();
         let rules = self
