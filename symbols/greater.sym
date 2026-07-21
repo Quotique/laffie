@@ -1,3 +1,97 @@
 symbol > {
     attr infix(400),display(">");
 }
+
+// Правила доказательства неравенств (см. doc/ru/inequalities.md).
+// `<=>` (Equivalence) применяется в одну сторону pattern→resolution, но
+// пускается к goal-терму prove — оттого обязано быть истинной эквивалентностью.
+// `=>` — только forward на не-goal термах. Правило лежит в файле корня паттерна.
+
+// Квадрат строго больше любого отрицательного числа.
+rule {
+    attr level(1),goal(prove(x));
+
+    a^2 > b <=> true;
+
+    b < 0;
+}
+
+// x^2 + c > b при b - c < 0. Специфично для `a^2 + c`: общий перенос
+// `a + c > b <=> a > b - c` взрывал sqrt-поиск на ОДЗ (см. doc).
+rule {
+    attr level(1),goal(prove(x));
+
+    a^2 + c > b <=> true;
+
+    c is known,
+    b - c < 0;
+}
+
+// Квадрат ненулевого положителен.
+rule {
+    attr level(2),goal(prove(x));
+
+    a^2 > 0 <=> a != 0;
+}
+
+// Ослабление границы: из a > b следует цель a > c при b >= c.
+rule {
+    attr level(1),goal(prove(a > c));
+
+    a > b => a > c;
+
+    b >= c,
+    !symbolic_eq(b, c);
+}
+
+// Нестрогое следствие строгого (те же операнды) — нужно для транзитивности.
+rule {
+    attr level(1),goal(prove(a >= b));
+
+    a > b => a >= b;
+}
+
+// Нестрогое следствие строгого с ослаблением границы.
+rule {
+    attr level(1),goal(prove(a >= c));
+
+    a > b => a >= c;
+
+    b >= c;
+}
+
+// Сумма оценок: из a > b и c > e - b следует a + c > e.
+rule {
+    attr level(2),goal(prove(a + c > e));
+
+    a > b => a + c > e;
+
+    c > e - b;
+}
+
+// Нестрогая сумма из строгой посылки.
+rule {
+    attr level(2),goal(prove(a + c >= e));
+
+    a > b => a + c >= e;
+
+    c >= e - b;
+}
+
+// Знак произведения: положительное на положительное.
+rule {
+    attr level(2),goal(prove(a * c > 0));
+
+    a > 0 => a * c > 0;
+
+    c > 0;
+}
+
+// Неотрицательность произведения.
+rule {
+    attr level(2),goal(prove(a * c >= 0));
+
+    a > 0 => a * c >= 0;
+
+    c >= 0;
+}

@@ -1,0 +1,28 @@
+// Цели этапов 2+ доказательства неравенств (см. doc/ru/inequalities.md).
+// Решаться на этапе 1 не обязаны — держим как дорожную карту.
+
+// Этап 2: n-арный знаковый анализ сумм.
+task { goal prove(x^2 + y^2 + 1 > 0); }
+task { goal prove(x + y + z > 6);        x > 1; y > 2; z > 3; }
+
+// Этап 2/3: выделение полного квадрата (transform разворачивает (x-1)^2).
+task { goal prove((x-1)^2 + 3 > 2); }
+task { goal prove(x^2 - 2*x + 1 >= 0); }
+
+// Ограничение (а) из doc/ru/inequalities.md: цепочка goal-переписываний.
+task { goal prove(x / y > 0);            x > 0; y > 0; }
+
+// Этап 2: монотонное масштабирование и произведение оценок.
+task { goal prove(x * z > y * z);        x > y; z > 0; }
+task { goal prove(x * y > 6);            x > 2; y > 3; }
+
+// Этап 2: степени и модуль.
+task { goal prove(x^4 >= 0); }
+task { goal prove(x^3 > 0);              x > 0; }
+task { goal prove(abs(x) >= 0); }
+task { goal prove(abs(x) >= x); }
+
+// Этап 3: классика.
+task { goal prove(a^2 + b^2 >= 2*a*b); }
+task { goal prove((a + b)/2 >= sqrt(a*b));       a >= 0; b >= 0; }
+task { goal prove(x + 1/x >= 2);                 x > 0; }

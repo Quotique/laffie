@@ -15,7 +15,7 @@ use super::{
     goal::FindGoal, props::TermInference,
 };
 use crate::{
-    NormLevel,
+    NormLevel, Rational,
     rule::{
         GroundedHypothesis, Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine,
         SharedRule,
@@ -757,6 +757,24 @@ impl Solver {
         index: usize,
     ) -> Result<bool, SolveError> {
         if solution[index].filters.is_goal() {
+            // Prove goal reduced to a trivial truth: solved even with no
+            // non-goal term to focus.
+            if solution.goal.is_prove() &&
+                let Some(i) = solution
+                    .goal_index
+                    .values()
+                    .copied()
+                    .find(|i| {
+                        solution[*i]
+                            .term
+                            .term()
+                            .truth(TruthCtx::new(&solution.known_vars))
+                            .is_true()
+                    })
+            {
+                solution.status = SolutionStatus::Answer(i);
+                return Ok(true);
+            }
             return Ok(false);
         }
         if self.check_answer_term(solution, index)? {
@@ -956,6 +974,12 @@ impl Solver {
                 solution.status = SolutionStatus::Answer(index);
                 return true;
             }
+            // A derived numeric bound (`x > 2`) proves a weaker goal bound
+            // (`x > 0`) on the same expression, even without a syntactic match.
+            if bound_implies(term.term.term(), solution[*i].term.term()) {
+                solution.status = SolutionStatus::Answer(index);
+                return true;
+            }
             if solution[*i]
                 .term
                 .term()
@@ -1031,6 +1055,77 @@ fn resolve_parents_in_hypothesis(hyp: &mut Hypothesis, term: &TermBuf) {
     }
 }
 
+/// A numeric bound on some expression, extracted from a comparison term.
+enum BoundKind {
+    Lower { strict: bool },
+    Upper { strict: bool },
+}
+
+/// Parses a comparison term into (expression, bound kind, numeric bound).
+///
+/// `E > c` / `E >= c` → Lower; `E < c` / `E <= c` → Upper. A number on the
+/// left flips the kind: `c < E` reads as `E > c` → Lower for `E`. Returns
+/// `None` unless exactly one side is a numeric literal.
+fn as_bound<'a>(t: TermRef<'a>) -> Option<(TermRef<'a>, BoundKind, Rational)> {
+    if t.degree() != 2 {
+        return None;
+    }
+    let data = t.data();
+    let strict = if data.is_symbol_name(">") || data.is_symbol_name("<") {
+        true
+    } else if data.is_symbol_name(">=") || data.is_symbol_name("<=") {
+        false
+    } else {
+        return None;
+    };
+    let greaterish = data.is_symbol_name(">") || data.is_symbol_name(">=");
+
+    let lhs = t.first_arg()?;
+    let rhs = t.last_arg()?;
+    if let Some(c) = rhs.data().number() {
+        let kind = if greaterish {
+            BoundKind::Lower { strict }
+        } else {
+            BoundKind::Upper { strict }
+        };
+        Some((lhs, kind, c.clone()))
+    } else if let Some(c) = lhs.data().number() {
+        // A number on the left flips the orientation for the expression `rhs`.
+        let kind = if greaterish {
+            BoundKind::Upper { strict }
+        } else {
+            BoundKind::Lower { strict }
+        };
+        Some((rhs, kind, c.clone()))
+    } else {
+        None
+    }
+}
+
+/// `derived ⇒ goal` for two comparisons over the same expression and numeric
+/// bounds. `x > 2` implies `x > 0`; `x >= 2` implies `x > 0`; `x >= 0` implies
+/// `x >= 0`. Mismatched expressions or bound kinds imply nothing.
+fn bound_implies(derived: TermRef, goal: TermRef) -> bool {
+    let Some((de, dk, dc)) = as_bound(derived) else {
+        return false;
+    };
+    let Some((ge, gk, gc)) = as_bound(goal) else {
+        return false;
+    };
+    if de != ge {
+        return false;
+    }
+    match (dk, gk) {
+        (BoundKind::Lower { strict: ds }, BoundKind::Lower { strict: gs }) => {
+            dc > gc || (dc == gc && (ds || !gs))
+        }
+        (BoundKind::Upper { strict: ds }, BoundKind::Upper { strict: gs }) => {
+            dc < gc || (dc == gc && (ds || !gs))
+        }
+        _ => false,
+    }
+}
+
 /// Matches `solve(...) == Param` (either argument order).
 fn match_solve_eq_param<'a>(req: &'a TermBuf) -> Option<(TermRef<'a>, Param)> {
     let (lhs, rhs) = match_term!(req.term(), "=="(lhs, rhs))?;
@@ -1102,6 +1197,61 @@ mod solution_tests {
             RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
         );
         assert!(solution.answer().is_some());
+    }
+
+    fn prove_solved(src: &'static str) -> bool {
+        let task = parse_task(src);
+        let rules = Arc::new(RulesEngine::default());
+        let mut solver = Solver::new(rules);
+        let solution = solver.solve(
+            task,
+            Default::default(),
+            RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+        );
+        solution.answer().is_some()
+    }
+
+    #[test]
+    fn bound_implies_lower_strict() {
+        // x > 2 proves x > 0.
+        assert!(prove_solved("task { goal prove(x > 0); x > 2; }"));
+    }
+
+    #[test]
+    fn bound_implies_strict_to_nonstrict_equal() {
+        // x > 0 proves x >= 0 (equal bounds, strict implies non-strict).
+        assert!(prove_solved("task { goal prove(x >= 0); x > 0; }"));
+    }
+
+    #[test]
+    fn bound_implies_upper() {
+        // x <= -1 proves x < 0.
+        assert!(prove_solved("task { goal prove(x < 0); x <= -1; }"));
+    }
+
+    #[test]
+    fn bound_implies_number_on_left() {
+        // 0 < x proves x > 0.
+        assert!(prove_solved("task { goal prove(x > 0); 0 < x; }"));
+    }
+
+    #[test]
+    fn bound_implies_rejects_stronger_goal() {
+        // x > 2 does not prove x > 3.
+        assert!(!prove_solved("task { goal prove(x > 3); x > 2; }"));
+    }
+
+    #[test]
+    fn bound_implies_rejects_mismatched_kind() {
+        // x < 5 (upper) does not prove x > 0 (lower).
+        assert!(!prove_solved("task { goal prove(x > 0); x < 5; }"));
+    }
+
+    #[test]
+    fn prove_trivial_truth_without_condition() {
+        // A goal that reduces to a trivial truth is solved even with no
+        // non-goal term to focus (no fictitious witness condition needed).
+        assert!(prove_solved("task { goal prove(1 > 0); }"));
     }
 
     #[test]

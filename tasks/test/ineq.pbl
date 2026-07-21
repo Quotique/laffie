@@ -63,3 +63,23 @@ task {
     x+3 == 0;
 }
 
+// Доказательство неравенств — этап 1 (см. doc/ru/inequalities.md).
+task { goal prove(x^2 >= 0); }
+task { goal prove(x^2 + 1 > 0); }
+task { goal prove(x^2 + 3 > 2); }
+task { goal prove(x^2 > 0);       x != 0; }
+task { goal prove(x > 0);         x > 2; }
+task { goal prove(x >= 0);        x > 2; }
+task { goal prove(x >= 2);        x >= 2; }
+task { goal prove(x > 0);         0 < x; }
+task { goal prove(x < 0);         x < -2; }
+task { goal prove(x <= 0);        x <= -1; }
+task { goal prove(x + y > 3);     x > 2; y > 1; }
+task { goal prove(x + y >= 3);    x >= 2; y >= 1; }
+task { goal prove(x + y > 0);     x > 0; y > 0; }
+task { goal prove(x * y > 0);     x > 0; y > 0; }
+task { goal prove(x * y > 0);     x < 0; y < 0; }
+task { goal prove(x * y >= 0);    x >= 0; y >= 0; }
+task { goal prove(x > z);         x > y; y > z; }
+task { goal prove(1/x > 0);       x > 0; }
+

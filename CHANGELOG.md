@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Inequality proving (stage 1: signs and numeric bounds). Comparison symbols
+  (`>`, `>=`, `<`, `<=`) gained `prove`-gated rules for square axioms
+  (`x^2 >= 0`, `x^2 + 1 > 0`), bound weakening, transitivity, sums of bounds,
+  and product signs. A numeric bound-implication check in the prover's answer
+  step (`bound_implies`) closes goals like `x > 0` from `x > 2` directly,
+  independent of the rule search. See `doc/ru/inequalities.md`.
+
 ### Changed
 - Numbers are now exact rationals (`num::BigRational`) instead of `BigDecimal`.
   Division of numbers always yields a single reduced number, so the ad-hoc
@@ -99,6 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `solve(...)` resolution and polls the wall-clock deadline while walking a
   large product, so a generator over a huge set aborts on the time limit
   instead of hanging
+- A `prove` goal that reduces to a trivial truth (e.g. `x^2 >= 0`) is now
+  solved without any witness condition; previously such goals needed a
+  fictitious `t == 0` term to give the answer check a non-goal term to focus.
 - Commutative / associative-commutative pattern matching is now a lazy
   backtracking search instead of materializing every permutation / partition:
   it prunes incompatible candidates, deduplicates results, and is bounded by a

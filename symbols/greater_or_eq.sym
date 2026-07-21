@@ -1,3 +1,68 @@
 symbol >= {
     attr infix(400),display("≥");
 }
+
+// Правила доказательства неравенств (см. doc/ru/inequalities.md).
+// `<=>` (Equivalence) применяется в одну сторону pattern→resolution, но
+// пускается к goal-терму prove — оттого обязано быть истинной эквивалентностью.
+// `=>` — только forward на не-goal термах. Правило лежит в файле корня паттерна.
+
+// Включая x^2 >= 0 (b == 0 удовлетворяет b <= 0).
+rule {
+    attr level(1),goal(prove(x));
+
+    a^2 >= b <=> true;
+
+    b <= 0;
+}
+
+// x^2 + c >= b при b - c <= 0. Специфично для `a^2 + c` (см. greater.sym).
+rule {
+    attr level(1),goal(prove(x));
+
+    a^2 + c >= b <=> true;
+
+    c is known,
+    b - c <= 0;
+}
+
+rule {
+    attr level(1),goal(prove(a >= c));
+
+    a >= b => a >= c;
+
+    b >= c,
+    !symbolic_eq(b, c);
+}
+
+rule {
+    attr level(1),goal(prove(a > c));
+
+    a >= b => a > c;
+
+    b > c;
+}
+
+rule {
+    attr level(2),goal(prove(a + c >= e));
+
+    a >= b => a + c >= e;
+
+    c >= e - b;
+}
+
+rule {
+    attr level(2),goal(prove(a + c > e));
+
+    a >= b => a + c > e;
+
+    c > e - b;
+}
+
+rule {
+    attr level(2),goal(prove(a * c >= 0));
+
+    a >= 0 => a * c >= 0;
+
+    c >= 0;
+}
