@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   byte-identical (matching the earlier `plus` fix)
 
 ### Added
+- cli: `--check` domain linter. Loads the corpus without solving and reports
+  load errors (parse failures and dangling `block(...)` references) as hard
+  errors, and leaf params within a small edit distance of a real symbol name
+  (a mistyped symbol silently parsed as a param) as warnings; `--strict`
+  promotes warnings to errors. Exits non-zero on errors
 - cli: run history in the DB is now read back as a regression diff. Each run
   is compared against the task's last stored run and the summary reports
   `NEWLY FAILING`, `NEWLY SOLVED`, `ANSWER CHANGED (vs last run)`, and

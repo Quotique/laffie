@@ -14,7 +14,9 @@ pub(crate) use refer::match_term;
 pub use refer::{Term, TermRef};
 pub use refer_mut::TermMut;
 pub use substitution::{ParamSubstitution, Substitute, VariableSubstitution};
-pub use symbol::{Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth, sym, try_sym};
+pub use symbol::{
+    Symbol, SymbolAttr, SymbolAttrValue, SymbolProgram, Truth, sym, symbol_names, try_sym,
+};
 
 #[cfg(test)]
 pub fn term_with_params(text: &'static str) -> TermBuf {

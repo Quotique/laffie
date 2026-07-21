@@ -29,6 +29,11 @@ pub fn try_sym(name: impl AsRef<str>) -> Option<Symbol> {
         .map(|x| Symbol(x.name.clone()))
 }
 
+/// Names of every registered symbol (base + loaded). For tooling; not hot.
+pub fn symbol_names() -> Vec<CompactString> {
+    all_func_symbols().read().keys().cloned().collect()
+}
+
 #[inline]
 pub fn sym(name: impl AsRef<str>) -> Symbol {
     let symbol = all_func_symbols().read()[&CompactString::from(name.as_ref())]

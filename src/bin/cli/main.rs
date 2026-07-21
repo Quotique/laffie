@@ -1,6 +1,7 @@
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::module_inception)]
 
+mod check;
 mod run_diff;
 mod settings;
 
@@ -63,6 +64,15 @@ struct Args {
     /// read-only: the run-vs-last-run diff is still computed and printed.
     #[clap(long)]
     record: bool,
+
+    /// Lint the corpus (parse errors, dangling block refs, suspicious params,
+    /// term roundtrip) instead of solving; exit non-zero on errors.
+    #[clap(long)]
+    check: bool,
+
+    /// With --check, treat warnings as errors.
+    #[clap(long)]
+    strict: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -124,6 +134,10 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+
+    if args.check {
+        return check::run(&rules, &tasks, args.strict);
+    }
 
     // A broken corpus is not a valid run: report every load error and bail out.
     let load_errors: Vec<_> = rules.errors.iter().chain(tasks.errors.iter()).collect();
