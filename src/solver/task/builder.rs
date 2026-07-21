@@ -52,14 +52,22 @@ impl TaskBuilder {
         condition.filters.level = 0.into();
         condition.id = self.conditions.len();
 
-        match &mut condition.inference {
-            TermInference::Rule { parent, .. } => {
-                *parent = *self.term_id_map.get(parent).unwrap();
+        let parent = match &condition.inference {
+            TermInference::Rule { parent, .. } | TermInference::Transform { parent, .. } => {
+                Some(*parent)
             }
-            TermInference::Transform { parent, .. } => {
-                *parent = *self.term_id_map.get(parent).unwrap();
+            TermInference::Condition => None,
+        };
+        if let Some(parent) = parent {
+            match self.term_id_map.get(&parent) {
+                Some(&new_parent) => match &mut condition.inference {
+                    TermInference::Rule { parent, .. } |
+                    TermInference::Transform { parent, .. } => *parent = new_parent,
+                    TermInference::Condition => {}
+                },
+                // Parent wasn't copied into the subtask: keep the term without one.
+                None => condition.inference = TermInference::Condition,
             }
-            _ => {}
         }
         self.conditions.push(condition);
         self

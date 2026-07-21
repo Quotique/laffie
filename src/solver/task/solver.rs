@@ -274,7 +274,7 @@ impl Solver {
             },
             &solution.goal,
         ) {
-            match self.produce(&rule, solution, state, index) {
+            match self.produce(&rule, solution, state, index)? {
                 Some(s) => {
                     trace!("{} => {s}", solution[index]);
                     self.add_term(s, solution, state)?;
@@ -302,7 +302,7 @@ impl Solver {
         s: &mut Solution,
         state: &mut SolutionState,
         index: TermIdx,
-    ) -> Option<TermProps> {
+    ) -> Result<Option<TermProps>, SolveError> {
         let is_goal = s[index].filters.is_goal();
         let prove_goal = TermBuf::symbol("prove").arg(s[index].term.as_ref().clone());
         let raw_hypotheses: Vec<Hypothesis> = HypothesisIterator::new(
@@ -324,28 +324,26 @@ impl Solver {
             })
             .filter_map(|h| self.resolve_solve_in_hypothesis(h, s, state))
             .collect();
-        resolved_hypotheses
+        for hypothesis in resolved_hypotheses
             .into_iter()
             .flat_map(|hypothesis| hypothesis.ground())
-            .filter_map(|hypothesis| {
-                let is_dub = if is_goal {
-                    s.goal_index.contains_key(&hypothesis.resolution)
-                } else {
-                    s.main_index.contains_key(&hypothesis.resolution)
-                };
-                if is_dub {
-                    return None;
-                }
-                let props = self.try_prove_hypothesis(index, s, hypothesis, state);
-                if props.inference.is_proven() {
-                    Some(props)
-                } else {
-                    // TODO: option to disable
-                    s.add_term(props).expect("can't add unproven");
-                    None
-                }
-            })
-            .next()
+        {
+            let is_dub = if is_goal {
+                s.goal_index.contains_key(&hypothesis.resolution)
+            } else {
+                s.main_index.contains_key(&hypothesis.resolution)
+            };
+            if is_dub {
+                continue;
+            }
+            let props = self.try_prove_hypothesis(index, s, hypothesis, state);
+            if props.inference.is_proven() {
+                return Ok(Some(props));
+            }
+            // TODO: option to disable
+            s.add_term(props)?;
+        }
+        Ok(None)
     }
 
     fn try_prove_hypothesis(
@@ -426,10 +424,10 @@ impl Solver {
             // The proven term is itself the answer.
             Truth::True => {
                 let mut trivial_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
-                let idx = trivial_solution
-                    .add_term(TermProps::from(term.clone()))
-                    .expect("failed to add trivial term");
-                trivial_solution.status = SolutionStatus::Answer(idx);
+                trivial_solution.status = match trivial_solution.add_term(TermProps::from(term)) {
+                    Ok(idx) => SolutionStatus::Answer(idx),
+                    Err(e) => SolutionStatus::Err(e),
+                };
                 SharedSolution::new(trivial_solution)
             }
             // Unprovable — fail fast instead of searching.
@@ -513,9 +511,16 @@ impl Solver {
             unimplemented!("subtask recursion");
         }
 
-        let mut subtask_solver = Solver::new(self.rules_engine.clone());
+        let subtask = match Self::subtask(solution, task.clone(), blocked_rules) {
+            Ok(subtask) => subtask,
+            Err(e) => {
+                let sol = Self::errored_subtask(task.term().to_owned(), e);
+                *state.cache.get_mut(&task).unwrap() = sol.clone();
+                return sol;
+            }
+        };
 
-        let subtask = Self::subtask(solution, task.clone(), blocked_rules);
+        let mut subtask_solver = Solver::new(self.rules_engine.clone());
         let mut subtask_solution = Solution::new(subtask);
         subtask_solver.solve_impl(&mut subtask_solution, state);
         let subtask_solution = SharedSolution::new(subtask_solution);
@@ -559,24 +564,37 @@ impl Solver {
         let mut goal_props = TermProps::from(goal);
         goal_props.filters.mark_goal();
 
-        let mut builder = TaskBuilder::default()
+        let task = match TaskBuilder::default()
             .with_goal(goal_props)
-            .expect("can't build solve subtask")
-            .with_level(parent.task.subtask_level + 1)
-            .with_conditions(
-                parent
-                    .terms
-                    .iter()
-                    .filter(|x| x.inference.is_proven())
-                    .filter(|x| {
-                        !(x.filters.is_goal() || x.term.term().data().is_symbol_name("answer"))
-                    })
-                    .cloned(),
-            );
-        for eq in eqs {
-            builder = builder.with_condition(TermProps::from(eq));
-        }
-        let task = builder.build().expect("can't build solve subtask");
+            .map(|builder| {
+                let mut builder = builder
+                    .with_level(parent.task.subtask_level + 1)
+                    .with_conditions(
+                        parent
+                            .terms
+                            .iter()
+                            .filter(|x| x.inference.is_proven())
+                            .filter(|x| {
+                                !(x.filters.is_goal() ||
+                                    x.term.term().data().is_symbol_name("answer"))
+                            })
+                            .cloned(),
+                    );
+                for eq in eqs {
+                    builder = builder.with_condition(TermProps::from(eq));
+                }
+                builder
+            })
+            .and_then(TaskBuilder::build)
+        {
+            Ok(task) => task,
+            Err(e) => {
+                error!("can't build solve subtask: {e}");
+                let sol = Self::errored_subtask(cache_key.clone(), SolveError::Internal);
+                *state.cache.get_mut(&cache_key).unwrap() = sol.clone();
+                return sol;
+            }
+        };
 
         let mut subtask_solver = Solver::new(self.rules_engine.clone());
 
@@ -633,25 +651,43 @@ impl Solver {
         Some(hyp)
     }
 
-    fn subtask(solution: &Solution, task: SharedTerm, blocked_rules: HashSet<RuleId>) -> Task {
+    fn subtask(
+        solution: &Solution,
+        task: SharedTerm,
+        blocked_rules: HashSet<RuleId>,
+    ) -> Result<Task, SolveError> {
         let mut goal = TermProps::from(task.clone());
         goal.filters.blocked_rules = blocked_rules;
         TaskBuilder::default()
             .with_goal(goal)
-            .expect("Can't build subtask")
-            .with_conditions(
-                solution
-                    .terms
-                    .iter()
-                    .filter(|x| x.inference.is_proven())
-                    .filter(|x| {
-                        !(x.filters.is_goal() || x.term.term().data().is_symbol_name("answer"))
-                    })
-                    .cloned(),
-            )
-            .with_level(solution.task.subtask_level + 1)
-            .build()
-            .expect("Can't build subtask")
+            .and_then(|builder| {
+                builder
+                    .with_conditions(
+                        solution
+                            .terms
+                            .iter()
+                            .filter(|x| x.inference.is_proven())
+                            .filter(|x| {
+                                !(x.filters.is_goal() ||
+                                    x.term.term().data().is_symbol_name("answer"))
+                            })
+                            .cloned(),
+                    )
+                    .with_level(solution.task.subtask_level + 1)
+                    .build()
+            })
+            .map_err(|e| {
+                error!("can't build subtask: {e}");
+                SolveError::Internal
+            })
+    }
+
+    /// A subtask solution carrying only an error status, for when the subtask
+    /// could not even be built.
+    fn errored_subtask(goal: TermBuf, e: SolveError) -> SharedSolution {
+        let mut solution = Solution::new(Task::from(TermProps::from(goal)));
+        solution.status = SolutionStatus::Err(e);
+        SharedSolution::new(solution)
     }
 
     fn check_if_answer(

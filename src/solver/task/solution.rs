@@ -29,6 +29,7 @@ pub enum SolveError {
     ExecutionDeadline,
     Canceled,
     TimeDeadline,
+    Internal,
 }
 
 #[derive(Debug, Display, Default, Clone, Copy, Encode, Decode, PartialEq, Eq)]

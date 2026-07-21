@@ -92,6 +92,15 @@ impl DirectoryParser {
             }
         }
 
+        // Rules whose block(...) references never resolved would have panicked
+        // suggest_rules at solve time; surface them as load errors instead.
+        for message in engine.dangling_ids() {
+            errors.push(LoadError {
+                path: self.symbols_path.clone(),
+                message,
+            });
+        }
+
         Ok(LoadReport {
             value: engine,
             errors,
@@ -199,4 +208,41 @@ fn declare_name(block: &Tree) -> Option<&str> {
         .find(|c| c.data().symbol == TOKEN_SYMBOL)
         .and_then(|c| c.front())
         .map(|n| n.data().symbol.as_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+
+    #[test]
+    fn dangling_block_is_a_load_error_not_a_panic() {
+        let dir = std::env::temp_dir().join("laffie_dir_loader_dangling");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("t.sym"),
+            "symbol qq { attr infix(10); }\n\
+             rule {\n\
+                 attr block(nonexistent);\n\
+                 qq(x) => x;\n\
+             }\n",
+        )
+        .unwrap();
+
+        // The block reference never resolves; this used to panic suggest_rules
+        // at solve time. Now it is a load error, and loading itself completes.
+        let report = DirectoryParser::new(&dir, &dir).load_rules().unwrap();
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|e| e.message.contains("nonexistent")),
+            "expected a dangling-block load error, got: {:?}",
+            report.errors.iter().map(|e| &e.message).collect::<Vec<_>>()
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Search-loop panics are now recoverable: a term-stack overflow propagates as
+  `SolveError::StackOverflow`, subtask build failures surface as an errored
+  subtask solution (`SolveError::Internal`), and a subtask condition whose
+  parent was not copied over degrades to a parent-less term
+- A rule whose `block(...)` reference never resolves is reported as a load
+  error (listing the undefined ids) instead of panicking `suggest_rules` at
+  solve time
+
 ### Changed
 - cli: exit with a non-zero code on failure — a rule/task load error, a
   broken config/paths/db, or any wrong answer in the corpus. Unsolved tasks

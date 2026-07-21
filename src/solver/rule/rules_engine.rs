@@ -48,8 +48,6 @@ impl RulesEngine {
     }
 
     pub fn suggest_rules(&self, filters: &TermFilters, goal: &TermBuf) -> Vec<SharedRule> {
-        assert!(self.rule_queue.is_empty());
-
         let empty_level = LevelRules::new();
         let level = self.all_rules.get(&filters.level).unwrap_or(&empty_level);
         let result: Vec<_> = once(&sym("AnySymbol"))
@@ -67,6 +65,25 @@ impl RulesEngine {
             );
         }
         result
+    }
+
+    /// Rules that never resolved their `block(...)` references, described with
+    /// the ids that stayed undefined. Empty once every reference is registered.
+    pub fn dangling_ids(&self) -> Vec<String> {
+        self.rule_queue
+            .iter()
+            .map(|rule| {
+                let missing: Vec<&str> = rule
+                    .attribute(&RuleAttr::Block)
+                    .filter_map(RuleAttrValue::str)
+                    .filter(|x| !self.id_map.contains_key(*x))
+                    .collect();
+                format!(
+                    "rule {rule} references undefined block(s): {}",
+                    missing.join(", ")
+                )
+            })
+            .collect()
     }
 
     fn process_queue(&mut self) {
