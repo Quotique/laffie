@@ -11,7 +11,7 @@ pub const RUNS_PER_TASK_LIMIT: usize = 10;
 
 /// On-disk schema version; bump on any incompatible layout/id/codec change.
 /// [`Db::open`] refuses a file with a different version.
-pub const SCHEMA_VERSION: u64 = 1;
+pub const SCHEMA_VERSION: u64 = 2;
 
 const TASKS: TableDefinition<&[u8; 16], &[u8]> = TableDefinition::new("tasks");
 const RUNS: TableDefinition<&[u8; 24], &[u8]> = TableDefinition::new("runs");

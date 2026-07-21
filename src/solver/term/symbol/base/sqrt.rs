@@ -1,12 +1,11 @@
-use bigdecimal::BigDecimal as Decimal;
-use num::{BigInt, Integer, One, Signed, Zero};
+use num::{BigInt, One, Signed, Zero};
 
 use super::{
     SymbolProgram,
     mul::{extract_numeric_factor, prepend_factor},
 };
 use crate::{
-    NormLevel,
+    NormLevel, Rational,
     term::{Atom, TermBuf, TermMut, TermRef},
 };
 
@@ -29,7 +28,7 @@ pub fn sqrt(root: &mut TermMut, _: NormLevel) -> bool {
 
     let last = root.pop_last_arg().unwrap();
     if let Atom::Number(d) = &last.data() &&
-        d >= &Decimal::from(0) &&
+        !d.is_negative() &&
         let Some(simplified) = simplify_sqrt_number(d)
     {
         *root.data_mut() = Atom::Number(simplified);
@@ -39,7 +38,7 @@ pub fn sqrt(root: &mut TermMut, _: NormLevel) -> bool {
     if let Some((p, new_arg)) = factor_sqrt_product(last.term()) {
         let sqrt_term = TermBuf::symbol("sqrt").arg(new_arg);
         // Left for the normalization fixpoint to finish.
-        let mut product = TermBuf::symbol("*").arg(TermBuf::number(p)).arg(sqrt_term);
+        let mut product = TermBuf::symbol("*").arg(TermBuf::ratio(p)).arg(sqrt_term);
         root.swap(&mut product.term_mut());
         return true;
     }
@@ -49,60 +48,62 @@ pub fn sqrt(root: &mut TermMut, _: NormLevel) -> bool {
     false
 }
 
-/// Returns √n as a Decimal if n is a perfect square.
-fn simplify_sqrt_number(d: &Decimal) -> Option<Decimal> {
-    let (mut m, mut e) = d.as_bigint_and_exponent();
-    if e.is_odd() {
-        m *= 10;
-        e += 1;
+/// Returns √r as a rational if both numerator and denominator are perfect
+/// squares. `None` for a negative `r`; the denominator is always positive.
+fn simplify_sqrt_number(r: &Rational) -> Option<Rational> {
+    if r.numer().is_negative() {
+        return None;
     }
-    let r = m.sqrt();
-    if m == &r * &r {
-        Some(Decimal::new(r, e / 2).normalized())
-    } else {
-        None
-    }
+    // `n.sqrt()` is the floor root; a perfect square satisfies `root^2 == n`.
+    let exact = |n: &BigInt| {
+        let root = n.sqrt();
+        (&root * &root == *n).then_some(root)
+    };
+    Some(Rational::new(exact(r.numer())?, exact(r.denom())?))
 }
 
 /// Pulls the largest square factor `p` out of a `*`-rooted sqrt argument.
 /// The sign of the original numeric child stays inside the returned rest.
-fn factor_sqrt_product(node: TermRef) -> Option<(Decimal, TermBuf)> {
-    let (factor, rest) = extract_numeric_factor(node)?;
-    let (mut m, mut e) = factor.as_bigint_and_exponent();
-    if m.is_zero() {
+fn factor_sqrt_product(node: TermRef) -> Option<(Rational, TermBuf)> {
+    let (c, rest) = extract_numeric_factor(node)?;
+    if c.is_zero() {
         return None;
     }
-    if e.is_odd() {
-        m *= 10;
-        e += 1;
-    }
-    let q = square_free_part(m.clone());
-    if q == m {
+    let (p_num, q_num) = pull_square(c.numer().abs());
+    let (p_den, q_den) = pull_square(c.denom().clone());
+    if p_num.is_one() && p_den.is_one() {
         return None;
     }
-    let p = (&m / &q).sqrt();
+    let extracted = Rational::new(p_num, p_den);
+    let inner_numer = if c.is_negative() { -q_num } else { q_num };
+    let inner_coeff = Rational::new(inner_numer, q_den);
 
-    let new_arg = if q.is_one() {
+    let new_arg = if inner_coeff.is_one() {
         rest
     } else {
-        prepend_factor(TermBuf::number(q), rest)
+        prepend_factor(TermBuf::ratio(inner_coeff), rest)
     };
-    Some((Decimal::new(p, e / 2).normalized(), new_arg))
+    Some((extracted, new_arg))
 }
 
-/// Square-free part of `n`, sign-preserving. Caller recovers the extracted
-/// root via `(n / q).sqrt()`.
-fn square_free_part(mut n: BigInt) -> BigInt {
-    let bound = n.abs().sqrt();
+/// Splits non-negative `n` into `(root, square_free)` with
+/// `n == root^2 * square_free`.
+fn pull_square(n: BigInt) -> (BigInt, BigInt) {
+    if n.is_zero() {
+        return (BigInt::zero(), BigInt::zero());
+    }
+    let mut q = n.clone();
+    let bound = q.sqrt();
     let mut k = BigInt::from(2);
     while k <= bound {
         let sq = &k * &k;
-        while (&n % &sq).is_zero() {
-            n /= &sq;
+        while (&q % &sq).is_zero() {
+            q /= &sq;
         }
         k += 1;
     }
-    n
+    let root = (&n / &q).sqrt();
+    (root, q)
 }
 
 #[cfg(test)]
@@ -115,6 +116,15 @@ mod tests {
         let mut t = term_with_vars("sqrt(4)");
         t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "2");
+    }
+
+    #[test]
+    fn sqrt_of_perfect_square_fraction() {
+        // sqrt(1/4) = 1/2 -> "0.5"
+        let t = TermBuf::symbol("sqrt").arg(TermBuf::ratio(Rational::new(1.into(), 4.into())));
+        let mut t = t;
+        t.term_mut().normalize(NormLevel::Full);
+        assert_eq!(t.term().to_string(), "0.5");
     }
 
     #[test]
@@ -139,23 +149,16 @@ mod tests {
     }
 
     #[test]
-    fn sqrt_of_perfect_square_with_negative_scale() {
-        // (10, -3): odd exponent — parity fix should preserve the value.
-        let mut t =
-            TermBuf::symbol("sqrt").arg(TermBuf::number(Decimal::new(BigInt::from(10), -3)));
+    fn sqrt_of_perfect_square_large() {
+        let mut t = term_with_vars("sqrt(10000)");
         t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "100");
     }
 
     #[test]
-    fn sqrt_factors_with_even_nonzero_scale() {
-        // (4800, 2) == 48: even nonzero exponent should still factor.
-        let arg = TermBuf::symbol("*")
-            .arg(TermBuf::number(Decimal::new(BigInt::from(4800), 2)))
-            .arg(TermBuf::variable("a"));
-        let mut t = TermBuf::symbol("sqrt").arg(arg);
+    fn sqrt_factors_large_coefficient() {
+        let mut t = term_with_vars("sqrt(48*a)");
         t.term_mut().normalize(NormLevel::Full);
-        // sqrt(48a) = 4·sqrt(3a)
         assert_eq!(t.term().to_string(), "4*sqrt(3*a)");
     }
 
@@ -167,17 +170,36 @@ mod tests {
     }
 
     #[test]
-    fn square_free_part_basic() {
-        assert_eq!(square_free_part(BigInt::from(4)), BigInt::from(1));
-        assert_eq!(square_free_part(BigInt::from(12)), BigInt::from(3));
-        assert_eq!(square_free_part(BigInt::from(72)), BigInt::from(2));
-        assert_eq!(square_free_part(BigInt::from(7)), BigInt::from(7));
+    fn sqrt_factors_fraction_coefficient() {
+        // sqrt((9/4)*a) = (3/2)*sqrt(a) -> square factors pulled from both the
+        // numerator and the denominator of the coefficient.
+        let mut t = term_with_vars("sqrt(2.25*a)");
+        t.term_mut().normalize(NormLevel::Full);
+        assert_eq!(t.term().to_string(), "1.5*sqrt(a)");
     }
 
     #[test]
-    fn square_free_part_negative() {
-        assert_eq!(square_free_part(BigInt::from(-4)), BigInt::from(-1));
-        assert_eq!(square_free_part(BigInt::from(-48)), BigInt::from(-3));
-        assert_eq!(square_free_part(BigInt::from(-7)), BigInt::from(-7));
+    fn pull_square_splits() {
+        // n == root^2 * square_free (non-negative input).
+        assert_eq!(
+            pull_square(BigInt::from(4)),
+            (BigInt::from(2), BigInt::from(1))
+        );
+        assert_eq!(
+            pull_square(BigInt::from(12)),
+            (BigInt::from(2), BigInt::from(3))
+        );
+        assert_eq!(
+            pull_square(BigInt::from(48)),
+            (BigInt::from(4), BigInt::from(3))
+        );
+        assert_eq!(
+            pull_square(BigInt::from(72)),
+            (BigInt::from(6), BigInt::from(2))
+        );
+        assert_eq!(
+            pull_square(BigInt::from(7)),
+            (BigInt::from(1), BigInt::from(7))
+        );
     }
 }

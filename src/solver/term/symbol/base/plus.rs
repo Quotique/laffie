@@ -1,10 +1,10 @@
 use std::{cmp::Ordering, collections::HashMap};
 
-use bigdecimal::{BigDecimal as Decimal, One, Zero};
+use num::{One, Zero};
 
 use super::{SymbolProgram, power::power_argument};
 use crate::{
-    NormLevel,
+    NormLevel, Rational,
     term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
 };
 
@@ -31,7 +31,7 @@ pub fn plus(root: &mut TermMut, level: NormLevel) -> bool {
         NormLevel::Off => return false,
         NormLevel::Units => {
             let result = root.iter_mut().fold(false, |acc, mut x| {
-                if x.data().is_number_value(&0.into()) {
+                if x.data().is_number_value(&Rational::zero()) {
                     x.detach();
                     true
                 } else {
@@ -43,7 +43,7 @@ pub fn plus(root: &mut TermMut, level: NormLevel) -> bool {
         NormLevel::ConstFold => {
             let degree = root.degree();
             let (constant, result) = root.iter_mut().enumerate().fold(
-                (Decimal::from(0), false),
+                (Rational::zero(), false),
                 |mut acc, (num, mut x)| {
                     if let Some(d) = x.data().number().cloned() {
                         x.detach();
@@ -82,7 +82,7 @@ pub fn plus(root: &mut TermMut, level: NormLevel) -> bool {
 
     for (mul, dec) in constant_mapping.into_iter() {
         let arg = merge_mul_const(mul, dec);
-        if !arg.data().is_number_value(&Decimal::from(0)) {
+        if !arg.data().is_number_value(&Rational::zero()) {
             root.push_last_arg(arg);
         } else {
             result = true;
@@ -90,7 +90,7 @@ pub fn plus(root: &mut TermMut, level: NormLevel) -> bool {
     }
 
     if root.degree() == 0 {
-        *root.data_mut() = Atom::Number(Decimal::from(0));
+        *root.data_mut() = Atom::Number(Rational::zero());
         result = true;
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
@@ -104,7 +104,7 @@ pub fn plus(root: &mut TermMut, level: NormLevel) -> bool {
 
 fn remove_unused_plus(root: &mut TermMut) -> bool {
     if root.degree() == 0 {
-        *root.data_mut() = Atom::Number(Decimal::from(0));
+        *root.data_mut() = Atom::Number(Rational::zero());
         true
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
@@ -115,21 +115,21 @@ fn remove_unused_plus(root: &mut TermMut) -> bool {
     }
 }
 
-fn attach_constant(root: &mut TermMut, constant: Decimal) {
+fn attach_constant(root: &mut TermMut, constant: Rational) {
     if !constant.is_zero() {
-        root.push_last_arg(TermBuf::number(constant));
+        root.push_last_arg(TermBuf::ratio(constant));
     }
 }
 
-fn merge_mul_const(mut root: TermBuf, d: Decimal) -> TermBuf {
+fn merge_mul_const(mut root: TermBuf, d: Rational) -> TermBuf {
     if d.is_one() {
         return root;
     } else if d.is_zero() {
         return TermBuf::zero();
     }
-    let constant = TermBuf::number(d);
+    let constant = TermBuf::ratio(d);
 
-    if root.data().is_number_value(&Decimal::from(1)) {
+    if root.data().is_number_value(&Rational::one()) {
         return constant;
     }
 
@@ -141,14 +141,14 @@ fn merge_mul_const(mut root: TermBuf, d: Decimal) -> TermBuf {
     }
 }
 
-fn extract_mul_const(root: &mut TermMut) -> Decimal {
+fn extract_mul_const(root: &mut TermMut) -> Rational {
     if let Some(d) = root.data().number() {
         let result = d.clone();
         root.swap(&mut TermBuf::one().term_mut());
         return result;
     }
 
-    let mut constant = Decimal::from(1);
+    let mut constant = Rational::one();
     if !root.data().is_symbol_name("*") {
         return constant;
     }
@@ -176,7 +176,7 @@ fn extract_mul_const(root: &mut TermMut) -> Decimal {
     // });
 
     if root.degree() == 0 {
-        *root.data_mut() = Atom::Number(Decimal::from(1));
+        *root.data_mut() = Atom::Number(Rational::one());
     } else if root.degree() == 1 {
         let mut child = root.pop_first_arg().unwrap();
         root.swap(&mut child.term_mut());
@@ -184,15 +184,15 @@ fn extract_mul_const(root: &mut TermMut) -> Decimal {
     constant
 }
 
-fn cummulative_power(root: TermRef) -> Decimal {
+fn cummulative_power(root: TermRef) -> Rational {
     if root.data().is_symbol_name("^") {
         if let Some(v) = root.last_arg().unwrap().data().number() {
             v.clone()
         } else {
-            Decimal::from(1)
+            Rational::one()
         }
     } else if root.data().is_symbol_name("*") {
-        let mut result = Decimal::from(0);
+        let mut result = Rational::zero();
         for i in root.args_iter() {
             match i.data() {
                 Atom::Number(_) | Atom::ArgList(_) => {}
@@ -200,17 +200,17 @@ fn cummulative_power(root: TermRef) -> Decimal {
                     result += if let Some(v) = i.last_arg().unwrap().data().number() {
                         v.clone()
                     } else {
-                        Decimal::from(1)
+                        Rational::one()
                     };
                 }
                 Atom::Symbol(_) | Atom::Variable(_) | Atom::Param(_) => {
-                    result += Decimal::from(1);
+                    result += Rational::one();
                 }
             }
         }
         result
     } else {
-        Decimal::from(1)
+        Rational::one()
     }
 }
 

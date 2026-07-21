@@ -20,14 +20,14 @@ smartstring = { workspace = true }
 trees = { workspace = true }
 parking_lot = { workspace = true }
 
-bigdecimal = { version = "0.4", features = ["serde"] }
 bincode = "2.0"
 bitflags = "2.9"
 derive_more = { version = "2.0", features = ["full"] }
 indexmap = "2.10"
 multimap = "0.10"
 num = "0.4"
-num-bigint = "0.4"
+num-bigint = { version = "0.4", features = ["serde"] }
+num-rational = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 parser = { path = "../parser" }

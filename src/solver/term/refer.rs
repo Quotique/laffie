@@ -4,11 +4,10 @@ use std::{
     iter::Iterator,
 };
 
-use bigdecimal::BigDecimal;
 use derive_more::{Debug, From};
 use eyre::{Result, bail, ensure};
 use itertools::Itertools;
-use num::Zero;
+use num::{Signed, Zero};
 use serde_derive::Serialize;
 use trees::Node;
 
@@ -17,6 +16,7 @@ use utils::SubsetIterator;
 use super::{
     Atom, ParamSubstitution, SharedTerm, Symbol, TermBuf, TermPath, Truth, TruthCtx, try_sym,
 };
+use crate::{Rational, number_to_string};
 
 /// Upper bound on search nodes visited while matching one commutative operator.
 /// A pathological AC term can't blow up: on exhaustion the matcher returns the
@@ -312,10 +312,10 @@ impl<'a> TermRef<'a> {
                 Ok(result)
             }
             // try map (-1)*param on (-number)
-            (Atom::Symbol(mul), Atom::Number(neg)) if mul == "*" && neg < &BigDecimal::zero() => {
+            (Atom::Symbol(mul), Atom::Number(neg)) if mul == "*" && neg < &Rational::zero() => {
                 TermBuf::symbol("*")
                     .arg(TermBuf::number(-1))
-                    .arg(TermBuf::number(neg.abs()))
+                    .arg(TermBuf::ratio(neg.abs()))
                     .term()
                     .try_match_extend(pattern, params)
             }
@@ -589,7 +589,7 @@ fn head_compatible(pattern: TermRef, candidate: TermRef) -> bool {
         (Atom::Param(_) | Atom::ArgList(_), _) => true,
         (Atom::Symbol(f), Atom::Symbol(g)) => f == g,
         // A `*` pattern may still match a negative number literal ((-1)*|n|).
-        (Atom::Symbol(f), Atom::Number(n)) => f == "*" && n < &BigDecimal::zero(),
+        (Atom::Symbol(f), Atom::Number(n)) => f == "*" && n < &Rational::zero(),
         (Atom::Symbol(_), _) => false,
         (Atom::Number(a), Atom::Number(b)) => a == b,
         (Atom::Number(_), _) => false,
@@ -636,7 +636,7 @@ impl<'a> fmt::Display for TermRef<'a> {
                 .replace("+-", "-");
                 write!(f, "{s}")?
             }
-            Atom::Number(num) => write!(f, "{num}")?,
+            Atom::Number(num) => write!(f, "{}", number_to_string(num))?,
             _ => write!(f, "{}", self.data())?,
         }
 

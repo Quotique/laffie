@@ -9,7 +9,7 @@ use derive_more::{AsRef, Display, From, FromStr, Into};
 use serde_derive::{Deserialize, Serialize};
 
 use super::symbol::Symbol;
-use crate::{CompactString, Decimal, Signed};
+use crate::{CompactString, Rational, Signed, number_to_string};
 
 #[derive(PartialEq, Eq, Hash)]
 #[derive(Ord, PartialOrd)]
@@ -102,7 +102,7 @@ pub enum Atom {
     /// Variable symbol
     Variable(Variable),
     /// Rational constant
-    Number(Decimal),
+    Number(#[serde(with = "crate::rational::serde_str")] Rational),
     /// Can be replaced with list of terms
     ArgList(ArgList),
 }
@@ -125,9 +125,9 @@ impl From<Symbol> for Atom {
     }
 }
 
-impl<T: Into<Decimal>> From<T> for Atom {
-    fn from(value: T) -> Self {
-        Self::Number(value.into())
+impl From<Rational> for Atom {
+    fn from(value: Rational) -> Self {
+        Self::Number(value)
     }
 }
 
@@ -169,7 +169,7 @@ impl Atom {
     ///
     /// returns None if the content is non a constant
     #[inline]
-    pub fn number(&self) -> Option<&Decimal> {
+    pub fn number(&self) -> Option<&Rational> {
         if let Atom::Number(d) = &self {
             return Some(d);
         }
@@ -199,7 +199,7 @@ impl Atom {
 
     #[inline]
     /// Check if content is constant with the value
-    pub fn is_number_value(&self, value: &Decimal) -> bool {
+    pub fn is_number_value(&self, value: &Rational) -> bool {
         if let Atom::Number(num) = &self {
             return num == value;
         }
@@ -245,10 +245,11 @@ impl fmt::Display for Atom {
             Atom::Symbol(s) => write!(f, "{s}"),
             Atom::Param(id) => write!(f, "{id}"),
             Atom::Number(value) => {
+                let s = number_to_string(value);
                 if value.is_negative() {
-                    write!(f, "({value})")
+                    write!(f, "({s})")
                 } else {
-                    write!(f, "{value}")
+                    write!(f, "{s}")
                 }
             }
             Atom::Variable(id) => write!(f, "{id}"),

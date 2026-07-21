@@ -3,11 +3,14 @@
 #[macro_use]
 extern crate log;
 
+mod rational;
 pub mod rule;
 pub mod task;
 pub mod term;
 
-pub use bigdecimal::{BigDecimal as Decimal, Signed};
+pub use num::Signed;
+pub use num_rational::BigRational as Rational;
+pub use rational::{from_decimal_str, number_to_string};
 pub use smartstring::alias::String as CompactString;
 
 /// Depth of term normalization, ordered `Off < Units < ConstFold < Full`.

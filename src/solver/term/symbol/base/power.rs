@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
-use bigdecimal::{BigDecimal as Decimal, One, ToPrimitive, Zero};
-use num::traits::Pow;
+use num::{One, ToPrimitive, Zero, traits::Pow};
 
 use super::SymbolProgram;
 use crate::{
-    NormLevel,
-    term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef, sym},
+    NormLevel, Rational,
+    term::{SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
 };
+
+/// Maximum absolute integer exponent folded eagerly; larger powers are left
+/// unevaluated to keep the numerator/denominator from blowing up.
+const MAX_POWER_EXPONENT: i64 = 128;
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
@@ -27,42 +30,56 @@ pub fn power(root: &mut TermMut, level: NormLevel) -> bool {
         return false;
     }
 
-    match (
-        root.first_arg().unwrap().data().number(),
-        root.last_arg().unwrap().data().number(),
-    ) {
-        (Some(d1), Some(d2)) if level > NormLevel::Units => {
-            if let Some(e) = d2.to_i8() {
-                let (m, exp) = d1.as_bigint_and_exponent();
-                let result = Decimal::new(m.pow(e.unsigned_abs()), exp * (e.abs() as i64));
-                let mut result = TermBuf::number(result);
-                while root.pop_first_arg().is_some() {}
-                if e >= 0 {
-                    root.swap(&mut result.term_mut());
-                } else {
-                    // Reciprocal left for the normalization fixpoint to fold.
-                    *root.data_mut() = Atom::from(sym("/"));
-                    root.push_last_arg(TermBuf::one()).push_last_arg(result);
-                }
+    let base = root.first_arg().unwrap().data().number().cloned();
+    let exp = root.last_arg().unwrap().data().number().cloned();
+    match (base, exp) {
+        (Some(b), Some(e)) if level > NormLevel::Units => match pow_rational(&b, &e) {
+            Some(result) => {
+                root.swap(&mut TermBuf::ratio(result).term_mut());
                 true
-            } else {
-                false
             }
-        }
-        (Some(arg), _) if arg.is_one() => {
+            None => false,
+        },
+        (Some(b), _) if b.is_one() => {
             root.swap(&mut TermBuf::one().term_mut());
             true
         }
-        (_, Some(pow)) if pow.is_zero() => {
+        (_, Some(e)) if e.is_zero() => {
             root.swap(&mut TermBuf::one().term_mut());
             true
         }
-        (_, Some(pow)) if pow.is_one() => {
+        (_, Some(e)) if e.is_one() => {
             let mut arg = root.pop_first_arg().unwrap();
             root.swap(&mut arg.term_mut());
             true
         }
         _ => false,
+    }
+}
+
+/// `base^exp` when `exp` is a bounded integer; `None` for fractional exponents
+/// (left for `sqrt`/other rules), out-of-range exponents, or `0` to a negative
+/// power.
+fn pow_rational(base: &Rational, exp: &Rational) -> Option<Rational> {
+    if !exp.is_integer() {
+        return None;
+    }
+    let e = exp.numer().to_i64()?;
+    if e.abs() > MAX_POWER_EXPONENT {
+        return None;
+    }
+    if e == 0 {
+        return Some(Rational::one());
+    }
+    let n = e.unsigned_abs() as u32;
+    let numer = base.numer().clone().pow(n);
+    let denom = base.denom().clone().pow(n);
+    if e > 0 {
+        Some(Rational::new(numer, denom))
+    } else if numer.is_zero() {
+        None
+    } else {
+        Some(Rational::new(denom, numer))
     }
 }
 

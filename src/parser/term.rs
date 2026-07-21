@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use solver::{
-    Decimal, NormLevel,
+    NormLevel, from_decimal_str,
     term::{ArgList, Atom, Param, Substitute, Term, TermBuf, Variable, try_sym},
 };
 
@@ -72,7 +72,7 @@ impl TermParser {
         if data == ".." {
             self.last_arglist_id += 1;
             Atom::ArgList(ArgList::from(self.last_arglist_id))
-        } else if let Ok(value) = Decimal::from_str(data) {
+        } else if let Some(value) = from_decimal_str(data) {
             Atom::Number(value)
         } else if let Some(symbol) = try_sym(data) {
             Atom::Symbol(symbol)

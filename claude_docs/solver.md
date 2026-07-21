@@ -6,7 +6,8 @@ Core reasoning engine: term representation, rule system, task-solving algorithm.
 
 ```
 src/solver/
-├── lib.rs                    # Exports: rule, task, term. Types: NormLevel (Off/Units/ConstFold/Full), Decimal, CompactString
+├── lib.rs                    # Exports: rule, task, term. Types: NormLevel (Off/Units/ConstFold/Full), Rational (=num::BigRational), CompactString; from_decimal_str, number_to_string
+├── rational.rs               # Rational parsing (decimal literal -> exact ratio) and human-facing rendering (decimal if 2·5-smooth, else p/q)
 ├── rule/
 │   ├── mod.rs                # Re-exports all rule types
 │   ├── rule.rs               # Rule, RuleId, Level, SharedRule, ApplyRule trait
@@ -136,7 +137,7 @@ src/solver/
 | 18 | `Param(CompactString)` | Rule parameter placeholder |
 | 20 | `Variable { name }` | Task variable; known-ness lives in `Solution.known_vars`, checked via `TruthCtx` (not a per-atom flag) |
 | 92 | `ArgList(u64)` | Variadic argument placeholder `..` |
-| 102 | `Atom` | Enum: Symbol, Param, Variable, Number(Decimal), ArgList |
+| 102 | `Atom` | Enum: Symbol, Param, Variable, Number(Rational), ArgList |
 
 ### term/buffer.rs
 | Line | Type | Description |

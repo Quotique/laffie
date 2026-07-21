@@ -30,8 +30,6 @@ use crate::{
     term::{TermMut, term_with_params},
 };
 
-pub const MAX_DEC_CONVERSION_EXP: i64 = 6;
-
 fn compare_numbers(left: TermRef, right: TermRef) -> Option<Ordering> {
     let left_num = left.data().number()?;
     let right_num = right.data().number()?;

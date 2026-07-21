@@ -1,11 +1,9 @@
-use std::{cmp::max, collections::HashMap};
+use std::collections::HashMap;
 
-use bigdecimal::{BigDecimal as Decimal, One, Zero};
-use num::{Signed, integer::gcd};
-use num_bigint::ToBigInt;
+use num::{One, Zero};
 
 use super::{
-    MAX_DEC_CONVERSION_EXP, SymbolProgram,
+    SymbolProgram,
     mul::{extract_numeric_factor, prepend_factor},
 };
 use crate::{
@@ -40,55 +38,36 @@ pub fn divide(root: &mut TermMut, level: NormLevel) -> bool {
             false
         }
         NormLevel::ConstFold | NormLevel::Full => {
-            match (
-                root.first_arg().unwrap().data().number(),
-                root.last_arg().unwrap().data().number(),
-            ) {
-                (Some(d1), Some(d2)) => {
-                    let (num, den) = simplify(d1.clone(), d2.clone());
-                    if let Some(t) = impl_divide(&num, &den) {
-                        root.swap(&mut TermBuf::number(t).term_mut());
-                        true
-                    } else if *d1 != num || *d2 != den {
-                        let num = num * den.signum();
-                        root.first_arg_mut()
-                            .unwrap()
-                            .swap(&mut TermBuf::number(num).term_mut());
-                        *root.last_arg_mut().unwrap().data_mut() = Atom::Number(den.abs());
-                        true
-                    } else {
-                        false
+            let num = root.first_arg().unwrap().data().number().cloned();
+            let den = root.last_arg().unwrap().data().number().cloned();
+            match (num, den) {
+                // Number / Number: rationals are closed under division, so this
+                // always collapses to a single reduced number.
+                (Some(n), Some(d)) => {
+                    if d.is_zero() {
+                        return false;
                     }
+                    root.swap(&mut TermBuf::ratio(n / d).term_mut());
+                    true
                 }
-                (_, Some(d2)) if d2.is_one() => {
+                (_, Some(d)) if d.is_one() => {
                     let mut child = root.pop_first_arg().unwrap();
                     root.swap(&mut child.term_mut());
                     true
                 }
-                (_, Some(d2)) if d2.is_zero() => false,
-                (_, Some(d2)) => {
+                (_, Some(d)) if d.is_zero() => false,
+                // Product / Number: fold the divisor into the product's numeric
+                // coefficient (exact — no leftover denominator).
+                (_, Some(d)) => {
                     let first_owned = root.first_arg().unwrap().to_owned();
                     let Some((c, rest)) = extract_numeric_factor(first_owned.term()) else {
                         return false;
                     };
-                    let (num, den) = simplify(c.clone(), d2.clone());
-                    if num == c && den == *d2 {
-                        return false;
-                    }
-                    let signed_num = num * den.signum();
-                    let den_abs = den.abs();
-
-                    let new_num = if signed_num.is_one() {
+                    let new_c = c / d;
+                    let mut new_root = if new_c.is_one() {
                         rest
                     } else {
-                        prepend_factor(TermBuf::number(signed_num), rest)
-                    };
-                    let mut new_root = if den_abs.is_one() {
-                        new_num
-                    } else {
-                        TermBuf::symbol("/")
-                            .arg(new_num)
-                            .arg(TermBuf::number(den_abs))
+                        prepend_factor(TermBuf::ratio(new_c), rest)
                     };
                     root.swap(&mut new_root.term_mut());
                     true
@@ -99,95 +78,53 @@ pub fn divide(root: &mut TermMut, level: NormLevel) -> bool {
     }
 }
 
-fn simplify(num: Decimal, den: Decimal) -> (Decimal, Decimal) {
-    let (num_m, num_e) = num.into_bigint_and_exponent();
-    let (den_m, den_e) = den.into_bigint_and_exponent();
-
-    let (num_e, den_e) = (num_e - max(num_e, den_e), den_e - max(num_e, den_e));
-    let (num_m, den_m) = (
-        num_m *
-            Decimal::new(10.into(), num_e)
-                .to_bigint()
-                .expect("Unable to get bigint"),
-        den_m *
-            Decimal::new(10.into(), den_e)
-                .to_bigint()
-                .expect("Unable to get bigint"),
-    );
-
-    let g = gcd(num_m.clone(), den_m.clone());
-    (Decimal::from(num_m / g.clone()), Decimal::from(den_m / g))
-}
-
-fn impl_divide(num: &Decimal, den: &Decimal) -> Option<Decimal> {
-    if den.is_zero() {
-        return None;
-    }
-    if den.is_one() {
-        Some(num.clone())
-    } else {
-        let res = (num / den).normalized();
-        let (_, exp) = res.clone().into_bigint_and_exponent();
-        if exp <= MAX_DEC_CONVERSION_EXP {
-            Some(res)
-        } else {
-            None
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::term::symbol::base::calculator_check;
+    use crate::term::term_with_vars;
 
-    #[test]
-    fn derive_test() {
-        assert_eq!(impl_divide(&5.into(), &1.into()), Some(5.into()));
+    /// Runs `divide` once at `level`, asserting its change flag and the result.
+    fn check(source: &'static str, level: NormLevel, changed: bool, expected: &str) {
+        let mut t = term_with_vars(source);
         assert_eq!(
-            impl_divide(&5.into(), &2.into()),
-            Some(Decimal::new(25.into(), 1))
+            divide(&mut t.term_mut(), level),
+            changed,
+            "change flag for {source} at {level:?}"
         );
-        assert_eq!(impl_divide(&1.into(), &3.into()), None);
+        assert_eq!(t.to_string(), expected, "result of {source} at {level:?}");
     }
 
     #[test]
-    fn simplify_test() {
-        assert_eq!(simplify(100.into(), 20.into()), (5.into(), 1.into()));
-
-        assert_eq!(
-            simplify(Decimal::new(35.into(), 1), Decimal::new(14.into(), 1)),
-            (5.into(), 2.into())
-        );
+    fn off_is_noop() {
+        for source in ["2/3", "2/1", "(6*a)/4"] {
+            let rendered = term_with_vars(source).to_string();
+            check(source, NormLevel::Off, false, &rendered);
+        }
     }
 
     #[test]
-    fn simplify_test_negative() {
-        assert_eq!(simplify((-4).into(), 6.into()), ((-2).into(), 3.into()));
-        assert_eq!(simplify(4.into(), (-6).into()), (2.into(), (-3).into()));
-        assert_eq!(
-            simplify((-4).into(), (-6).into()),
-            ((-2).into(), (-3).into())
-        );
+    fn units_only_drops_denominator_one() {
+        check("2/1", NormLevel::Units, true, "2");
+        check("a/1", NormLevel::Units, true, "a");
+        // A non-unit denominator is not folded at `Units`.
+        check("2/3", NormLevel::Units, false, "2/3");
+        check("(6*a)/4", NormLevel::Units, false, "(6*a)/4");
     }
 
+    /// Rationals are exact: a number division collapses to a single reduced
+    /// number (no leftover `/`), and a product over a number folds into the
+    /// coefficient.
     #[test]
-    fn calculator_test() {
-        for (source, level_one, level_all) in [
-            ("2/3", "2/3", "2/3"),
-            ("2/1", "2", "2"),
-            ("a/1", "a", "a"),
-            ("25/35", "25/35", "5 / 7"),
-            ("2.5/3.5", "2.5/3.5", "5 / 7"),
-            ("(-10)/6", "(-10)/6", "(-5)/3"),
-            ("(2*a)/(-2)", "(2*a)/(-2)", "(-1)*a"),
-            ("(6*a)/4", "(6*a)/4", "(3*a)/2"),
-            ("(2*a)/3", "(2*a)/3", "(2*a)/3"),
-            ("(2*a*b)/(-2)", "(2*a*b)/(-2)", "(-1)*a*b"),
-        ] {
-            calculator_check(source, source, divide, NormLevel::Off);
-            calculator_check(source, level_one, divide, NormLevel::Units);
-            calculator_check(source, level_all, divide, NormLevel::Full);
+    fn const_fold_and_full_fold_numbers() {
+        for level in [NormLevel::ConstFold, NormLevel::Full] {
+            check("2/3", level, true, "2/3");
+            check("25/35", level, true, "5/7");
+            check("2.5/3.5", level, true, "5/7");
+            check("(-10)/6", level, true, "-5/3");
+            check("(2*a)/(-2)", level, true, "-a");
+            check("(6*a)/4", level, true, "1.5*a");
+            check("(2*a)/3", level, true, "2/3*a");
+            check("(2*a*b)/(-2)", level, true, "-a*b");
         }
     }
 }

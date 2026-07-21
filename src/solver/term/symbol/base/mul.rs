@@ -1,10 +1,10 @@
 use std::{cmp::Ordering, collections::HashMap};
 
-use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use indexmap::IndexMap;
+use num::{One, Zero};
 
 use crate::{
-    NormLevel,
+    NormLevel, Rational,
     term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
 };
 
@@ -34,13 +34,13 @@ pub fn multiply(root: &mut TermMut, level: NormLevel) -> bool {
         NormLevel::Units => {
             if root
                 .iter()
-                .any(|x| x.data().is_number_value(&Decimal::zero()))
+                .any(|x| x.data().is_number_value(&Rational::zero()))
             {
                 root.swap(&mut TermBuf::zero().term_mut());
                 return true;
             }
             let result = root.iter_mut().fold(false, |acc, mut x| {
-                if x.data().is_number_value(&Decimal::one()) {
+                if x.data().is_number_value(&Rational::one()) {
                     x.detach();
                     true
                 } else {
@@ -83,7 +83,7 @@ pub fn multiply(root: &mut TermMut, level: NormLevel) -> bool {
             for (elem, mut pow) in powers.into_iter() {
                 plus(&mut pow.term_mut(), level);
                 let arg = merge_power(elem, pow);
-                if !arg.data().is_number_value(&Decimal::from(1)) {
+                if !arg.data().is_number_value(&Rational::one()) {
                     root.push_last_arg(arg);
                 }
             }
@@ -105,7 +105,7 @@ pub(super) fn prepend_factor(factor: TermBuf, rest: TermBuf) -> TermBuf {
 
 /// Folds all numeric children of a `*`-rooted term into one factor and
 /// returns it with the remaining product. `None` if no numeric child exists.
-pub(super) fn extract_numeric_factor(node: TermRef) -> Option<(Decimal, TermBuf)> {
+pub(super) fn extract_numeric_factor(node: TermRef) -> Option<(Rational, TermBuf)> {
     if !node.data().is_symbol_name("*") {
         return None;
     }
@@ -118,22 +118,22 @@ pub(super) fn extract_numeric_factor(node: TermRef) -> Option<(Decimal, TermBuf)
     Some((factor, owned))
 }
 
-fn attach_constant(root: &mut TermMut, constant: Decimal) -> bool {
-    if constant == Decimal::zero() {
+fn attach_constant(root: &mut TermMut, constant: Rational) -> bool {
+    if constant == Rational::zero() {
         root.swap(&mut TermBuf::zero().term_mut());
         true
-    } else if constant != Decimal::one() {
-        root.push_first_arg(TermBuf::number(constant));
+    } else if constant != Rational::one() {
+        root.push_first_arg(TermBuf::ratio(constant));
         false
     } else {
         false
     }
 }
 
-fn fold_constant(root: &mut TermMut) -> (Decimal, bool) {
+fn fold_constant(root: &mut TermMut) -> (Rational, bool) {
     root.iter_mut()
         .enumerate()
-        .fold((Decimal::from(1), false), |acc, (num, mut x)| {
+        .fold((Rational::one(), false), |acc, (num, mut x)| {
             if let Some(d) = x.data().clone().number() {
                 x.detach();
                 let res = d.is_one() || num != 0;
@@ -147,7 +147,7 @@ fn fold_constant(root: &mut TermMut) -> (Decimal, bool) {
 fn remove_unused_mul(root: &mut TermMut) -> bool {
     match root.degree() {
         0 => {
-            *root.data_mut() = Atom::Number(Decimal::from(1));
+            *root.data_mut() = Atom::Number(Rational::one());
             true
         }
         1 => {

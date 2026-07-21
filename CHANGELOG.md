@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Numbers are now exact rationals (`num::BigRational`) instead of `BigDecimal`.
+  Division of numbers always yields a single reduced number, so the ad-hoc
+  rational layer (gcd `simplify`, the `MAX_DEC_CONVERSION_EXP` threshold that
+  left some quotients as `/` terms) is gone and a value has one canonical
+  representation (`0.5` and `1/2` no longer differ). Numbers render as a
+  terminating decimal when the denominator is 2·5-smooth, otherwise `p/q`.
+  Some answers change form accordingly (e.g. a parameter solution now prints
+  `2.5 - 0.5*t` rather than `(5 - t)/2`); the value is unchanged. Also fixes a
+  latent bug where a literal fractional exponent (`13^(1/2)`) was truncated to
+  `13^0 = 1`; fractional exponents are now left unevaluated. Persisted number
+  encoding changed, so the DB schema version is bumped (existing databases must
+  be recreated).
 - Task identity and DB persistence hardened. `TaskId` is now `blake3` over the
   canonical **text** rendering of a task's givens and goal (domain
   `laffie:task:v2`) instead of serde-json bytes, so it no longer shifts when

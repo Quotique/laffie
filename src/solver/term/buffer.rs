@@ -1,13 +1,14 @@
 use std::{collections::HashSet, convert::From, fmt, sync::Arc};
 
 use derive_more::From;
+use num::BigInt;
 use serde::{Serialize, Serializer};
 use serde_derive::Deserialize;
 use trees::Tree;
 
 use super::{Atom, Symbol, TermMut, TermRef, sym};
 use crate::{
-    CompactString, Decimal, NormLevel,
+    CompactString, NormLevel, Rational,
     term::{Param, Variable},
 };
 
@@ -43,8 +44,13 @@ impl TermBuf {
     }
 
     #[inline]
-    pub fn number(num: impl Into<Decimal>) -> Self {
-        Self::from(Atom::from(num))
+    pub fn number(num: impl Into<BigInt>) -> Self {
+        Self::from(Atom::Number(Rational::from_integer(num.into())))
+    }
+
+    #[inline]
+    pub fn ratio(value: Rational) -> Self {
+        Self::from(Atom::Number(value))
     }
 
     #[inline]

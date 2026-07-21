@@ -3,7 +3,7 @@ use std::{collections::VecDeque, str::FromStr};
 use bincode::{Decode, Encode, error::DecodeError};
 
 use super::{Atom, TermBuf, TermPath};
-use crate::{CompactString, Decimal, term::try_sym};
+use crate::{CompactString, Rational, term::try_sym};
 
 impl Encode for Atom {
     fn encode<E: bincode::enc::Encoder>(
@@ -59,7 +59,7 @@ impl<Context> Decode<Context> for Atom {
             }
             4 => {
                 let s: String = Decode::decode(decoder)?;
-                Atom::Number(Decimal::from_str(&s).map_err(|e| {
+                Atom::Number(Rational::from_str(&s).map_err(|e| {
                     DecodeError::OtherString(format!("decimal parse error, str: '{s}': err: {e}"))
                 })?)
             }
@@ -132,7 +132,7 @@ mod tests {
     use bincode::config;
 
     use crate::{
-        CompactString, Decimal,
+        CompactString, Rational,
         term::{Atom, TermBuf, sym, term_with_params},
     };
 
@@ -142,7 +142,7 @@ mod tests {
             Atom::from(sym("+")),
             Atom::Param(CompactString::from("a").into()),
             Atom::Variable(CompactString::from("x").into()),
-            Atom::Number(Decimal::from(100)),
+            Atom::Number(Rational::from_integer(100.into())),
             Atom::ArgList(10.into()),
         ] {
             let config = config::standard();

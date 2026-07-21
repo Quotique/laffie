@@ -348,9 +348,16 @@ mod tests {
 
 #[cfg(test)]
 mod operations_tests {
-    use crate::term::{TermBuf, var};
+    use crate::{
+        Rational,
+        term::{TermBuf, var},
+    };
 
     use super::*;
+
+    fn rat(numer: i64, denom: i64) -> TermBuf {
+        TermBuf::ratio(Rational::new(numer.into(), denom.into()))
+    }
 
     #[test]
     fn associative_nesting_remove_test() {
@@ -446,36 +453,24 @@ mod operations_tests {
             TermBuf::symbol("/").arg(var("x")).arg(TermBuf::number(2))
         );
 
-        // 2 / 5 -> 0.4
+        // 2 / 5 -> 2/5 (a single reduced number)
         let mut test_tree = TermBuf::symbol("/")
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(5));
         assert!(test_tree.term_mut().evaluate(NormLevel::Full));
-        assert_eq!(test_tree, TermBuf::number((4, 1)));
+        assert_eq!(test_tree, rat(2, 5));
 
-        // 30 / 45 -> 2/3
+        // 30 / 45 -> 2/3 (rationals close under division; no leftover `/`)
         let mut test_tree = TermBuf::symbol("/")
             .arg(TermBuf::number(30))
             .arg(TermBuf::number(45));
         assert!(test_tree.term_mut().evaluate(NormLevel::Full));
-        assert_eq!(
-            test_tree,
-            TermBuf::symbol("/")
-                .arg(TermBuf::number(2))
-                .arg(TermBuf::number(3))
-        );
+        assert_eq!(test_tree, rat(2, 3));
 
         // 30 / 4.5 -> 20/3
-        let mut test_tree = TermBuf::symbol("/")
-            .arg(TermBuf::number(30))
-            .arg(TermBuf::number((45, 1)));
+        let mut test_tree = TermBuf::symbol("/").arg(TermBuf::number(30)).arg(rat(9, 2));
         assert!(test_tree.term_mut().evaluate(NormLevel::Full));
-        assert_eq!(
-            test_tree,
-            TermBuf::symbol("/")
-                .arg(TermBuf::number(20))
-                .arg(TermBuf::number(3))
-        );
+        assert_eq!(test_tree, rat(20, 3));
     }
 
     #[test]
@@ -489,31 +484,24 @@ mod operations_tests {
         assert!(test_tree.term_mut().normalize(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::number(4));
 
-        // 2 ^ (-2) -> 0.25
+        // 2 ^ (-2) -> 1/4
         let mut test_tree = TermBuf::symbol("^")
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(-2));
         assert!(test_tree.term_mut().normalize(NormLevel::Full));
-        assert_eq!(test_tree, TermBuf::number((25, 2)));
+        assert_eq!(test_tree, rat(1, 4));
 
         // 0.5 ^ (-2) -> 4
-        let mut test_tree = TermBuf::symbol("^")
-            .arg(TermBuf::number((5, 1)))
-            .arg(TermBuf::number(-2));
+        let mut test_tree = TermBuf::symbol("^").arg(rat(1, 2)).arg(TermBuf::number(-2));
         assert!(test_tree.term_mut().normalize(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::number(4));
 
-        // 3 ^ (-2) -> 1/9
+        // 3 ^ (-2) -> 1/9 (a single reduced number)
         let mut test_tree = TermBuf::symbol("^")
             .arg(TermBuf::number(3))
             .arg(TermBuf::number(-2));
         assert!(test_tree.term_mut().normalize(NormLevel::Full));
-        assert_eq!(
-            test_tree,
-            TermBuf::symbol("/")
-                .arg(TermBuf::number(1))
-                .arg(TermBuf::number(9))
-        );
+        assert_eq!(test_tree, rat(1, 9));
     }
 
     #[test]
