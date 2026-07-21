@@ -25,7 +25,7 @@ use crate::{run_diff::RunDiff, settings::Settings};
 #[clap(author, version, about, long_about = None)]
 struct Args {
     /// Sets a custom config file
-    #[clap(short, long, default_value = "./config/local.json")]
+    #[clap(short, long, default_value = "config/cli.yaml")]
     config: PathBuf,
 
     /// Runs only the specified task(s): comma-separated ids or hex prefixes

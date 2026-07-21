@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no longer pollute the history
 
 ### Changed
+- cli: collapsed the near-duplicate `cli_regress` / `cli_slow` / `cli_unsolved`
+  configs into the single canonical `config/cli.yaml`; pick a task set with
+  `-p/--tasks` (e.g. `-p tasks/regress`). The `--config` default now points at
+  `config/cli.yaml` (was a non-existent `local.json`). `config/cli_trace.yaml`
+  stays as the verbose-logging profile
 - Cancellation is now a first-class run control instead of riding on the
   observability `Tracer`: `Solver::solve` takes a `RunControl` bundling the
   cycle budget, wall-clock deadline, and a `CancelToken`, all checked together

@@ -13,6 +13,11 @@ cargo build --release           # Release build
 # Run binaries
 cargo run --release --bin cli -- -c config/cli.yaml
 cargo run --release --bin tui -- -c config/tui.yaml
+
+# Pick a task set with -p/--tasks (one canonical config/cli.yaml):
+cargo run --release --bin cli -- -c config/cli.yaml -p tasks/regress   # regression gate
+cargo run --release --bin cli -- -c config/cli.yaml -p tasks/slow
+cargo run --release --bin cli -- -c config/cli.yaml --check            # lint the corpus
 ```
 
 ## Testing & Linting
@@ -34,7 +39,7 @@ Before `git commit`:
 
 1. **Format**: `cargo +nightly fmt`
 2. **Clippy clean**: `cargo clippy --workspace --release --all-targets -- -D warnings`
-3. **Tests**: `cargo test --workspace --release` + relevant CLI smoke (`config/cli*.yaml`)
+3. **Tests**: `cargo test --workspace --release` + CLI smoke (`cli -c config/cli.yaml -p tasks/regress`)
 4. **File structure**: `pub` → `pub(super)` → private `fn` (top-down within each `.rs`); tests at the end
 5. **Comments**: concise; no doc-essays; Rustdoc in English
 6. **`CHANGELOG.md`**: update `[Unreleased]` section if user-visible change
