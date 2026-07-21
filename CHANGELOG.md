@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `x^3 + 3 > 0` and `x^2 < 30` on `0 <= x < 5`, `x^3 > 0`, `x^4 >= 0` (for
   `x >= 0`), `abs(x) >= 0`, and n-ary sums like `x + y + z > 6`. Estimate
   arithmetic rides in numeric requirements (`b*b <= c`).
+- `<expr> is even` predicate, enabling unconditional even-power lemmas
+  (`x^4 >= 0`, `x^2 + y^2 + 1 > 0`) — an even integer exponent makes the power
+  nonnegative for any base.
 
 ### Changed
 - Numbers are now exact rationals (`num::BigRational`) instead of `BigDecimal`.

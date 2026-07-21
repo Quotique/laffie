@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use num::Integer;
+
 use super::SymbolProgram;
 use crate::term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermRef, Truth, TruthCtx, match_term};
 
@@ -42,6 +44,19 @@ pub fn is(root: TermRef, ctx: TruthCtx) -> Truth {
         Atom::Symbol(s) if s == "variable" && matches!(lhs.data(), Atom::Variable(_)) => {
             Truth::True
         }
+        // Even iff lhs is an even integer literal; a non-integer number is not
+        // even, a symbolic operand is undecidable.
+        Atom::Symbol(s) if s == "even" => match lhs.data().number() {
+            Some(n) if n.is_integer() => {
+                if n.to_integer().is_even() {
+                    Truth::True
+                } else {
+                    Truth::False
+                }
+            }
+            Some(_) => Truth::False,
+            None => Truth::Unknown,
+        },
         _ => Truth::Unknown,
     }
 }
@@ -135,6 +150,30 @@ mod tests {
     #[test]
     fn non_is_term_returns_unknown() {
         let t = term_with_vars("x == 5");
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::Unknown);
+    }
+
+    #[test]
+    fn is_even_true_for_even_integer() {
+        let t = term_with_vars("4 is even");
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::True);
+    }
+
+    #[test]
+    fn is_even_false_for_odd_integer() {
+        let t = term_with_vars("3 is even");
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
+    }
+
+    #[test]
+    fn is_even_false_for_non_integer() {
+        let t = term_with_vars("2.5 is even");
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
+    }
+
+    #[test]
+    fn is_even_unknown_for_symbolic() {
+        let t = term_with_vars("x is even");
         assert_eq!(is(t.term(), TruthCtx::default()), Truth::Unknown);
     }
 }

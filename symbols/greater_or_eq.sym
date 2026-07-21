@@ -82,3 +82,13 @@ rule {
 
     b <= 0;
 }
+
+// Чётная степень неотрицательна безусловно (x^4 >= 0).
+rule {
+    attr level(1),goal(prove(x));
+
+    a^c >= b <=> true;
+
+    c is even,
+    b <= 0;
+}

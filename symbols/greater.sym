@@ -115,3 +115,14 @@ rule {
     d is known,
     b - d < 0;
 }
+
+// Чётная степень плюс остаток, превышающий границу (x^2 + y^2 + 1 > 0):
+// a^c >= 0 при чётном c, значит a^c + d > b при d > b.
+rule {
+    attr level(1),goal(prove(x));
+
+    a^c + d > b <=> true;
+
+    c is even,
+    d > b;
+}
