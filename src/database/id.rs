@@ -6,36 +6,30 @@ use solver::term::TermBuf;
 
 /// Stable, content-addressed identifier of a [`Task`](crate::Task).
 ///
-/// 16 bytes of `blake3` over a domain-separated, canonical encoding of the
-/// task's givens (as a multiset) and goal. Truncating to 128 bits keeps the
-/// keys short while leaving collision probability astronomically low for the
-/// expected scale (~10^5 tasks).
+/// 16 bytes of `blake3` over a domain-separated canonical **text** rendering of
+/// the givens (as a multiset) and goal. Hashing the `Display` form, not serde
+/// bytes, keeps the id stable across serialization refactors.
 pub type TaskId = [u8; 16];
 
-const DOMAIN: &[u8] = b"laffie:task:v1";
+const DOMAIN: &[u8] = b"laffie:task:v2";
 const GOAL_SEP: &[u8] = b"|goal|";
 
-/// Compute the [`TaskId`] for a task with the given conditions and goal.
+/// Compute the [`TaskId`] from a task's conditions and goal.
 ///
-/// Givens are hashed as a multiset: each element is JSON-encoded individually
-/// and the resulting byte strings are sorted before being fed into the hasher.
-/// Reordering the input slice does not change the id.
+/// Givens are hashed as a multiset (each rendered to text, then sorted), so
+/// reordering the input does not change the id.
 pub fn compute_task_id(givens: &[TermBuf], goal: &TermBuf) -> TaskId {
-    let mut sorted_givens: Vec<Vec<u8>> = givens
-        .iter()
-        .map(|t| serde_json::to_vec(t).expect("TermBuf serialization is infallible"))
-        .collect();
+    let mut sorted_givens: Vec<String> = givens.iter().map(|t| t.to_string()).collect();
     sorted_givens.sort();
 
     let mut hasher = blake3::Hasher::new();
     hasher.update(DOMAIN);
     for g in &sorted_givens {
         hasher.update(&(g.len() as u32).to_le_bytes());
-        hasher.update(g);
+        hasher.update(g.as_bytes());
     }
     hasher.update(GOAL_SEP);
-    let goal_bytes = serde_json::to_vec(goal).expect("TermBuf serialization is infallible");
-    hasher.update(&goal_bytes);
+    hasher.update(goal.to_string().as_bytes());
 
     let mut id = [0u8; 16];
     id.copy_from_slice(&hasher.finalize().as_bytes()[..16]);

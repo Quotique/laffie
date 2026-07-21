@@ -44,13 +44,17 @@ Two tables in one file:
 |-------|-----|-------|
 | `tasks` | `TaskId` (`[u8;16]`) | encoded [`Task`](#task) |
 | `runs`  | `TaskId ‖ seq` (`[u8;24]`, BE seq) | encoded [`Run`](#run) |
+| `meta`  | `&str` (`"schema_version"`) | `u64` schema version |
+
+`Db::open` checks `meta` against `SCHEMA_VERSION` and refuses a mismatched or
+pre-versioning (tasks but no marker) file with a clear error.
 
 ### File Map
 
 ```
 src/database/
 ├── lib.rs    # Module wiring + re-exports
-├── id.rs     # TaskId, compute_task_id, id_to_hex / id_from_hex
+├── id.rs     # TaskId, compute_task_id (blake3 over Display text), id_to_hex / id_from_hex
 ├── task.rs   # Task DTO, From<&solver::Task>, From<Task> for solver::Task
 ├── run.rs    # Run, RunStats, Run::from_solution
 ├── trace.rs  # SolutionTrace (mirror), TraceTerm, TraceInference, RuleRef, TraceParams
@@ -63,22 +67,24 @@ src/database/
 `TaskId = [u8; 16]`. Computed by `id::compute_task_id`:
 
 ```
-blake3(b"laffie:task:v1"
-       || (len(g) || g  for g in sort(json(givens)))
+blake3(b"laffie:task:v2"
+       || (len(g) || g  for g in sort(text(givens)))
        || b"|goal|"
-       || json(goal))[..16]
+       || text(goal))[..16]
 ```
 
-Equivalent tasks (same givens-multiset and goal) collapse to the same id;
-`possible_answers` is intentionally outside the hash. Convert to/from
-hex with `id_to_hex` / `id_from_hex`.
+`text(t)` is `t.to_string()` (canonical Display), not serde bytes, so the id is
+stable across serialization refactors. Equivalent tasks (same givens-multiset
+and goal) collapse to the same id; `possible_answers` is intentionally outside
+the hash. Convert to/from hex with `id_to_hex` / `id_from_hex`.
 
 ### Task
 
-`task.rs` — `Task { id, text, group, givens, goal, possible_answers, hidden, created_at }`.
-`From<&solver::task::Task>` computes the id; the inverse (`From<Task> for
-solver::Task`) drops the bottom 64 bits into `solver::Task::id` (display-only
-field on the solver side).
+`task.rs` — `Task { id, name, text, group, givens, goal, possible_answers, hidden, created_at }`.
+`From<&solver::task::Task>` computes the id and carries `name`; the inverse
+(`From<Task> for solver::Task`) restores `name` and sets `solver::Task::id` via
+`solver::task::content_id` (location-independent hash of the terms), not by
+truncating the 128-bit `TaskId`.
 
 ### Run
 

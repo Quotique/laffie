@@ -1,11 +1,6 @@
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
-
 use solver::{
     NormLevel,
-    task::{Task, TaskBuilder, TermProps},
+    task::{Task, TaskBuilder, TermProps, content_id},
 };
 
 use crate::ParserError;
@@ -30,11 +25,7 @@ impl<'a> TaskParser<'a> {
                 msg: "expected 'task'".to_owned(),
             });
         }
-        let mut hasher = DefaultHasher::new();
-        self.syntax_tree.root().hash(&mut hasher);
-        let hash = hasher.finish();
-
-        let mut builder = TaskBuilder::default().with_id(hash);
+        let mut builder = TaskBuilder::default();
 
         for child in self.syntax_tree.iter() {
             match child.data().symbol.as_str() {
@@ -99,11 +90,13 @@ impl<'a> TaskParser<'a> {
                 }
             }
         }
-        builder.build().map_err(|e| ParserError {
+        let mut task = builder.build().map_err(|e| ParserError {
             loc: self.syntax_tree.data().location.clone(),
-
             msg: e.to_string(),
-        })
+        })?;
+        // Content id from the parsed terms, not the syntax tree (location-free).
+        task.id = content_id(&task.givens, &task.goal);
+        Ok(task)
     }
 }
 

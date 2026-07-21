@@ -2,7 +2,7 @@ use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
 
 use solver::{
-    task::{Task as SolverTask, TermProps},
+    task::{Task as SolverTask, TermProps, content_id},
     term::TermBuf,
 };
 
@@ -16,6 +16,9 @@ use crate::id::{TaskId, compute_task_id};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Task {
     pub id:    TaskId,
+    /// Task name (`.pbl` `id "..."`), empty if unset; preserved across the db.
+    #[serde(default)]
+    pub name:  String,
     pub text:  String,
     pub group: String,
 
@@ -38,6 +41,7 @@ impl From<&SolverTask> for Task {
 
         Task {
             id,
+            name: t.name.clone(),
             text: t.text.clone(),
             group: t.group.clone(),
             givens,
@@ -51,15 +55,17 @@ impl From<&SolverTask> for Task {
 
 impl From<Task> for SolverTask {
     fn from(t: Task) -> Self {
+        let givens: Vec<TermProps> = t.givens.into_iter().map(TermProps::from).collect();
+        let goal = TermProps::from(t.goal);
         SolverTask {
-            id:               u64::from_le_bytes(t.id[..8].try_into().expect("id is 16 bytes")),
-            name:             Default::default(),
-            text:             t.text,
-            group:            t.group,
-            givens:           t.givens.into_iter().map(TermProps::from).collect(),
-            goal:             TermProps::from(t.goal),
+            id: content_id(&givens, &goal),
+            name: t.name,
+            text: t.text,
+            group: t.group,
+            givens,
+            goal,
             possible_answers: t.possible_answers,
-            subtask_level:    0,
+            subtask_level: 0,
         }
     }
 }

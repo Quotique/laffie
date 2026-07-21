@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use eyre::{Result, WrapErr};
+use eyre::{Result, WrapErr, bail};
 use redb::{Database, ReadableTable, ReadableTableMetadata, TableDefinition};
 
 use crate::{codec, id::TaskId, run::Run, task::Task};
@@ -9,15 +9,22 @@ use crate::{codec, id::TaskId, run::Run, task::Task};
 /// exceed this, the oldest run for the task is evicted.
 pub const RUNS_PER_TASK_LIMIT: usize = 10;
 
+/// On-disk schema version; bump on any incompatible layout/id/codec change.
+/// [`Db::open`] refuses a file with a different version.
+pub const SCHEMA_VERSION: u64 = 1;
+
 const TASKS: TableDefinition<&[u8; 16], &[u8]> = TableDefinition::new("tasks");
 const RUNS: TableDefinition<&[u8; 24], &[u8]> = TableDefinition::new("runs");
+const META: TableDefinition<&str, u64> = TableDefinition::new("meta");
+const SCHEMA_KEY: &str = "schema_version";
 
 pub struct Db {
     inner: Database,
 }
 
 impl Db {
-    /// Opens (creating if missing) the database file at `path`.
+    /// Opens (creating if missing) the database file at `path`. Refuses a file
+    /// with a mismatched, or missing-but-non-empty, [`SCHEMA_VERSION`].
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         let inner =
@@ -25,8 +32,35 @@ impl Db {
 
         let tx = inner.begin_write().wrap_err("init: begin_write")?;
         {
-            let _ = tx.open_table(TASKS).wrap_err("init: open tasks table")?;
             let _ = tx.open_table(RUNS).wrap_err("init: open runs table")?;
+            let task_count = tx
+                .open_table(TASKS)
+                .wrap_err("init: open tasks table")?
+                .len();
+            let task_count = task_count.wrap_err("init: tasks len")?;
+
+            let mut meta = tx.open_table(META).wrap_err("init: open meta table")?;
+            let stored = meta
+                .get(SCHEMA_KEY)
+                .wrap_err("init: read version")?
+                .map(|v| v.value());
+            match stored {
+                Some(v) if v == SCHEMA_VERSION => {}
+                Some(v) => bail!(
+                    "db at {} has schema version {v}, expected {SCHEMA_VERSION}; \
+                     back it up and recreate",
+                    path.display()
+                ),
+                None if task_count > 0 => bail!(
+                    "db at {} predates schema versioning (no version marker); \
+                     back it up and recreate",
+                    path.display()
+                ),
+                None => {
+                    meta.insert(SCHEMA_KEY, SCHEMA_VERSION)
+                        .wrap_err("init: write version")?;
+                }
+            }
         }
         tx.commit().wrap_err("init: commit")?;
 
@@ -228,6 +262,7 @@ mod tests {
         let id = compute_task_id(&givens, &goal);
         Task {
             id,
+            name: "sample".into(),
             text: "x>0; find(x)".into(),
             group: "test".into(),
             givens,
@@ -314,6 +349,59 @@ mod tests {
         db.remove_task(task.id).unwrap();
         assert!(db.get_task(task.id).unwrap().is_none());
         assert!(db.runs_of(task.id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn reopen_same_version_succeeds() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db.redb");
+        {
+            let db = Db::open(&path).unwrap();
+            db.put_task(&sample_task()).unwrap();
+        }
+        // Reopening a version-stamped db must succeed and keep the data.
+        let db = Db::open(&path).unwrap();
+        assert_eq!(db.task_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn open_rejects_version_mismatch() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db.redb");
+        {
+            let db = Db::open(&path).unwrap();
+            db.put_task(&sample_task()).unwrap();
+        }
+        // Stamp a foreign version directly, then Db::open must refuse.
+        {
+            let raw = Database::create(&path).unwrap();
+            let tx = raw.begin_write().unwrap();
+            {
+                let mut meta = tx.open_table(META).unwrap();
+                meta.insert(SCHEMA_KEY, SCHEMA_VERSION + 1).unwrap();
+            }
+            tx.commit().unwrap();
+        }
+        assert!(Db::open(&path).is_err());
+    }
+
+    #[test]
+    fn open_rejects_unversioned_db_with_data() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("db.redb");
+        // Simulate a pre-versioning db: a task row but no meta table.
+        {
+            let raw = Database::create(&path).unwrap();
+            let tx = raw.begin_write().unwrap();
+            {
+                let mut t = tx.open_table(TASKS).unwrap();
+                let task = sample_task();
+                t.insert(&task.id, codec::encode(&task).unwrap().as_slice())
+                    .unwrap();
+            }
+            tx.commit().unwrap();
+        }
+        assert!(Db::open(&path).is_err());
     }
 
     #[test]

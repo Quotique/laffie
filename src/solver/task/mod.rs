@@ -7,7 +7,12 @@ mod steps;
 mod tracing;
 
 use crate::term::TermBuf;
-use std::{fmt, iter::Iterator};
+use std::{
+    collections::hash_map::DefaultHasher,
+    fmt,
+    hash::{Hash, Hasher},
+    iter::Iterator,
+};
 
 pub use builder::TaskBuilder;
 pub use goal::Goal;
@@ -65,6 +70,25 @@ impl fmt::Display for Task {
                 .join("\n  "),
         )
     }
+}
+
+/// Content-addressed `u64` id from a task's givens (order-independent) and
+/// goal. Formatting- and location-independent. In-memory dedup key only.
+pub fn content_id(givens: &[TermProps], goal: &TermProps) -> u64 {
+    let mut given_hashes: Vec<u64> = givens
+        .iter()
+        .map(|g| {
+            let mut h = DefaultHasher::new();
+            g.term.hash(&mut h);
+            h.finish()
+        })
+        .collect();
+    given_hashes.sort_unstable();
+
+    let mut h = DefaultHasher::new();
+    given_hashes.hash(&mut h);
+    goal.term.hash(&mut h);
+    h.finish()
 }
 
 #[cfg(test)]

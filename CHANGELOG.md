@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Task identity and DB persistence hardened. `TaskId` is now `blake3` over the
+  canonical **text** rendering of a task's givens and goal (domain
+  `laffie:task:v2`) instead of serde-json bytes, so it no longer shifts when
+  the serialization format changes. The redb file carries a `schema_version`;
+  `Db::open` refuses a file with a different version, or one predating
+  versioning, with a clear error rather than misreading it. **Existing
+  databases are incompatible and must be recreated.** The solver task id is now
+  a location-independent content hash of its terms (was a hash of the syntax
+  tree, so it changed on reformatting), and the DB now stores and restores the
+  task `name` (previously dropped) instead of truncating the 128-bit id into it
+
 ### Fixed
 - Solving is now fully deterministic: `*` multiplication grouped its factors
   in a `HashMap` and iterated it in random order in release builds (the sort
