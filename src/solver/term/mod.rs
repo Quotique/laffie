@@ -2,7 +2,6 @@
 
 mod atom;
 mod buffer;
-mod codec;
 mod refer;
 mod refer_mut;
 mod substitution;

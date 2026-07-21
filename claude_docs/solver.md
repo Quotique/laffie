@@ -33,7 +33,6 @@ src/solver/
     ├── mod.rs                # Re-exports, test helpers: term_with_params(), term_with_vars()
     ├── atom.rs               # Atom enum (Symbol|Param|Variable|Number|ArgList), Param, Variable, ArgList
     ├── buffer.rs             # TermBuf (owned tree), SharedTerm (Arc), TermPath
-    ├── codec.rs              # bincode Encode/Decode for Atom, TermBuf
     ├── refer.rs              # Term trait, TermRef — read-only view, pattern matching, match_term! macro
     ├── refer_mut.rs          # TermMut — mutable view, normalization, evaluate
     ├── substitution.rs       # ParamSubstitution, VariableSubstitution

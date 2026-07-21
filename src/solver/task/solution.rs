@@ -6,7 +6,6 @@ use std::{
     sync::Arc,
 };
 
-use bincode::{Decode, Encode};
 use derive_more::Display;
 use itertools::Itertools;
 
@@ -22,7 +21,7 @@ pub const STACK_SIZE: usize = 2048;
 pub type SharedSolution = Arc<Solution>;
 pub type TermIdx = usize;
 
-#[derive(Debug, Display, Clone, Copy, Encode, Decode, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum SolveError {
     StackOverflow,
     MaxSubtaskLevelExceed,
@@ -34,7 +33,7 @@ pub enum SolveError {
     Internal,
 }
 
-#[derive(Debug, Display, Default, Clone, Copy, Encode, Decode, PartialEq, Eq)]
+#[derive(Debug, Display, Default, Clone, Copy, PartialEq, Eq)]
 pub enum SolutionStatus {
     #[default]
     NotDone,

@@ -1,6 +1,5 @@
 use std::{collections::HashSet, fmt, hash, sync::Arc};
 
-use bincode::{Decode, Encode};
 use derive_more::{Display, From, Into};
 use eyre::Result;
 use itertools::Itertools;
@@ -16,7 +15,6 @@ use crate::{
 #[derive(Clone, Copy, Debug, Default, Display)]
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[derive(From)]
-#[derive(Decode, Encode)]
 pub struct RuleId(u64);
 
 /// Represents the level (or priority) of a rule.
@@ -24,7 +22,6 @@ pub struct RuleId(u64);
 #[derive(Clone, Copy, Debug, Default, Display)]
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[derive(From, Into)]
-#[derive(Decode, Encode)]
 pub struct Level(u64);
 
 /// Reasons why a rule could not be applied.

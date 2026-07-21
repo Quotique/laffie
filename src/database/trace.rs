@@ -38,8 +38,24 @@ pub enum TraceStatus {
     NotDone,
     /// Index into [`SolutionTrace::terms`] holding the answer term.
     Answer(usize),
-    /// `Display` form of [`solver::task::SolveError`].
-    Err(String),
+    Err(TraceError),
+}
+
+/// Serializable mirror of [`solver::task::SolveError`]. `Unknown` is the
+/// forward-compatible fallback: a variant added to `SolveError` later
+/// deserializes here instead of failing to load an older trace.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TraceError {
+    StackOverflow,
+    MaxSubtaskLevelExceed,
+    NoConditions,
+    NoSolutionsFound,
+    ExecutionDeadline,
+    Canceled,
+    TimeDeadline,
+    Internal,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -101,7 +117,22 @@ impl From<SolutionStatus> for TraceStatus {
         match s {
             SolutionStatus::NotDone => Self::NotDone,
             SolutionStatus::Answer(idx) => Self::Answer(idx),
-            SolutionStatus::Err(e) => Self::Err(e.to_string()),
+            SolutionStatus::Err(e) => Self::Err(e.into()),
+        }
+    }
+}
+
+impl From<SolveError> for TraceError {
+    fn from(e: SolveError) -> Self {
+        match e {
+            SolveError::StackOverflow => Self::StackOverflow,
+            SolveError::MaxSubtaskLevelExceed => Self::MaxSubtaskLevelExceed,
+            SolveError::NoConditions => Self::NoConditions,
+            SolveError::NoSolutionsFound => Self::NoSolutionsFound,
+            SolveError::ExecutionDeadline => Self::ExecutionDeadline,
+            SolveError::Canceled => Self::Canceled,
+            SolveError::TimeDeadline => Self::TimeDeadline,
+            SolveError::Internal => Self::Internal,
         }
     }
 }
@@ -112,23 +143,23 @@ impl TraceStatus {
         matches!(self, Self::Answer(_))
     }
 
-    /// Converts back into a [`SolveError`] when the status carries one.
-    /// Loses identity — only `Display` strings are matched — so this is
-    /// strictly best-effort.
+    /// Converts back into a [`SolveError`] when the status carries a known one;
+    /// `None` for a non-error status or an `Unknown` (forward-compat) variant.
     pub fn as_solve_error(&self) -> Option<SolveError> {
-        let Self::Err(s) = self else {
+        let Self::Err(e) = self else {
             return None;
         };
-        match s.as_str() {
-            "StackOverflow" => Some(SolveError::StackOverflow),
-            "MaxSubtaskLevelExceed" => Some(SolveError::MaxSubtaskLevelExceed),
-            "NoConditions" => Some(SolveError::NoConditions),
-            "NoSolutionsFound" => Some(SolveError::NoSolutionsFound),
-            "ExecutionDeadline" => Some(SolveError::ExecutionDeadline),
-            "Canceled" => Some(SolveError::Canceled),
-            "TimeDeadline" => Some(SolveError::TimeDeadline),
-            _ => None,
-        }
+        Some(match e {
+            TraceError::StackOverflow => SolveError::StackOverflow,
+            TraceError::MaxSubtaskLevelExceed => SolveError::MaxSubtaskLevelExceed,
+            TraceError::NoConditions => SolveError::NoConditions,
+            TraceError::NoSolutionsFound => SolveError::NoSolutionsFound,
+            TraceError::ExecutionDeadline => SolveError::ExecutionDeadline,
+            TraceError::Canceled => SolveError::Canceled,
+            TraceError::TimeDeadline => SolveError::TimeDeadline,
+            TraceError::Internal => SolveError::Internal,
+            TraceError::Unknown => return None,
+        })
     }
 }
 
@@ -267,6 +298,23 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let back: RuleRef = serde_json::from_str(&json).unwrap();
         assert_eq!(r, back);
+    }
+
+    #[test]
+    fn trace_error_round_trip_and_solve_error() {
+        let status = TraceStatus::Err(TraceError::StackOverflow);
+        let json = serde_json::to_string(&status).unwrap();
+        let back: TraceStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.as_solve_error(), Some(SolveError::StackOverflow));
+    }
+
+    #[test]
+    fn trace_error_unknown_fallback() {
+        // A variant a newer solver might emit deserializes to `Unknown`
+        // instead of failing to load an older trace.
+        let back: TraceStatus = serde_json::from_str(r#"{"Err":"SomeFutureError"}"#).unwrap();
+        assert!(matches!(back, TraceStatus::Err(TraceError::Unknown)));
+        assert_eq!(back.as_solve_error(), None);
     }
 
     #[test]

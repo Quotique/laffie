@@ -20,7 +20,6 @@ smartstring = { workspace = true }
 trees = { workspace = true }
 parking_lot = { workspace = true }
 
-bincode = "2.0"
 bitflags = "2.9"
 derive_more = { version = "2.0", features = ["full"] }
 indexmap = "2.10"
