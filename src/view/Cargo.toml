@@ -9,13 +9,18 @@ edition.workspace = true
 [lib]
 path = "./lib.rs"
 
+[features]
+default = ["console"]
+console = ["dep:colored"]
+html = ["dep:html-escape"]
+tui = ["dep:ratatui"]
+
 [dependencies]
 solver = { path = "../solver" }
-utils = { path = "../utils" }
 
 eyre = { workspace = true }
 itertools = { workspace = true }
 
-colored = "3"
-html-escape = "0.2"
-ratatui = { version = "0.29", features = ["all-widgets"] }
+colored = { version = "3", optional = true }
+html-escape = { version = "0.2", optional = true }
+ratatui = { version = "0.29", features = ["all-widgets"], optional = true }

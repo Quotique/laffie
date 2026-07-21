@@ -14,7 +14,7 @@ members = [
 exclude = [
     # Archived: requires telegram-bot lib upgrade and rewrite onto new Db API
     # before it can be re-included in the workspace.
-    "src/bin/tgbot",
+    "archive/tgbot",
 ]
 
 [workspace.package]
@@ -33,5 +33,5 @@ serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 smartstring = { version = "1", features = ["serde"] }
-trees = { git = "https://github.com/Quotique/trees.git", branch = "serde", features = ["serde"] }
+trees = { git = "https://github.com/Quotique/trees.git", rev = "d2ad2beb3488b2a256d0129fe24b967c167319a0", features = ["serde"] }
 

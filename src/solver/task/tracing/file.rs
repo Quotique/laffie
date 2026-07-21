@@ -1,7 +1,7 @@
 use std::{fs::File, io::prelude::*, path::Path};
 
 use crate::{
-    rule::{GroundedHypothesis, SharedRule},
+    rule::GroundedHypothesis,
     task::{Solution, Task, TermProps},
     term::SharedTerm,
 };
@@ -53,6 +53,9 @@ impl Tracer for FileDumpTracer {
     }
 
     fn on_subtask_end(&mut self, status: &Solution) {
+        // Balance the push in `on_subtask_start`; the summary closes the block at
+        // the parent indent. Without this the nesting level grew unbounded.
+        self.subtask_start_cycle.pop();
         self.file
             .write_all(
                 format!(
@@ -91,12 +94,6 @@ impl Tracer for FileDumpTracer {
     fn on_term_focus(&mut self, term: &TermProps, _cycle: usize) {
         self.file
             .write_all(format!("{}[> {}\n", self.idention(), term).as_bytes())
-            .expect(WRITE_ERROR_TEXT);
-    }
-
-    fn on_rule_selection(&mut self, rule: SharedRule) {
-        self.file
-            .write_all(format!("{}>> {}\n", self.idention(), rule).as_bytes())
             .expect(WRITE_ERROR_TEXT);
     }
 

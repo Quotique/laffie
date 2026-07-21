@@ -1,9 +1,6 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    str::FromStr,
-};
+use std::{collections::VecDeque, str::FromStr};
 
-use bincode::{BorrowDecode, Decode, Encode, error::DecodeError};
+use bincode::{Decode, Encode, error::DecodeError};
 
 use super::{Atom, TermBuf, TermPath};
 use crate::{CompactString, Decimal, term::try_sym};
@@ -76,84 +73,6 @@ impl<Context> Decode<Context> for Atom {
                 )));
             }
         };
-        Ok(term)
-    }
-}
-
-impl<'de, Context> BorrowDecode<'de, Context> for Atom {
-    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
-        decoder: &mut D,
-    ) -> core::result::Result<Self, bincode::error::DecodeError> {
-        let index: i8 = BorrowDecode::borrow_decode(decoder)?;
-        let term = match index {
-            1 => {
-                let s: String = BorrowDecode::borrow_decode(decoder)?;
-                Atom::from(
-                    try_sym(&s)
-                        .ok_or_else(|| DecodeError::OtherString(format!("bad symbol {s}")))?,
-                )
-            }
-            2 => {
-                let s: String = BorrowDecode::borrow_decode(decoder)?;
-                Atom::Param(CompactString::from(s).into())
-            }
-            3 => {
-                let s: String = BorrowDecode::borrow_decode(decoder)?;
-                Atom::Variable(CompactString::from(s).into())
-            }
-            4 => {
-                let s: String = BorrowDecode::borrow_decode(decoder)?;
-                Atom::Number(Decimal::from_str(&s).map_err(|e| {
-                    DecodeError::OtherString(format!("decimal parse error, str: '{s}': err: {e}"))
-                })?)
-            }
-            5 => {
-                let p: u64 = BorrowDecode::borrow_decode(decoder)?;
-                Atom::ArgList(p.into())
-            }
-            _ => {
-                return Err(DecodeError::OtherString(format!(
-                    "unknown Atom tag: {index}"
-                )));
-            }
-        };
-        Ok(term)
-    }
-}
-
-impl<'de, Context> BorrowDecode<'de, Context> for TermBuf {
-    fn borrow_decode<D: bincode::de::BorrowDecoder<'de>>(
-        decoder: &mut D,
-    ) -> core::result::Result<Self, bincode::error::DecodeError> {
-        let parent_no: isize = Decode::decode(decoder)?;
-        if parent_no != -1 {
-            return Err(DecodeError::OtherString(
-                "root element must be first".into(),
-            ));
-        }
-        let data: Atom = Decode::decode(decoder)?;
-        let mut term = TermBuf::from(data);
-        let mut id_map: HashMap<isize, TermPath> =
-            FromIterator::from_iter(vec![(0, term.term().id())]);
-
-        for num in 1.. {
-            let parent_no: isize = Decode::decode(decoder)?;
-            if parent_no == -2 {
-                break;
-            }
-            let parent_id = id_map.get(&parent_no).expect("parent must be first");
-
-            let data: Atom = Decode::decode(decoder)?;
-            id_map.insert(
-                num,
-                term.get_mut(parent_id)
-                    .unwrap()
-                    .push_last_arg(TermBuf::from(data))
-                    .last_arg()
-                    .unwrap()
-                    .id(),
-            );
-        }
         Ok(term)
     }
 }

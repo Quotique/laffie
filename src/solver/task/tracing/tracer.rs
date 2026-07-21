@@ -1,5 +1,5 @@
 use crate::{
-    rule::{GroundedHypothesis, SharedRule},
+    rule::GroundedHypothesis,
     task::{Solution, Task, TermInference, TermProps},
     term::SharedTerm,
 };
@@ -18,9 +18,6 @@ pub trait Tracer: Send + Sync {
 
     // Called on each solution cycle iteration with picked term argument
     fn on_term_focus(&mut self, _term: &TermProps, _cycle: usize) {}
-
-    // Called on each attempt to apply rule
-    fn on_rule_selection(&mut self, _rule: SharedRule) {}
 
     // Called on each new hypothesis
     fn on_new_hypothesis(
@@ -86,12 +83,6 @@ impl Tracer for TracerHub {
     fn on_term_focus(&mut self, term: &TermProps, cycle: usize) {
         for i in self.tracers.iter_mut() {
             i.on_term_focus(term, cycle);
-        }
-    }
-
-    fn on_rule_selection(&mut self, rule: SharedRule) {
-        for i in self.tracers.iter_mut() {
-            i.on_rule_selection(rule.clone());
         }
     }
 

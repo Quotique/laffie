@@ -91,7 +91,7 @@ src/bin/tui/
 
 ---
 
-## Telegram Bot (`src/bin/tgbot/`) — **archived**
+## Telegram Bot (`archive/tgbot/`) — **archived**
 
 Excluded from `[workspace.members]`; not built by `cargo build --workspace`.
 Reviving requires a `telegram-bot` crate upgrade and a rewrite onto the new

@@ -77,7 +77,7 @@ Laffie is a **symbolic mathematical problem solver** — a rule-based reasoning 
 - **utils** — Structured logging (`slog`) and helper utilities
 - **cli**, **tui** — Binary applications
 
-> `src/bin/tgbot/` is archived (excluded from the workspace). Reviving it requires a `telegram-bot` crate upgrade and a rewrite onto the new `Db` API.
+> `archive/tgbot/` is archived (excluded from the workspace). Reviving it requires a `telegram-bot` crate upgrade and a rewrite onto the new `Db` API.
 
 ### Core Data Flow
 
