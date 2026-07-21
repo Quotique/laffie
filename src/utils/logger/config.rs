@@ -54,24 +54,29 @@ impl Config {
             self.target_levels.iter().map(|(x, y)| (x.clone(), y.0)),
         );
 
-        let drain = slog_term::FullFormat::new(slog_term::PlainDecorator::new(file))
+        let fmt = slog_term::FullFormat::new(slog_term::PlainDecorator::new(file))
             .use_custom_header_print(print_msg_header)
             .use_custom_timestamp(system_time_write)
             .use_file_location()
             .build()
+            .fuse();
+
+        let async_drain = Async::new(fmt)
+            .chan_size(self.channel_size)
+            .overflow_strategy(OverflowStrategy::Block)
+            .build()
+            .fuse();
+
+        // Filter ahead of the async drain: a suppressed record is dropped on the
+        // logging thread and never gets serialized into an owned record nor
+        // pushed onto the (blocking) channel.
+        let drain = async_drain
             .filter(Box::new(move |record: &Record| -> bool {
                 f.filter(record.module(), record.level())
             }))
             .fuse();
 
-        let guard = slog_scope::set_global_logger(slog::Logger::root(
-            Async::new(drain)
-                .chan_size(self.channel_size)
-                .overflow_strategy(OverflowStrategy::Block)
-                .build()
-                .fuse(),
-            o!(),
-        ));
+        let guard = slog_scope::set_global_logger(slog::Logger::root(drain, o!()));
         slog_stdlog::init().unwrap();
 
         log::info!(target: "init", "Log initialized with params: {self:?}");

@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Logging no longer stalls the solver: the level filter now runs ahead of the
+  async drain, so a suppressed record (e.g. a hot-loop `trace!` at the default
+  `Info` level) is dropped on the logging thread instead of being serialized
+  into an owned record and blocked on the full log channel. A regress run at
+  `Info` drops from ~85s to ~7s
 - A rule with more than one `solve(...) == Param` requirement now binds every
   parameter: bindings are accumulated and applied in a single substitution
   instead of keeping only the last, which left the earlier params free and
