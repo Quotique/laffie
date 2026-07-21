@@ -4,15 +4,30 @@ use std::{
 };
 
 use itertools::Itertools;
-use trees::Tree;
 
 use solver::{
     rule::RulesEngine,
     task::Task,
-    term::{Symbol, SymbolProgram},
+    term::{Symbol, try_sym},
 };
 
-use crate::{NodeData, RuleParser, SymbolParser, TaskParser, lang};
+use crate::{
+    ParserError, RuleParser, SymbolParser, TaskParser, Tree,
+    grammar::{TOKEN_DECLARE, TOKEN_RULE, TOKEN_SYMBOL, TOKEN_TASK},
+    lang,
+};
+
+/// Parsed value plus every non-fatal error collected during a directory load.
+pub struct LoadReport<T> {
+    pub value:  T,
+    pub errors: Vec<LoadError>,
+}
+
+/// A non-fatal load failure; `message` carries the source location and snippet.
+pub struct LoadError {
+    pub path:    PathBuf,
+    pub message: String,
+}
 
 pub struct DirectoryParser {
     symbols_path: PathBuf,
@@ -27,40 +42,72 @@ impl DirectoryParser {
         }
     }
 
-    pub fn load_rules(&self) -> io::Result<RulesEngine> {
+    pub fn load_rules(&self) -> io::Result<LoadReport<RulesEngine>> {
         info!(target: "init", "Reading rules: {:?}", self.symbols_path);
 
-        self.load_symbols()?;
+        let (files, mut errors) = Self::gather(&self.symbols_path, &["sym"])?;
 
-        let mut result = RulesEngine::default();
-        let mut last_sym: Option<Symbol> = None;
-
-        Self::load_dir(
-            &self.symbols_path,
-            &["sym"],
-            &mut |path, src, s: &Tree<NodeData>| {
-                if let Ok(sym) = SymbolParser::from(s).parse() {
-                    let sym = SymbolProgram::register(sym);
-                    last_sym.replace(sym);
-                } else if let Ok(rules) = RuleParser::from(s)
-                    .with_func_symbol(last_sym.as_ref().unwrap().clone())
-                    .parse()
-                    .map_err(|e| error!("Rule not parsed: {}", e.error_string(src, Some(path))))
-                {
-                    for rule in rules {
-                        result.register_rule(rule);
-                    }
+        // Pass 1: register every symbol so rules can resolve any of them; the
+        // symbol's Python runs here, once.
+        for file in &files {
+            for block in &file.blocks {
+                if block.data().symbol != TOKEN_DECLARE {
+                    continue;
                 }
-            },
-        )?;
-        Ok(result)
+                match SymbolParser::from(block).parse() {
+                    Ok(program) => {
+                        program.register();
+                    }
+                    Err(e) => errors.push(file.error(&e)),
+                }
+            }
+        }
+
+        // Pass 2: parse rules, each attached to the most recent symbol in its
+        // file. Symbols are looked up, not re-parsed (no double Python).
+        let mut engine = RulesEngine::default();
+        for file in &files {
+            let mut last_sym: Option<Symbol> = None;
+            for block in &file.blocks {
+                match block.data().symbol.as_str() {
+                    TOKEN_DECLARE => last_sym = declare_name(block).and_then(try_sym),
+                    TOKEN_RULE => {
+                        let Some(func_symbol) = last_sym.clone() else {
+                            errors.push(file.error(&ParserError {
+                                loc: block.data().location.clone(),
+                                msg: "rule appears before any symbol declaration".to_owned(),
+                            }));
+                            continue;
+                        };
+                        match RuleParser::from(block)
+                            .with_func_symbol(func_symbol)
+                            .parse()
+                        {
+                            Ok(rules) => rules.into_iter().for_each(|r| engine.register_rule(r)),
+                            Err(e) => errors.push(file.error(&e)),
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(LoadReport {
+            value: engine,
+            errors,
+        })
     }
 
-    pub fn load_tasks(&self) -> io::Result<Vec<Task>> {
-        let mut result = vec![];
-        Self::load_dir(self.tasks_path.as_ref(), &["pbl"], &mut |path, src, s| {
-            if s.root().data().symbol == "Task" {
-                match TaskParser::from(s).parse() {
+    pub fn load_tasks(&self) -> io::Result<LoadReport<Vec<Task>>> {
+        let (files, mut errors) = Self::gather(&self.tasks_path, &["pbl"])?;
+
+        let mut result = Vec::new();
+        for file in &files {
+            for block in &file.blocks {
+                if block.data().symbol != TOKEN_TASK {
+                    continue;
+                }
+                match TaskParser::from(block).parse() {
                     Ok(mut t) => {
                         trace!(
                             "New task: [{:x}] {} [{}]",
@@ -68,68 +115,88 @@ impl DirectoryParser {
                             t.goal,
                             t.givens.iter().format(", ")
                         );
-                        t.group = path.with_extension("").display().to_string();
-                        result.push(t)
+                        t.group = file.path.with_extension("").display().to_string();
+                        result.push(t);
                     }
-                    Err(e) => error!("Task not parsed: {}", e.error_string(src, Some(path))),
+                    Err(e) => errors.push(file.error(&e)),
                 }
             }
-        })?;
-        Ok(result)
+        }
+
+        Ok(LoadReport {
+            value: result,
+            errors,
+        })
     }
 
-    fn load_symbols(&self) -> io::Result<()> {
-        Self::load_dir(
-            &self.symbols_path,
-            &["sym"],
-            &mut |_, _, s: &Tree<NodeData>| {
-                let _ = SymbolParser::from(s).parse().map(|s| s.register());
-            },
-        )
-    }
-
-    fn load_dir<F>(dir: &Path, extensions: &[&str], cb: &mut F) -> io::Result<()>
-    where
-        F: FnMut(&Path, &str, &Tree<NodeData>),
-    {
+    /// Walk `dir` recursively (sorted), reading and parsing each file once.
+    /// Read and parse failures go into the returned errors; only an unreadable
+    /// directory is fatal.
+    fn gather(dir: &Path, extensions: &[&str]) -> io::Result<(Vec<ParsedFile>, Vec<LoadError>)> {
         trace!("Processing dir: {}", dir.to_string_lossy());
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
+        let mut entries = fs::read_dir(dir)?
+            .map(|e| e.map(|e| e.path()))
+            .collect::<io::Result<Vec<_>>>()?;
+        entries.sort();
+
+        let mut files = Vec::new();
+        let mut errors = Vec::new();
+        for path in entries {
             if path.is_dir() {
-                Self::load_dir(&path, extensions, cb)?;
+                let (sub_files, sub_errors) = Self::gather(&path, extensions)?;
+                files.extend(sub_files);
+                errors.extend(sub_errors);
             } else if path
                 .extension()
                 .and_then(|x| x.to_str())
                 .map(|x| extensions.contains(&x))
                 .unwrap_or(false)
             {
-                Self::load_file(&path, cb)?;
+                info!("Processing file: {}", path.to_string_lossy());
+                let src = match fs::read_to_string(&path) {
+                    Ok(src) => src,
+                    Err(e) => {
+                        errors.push(LoadError {
+                            message: format!("cannot read file: {e}"),
+                            path,
+                        });
+                        continue;
+                    }
+                };
+                match lang::any(&src) {
+                    Ok(blocks) => files.push(ParsedFile { path, src, blocks }),
+                    Err(e) => errors.push(LoadError {
+                        message: e.error_string(&src, Some(&path)),
+                        path,
+                    }),
+                }
             }
         }
-        Ok(())
+        Ok((files, errors))
     }
+}
 
-    fn load_file<P, F>(file: P, cb: &mut F) -> io::Result<()>
-    where
-        P: AsRef<Path>,
-        F: FnMut(&Path, &str, &Tree<NodeData>),
-    {
-        info!("Processing file: {}", file.as_ref().to_string_lossy());
-        let content = fs::read_to_string(file.as_ref())?;
-        let states = lang::any(content.as_str()).map_err(|e| {
-            let error_string = e.error_string(content.as_str(), Some(file.as_ref()));
-            error!(
-                "Unable to parse file {}: {}",
-                file.as_ref().to_string_lossy(),
-                error_string
-            );
-            io::Error::new(io::ErrorKind::InvalidData, error_string)
-        })?;
-        for s in states {
-            cb(file.as_ref(), content.as_str(), &s);
+/// A source file read once, split into its top-level blocks.
+struct ParsedFile {
+    path:   PathBuf,
+    src:    String,
+    blocks: Vec<Tree>,
+}
+
+impl ParsedFile {
+    fn error(&self, e: &ParserError) -> LoadError {
+        LoadError {
+            path:    self.path.clone(),
+            message: e.error_string(&self.src, Some(&self.path)),
         }
-
-        Ok(())
     }
+}
+
+/// Name of a `Declare` block's symbol, if present.
+fn declare_name(block: &Tree) -> Option<&str> {
+    block
+        .iter()
+        .find(|c| c.data().symbol == TOKEN_SYMBOL)
+        .and_then(|c| c.front())
+        .map(|n| n.data().symbol.as_str())
 }

@@ -150,8 +150,8 @@ impl State {
     pub fn try_new(settings: Settings) -> io::Result<Self> {
         let parser = DirectoryParser::new(settings.symbols.clone(), settings.tasks.clone());
 
-        let rules = parser.load_rules().map(Arc::new)?;
-        let tasks = parser.load_tasks()?;
+        let rules = Arc::new(parser.load_rules()?.value);
+        let tasks = parser.load_tasks()?.value;
         let mut result = Self {
             rules_engine: rules,
             rules_pos: default_state(),
@@ -186,15 +186,17 @@ impl State {
     }
 
     pub fn reload(&mut self) -> io::Result<()> {
-        self.rules_engine = DirectoryParser::new(&self.settings.symbols, &self.settings.tasks)
-            .load_rules()
-            .map(Arc::new)?;
+        self.rules_engine = Arc::new(
+            DirectoryParser::new(&self.settings.symbols, &self.settings.tasks)
+                .load_rules()?
+                .value,
+        );
         Ok(())
     }
 
     pub fn reload_tasks(&mut self) -> io::Result<()> {
         let parser = DirectoryParser::new(&self.settings.symbols, &self.settings.tasks);
-        let new_tasks = parser.load_tasks()?;
+        let new_tasks = parser.load_tasks()?.value;
 
         let mut existing: HashSet<u64> = HashSet::new();
         collect_known_task_ids(self.tasks.root(), &mut existing);

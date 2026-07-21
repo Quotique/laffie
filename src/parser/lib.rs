@@ -16,8 +16,12 @@ mod term;
 pub type CompactString = smartstring::alias::String;
 
 pub use self::{
-    dir_loader::DirectoryParser, error::ParserError, rule::RuleParser, symbol::SymbolParser,
-    task::TaskParser, term::TermParser,
+    dir_loader::{DirectoryParser, LoadError, LoadReport},
+    error::ParserError,
+    rule::RuleParser,
+    symbol::SymbolParser,
+    task::TaskParser,
+    term::TermParser,
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

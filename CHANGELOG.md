@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   broken config/paths/db, or any wrong answer in the corpus. Unsolved tasks
   are not treated as failures. A wrong answer is now counted only under
   `wrong answer`, no longer double-counted as `solved`
+- Directory loading no longer swallows errors or aborts on the first broken
+  file: `load_rules` / `load_tasks` return a `LoadReport` collecting every
+  parse error (with path and location), and the loader keeps going. cli lists
+  all load errors and refuses to run a broken corpus; the TUI continues with
+  whatever loaded
+- Block type is dispatched by its root token (`Declare` / `Rule` / `Task`)
+  instead of by which parser happened to fail, so a broken symbol is reported
+  as a symbol error. Files are loaded in a deterministic (sorted) order, and a
+  symbol's Python program runs once instead of twice
 
 ## [0.6.0] - 2026-07-09
 
