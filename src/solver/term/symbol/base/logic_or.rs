@@ -34,12 +34,12 @@ pub fn or(root: TermRef) -> Truth {
 mod tests {
     use super::or;
     use crate::{
-        NormalizationLevel,
+        NormLevel,
         term::{Truth, term_with_vars},
     };
 
     fn truth(src: &'static str) -> Truth {
-        let t = term_with_vars(src).normalize(NormalizationLevel::max());
+        let t = term_with_vars(src).normalize(NormLevel::Full);
         or(t.term())
     }
 

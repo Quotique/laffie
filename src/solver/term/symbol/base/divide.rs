@@ -9,7 +9,7 @@ use super::{
     mul::{extract_numeric_factor, prepend_factor},
 };
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut},
 };
 
@@ -22,14 +22,14 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn divide(root: &mut TermMut, level: NormalizationLevel) -> bool {
+pub fn divide(root: &mut TermMut, level: NormLevel) -> bool {
     if !root.data().is_symbol_name("/") {
         return false;
     }
 
     match level {
-        NormalizationLevel(0) => false,
-        NormalizationLevel(1) => {
+        NormLevel::Off => false,
+        NormLevel::Units => {
             if let Atom::Number(d) = &root.last_arg().unwrap().data() &&
                 d.is_one()
             {
@@ -39,7 +39,7 @@ pub fn divide(root: &mut TermMut, level: NormalizationLevel) -> bool {
             }
             false
         }
-        _ => {
+        NormLevel::ConstFold | NormLevel::Full => {
             match (
                 root.first_arg().unwrap().data().number(),
                 root.last_arg().unwrap().data().number(),
@@ -185,9 +185,9 @@ mod tests {
             ("(2*a)/3", "(2*a)/3", "(2*a)/3"),
             ("(2*a*b)/(-2)", "(2*a*b)/(-2)", "(-1)*a*b"),
         ] {
-            calculator_check(source, source, divide, NormalizationLevel(0));
-            calculator_check(source, level_one, divide, NormalizationLevel(1));
-            calculator_check(source, level_all, divide, NormalizationLevel::max());
+            calculator_check(source, source, divide, NormLevel::Off);
+            calculator_check(source, level_one, divide, NormLevel::Units);
+            calculator_check(source, level_all, divide, NormLevel::Full);
         }
     }
 }

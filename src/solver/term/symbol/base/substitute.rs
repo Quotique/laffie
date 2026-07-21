@@ -1,6 +1,6 @@
 use super::SymbolProgram;
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Term, TermBuf, TermMut, VariableSubstitution},
 };
 
@@ -12,7 +12,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn substitute(root: &mut TermMut, level: NormalizationLevel) -> bool {
+pub fn substitute(root: &mut TermMut, level: NormLevel) -> bool {
     if !root.data().is_symbol_name("substitute") || root.degree() != 2 {
         return false;
     }
@@ -53,27 +53,26 @@ fn into_variable_map(mut state: TermBuf) -> VariableSubstitution {
 
 #[cfg(test)]
 mod tests {
-    use crate::{NormalizationLevel, term::term_with_vars};
+    use crate::{NormLevel, term::term_with_vars};
 
     #[test]
     fn substitute_test() {
         insta::assert_snapshot!(
           term_with_vars(r#"substitute(x == 5, x^4 - 25*x^2 + 60*x -36 != 0)"#)
-                .normalize(NormalizationLevel::max()),
+                .normalize(NormLevel::Full),
             @"264!=0");
     }
 
     #[test]
     fn substitute_cubic_root_test() {
         let result = term_with_vars(r#"substitute(x == 1, x^3 - 6*x^2 + 11*x - 6) == 0"#)
-            .normalize(NormalizationLevel::max());
+            .normalize(NormLevel::Full);
         insta::assert_snapshot!(result, @"0==0");
     }
 
     #[test]
     fn normalize_after_substitute_test() {
-        let result =
-            term_with_vars(r#"1^3 - 6*1^2 + 11*1 - 6 == 0"#).normalize(NormalizationLevel::max());
+        let result = term_with_vars(r#"1^3 - 6*1^2 + 11*1 - 6 == 0"#).normalize(NormLevel::Full);
         insta::assert_snapshot!(result, @"0==0");
     }
 }

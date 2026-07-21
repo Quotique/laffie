@@ -7,21 +7,44 @@ pub mod rule;
 pub mod task;
 pub mod term;
 
-use bincode::{Decode, Encode};
-use derive_more::{Display, From};
-
 pub use bigdecimal::{BigDecimal as Decimal, Signed};
 pub use smartstring::alias::String as CompactString;
 
-#[derive(Clone, Copy, Debug, Default, Display)]
+/// Depth of term normalization, ordered `Off < Units < ConstFold < Full`.
+#[derive(Clone, Copy, Debug, Default)]
 #[derive(Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[derive(From)]
-#[derive(Decode, Encode)]
-pub struct NormalizationLevel(u64);
+pub enum NormLevel {
+    /// No rewriting.
+    #[default]
+    Off,
+    /// Drop identity elements (`+0`, `*1`, `/1`, `^1`, …).
+    Units,
+    /// Additionally fold numeric constants.
+    ConstFold,
+    /// Full canonicalization: like terms, powers, commutative order.
+    Full,
+}
 
-impl NormalizationLevel {
-    pub fn max() -> Self {
-        Self(u64::MAX)
+impl From<u64> for NormLevel {
+    fn from(n: u64) -> Self {
+        match n {
+            0 => Self::Off,
+            1 => Self::Units,
+            2 => Self::ConstFold,
+            _ => Self::Full,
+        }
+    }
+}
+
+impl std::fmt::Display for NormLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let rank = match self {
+            Self::Off => 0,
+            Self::Units => 1,
+            Self::ConstFold => 2,
+            Self::Full => 3,
+        };
+        write!(f, "{rank}")
     }
 }
 

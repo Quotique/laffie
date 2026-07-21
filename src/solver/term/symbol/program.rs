@@ -2,13 +2,13 @@ use std::{cmp, collections::HashMap, fmt};
 
 use super::{Symbol, container};
 use crate::{
-    CompactString, NormalizationLevel,
+    CompactString, NormLevel,
     term::{Term, TermMut, TermRef},
 };
 
 pub type TruthChecker = dyn Fn(TermRef) -> Truth + Sync + Send;
 pub type Comparator = dyn Fn(TermRef, TermRef) -> cmp::Ordering + Send + Sync;
-pub type Calculator = dyn Fn(&mut TermMut, NormalizationLevel) -> bool + Send + Sync;
+pub type Calculator = dyn Fn(&mut TermMut, NormLevel) -> bool + Send + Sync;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Truth {

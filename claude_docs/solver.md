@@ -6,7 +6,7 @@ Core reasoning engine: term representation, rule system, task-solving algorithm.
 
 ```
 src/solver/
-├── lib.rs                    # Exports: rule, task, term. Types: NormalizationLevel, Decimal, CompactString
+├── lib.rs                    # Exports: rule, task, term. Types: NormLevel (Off/Units/ConstFold/Full), Decimal, CompactString
 ├── rule/
 │   ├── mod.rs                # Re-exports all rule types
 │   ├── rule.rs               # Rule, RuleId, Level, SharedRule, ApplyRule trait
@@ -172,7 +172,8 @@ Implementors: `TermBuf`, `TermMut`, `Hypothesis`.
 |------|------|-------------|
 | 11 | `TermMut<'a>` | Mutable term view |
 | 184 | `evaluate()` | Runs symbol-specific calculator |
-| 280 | `normalize()` | Full normalization: associative nesting, commutative reorder, evaluate |
+| 288 | `normalize()` | Repeats `normalize_pass` to a fixpoint (cap 8, debug tripwire) |
+| ~ | `normalize_pass()` | One bottom-up sweep: associative nesting, evaluate, commutative reorder |
 
 ### term/symbol/program.rs
 | Line | Type | Description |

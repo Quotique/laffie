@@ -34,12 +34,12 @@ pub fn and(root: TermRef) -> Truth {
 mod tests {
     use super::and;
     use crate::{
-        NormalizationLevel,
+        NormLevel,
         term::{Truth, term_with_vars},
     };
 
     fn truth(src: &'static str) -> Truth {
-        let t = term_with_vars(src).normalize(NormalizationLevel::max());
+        let t = term_with_vars(src).normalize(NormLevel::Full);
         and(t.term())
     }
 

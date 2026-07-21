@@ -15,7 +15,7 @@ use super::{
     goal::FindGoal, props::TermInference,
 };
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     rule::{
         GroundedHypothesis, Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine,
         SharedRule,
@@ -476,7 +476,7 @@ impl Solver {
         state: &mut SolutionState,
     ) -> SharedSolution {
         is_replace(&mut term.term_mut());
-        let term = term.normalize(NormalizationLevel::max());
+        let term = term.normalize(NormLevel::Full);
         let prove_goal = SharedTerm::new(TermBuf::symbol("prove").arg(term.clone()));
 
         match term.term().truth() {

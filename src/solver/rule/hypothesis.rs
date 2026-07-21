@@ -4,7 +4,7 @@ use itertools::{Either, Itertools};
 
 use super::{ApplyRule, RuleId, SharedRule, TermFilters};
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{
         Atom, Param, ParamSubstitution, Substitute, Term as _, TermBuf, TermPath, Truth, match_term,
     },
@@ -119,7 +119,7 @@ impl Hypothesis {
         self.requirements = self
             .requirements
             .drain(..)
-            .map(|r| r.normalize(NormalizationLevel::max()))
+            .map(|r| r.normalize(NormLevel::Full))
             .filter(|r| r.term().truth() != Truth::True)
             .collect();
     }

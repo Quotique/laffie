@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use solver::{
-    Decimal,
+    Decimal, NormLevel,
     term::{ArgList, Atom, Param, Substitute, Term, TermBuf, Variable, try_sym},
 };
 
@@ -29,7 +29,7 @@ impl TermParser {
         let mut tree = self.try_parse_node(node)?;
 
         tree.substitute_iter(self.params.clone());
-        Ok(tree.normalize(0.into()))
+        Ok(tree.normalize(NormLevel::Off))
     }
 
     fn try_parse_node(&mut self, mut node: &Node) -> Result<TermBuf, ParserError> {

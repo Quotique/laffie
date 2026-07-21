@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashSet, iter::Iterator, rc::Rc};
+use std::{cmp::Ordering, collections::HashSet, iter::Iterator};
 
 use derive_more::{Debug, Display, From};
 use trees::Node;
@@ -9,7 +9,10 @@ use super::{
     Atom, ParamSubstitution, Substitute, Symbol, Term, TermBuf, TermRef, Truth,
     VariableSubstitution,
 };
-use crate::NormalizationLevel;
+use crate::NormLevel;
+
+/// Max normalization sweeps before giving up (see `normalize`).
+const NORMALIZE_FIXPOINT_CAP: usize = 8;
 
 #[derive(Debug, Display, From)]
 pub struct TermMut<'a>(&'a mut Node<Atom>);
@@ -189,7 +192,7 @@ impl<'a> TermMut<'a> {
     }
 
     #[inline]
-    pub fn evaluate(&mut self, level: NormalizationLevel) -> bool {
+    pub fn evaluate(&mut self, level: NormLevel) -> bool {
         self.data()
             .symbol()
             .map(|x| x.evaluate(self, level))
@@ -269,15 +272,15 @@ impl<'a> TermMut<'a> {
                 .iter()
                 .is_sorted_by(|l, r| symbol.arg_order(*l, *r) != Ordering::Greater)
             {
-                let mut to_sort = vec![];
+                let mut to_sort: Vec<TermBuf> = vec![];
                 while let Some(t) = self.pop_first_arg() {
-                    to_sort.push(Rc::new(t));
+                    to_sort.push(t);
                 }
 
                 to_sort.sort_by(|x, y| symbol.arg_order(x.term(), y.term()));
 
                 while let Some(t) = to_sort.pop() {
-                    self.push_first_arg(Rc::try_unwrap(t).unwrap());
+                    self.push_first_arg(t);
                 }
                 return true;
             }
@@ -285,15 +288,35 @@ impl<'a> TermMut<'a> {
         false
     }
 
-    pub fn normalize(&mut self, level: NormalizationLevel) -> bool {
+    /// Normalizes the subtree to a fixpoint by repeating bottom-up passes,
+    /// so a calculator can emit a term the next pass finishes.
+    pub fn normalize(&mut self, level: NormLevel) -> bool {
+        let mut any = false;
+        for _ in 0..NORMALIZE_FIXPOINT_CAP {
+            if !self.normalize_pass(level) {
+                return any;
+            }
+            any = true;
+        }
+        // Hitting the cap = non-confluent rewrites; release stops with a
+        // bounded partial result.
+        debug_assert!(
+            false,
+            "normalize did not converge in {NORMALIZE_FIXPOINT_CAP} passes"
+        );
+        any
+    }
+
+    /// One bottom-up normalization sweep. Returns whether anything changed.
+    fn normalize_pass(&mut self, level: NormLevel) -> bool {
         let mut result = false;
         for mut i in self.iter_mut() {
-            result |= i.normalize(level);
+            result |= i.normalize_pass(level);
         }
 
         result |= self.associative_nesting_remove();
         result |= self.evaluate(level);
-        if level > NormalizationLevel(0) {
+        if level > NormLevel::Off {
             result |= self.commutative_reorder();
         }
         result
@@ -355,7 +378,7 @@ mod operations_tests {
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(5));
 
-        assert!(test_tree1.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree1.term_mut().evaluate(NormLevel::Full));
         assert_eq!(test_tree1, TermBuf::number(8));
 
         // x+1+2+5 -> x+8
@@ -365,7 +388,7 @@ mod operations_tests {
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(5));
 
-        assert!(test_tree1.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree1.term_mut().evaluate(NormLevel::Full));
         test_tree1.term_mut().commutative_reorder();
         assert_eq!(
             test_tree1,
@@ -380,7 +403,7 @@ mod operations_tests {
             .arg(TermBuf::number(1))
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(5));
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().evaluate(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::number(10));
 
         // x*1*2*5 -> 10*x
@@ -390,7 +413,7 @@ mod operations_tests {
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(5));
 
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().evaluate(NormLevel::Full));
         test_tree.term_mut().commutative_reorder();
         assert_eq!(
             test_tree,
@@ -400,7 +423,7 @@ mod operations_tests {
         // x*1 -> x
         let mut test_tree = TermBuf::symbol("*").arg(var("x")).arg(TermBuf::number(1));
 
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().evaluate(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::variable("x"));
     }
 
@@ -411,13 +434,13 @@ mod operations_tests {
             .arg(TermBuf::number(10))
             .arg(TermBuf::number(2));
 
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().evaluate(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::number(5));
 
         // x / 2 -> x / 2
         let mut test_tree = TermBuf::symbol("/").arg(var("x")).arg(TermBuf::number(2));
 
-        assert!(!test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(!test_tree.term_mut().evaluate(NormLevel::Full));
         assert_eq!(
             test_tree,
             TermBuf::symbol("/").arg(var("x")).arg(TermBuf::number(2))
@@ -427,14 +450,14 @@ mod operations_tests {
         let mut test_tree = TermBuf::symbol("/")
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(5));
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().evaluate(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::number((4, 1)));
 
         // 30 / 45 -> 2/3
         let mut test_tree = TermBuf::symbol("/")
             .arg(TermBuf::number(30))
             .arg(TermBuf::number(45));
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().evaluate(NormLevel::Full));
         assert_eq!(
             test_tree,
             TermBuf::symbol("/")
@@ -446,7 +469,7 @@ mod operations_tests {
         let mut test_tree = TermBuf::symbol("/")
             .arg(TermBuf::number(30))
             .arg(TermBuf::number((45, 1)));
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().evaluate(NormLevel::Full));
         assert_eq!(
             test_tree,
             TermBuf::symbol("/")
@@ -456,33 +479,35 @@ mod operations_tests {
     }
 
     #[test]
-    fn evaluate_power_test() {
+    fn normalize_power_test() {
+        // Negative-exponent reciprocals are folded by the fixpoint, not `power`.
+
         // 2 ^ 2 -> 4
         let mut test_tree = TermBuf::symbol("^")
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(2));
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().normalize(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::number(4));
 
         // 2 ^ (-2) -> 0.25
         let mut test_tree = TermBuf::symbol("^")
             .arg(TermBuf::number(2))
             .arg(TermBuf::number(-2));
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().normalize(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::number((25, 2)));
 
         // 0.5 ^ (-2) -> 4
         let mut test_tree = TermBuf::symbol("^")
             .arg(TermBuf::number((5, 1)))
             .arg(TermBuf::number(-2));
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().normalize(NormLevel::Full));
         assert_eq!(test_tree, TermBuf::number(4));
 
         // 3 ^ (-2) -> 1/9
         let mut test_tree = TermBuf::symbol("^")
             .arg(TermBuf::number(3))
             .arg(TermBuf::number(-2));
-        assert!(test_tree.term_mut().evaluate(NormalizationLevel::max()));
+        assert!(test_tree.term_mut().normalize(NormLevel::Full));
         assert_eq!(
             test_tree,
             TermBuf::symbol("/")

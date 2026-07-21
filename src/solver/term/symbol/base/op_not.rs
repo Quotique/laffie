@@ -1,6 +1,6 @@
 use super::SymbolProgram;
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Atom, Term, TermMut, TermRef, Truth, sym},
 };
 
@@ -13,7 +13,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-fn not_replace(root: &mut TermMut, _: NormalizationLevel) -> bool {
+fn not_replace(root: &mut TermMut, _: NormLevel) -> bool {
     if !root.data().is_symbol_name("!") || root.degree() != 1 {
         return false;
     }

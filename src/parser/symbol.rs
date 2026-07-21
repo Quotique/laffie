@@ -206,7 +206,7 @@ pub mod tests {
 
     #[test]
     fn malformed_calculator_result_is_a_noop() {
-        use solver::NormalizationLevel;
+        use solver::NormLevel;
 
         // A procedural calculator whose result can't be deserialized must be a
         // no-op, not a panic: the term stays put and the solver keeps running.
@@ -221,7 +221,7 @@ def calculator(root, level):
 
         let mut term = TermBuf::variable("x");
         let original = term.clone();
-        let changed = (program.calculator)(&mut term.term_mut(), NormalizationLevel::max());
+        let changed = (program.calculator)(&mut term.term_mut(), NormLevel::Full);
 
         assert!(!changed, "a failing calculator must report no change");
         assert_eq!(term, original, "the term must be left untouched");

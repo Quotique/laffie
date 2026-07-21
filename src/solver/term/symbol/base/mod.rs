@@ -26,7 +26,7 @@ use crate::term::{Term, TermRef};
 
 #[cfg(test)]
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{TermMut, term_with_params},
 };
 
@@ -43,15 +43,15 @@ fn compare_numbers(left: TermRef, right: TermRef) -> Option<Ordering> {
 pub fn calculator_check(
     src: &'static str,
     res: &'static str,
-    f: impl Fn(&mut TermMut, NormalizationLevel) -> bool,
-    level: NormalizationLevel,
+    f: impl Fn(&mut TermMut, NormLevel) -> bool,
+    level: NormLevel,
 ) {
     let mut s = term_with_params(src);
     let r = term_with_params(res);
     assert_eq!(
         f(&mut s.term_mut(), level),
         src != res,
-        "{src} {res} l:{level}"
+        "{src} {res} l:{level:?}"
     );
-    assert_eq!(s, r, "{src} {res} l:{level}");
+    assert_eq!(s, r, "{src} {res} l:{level:?}");
 }

@@ -7,7 +7,7 @@ use trees::Tree;
 
 use super::{Atom, Symbol, TermMut, TermRef, sym};
 use crate::{
-    CompactString, Decimal, NormalizationLevel,
+    CompactString, Decimal, NormLevel,
     term::{Param, Variable},
 };
 
@@ -76,7 +76,7 @@ impl TermBuf {
 
 impl TermBuf {
     #[inline]
-    pub fn normalize(mut self, level: NormalizationLevel) -> Self {
+    pub fn normalize(mut self, level: NormLevel) -> Self {
         self.term_mut().normalize(level);
         self
     }
@@ -192,19 +192,15 @@ mod tests {
 
     #[test]
     fn unification_test() {
-        let test =
-            term_with_params("2*x*x + x + 3*x + 4 + 2 == 0").normalize(NormalizationLevel::max());
-        let test_norm =
-            term_with_params("2*x^2 + 4*x + 6 == 0").normalize(NormalizationLevel::max());
+        let test = term_with_params("2*x*x + x + 3*x + 4 + 2 == 0").normalize(NormLevel::Full);
+        let test_norm = term_with_params("2*x^2 + 4*x + 6 == 0").normalize(NormLevel::Full);
         assert_eq!(test, test_norm);
     }
 
     #[test]
     fn unification_with_minus_test() {
-        let test =
-            term_with_params("x^2 + (-5)*x - x + 5 == 0").normalize(NormalizationLevel::max());
-        let test_norm =
-            term_with_params("x^2 + (-6)*x + 5 == 0").normalize(NormalizationLevel::max());
+        let test = term_with_params("x^2 + (-5)*x - x + 5 == 0").normalize(NormLevel::Full);
+        let test_norm = term_with_params("x^2 + (-6)*x + 5 == 0").normalize(NormLevel::Full);
         assert_eq!(test, test_norm);
     }
 

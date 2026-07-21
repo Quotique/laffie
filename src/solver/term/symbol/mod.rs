@@ -11,7 +11,7 @@ use serde_derive::{Deserialize, Serialize};
 pub use program::{SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
 
 use crate::{
-    CompactString, NormalizationLevel,
+    CompactString, NormLevel,
     term::{TermMut, TermRef},
 };
 
@@ -70,7 +70,7 @@ impl Symbol {
     }
 
     #[inline]
-    pub fn evaluate(&self, node: &mut TermMut, level: NormalizationLevel) -> bool {
+    pub fn evaluate(&self, node: &mut TermMut, level: NormLevel) -> bool {
         (self.program().calculator)(node, level)
     }
 

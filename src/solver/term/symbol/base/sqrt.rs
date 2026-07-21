@@ -6,7 +6,7 @@ use super::{
     mul::{extract_numeric_factor, prepend_factor},
 };
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Atom, TermBuf, TermMut, TermRef},
 };
 
@@ -18,7 +18,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn sqrt(root: &mut TermMut, _: NormalizationLevel) -> bool {
+pub fn sqrt(root: &mut TermMut, _: NormLevel) -> bool {
     if !root.data().is_symbol_name("sqrt") {
         return false;
     }
@@ -38,8 +38,8 @@ pub fn sqrt(root: &mut TermMut, _: NormalizationLevel) -> bool {
 
     if let Some((p, new_arg)) = factor_sqrt_product(last.term()) {
         let sqrt_term = TermBuf::symbol("sqrt").arg(new_arg);
+        // Left for the normalization fixpoint to finish.
         let mut product = TermBuf::symbol("*").arg(TermBuf::number(p)).arg(sqrt_term);
-        product = product.normalize(NormalizationLevel::max());
         root.swap(&mut product.term_mut());
         return true;
     }
@@ -108,33 +108,33 @@ fn square_free_part(mut n: BigInt) -> BigInt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{NormalizationLevel, term::term_with_vars};
+    use crate::{NormLevel, term::term_with_vars};
 
     #[test]
     fn sqrt_of_perfect_square_number() {
         let mut t = term_with_vars("sqrt(4)");
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "2");
     }
 
     #[test]
     fn sqrt_factors_perfect_square_out_of_product() {
         let mut t = term_with_vars("sqrt(4*a)");
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "2*sqrt(a)");
     }
 
     #[test]
     fn sqrt_factors_partial_square() {
         let mut t = term_with_vars("sqrt(12*a)");
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "2*sqrt(3*a)");
     }
 
     #[test]
     fn sqrt_factors_partial_square_multi() {
         let mut t = term_with_vars("sqrt(48*(-a))");
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "4*sqrt(-3*a)");
     }
 
@@ -143,7 +143,7 @@ mod tests {
         // (10, -3): odd exponent — parity fix should preserve the value.
         let mut t =
             TermBuf::symbol("sqrt").arg(TermBuf::number(Decimal::new(BigInt::from(10), -3)));
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "100");
     }
 
@@ -154,7 +154,7 @@ mod tests {
             .arg(TermBuf::number(Decimal::new(BigInt::from(4800), 2)))
             .arg(TermBuf::variable("a"));
         let mut t = TermBuf::symbol("sqrt").arg(arg);
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         // sqrt(48a) = 4·sqrt(3a)
         assert_eq!(t.term().to_string(), "4*sqrt(3*a)");
     }
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn sqrt_no_op_on_unfactorable() {
         let mut t = term_with_vars("sqrt(a)");
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "sqrt(a)");
     }
 

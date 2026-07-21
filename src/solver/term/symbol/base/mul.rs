@@ -4,7 +4,7 @@ use bigdecimal::{BigDecimal as Decimal, One, Zero};
 use indexmap::IndexMap;
 
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
 };
 
@@ -24,14 +24,14 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn multiply(root: &mut TermMut, level: NormalizationLevel) -> bool {
+pub fn multiply(root: &mut TermMut, level: NormLevel) -> bool {
     if !root.data().is_symbol_name("*") {
         return false;
     }
 
     match level {
-        NormalizationLevel(0) => false,
-        NormalizationLevel(1) => {
+        NormLevel::Off => false,
+        NormLevel::Units => {
             if root
                 .iter()
                 .any(|x| x.data().is_number_value(&Decimal::zero()))
@@ -49,11 +49,11 @@ pub fn multiply(root: &mut TermMut, level: NormalizationLevel) -> bool {
             });
             remove_unused_mul(root) || result
         }
-        NormalizationLevel(2) => {
+        NormLevel::ConstFold => {
             let (constant, result) = fold_constant(root);
             attach_constant(root, constant) || remove_unused_mul(root) || result
         }
-        _ => {
+        NormLevel::Full => {
             let (constant, result) = fold_constant(root);
             let (powers, result) = root.iter_mut().fold(
                 (IndexMap::<TermBuf, TermBuf>::new(), result),
@@ -237,10 +237,10 @@ mod tests {
             ("1*3", "3", "3", "3"),
             ("(-6)*(-x^2)", "(-6)*(-x^2)", "6*x^2", "6*x^2"),
         ] {
-            calculator_check(source, source, multiply, NormalizationLevel(0));
-            calculator_check(source, level_one, multiply, NormalizationLevel(1));
-            calculator_check(source, level_two, multiply, NormalizationLevel(2));
-            calculator_check(source, level_all, multiply, NormalizationLevel::max());
+            calculator_check(source, source, multiply, NormLevel::Off);
+            calculator_check(source, level_one, multiply, NormLevel::Units);
+            calculator_check(source, level_two, multiply, NormLevel::ConstFold);
+            calculator_check(source, level_all, multiply, NormLevel::Full);
         }
     }
 }

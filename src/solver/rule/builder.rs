@@ -3,7 +3,7 @@ use std::{convert::From, fmt};
 use multimap::MultiMap;
 
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Symbol, Term, TermBuf, sym},
 };
 
@@ -145,7 +145,7 @@ impl RuleBuilder {
                 }
             }
             // TODO: normalization level
-            term = term.normalize(NormalizationLevel::from(1));
+            term = term.normalize(NormLevel::Units);
 
             result.push(Rule {
                 id: self.rule_id,

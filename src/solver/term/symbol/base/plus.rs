@@ -4,7 +4,7 @@ use bigdecimal::{BigDecimal as Decimal, One, Zero};
 
 use super::{SymbolProgram, power::power_argument};
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef},
 };
 
@@ -22,14 +22,14 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn plus(root: &mut TermMut, level: NormalizationLevel) -> bool {
+pub fn plus(root: &mut TermMut, level: NormLevel) -> bool {
     if !root.data().is_symbol_name("+") || root.degree() < 2 {
         return false;
     }
 
     match level {
-        NormalizationLevel(0) => return false,
-        NormalizationLevel(1) => {
+        NormLevel::Off => return false,
+        NormLevel::Units => {
             let result = root.iter_mut().fold(false, |acc, mut x| {
                 if x.data().is_number_value(&0.into()) {
                     x.detach();
@@ -40,7 +40,7 @@ pub fn plus(root: &mut TermMut, level: NormalizationLevel) -> bool {
             });
             return remove_unused_plus(root) || result;
         }
-        NormalizationLevel(2) => {
+        NormLevel::ConstFold => {
             let degree = root.degree();
             let (constant, result) = root.iter_mut().enumerate().fold(
                 (Decimal::from(0), false),
@@ -57,7 +57,7 @@ pub fn plus(root: &mut TermMut, level: NormalizationLevel) -> bool {
             attach_constant(root, constant);
             return remove_unused_plus(root) || result;
         }
-        _ => {}
+        NormLevel::Full => {}
     };
 
     let mut result = false;
@@ -98,8 +98,7 @@ pub fn plus(root: &mut TermMut, level: NormalizationLevel) -> bool {
         result = true;
     }
 
-    result |= root.commutative_reorder();
-
+    // Ordering is the normalization pass's job.
     result
 }
 
@@ -291,13 +290,15 @@ mod tests {
 
     #[test]
     fn plus_test() {
+        // `Full` keeps the term multiset but not a canonical order: `plus` no
+        // longer sorts (the normalization pass does).
         for (source, level_one, level_two, level_all) in [
             ("x+y", "x+y", "x+y", "x+y"),
             ("0+x", "x", "x", "x"),
-            ("1+x", "1+x", "x+1", "x+1"),
+            ("1+x", "1+x", "x+1", "1+x"),
             ("0+0", "0", "0", "0"),
-            ("1+x+3", "1+x+3", "x+4", "x+4"),
-            ("-1+x+3", "-1+x+3", "x+2", "x+2"),
+            ("1+x+3", "1+x+3", "x+4", "4+x"),
+            ("-1+x+3", "-1+x+3", "x+2", "2+x"),
             ("x-y", "x-y", "x-y", "x-y"),
             ("0-x", "-x", "-x", "-x"),
             ("x-0", "x", "x", "x"),
@@ -306,10 +307,10 @@ mod tests {
             ("1+2+3", "1+2+3", "6", "6"),
             ("1+2-3", "1+2-3", "0", "0"),
         ] {
-            calculator_check(source, source, plus, NormalizationLevel(0));
-            calculator_check(source, level_one, plus, NormalizationLevel(1));
-            calculator_check(source, level_two, plus, NormalizationLevel(2));
-            calculator_check(source, level_all, plus, NormalizationLevel::max());
+            calculator_check(source, source, plus, NormLevel::Off);
+            calculator_check(source, level_one, plus, NormLevel::Units);
+            calculator_check(source, level_two, plus, NormLevel::ConstFold);
+            calculator_check(source, level_all, plus, NormLevel::Full);
         }
     }
 }

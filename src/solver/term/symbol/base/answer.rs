@@ -1,6 +1,6 @@
 use super::SymbolProgram;
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Term, TermMut},
 };
 
@@ -13,7 +13,7 @@ pub fn symbol() -> SymbolProgram {
 }
 
 /// Collapses `answer(answer(...(X)))` of any depth to `answer(X)`.
-pub fn answer(root: &mut TermMut, _: NormalizationLevel) -> bool {
+pub fn answer(root: &mut TermMut, _: NormLevel) -> bool {
     if !root.data().is_symbol_name("answer") || root.degree() != 1 {
         return false;
     }
@@ -33,26 +33,26 @@ pub fn answer(root: &mut TermMut, _: NormalizationLevel) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::{NormalizationLevel, term::term_with_vars};
+    use crate::{NormLevel, term::term_with_vars};
 
     #[test]
     fn answer_collapses_double() {
         let mut t = term_with_vars("answer(answer(x))");
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "answer(x)");
     }
 
     #[test]
     fn answer_collapses_triple() {
         let mut t = term_with_vars("answer(answer(answer(x)))");
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "answer(x)");
     }
 
     #[test]
     fn answer_no_op_on_single() {
         let mut t = term_with_vars("answer(x)");
-        t.term_mut().normalize(NormalizationLevel::max());
+        t.term_mut().normalize(NormLevel::Full);
         assert_eq!(t.term().to_string(), "answer(x)");
     }
 }

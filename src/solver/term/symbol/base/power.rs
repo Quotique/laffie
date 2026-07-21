@@ -5,7 +5,7 @@ use num::traits::Pow;
 
 use super::SymbolProgram;
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermBuf, TermMut, TermRef, sym},
 };
 
@@ -18,12 +18,12 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn power(root: &mut TermMut, level: NormalizationLevel) -> bool {
+pub fn power(root: &mut TermMut, level: NormLevel) -> bool {
     if !root.data().is_symbol_name("^") {
         return false;
     }
 
-    if level == 0.into() {
+    if level == NormLevel::Off {
         return false;
     }
 
@@ -31,7 +31,7 @@ pub fn power(root: &mut TermMut, level: NormalizationLevel) -> bool {
         root.first_arg().unwrap().data().number(),
         root.last_arg().unwrap().data().number(),
     ) {
-        (Some(d1), Some(d2)) if level > 1.into() => {
+        (Some(d1), Some(d2)) if level > NormLevel::Units => {
             if let Some(e) = d2.to_i8() {
                 let (m, exp) = d1.as_bigint_and_exponent();
                 let result = Decimal::new(m.pow(e.unsigned_abs()), exp * (e.abs() as i64));
@@ -40,9 +40,9 @@ pub fn power(root: &mut TermMut, level: NormalizationLevel) -> bool {
                 if e >= 0 {
                     root.swap(&mut result.term_mut());
                 } else {
+                    // Reciprocal left for the normalization fixpoint to fold.
                     *root.data_mut() = Atom::from(sym("/"));
                     root.push_last_arg(TermBuf::one()).push_last_arg(result);
-                    root.evaluate(level);
                 }
                 true
             } else {
@@ -89,9 +89,9 @@ mod tests {
             ("(-2)^3", "(-2)^3", "-8"),
             ("(-2)^2", "(-2)^2", "4"),
         ] {
-            calculator_check(source, source, power, NormalizationLevel(0));
-            calculator_check(source, level_one, power, NormalizationLevel(1));
-            calculator_check(source, level_all, power, NormalizationLevel::max());
+            calculator_check(source, source, power, NormLevel::Off);
+            calculator_check(source, level_one, power, NormLevel::Units);
+            calculator_check(source, level_all, power, NormLevel::Full);
         }
     }
 }

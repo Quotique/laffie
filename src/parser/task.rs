@@ -4,7 +4,7 @@ use std::{
 };
 
 use solver::{
-    NormalizationLevel,
+    NormLevel,
     task::{Task, TaskBuilder, TermProps},
 };
 
@@ -85,7 +85,7 @@ impl<'a> TaskParser<'a> {
                             TermParser::default()
                                 .with_variables()
                                 .try_parse(i)?
-                                .normalize(NormalizationLevel::max()),
+                                .normalize(NormLevel::Full),
                         )
                     }
                 }
@@ -94,7 +94,7 @@ impl<'a> TaskParser<'a> {
                         TermParser::default()
                             .with_variables()
                             .try_parse(child)?
-                            .normalize(NormalizationLevel::max()),
+                            .normalize(NormLevel::Full),
                     ));
                 }
             }

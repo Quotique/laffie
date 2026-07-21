@@ -8,7 +8,7 @@ use multimap::MultiMap;
 
 use super::{Hypothesis, RuleAttr, RuleAttrValue, TermFilters};
 use crate::{
-    NormalizationLevel,
+    NormLevel,
     term::{ParamSubstitution, Substitute, Symbol, Term, TermBuf, TermPath, TermRef},
 };
 
@@ -131,11 +131,11 @@ impl Rule {
 
     /// Determines the maximal normalization level requested by the rule’s
     /// `normalize` attributes. Max level by default.
-    pub fn norm_level(&self) -> NormalizationLevel {
+    pub fn norm_level(&self) -> NormLevel {
         self.attribute(&RuleAttr::Normalize)
             .filter_map(RuleAttrValue::uint)
             .max()
-            .map_or(NormalizationLevel::max(), NormalizationLevel)
+            .map_or(NormLevel::Full, NormLevel::from)
     }
 
     /// Checks if the pattern and replacement are syntactically identical.
@@ -326,7 +326,7 @@ pub mod tests {
     use std::sync::Arc;
 
     use crate::{
-        NormalizationLevel,
+        NormLevel,
         rule::{RuleDeclineReason, TermFilters, parse_rule},
         term::{TermBuf, term_with_params, term_with_vars},
     };
@@ -408,7 +408,7 @@ pub mod tests {
         assert_eq!(hypothesis[0].requirements[0], term_with_vars("2 != 0"));
         assert_eq!(
             hypothesis[0].resolution,
-            term_with_vars("x == -2").normalize(NormalizationLevel::max())
+            term_with_vars("x == -2").normalize(NormLevel::Full)
         );
         assert_eq!(hypothesis[1].requirements.len(), 1);
         assert_eq!(hypothesis[1].requirements[0], term_with_vars("x != 0"));
