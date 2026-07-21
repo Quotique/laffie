@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   byte-identical (matching the earlier `plus` fix)
 
 ### Added
+- cli: `--explain` prints a per-task breakdown of where a solve spent its
+  cycles — total cycles, the top focused terms (focuses ≈ cycles), each rule's
+  accepted/rejected hypothesis counts (surfacing rules that only generate dead
+  weight), and the subtask count, max depth, and solved/failed split. Purely an
+  aggregating tracer over existing hooks, so it changes no search behaviour;
+  best combined with `--only <id>` to focus one task
 - cli: `--check` domain linter. Loads the corpus without solving and reports
   load errors (parse failures and dangling `block(...)` references) as hard
   errors, and leaf params within a small edit distance of a real symbol name

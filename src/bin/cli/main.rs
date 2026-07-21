@@ -2,6 +2,7 @@
 #![allow(clippy::module_inception)]
 
 mod check;
+mod explain;
 mod run_diff;
 mod settings;
 
@@ -18,7 +19,7 @@ use parser::DirectoryParser;
 use solver::task::{RunControl, SolutionStatus, Solver, Task as SolverTask, TracerHub};
 use view::View;
 
-use crate::{run_diff::RunDiff, settings::Settings};
+use crate::{explain::ExplainTracer, run_diff::RunDiff, settings::Settings};
 
 /// Core develop/debug environment
 #[derive(Parser, Debug)]
@@ -73,6 +74,11 @@ struct Args {
     /// With --check, treat warnings as errors.
     #[clap(long)]
     strict: bool,
+
+    /// Print a per-task breakdown of where the solve spent its cycles
+    /// (focused terms, rule accept/reject counts, subtasks). Best with --only.
+    #[clap(long)]
+    explain: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -215,6 +221,7 @@ fn main() -> ExitCode {
         let task_label = format!("{}/{}", db_task.group, &task_id_hex[..8]);
         let mut solver = Solver::new(rules_engine.clone());
 
+        let explain = args.explain.then(ExplainTracer::default);
         let start = std::time::Instant::now();
         let solution = solver.solve(
             solver_task,
@@ -222,6 +229,9 @@ fn main() -> ExitCode {
                 let mut tracer = TracerHub::default();
                 if args.trace {
                     tracer.add_file_dumper(format!("dumps/{task_id_hex}.dump"));
+                }
+                if let Some(explain) = &explain {
+                    tracer.add_custom(explain.clone());
                 }
                 tracer
             },
@@ -232,6 +242,9 @@ fn main() -> ExitCode {
             .0,
         );
         let duration_ms = start.elapsed().as_millis() as u64;
+        if let Some(explain) = &explain {
+            println!("{}", explain.report());
+        }
         match solution.status {
             SolutionStatus::Answer(_) => {
                 println!(

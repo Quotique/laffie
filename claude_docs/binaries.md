@@ -10,18 +10,26 @@ redb-backed `database::Db`, reports statistics.
 ### Files
 - `main.rs` — argument parsing, main loop, statistics
 - `settings.rs` — YAML config deserialization
+- `check.rs` — `--check` domain linter (parse/dangling errors, typo'd params)
+- `run_diff.rs` — `RunDiff`: regression diff of a run vs the task's last stored run
+- `explain.rs` — `ExplainTracer`/`ExplainReport`: `--explain` cycle breakdown
 
 ### CLI Arguments
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--config` | `./config/local.json` | Config file path |
-| `--only` | `""` | Filter tasks by 32-hex `TaskId` prefix/suffix |
+| `--config` | `config/cli.yaml` | Config file path |
+| `--only` | `""` | Filter tasks by name, or 32-hex `TaskId` prefix/suffix (comma-separated) |
 | `--remove` | — | Remove task from DB by 32-hex `TaskId` (cascades to its runs) |
 | `--symbols` | — | Override symbols directory |
-| `--tasks` | — | Override tasks directory |
+| `--tasks` / `-p` | — | Override tasks directory (pick a task set) |
 | `--db-path` | `./db/tasks.redb` | redb file path |
 | `--trace` | false | Dump solver trace into `dumps/<id>.dump` |
 | `--exec-deadline` | 100000 | Max execution cycles |
+| `--time-limit` | 86400 | Wall-clock limit (seconds) per task |
+| `--record` | false | Persist each run to the DB as the new baseline (default: read-only diff) |
+| `--check` | false | Lint the corpus instead of solving; non-zero exit on errors |
+| `--strict` | false | With `--check`, treat warnings as errors |
+| `--explain` | false | Print per-task cycle breakdown (aggregating tracer; best with `--only`) |
 
 ### Main Flow
 1. Parse args → load settings → init logger.
