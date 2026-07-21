@@ -1,6 +1,7 @@
 #![allow(clippy::redundant_field_names)]
 #![allow(clippy::module_inception)]
 
+mod run_diff;
 mod settings;
 
 use std::{
@@ -16,7 +17,7 @@ use parser::DirectoryParser;
 use solver::task::{RunControl, SolutionStatus, Solver, Task as SolverTask, TracerHub};
 use view::View;
 
-use crate::settings::Settings;
+use crate::{run_diff::RunDiff, settings::Settings};
 
 /// Core develop/debug environment
 #[derive(Parser, Debug)]
@@ -57,6 +58,11 @@ struct Args {
     /// Wall-clock time limit (in seconds) per problem
     #[clap(short = 'l', long, default_value = "86400")]
     time_limit: u64,
+
+    /// Persist each run to the DB as the new baseline. Off (default) is
+    /// read-only: the run-vs-last-run diff is still computed and printed.
+    #[clap(long)]
+    record: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -156,6 +162,7 @@ fn main() -> ExitCode {
     }
 
     let mut stats: HashMap<String, SolveStats> = Default::default();
+    let mut diff = RunDiff::default();
 
     let only_ids: Vec<&str> = only
         .split(',')
@@ -182,15 +189,19 @@ fn main() -> ExitCode {
             .any(|w| id.starts_with(w) || id.ends_with(w))
     }) {
         let db_task = DbTask::from(&solver_task);
-        if let Err(e) = db.put_task(&db_task) {
+        if args.record &&
+            let Err(e) = db.put_task(&db_task)
+        {
             println!("task put error: {e:?}");
         }
 
         let solver_task: SolverTask = db_task.clone().into();
         println!("{} {}", "Task".bold().green(), solver_task);
         let task_id_hex = id_to_hex(&db_task.id);
+        let task_label = format!("{}/{}", db_task.group, &task_id_hex[..8]);
         let mut solver = Solver::new(rules_engine.clone());
 
+        let start = std::time::Instant::now();
         let solution = solver.solve(
             solver_task,
             {
@@ -206,6 +217,7 @@ fn main() -> ExitCode {
             )
             .0,
         );
+        let duration_ms = start.elapsed().as_millis() as u64;
         match solution.status {
             SolutionStatus::Answer(_) => {
                 println!(
@@ -248,9 +260,21 @@ fn main() -> ExitCode {
             }
         };
 
-        let run = Run::from_solution(db_task.id, &solution);
-        if let Err(e) = db.add_run(run) {
-            println!("run add error: {e:?}");
+        // Diff against the last stored run (read-only; always computed).
+        let prev = db.last_run(db_task.id).ok().flatten();
+        diff.record(
+            &task_label,
+            prev.as_ref(),
+            solution.answer().as_deref(),
+            duration_ms,
+        );
+
+        if args.record {
+            let mut run = Run::from_solution(db_task.id, &solution);
+            run.stats.duration_ms = Some(duration_ms);
+            if let Err(e) = db.add_run(run) {
+                println!("run add error: {e:?}");
+            }
         }
     }
 
@@ -262,9 +286,11 @@ fn main() -> ExitCode {
         println!("{group}: {stats}");
     }
     println!("total: {total}");
+    println!("{diff}");
 
-    // Only a wrong answer is a hard failure; unsolved tasks are not.
-    if total.answer_changed > 0 {
+    // A wrong answer (vs expected) or a regression (newly failing vs last run)
+    // is a hard failure; unsolved tasks on their own are not.
+    if total.answer_changed > 0 || diff.has_regression() {
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS

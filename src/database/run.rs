@@ -33,8 +33,9 @@ pub struct RunStats {
     /// quick lookups don't pay the full trace deserialization cost.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer:      Option<TermBuf>,
-    /// Wall-clock duration. Currently always `None` (the solver tracks
-    /// only cycles); reserved for when timing is wired in.
+    /// Wall-clock duration, set by the cli around `solve`. `None` when the
+    /// producer did not time the run (e.g. `Run::from_solution` before it is
+    /// filled in).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<u64>,
 }

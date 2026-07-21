@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- cli: run history in the DB is now read back as a regression diff. Each run
+  is compared against the task's last stored run and the summary reports
+  `NEWLY FAILING`, `NEWLY SOLVED`, `ANSWER CHANGED (vs last run)`, and
+  `SLOWER >2x` (using a new per-run `duration_ms`); a newly-failing task makes
+  the exit code non-zero. Persisting a run is now opt-in via `--record`
+  (default off is read-only: the diff is still computed), so experimental runs
+  no longer pollute the history
+
 ### Changed
 - Cancellation is now a first-class run control instead of riding on the
   observability `Tracer`: `Solver::solve` takes a `RunControl` bundling the
