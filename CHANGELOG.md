@@ -7,180 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Inequality proving (stage 1: signs and numeric bounds). Comparison symbols
-  (`>`, `>=`, `<`, `<=`) gained `prove`-gated rules for square axioms
-  (`x^2 >= 0`, `x^2 + 1 > 0`), bound weakening, transitivity, sums of bounds,
-  and product signs. A numeric bound-implication check in the prover's answer
-  step (`bound_implies`) closes goals like `x > 0` from `x > 2` directly,
-  independent of the rule search. See `doc/ru/inequalities.md`.
-- Inequality proving (stage 2: sign, power, and bounded-estimate lemmas, in
-  rules only — no core changes). Proves goals over bounded variables such as
-  `x^3 + 3 > 0` and `x^2 < 30` on `0 <= x < 5`, `x^3 > 0`, `x^4 >= 0` (for
-  `x >= 0`), `abs(x) >= 0`, and n-ary sums like `x + y + z > 6`. Estimate
-  arithmetic rides in numeric requirements (`b*b <= c`).
-- `<expr> is even` predicate, enabling unconditional even-power lemmas
-  (`x^4 >= 0`, `x^2 + y^2 + 1 > 0`) — an even integer exponent makes the power
-  nonnegative for any base.
-- Monotone scaling (`x*z > y*z` from `x > y, z > 0`) and bounded-above linear
-  (`6 - x > 0` from `x < 5`) inequality lemmas.
-- Product of two lower bounds against a number (`x*y > 6` from `x > 2, y > 3`),
-  via a scaling lemma whose estimate `2*y >= 6` is discharged by constant
-  scaling — all requirements use multiplication, never division.
-- `abs(x) >= x` lemma (absolute value is never below its argument).
-
-### Fixed
-- The prove-goal answer check is now stable under commutative argument order:
-  the goal term is normalized before it enters the goal index, so a derived
-  term equal to the goal modulo `+`/`*` reordering (e.g. `-x + 6 > 0` vs
-  `6 - x > 0`) is recognized. Previously such proofs were silently missed.
-
-### Changed
-- Numbers are now exact rationals (`num::BigRational`) instead of `BigDecimal`.
-  Division of numbers always yields a single reduced number, so the ad-hoc
-  rational layer (gcd `simplify`, the `MAX_DEC_CONVERSION_EXP` threshold that
-  left some quotients as `/` terms) is gone and a value has one canonical
-  representation (`0.5` and `1/2` no longer differ). Numbers render as a
-  terminating decimal when the denominator is 2·5-smooth, otherwise `p/q`.
-  Some answers change form accordingly (e.g. a parameter solution now prints
-  `2.5 - 0.5*t` rather than `(5 - t)/2`); the value is unchanged. Also fixes a
-  latent bug where a literal fractional exponent (`13^(1/2)`) was truncated to
-  `13^0 = 1`; fractional exponents are now left unevaluated. Persisted number
-  encoding changed, so the DB schema version is bumped (existing databases must
-  be recreated).
-- Task identity and DB persistence hardened. `TaskId` is now `blake3` over the
-  canonical **text** rendering of a task's givens and goal (domain
-  `laffie:task:v2`) instead of serde-json bytes, so it no longer shifts when
-  the serialization format changes. The redb file carries a `schema_version`;
-  `Db::open` refuses a file with a different version, or one predating
-  versioning, with a clear error rather than misreading it. **Existing
-  databases are incompatible and must be recreated.** The solver task id is now
-  a location-independent content hash of its terms (was a hash of the syntax
-  tree, so it changed on reformatting), and the DB now stores and restores the
-  task `name` (previously dropped) instead of truncating the 128-bit id into it
-
-### Fixed
-- Solving is now fully deterministic: `*` multiplication grouped its factors
-  in a `HashMap` and iterated it in random order in release builds (the sort
-  was gated behind `#[cfg(test)]`), so a product's factor order — and thus the
-  normalized term, its `TaskId`, and downstream search order and cycle counts —
-  varied run to run. Factors are now grouped in an insertion-ordered `IndexMap`
-  and sorted in every build, so repeated runs of the same corpus are
-  byte-identical (matching the earlier `plus` fix)
+## [0.7.0] - 2026-07-21
 
 ### Added
-- cli: `--coverage` lists, after the run, every loaded rule that produced no
-  accepted hypothesis over the tasks solved (dead rules), split into
-  never-fired and fired-but-useless (generated hypotheses, all rejected) with
-  reject counts. Aggregates over `on_hypothesis_finish` against the full rule
-  set (`RulesEngine::iter`); observation only, so search behaviour is
-  unchanged. Coverage is relative to the tasks actually run (respects `--only`)
-- cli: `--explain` prints a per-task breakdown of where a solve spent its
-  cycles — total cycles, the top focused terms (focuses ≈ cycles), each rule's
-  accepted/rejected hypothesis counts (surfacing rules that only generate dead
-  weight), and the subtask count, max depth, and solved/failed split. Purely an
-  aggregating tracer over existing hooks, so it changes no search behaviour;
-  best combined with `--only <id>` to focus one task
-- cli: `--check` domain linter. Loads the corpus without solving and reports
-  load errors (parse failures and dangling `block(...)` references) as hard
-  errors, and leaf params within a small edit distance of a real symbol name
-  (a mistyped symbol silently parsed as a param) as warnings; `--strict`
-  promotes warnings to errors. Exits non-zero on errors
-- cli: run history in the DB is now read back as a regression diff. Each run
-  is compared against the task's last stored run and the summary reports
-  `NEWLY FAILING`, `NEWLY SOLVED`, `ANSWER CHANGED (vs last run)`, and
-  `SLOWER >2x` (using a new per-run `duration_ms`); a newly-failing task makes
-  the exit code non-zero. Persisting a run is now opt-in via `--record`
-  (default off is read-only: the diff is still computed), so experimental runs
-  no longer pollute the history
+- Inequality proving over `>`, `>=`, `<`, `<=`: sign/bound/power/estimate lemmas
+  and a `bound_implies` check (`x^2 >= 0`, `x*y > 6`, …; `doc/ru/inequalities.md`).
+- `<expr> is even` predicate → unconditional even-power lemmas (`x^4 >= 0`,
+  `x^2 + y^2 + 1 > 0`).
+- cli `--coverage`: lists dead rules (never-fired vs fired-but-useless).
+- cli `--explain`: per-task cycle / focus / rule / subtask breakdown.
+- cli `--check`: domain linter — load errors and near-miss symbol names
+  (`--strict` promotes warnings; non-zero exit on errors).
+- cli regression diff vs the task's last run (`NEWLY FAILING` / `SOLVED`,
+  `ANSWER CHANGED`, `SLOWER >2x`); recording opt-in via `--record`.
 
 ### Changed
-- cli: collapsed the near-duplicate `cli_regress` / `cli_slow` / `cli_unsolved`
-  configs into the single canonical `config/cli.yaml`; pick a task set with
-  `-p/--tasks` (e.g. `-p tasks/regress`). The `--config` default now points at
-  `config/cli.yaml` (was a non-existent `local.json`). `config/cli_trace.yaml`
-  stays as the verbose-logging profile
-- Cancellation is now a first-class run control instead of riding on the
-  observability `Tracer`: `Solver::solve` takes a `RunControl` bundling the
-  cycle budget, wall-clock deadline, and a `CancelToken`, all checked together
-  each cycle (and while grounding a large operator). `Tracer::is_cancelled` is
-  gone, so the trait is purely observational; the TUI holds the `CancelToken`
-  directly rather than smuggling a flag through a tracer
-- Subterm matching (`find_matching_subterms`) carries each node's path
-  incrementally down the BFS instead of recomputing it per node by walking to
-  the root and scanning siblings (which was O(n²) over a term), and skips the
-  full pattern match on nodes whose root can't match the pattern root anyway.
-  Same matches, same answers; removes an O(n²) scan that grows with term width
-- Pattern-match substitutions share their bound param values via `Arc`
-  instead of owning a deep-cloned term each: cloning a substitution across a
-  match branch (or a hypothesis) now only bumps refcounts, and the deep copy
-  happens once, at the point a value is written into a result term. ~11%
-  faster on the `slow` corpus, same answers
-- The solver picks the next term to work on from a `(level, id)` min-heap
-  instead of scanning every term each cycle, and caches each term's
-  provenness at insertion instead of re-checking its requirements on every
-  scan. Search order is unchanged (`id` breaks level ties, as before)
-- Hypothesis grounding is now lazy: the cartesian product over `param in
-  set(...)` generators is pulled on demand instead of being fully materialized,
-  so a rule application that succeeds on its first grounding no longer builds
-  every combination first. `produce` also short-circuits the per-hypothesis
-  `solve(...)` resolution and polls the wall-clock deadline while walking a
-  large product, so a generator over a huge set aborts on the time limit
-  instead of hanging
-- A `prove` goal that reduces to a trivial truth (e.g. `x^2 >= 0`) is now
-  solved without any witness condition; previously such goals needed a
-  fictitious `t == 0` term to give the answer check a non-goal term to focus.
-- Commutative / associative-commutative pattern matching is now a lazy
-  backtracking search instead of materializing every permutation / partition:
-  it prunes incompatible candidates, deduplicates results, and is bounded by a
-  search budget that returns partial matches on exhaustion instead of failing
-  the whole match. A large operator term no longer silently stops matching once
-  it exceeds a fixed partition count. Non-linear pattern params (`?a` repeated)
-  are checked by equality rather than a re-match
+- Numbers are exact rationals (`num::BigRational`); some answers change form
+  (values unchanged) and `13^(1/2)` no longer truncates.
+- `TaskId` / task id are content hashes stable across reformat and serde; redb
+  carries a `schema_version` and stores the task `name`. Recreate databases.
+- Cancellation via a first-class `RunControl` (budget + deadline + `CancelToken`);
+  `Tracer` is now purely observational.
+- Commutative / AC matching is a budgeted lazy backtracking search (no more
+  permutation/partition blow-up or completeness cliff).
+- Search hot-path ~11% faster (`slow` corpus, answers unchanged): lazy grounding,
+  min-heap agenda, `Arc` substitutions, incremental subterm paths.
+- A `prove` goal reducing to a trivial truth (e.g. `x^2 >= 0`) needs no witness
+  term.
+- cli: single `config/cli.yaml`, pick tasks with `-p/--tasks`; `--config`
+  default fixed.
+- cli: non-zero exit on failure (load error / broken config / wrong answer);
+  wrong answers no longer counted as solved.
+- Directory loading collects all errors (`LoadReport`) instead of aborting on
+  the first; sorted order, one Python run per symbol.
 
 ### Fixed
-- A procedural (Python) symbol whose result cannot be (de)serialized is now a
-  no-op instead of crashing the solver — the failure joins the same skip path
-  as a Python exception
-- Procedural symbols no longer depend on the current working directory: the
-  sympy helper source is embedded in the binary and injected as
-  `SYMPY_CONVERT_SRC`, so running from any directory (with absolute config
-  paths) works
-- Parser error locations are correct in files with multi-byte (e.g. Cyrillic)
-  content: newline offsets are counted in bytes to match `peg`'s positions, and
-  the column is counted in characters. The last line no longer reports a row one
-  short, and `error_string` no longer panics when the row is past the end
-- Logging no longer stalls the solver: the level filter now runs ahead of the
-  async drain, so a suppressed record (e.g. a hot-loop `trace!` at the default
-  `Info` level) is dropped on the logging thread instead of being serialized
-  into an owned record and blocked on the full log channel. A regress run at
-  `Info` drops from ~85s to ~7s
-- A rule with more than one `solve(...) == Param` requirement now binds every
-  parameter: bindings are accumulated and applied in a single substitution
-  instead of keeping only the last, which left the earlier params free and
-  silently dropped the hypothesis
-- Search-loop panics are now recoverable: a term-stack overflow propagates as
-  `SolveError::StackOverflow`, subtask build failures surface as an errored
-  subtask solution (`SolveError::Internal`), and a subtask condition whose
-  parent was not copied over degrades to a parent-less term
-- A rule whose `block(...)` reference never resolves is reported as a load
-  error (listing the undefined ids) instead of panicking `suggest_rules` at
-  solve time
-
-### Changed
-- cli: exit with a non-zero code on failure — a rule/task load error, a
-  broken config/paths/db, or any wrong answer in the corpus. Unsolved tasks
-  are not treated as failures. A wrong answer is now counted only under
-  `wrong answer`, no longer double-counted as `solved`
-- Directory loading no longer swallows errors or aborts on the first broken
-  file: `load_rules` / `load_tasks` return a `LoadReport` collecting every
-  parse error (with path and location), and the loader keeps going. cli lists
-  all load errors and refuses to run a broken corpus; the TUI continues with
-  whatever loaded
-- Block type is dispatched by its root token (`Declare` / `Rule` / `Task`)
-  instead of by which parser happened to fail, so a broken symbol is reported
-  as a symbol error. Files are loaded in a deterministic (sorted) order, and a
-  symbol's Python program runs once instead of twice
+- Prove-goal answer check stable under `+`/`*` reordering (`-x + 6 > 0` =
+  `6 - x > 0`).
+- Fully deterministic solving: `*` factor order via a sorted `IndexMap` (was a
+  random-order `HashMap` in release builds).
+- A rule with multiple `solve(...) == Param` requirements binds every param.
+- Search-loop panics recoverable (`StackOverflow` / `Internal`); an unresolved
+  `block(...)` is a load error, not a panic.
+- Procedural symbols: a (de)serialize failure is a no-op, and no CWD dependency
+  (embedded sympy helper).
+- Parser error locations correct with multi-byte content (byte offsets, char
+  columns; off-by-one and past-end fixed).
+- Logging level filter runs ahead of the async drain — regress at `Info`
+  ~85s → ~7s.
 
 ## [0.6.0] - 2026-07-09
 
