@@ -8,7 +8,7 @@ use container::all_func_symbols;
 use parking_lot::{RawRwLock, RwLockReadGuard, lock_api::MappedRwLockReadGuard};
 use serde_derive::{Deserialize, Serialize};
 
-pub use program::{SymbolAttr, SymbolAttrValue, SymbolProgram, Truth};
+pub use program::{SymbolAttr, SymbolAttrValue, SymbolProgram, Truth, TruthCtx};
 
 use crate::{
     CompactString, NormLevel,
@@ -65,8 +65,8 @@ impl Symbol {
         None
     }
 
-    pub fn check_truth(&self, node: TermRef) -> Truth {
-        (self.program().truth_checker)(node)
+    pub fn check_truth(&self, node: TermRef, ctx: TruthCtx) -> Truth {
+        (self.program().truth_checker)(node, ctx)
     }
 
     #[inline]

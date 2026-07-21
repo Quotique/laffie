@@ -1,5 +1,5 @@
 use super::SymbolProgram;
-use crate::term::{Term, TermRef, Truth};
+use crate::term::{Term, TermRef, Truth, TruthCtx};
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
@@ -11,13 +11,13 @@ pub fn symbol() -> SymbolProgram {
 
 /// Kleene disjunction: `True` if any operand is `True`; `False` if every
 /// operand is `False`; otherwise `Unknown`.
-pub fn or(root: TermRef) -> Truth {
+pub fn or(root: TermRef, ctx: TruthCtx) -> Truth {
     if !root.data().is_symbol_name("||") {
         return Truth::Unknown;
     }
     let mut all_false = true;
     for arg in root.args_iter() {
-        match arg.truth() {
+        match arg.truth(ctx) {
             Truth::True => return Truth::True,
             Truth::Unknown => all_false = false,
             Truth::False => {}
@@ -35,12 +35,12 @@ mod tests {
     use super::or;
     use crate::{
         NormLevel,
-        term::{Truth, term_with_vars},
+        term::{Truth, TruthCtx, term_with_vars},
     };
 
     fn truth(src: &'static str) -> Truth {
         let t = term_with_vars(src).normalize(NormLevel::Full);
-        or(t.term())
+        or(t.term(), TruthCtx::default())
     }
 
     #[test]

@@ -1,4 +1,8 @@
-use std::{cmp, collections::HashMap, fmt};
+use std::{
+    cmp,
+    collections::{HashMap, HashSet},
+    fmt,
+};
 
 use super::{Symbol, container};
 use crate::{
@@ -6,9 +10,31 @@ use crate::{
     term::{Term, TermMut, TermRef},
 };
 
-pub type TruthChecker = dyn Fn(TermRef) -> Truth + Sync + Send;
+pub type TruthChecker = dyn Fn(TermRef, TruthCtx) -> Truth + Sync + Send;
 pub type Comparator = dyn Fn(TermRef, TermRef) -> cmp::Ordering + Send + Sync;
 pub type Calculator = dyn Fn(&mut TermMut, NormLevel) -> bool + Send + Sync;
+
+/// Context threaded through truth evaluation. Carries the names of variables
+/// declared known (`v is known`), on which the truth of `_ is known` depends.
+/// Empty by default, for context-free checks.
+#[derive(Clone, Copy, Default)]
+pub struct TruthCtx<'a> {
+    known_vars: Option<&'a HashSet<CompactString>>,
+}
+
+impl<'a> TruthCtx<'a> {
+    #[inline]
+    pub fn new(known_vars: &'a HashSet<CompactString>) -> Self {
+        Self {
+            known_vars: Some(known_vars),
+        }
+    }
+
+    #[inline]
+    pub fn is_known(&self, name: &str) -> bool {
+        self.known_vars.is_some_and(|s| s.contains(name))
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Truth {
@@ -63,7 +89,7 @@ impl Default for SymbolProgram {
             attrs:         Default::default(),
             arg_cmp:       Box::new(|l, r| l.data().cmp(r.data())),
             calculator:    Box::new(|_, _| false),
-            truth_checker: Box::new(|_| Truth::Unknown),
+            truth_checker: Box::new(|_, _| Truth::Unknown),
         }
     }
 }

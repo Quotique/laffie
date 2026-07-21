@@ -1,7 +1,7 @@
 use super::SymbolProgram;
 use crate::{
     NormLevel,
-    term::{Atom, Term, TermMut, TermRef, Truth, sym},
+    term::{Atom, Term, TermMut, TermRef, Truth, TruthCtx, sym},
 };
 
 pub fn symbol() -> SymbolProgram {
@@ -35,13 +35,13 @@ fn not_replace(root: &mut TermMut, _: NormLevel) -> bool {
     }
 }
 
-pub fn is_not(root: TermRef) -> Truth {
+pub fn is_not(root: TermRef, ctx: TruthCtx) -> Truth {
     if !root.data().is_symbol_name("!") {
         return Truth::Unknown;
     }
 
     if let Some(child) = root.first_arg() {
-        return child.truth().reverse();
+        return child.truth(ctx).reverse();
     }
 
     Truth::Unknown

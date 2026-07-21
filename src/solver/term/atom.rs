@@ -21,9 +21,7 @@ pub struct Param(CompactString);
 #[derive(Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Variable {
-    name:      CompactString,
-    #[serde(skip)]
-    pub known: bool,
+    name: CompactString,
 }
 
 impl Variable {
@@ -68,7 +66,7 @@ impl fmt::Display for Variable {
 
 impl From<CompactString> for Variable {
     fn from(name: CompactString) -> Self {
-        Self { name, known: false }
+        Self { name }
     }
 }
 
@@ -82,10 +80,7 @@ impl FromStr for Variable {
     type Err = <CompactString as FromStr>::Err;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self {
-            name:  s.parse()?,
-            known: false,
-        })
+        Ok(Self { name: s.parse()? })
     }
 }
 
@@ -120,8 +115,7 @@ pub fn param(p: impl AsRef<str>) -> Param {
 #[inline]
 pub fn var(v: impl AsRef<str>) -> Variable {
     Variable {
-        name:  v.as_ref().into(),
-        known: false,
+        name: v.as_ref().into(),
     }
 }
 

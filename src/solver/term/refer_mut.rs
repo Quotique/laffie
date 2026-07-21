@@ -6,7 +6,7 @@ use trees::Node;
 use utils::SubsetIterator;
 
 use super::{
-    Atom, ParamSubstitution, Substitute, Symbol, Term, TermBuf, TermRef, Truth,
+    Atom, ParamSubstitution, Substitute, Symbol, Term, TermBuf, TermRef, Truth, TruthCtx,
     VariableSubstitution,
 };
 use crate::NormLevel;
@@ -200,8 +200,8 @@ impl<'a> TermMut<'a> {
     }
 
     #[inline]
-    pub fn truth(&self) -> Truth {
-        TermRef::from(self.0 as &Node<_>).truth()
+    pub fn truth(&self, ctx: TruthCtx) -> Truth {
+        TermRef::from(self.0 as &Node<_>).truth(ctx)
     }
 
     /// Swap data and children between two subterms.

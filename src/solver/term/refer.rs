@@ -14,7 +14,9 @@ use trees::Node;
 
 use utils::SubsetIterator;
 
-use super::{Atom, ParamSubstitution, SharedTerm, Symbol, TermBuf, TermPath, Truth, try_sym};
+use super::{
+    Atom, ParamSubstitution, SharedTerm, Symbol, TermBuf, TermPath, Truth, TruthCtx, try_sym,
+};
 
 /// Upper bound on search nodes visited while matching one commutative operator.
 /// A pathological AC term can't blow up: on exhaustion the matcher returns the
@@ -40,7 +42,7 @@ pub trait Term {
         self.as_ref().degree()
     }
 
-    fn truth(&self) -> Truth;
+    fn truth(&self, ctx: TruthCtx) -> Truth;
 }
 
 #[derive(Clone, Copy, From)]
@@ -92,10 +94,10 @@ impl<'a> Term for TermRef<'a> {
         self.0.degree()
     }
 
-    fn truth(&self) -> Truth {
+    fn truth(&self, ctx: TruthCtx) -> Truth {
         self.data()
             .symbol()
-            .map(|x| x.check_truth(*self))
+            .map(|x| x.check_truth(*self, ctx))
             .unwrap_or(Truth::Unknown)
     }
 }

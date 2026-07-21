@@ -134,7 +134,7 @@ src/solver/
 | Line | Type | Description |
 |------|------|-------------|
 | 18 | `Param(CompactString)` | Rule parameter placeholder |
-| 20 | `Variable { name, known }` | Task variable; `known` bit stamped at task load, excluded from eq/hash/serde |
+| 20 | `Variable { name }` | Task variable; known-ness lives in `Solution.known_vars`, checked via `TruthCtx` (not a per-atom flag) |
 | 92 | `ArgList(u64)` | Variadic argument placeholder `..` |
 | 102 | `Atom` | Enum: Symbol, Param, Variable, Number(Decimal), ArgList |
 
@@ -179,6 +179,7 @@ Implementors: `TermBuf`, `TermMut`, `Hypothesis`.
 | Line | Type | Description |
 |------|------|-------------|
 | 13 | `Truth` | Enum: True, False, Unknown |
+| 20 | `TruthCtx<'a>` | Truth-eval context; carries known-var names for `_ is known` |
 | 20 | `SymbolAttr` | Enum: Infix, Display, Associative, Commutative |
 | 35 | `SymbolProgram` | Symbol definition: name, attrs, arg_cmp, calculator, truth_checker |
 | 79 | `register()` | Registers symbol in global registry |

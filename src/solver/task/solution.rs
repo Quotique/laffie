@@ -14,7 +14,7 @@ use super::{Goal, Task, TermProps};
 use crate::{
     CompactString,
     rule::Level,
-    term::{Atom, SharedTerm, Term, TermBuf, TermMut, match_term},
+    term::{Atom, SharedTerm, Term, TermBuf, match_term},
 };
 
 pub const STACK_SIZE: usize = 2048;
@@ -57,6 +57,11 @@ pub struct Solution {
     pub find_bindings:    HashMap<TermBuf, TermIdx>,
     unproven_terms_count: usize,
 
+    /// Names of variables declared known (`v is known`) among the givens.
+    /// The truth of `_ is known` is evaluated against this set instead of a
+    /// per-atom flag, so term identity stays independent of known-ness.
+    pub known_vars: HashSet<CompactString>,
+
     /// Min-heap of proven, pickable terms keyed by `(level, id)` so that
     /// `pick_next` is O(log n) instead of a full scan. Holds stale entries
     /// (replaced terms, superseded levels) that are discarded lazily on peek.
@@ -81,6 +86,7 @@ impl Solution {
             }
         }
 
+        let known_vars = collect_known_set(&task.givens);
         let mut solution = Self {
             task,
             goal,
@@ -93,15 +99,13 @@ impl Solution {
             status: Default::default(),
             unproven_terms_count: Default::default(),
             agenda: Default::default(),
+            known_vars,
         };
-        let known = collect_known_set(&solution.task.givens);
         let conditions = solution.task.givens.clone();
-        for mut i in conditions.into_iter() {
-            stamp_known(&mut Arc::make_mut(&mut i.term).term_mut(), &known);
+        for i in conditions.into_iter() {
             let _ = solution.add_term(i);
         }
-        let mut goal_term = solution.goal.term().clone();
-        stamp_known(&mut Arc::make_mut(&mut goal_term.term).term_mut(), &known);
+        let goal_term = solution.goal.term().clone();
         let _ = solution.add_term(goal_term);
 
         trace!(target: "subtask", "Subtask: {}, [{}]",
@@ -235,27 +239,10 @@ fn collect_known_set(givens: &[TermProps]) -> HashSet<CompactString> {
     set
 }
 
-/// Stamp `known = true` on every variable whose name was declared known.
-fn stamp_known(term: &mut TermMut<'_>, known: &HashSet<CompactString>) {
-    if let Atom::Variable(v) = term.data_mut() &&
-        known.contains(v.as_ref())
-    {
-        v.known = true;
-    }
-    for mut child in term.iter_mut() {
-        stamp_known(&mut child, known);
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
     use super::Solution;
-    use crate::{
-        task::parse_task,
-        term::{Atom, Term, TermRef},
-    };
+    use crate::task::parse_task;
 
     fn is_send_sync<T: Send + Sync>() {}
 
@@ -264,27 +251,13 @@ mod test {
         is_send_sync::<Solution>();
     }
 
-    fn collect_var_known(term: TermRef<'_>, out: &mut HashMap<String, bool>) {
-        if let Atom::Variable(v) = term.data() {
-            *out.entry(v.as_str().to_string()).or_insert(false) |= v.known;
-        }
-        for child in term.args_iter() {
-            collect_var_known(child, out);
-        }
-    }
-
     #[test]
-    fn stamps_known_from_givens() {
+    fn known_vars_from_givens() {
         let task = parse_task("task { goal find(x); a*x == b; a is known; b is known; }");
         let solution = Solution::new(task);
 
-        let mut status = HashMap::new();
-        for tp in &solution.terms {
-            collect_var_known(tp.term.term(), &mut status);
-        }
-
-        assert_eq!(status.get("a"), Some(&true));
-        assert_eq!(status.get("b"), Some(&true));
-        assert_eq!(status.get("x"), Some(&false));
+        assert!(solution.known_vars.contains("a"));
+        assert!(solution.known_vars.contains("b"));
+        assert!(!solution.known_vars.contains("x"));
     }
 }

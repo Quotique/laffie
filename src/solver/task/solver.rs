@@ -22,7 +22,8 @@ use crate::{
     },
     task::{Tracer, solution::SolutionStatus},
     term::{
-        Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, match_term,
+        Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
+        match_term,
     },
 };
 
@@ -381,7 +382,7 @@ impl Solver {
             let Some(h) = self.resolve_solve_in_hypothesis(h, s, state) else {
                 continue;
             };
-            for hypothesis in h.ground() {
+            for hypothesis in h.ground(&s.known_vars) {
                 grounded_seen += 1;
                 if grounded_seen.is_multiple_of(DEADLINE_CHECK_INTERVAL) {
                     state.control.check(state.cycle_counter)?;
@@ -479,7 +480,7 @@ impl Solver {
         let term = term.normalize(NormLevel::Full);
         let prove_goal = SharedTerm::new(TermBuf::symbol("prove").arg(term.clone()));
 
-        match term.term().truth() {
+        match term.term().truth(TruthCtx::new(&solution.known_vars)) {
             // The proven term is itself the answer.
             Truth::True => {
                 let mut trivial_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
@@ -955,7 +956,12 @@ impl Solver {
                 solution.status = SolutionStatus::Answer(index);
                 return true;
             }
-            if solution[*i].term.term().truth().is_true() {
+            if solution[*i]
+                .term
+                .term()
+                .truth(TruthCtx::new(&solution.known_vars))
+                .is_true()
+            {
                 solution.status = SolutionStatus::Answer(*i);
                 // TODO: надо заполнить правильно
                 // согласовать с выводом решения по шагам

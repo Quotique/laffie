@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::SymbolProgram;
-use crate::term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermRef, Truth, match_term};
+use crate::term::{Atom, SymbolAttr, SymbolAttrValue, Term, TermRef, Truth, TruthCtx, match_term};
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
@@ -15,7 +15,7 @@ pub fn symbol() -> SymbolProgram {
     }
 }
 
-pub fn is(root: TermRef) -> Truth {
+pub fn is(root: TermRef, ctx: TruthCtx) -> Truth {
     let Some((lhs, rhs)) = match_term!(root, "is"(lhs, rhs)) else {
         return Truth::Unknown;
     };
@@ -27,10 +27,10 @@ pub fn is(root: TermRef) -> Truth {
                 Truth::False
             }
         }
-        // Known iff every leaf is a number or a variable stamped known.
+        // Known iff every leaf is a number or a variable named in the context.
         Atom::Symbol(s) if s == "known" => {
             if lhs.bfs().all(|v| match v.data {
-                Atom::Variable(var) => var.known,
+                Atom::Variable(var) => ctx.is_known(var.as_str()),
                 Atom::Param(_) | Atom::ArgList(_) => false,
                 _ => true,
             }) {
@@ -48,101 +48,93 @@ pub fn is(root: TermRef) -> Truth {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::term::{TermBuf, TermMut, term_with_vars};
+    use std::collections::HashSet;
 
-    fn stamp(mut t: TermBuf, known: &[&str]) -> TermBuf {
-        fn go(mut node: TermMut<'_>, known: &[&str]) {
-            if let Atom::Variable(v) = node.data_mut() &&
-                known.contains(&v.as_str())
-            {
-                v.known = true;
-            }
-            for child in node.iter_mut() {
-                go(child, known);
-            }
-        }
-        go(t.term_mut(), known);
-        t
+    use super::*;
+    use crate::term::{TermBuf, term_with_vars};
+
+    fn names(list: &[&str]) -> HashSet<crate::CompactString> {
+        list.iter().map(|s| (*s).into()).collect()
     }
 
     #[test]
     fn is_atom_true_for_number() {
         let t = term_with_vars("5 is atom");
-        assert_eq!(is(t.term()), Truth::True);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::True);
     }
 
     #[test]
     fn is_atom_true_for_variable() {
         let t = term_with_vars("x is atom");
-        assert_eq!(is(t.term()), Truth::True);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::True);
     }
 
     #[test]
     fn is_atom_false_for_compound() {
         let t = term_with_vars("x^2 is atom");
-        assert_eq!(is(t.term()), Truth::False);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
     }
 
     #[test]
     fn is_atom_false_for_sum() {
         let t = term_with_vars("a + b is atom");
-        assert_eq!(is(t.term()), Truth::False);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
     }
 
     #[test]
     fn is_known_true_for_number() {
         let t = term_with_vars("3 is known");
-        assert_eq!(is(t.term()), Truth::True);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::True);
     }
 
     #[test]
     fn is_known_false_for_unknown_variable() {
         let t = term_with_vars("x is known");
-        assert_eq!(is(t.term()), Truth::False);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
     }
 
     #[test]
     fn is_known_false_for_unknown_compound() {
         let t = term_with_vars("x + 1 is known");
-        assert_eq!(is(t.term()), Truth::False);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
     }
 
     #[test]
     fn is_known_true_for_known_compound() {
-        let lhs = stamp(term_with_vars("a^2 - 4"), &["a"]);
+        let lhs = term_with_vars("a^2 - 4");
         let t = TermBuf::symbol("is").arg(lhs).arg(TermBuf::symbol("known"));
-        assert_eq!(is(t.term()), Truth::True);
+        let known = names(&["a"]);
+        assert_eq!(is(t.term(), TruthCtx::new(&known)), Truth::True);
     }
 
     #[test]
     fn is_known_false_for_partially_unknown_compound() {
         let lhs = term_with_vars("a^2 - 4");
         let t = TermBuf::symbol("is").arg(lhs).arg(TermBuf::symbol("known"));
-        assert_eq!(is(t.term()), Truth::False);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
     }
 
     #[test]
     fn is_variable_true_for_variable() {
         let t = term_with_vars("x is variable");
-        assert_eq!(is(t.term()), Truth::True);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::True);
     }
 
     #[test]
     fn is_variable_unknown_for_number() {
         let t = term_with_vars("5 is variable");
-        assert_eq!(is(t.term()), Truth::Unknown);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::Unknown);
     }
 
     #[test]
     fn is_variable_unknown_for_compound() {
         let t = term_with_vars("x^2 is variable");
-        assert_eq!(is(t.term()), Truth::Unknown);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::Unknown);
     }
 
     #[test]
     fn non_is_term_returns_unknown() {
         let t = term_with_vars("x == 5");
-        assert_eq!(is(t.term()), Truth::Unknown);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::Unknown);
     }
 }
