@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Solving is now fully deterministic: `*` multiplication grouped its factors
+  in a `HashMap` and iterated it in random order in release builds (the sort
+  was gated behind `#[cfg(test)]`), so a product's factor order — and thus the
+  normalized term, its `TaskId`, and downstream search order and cycle counts —
+  varied run to run. Factors are now grouped in an insertion-ordered `IndexMap`
+  and sorted in every build, so repeated runs of the same corpus are
+  byte-identical (matching the earlier `plus` fix)
+
 ### Added
 - cli: run history in the DB is now read back as a regression diff. Each run
   is compared against the task's last stored run and the summary reports

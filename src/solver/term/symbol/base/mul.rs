@@ -1,6 +1,7 @@
 use std::{cmp::Ordering, collections::HashMap};
 
 use bigdecimal::{BigDecimal as Decimal, One, Zero};
+use indexmap::IndexMap;
 
 use crate::{
     NormalizationLevel,
@@ -55,7 +56,7 @@ pub fn multiply(root: &mut TermMut, level: NormalizationLevel) -> bool {
         _ => {
             let (constant, result) = fold_constant(root);
             let (powers, result) = root.iter_mut().fold(
-                (HashMap::<TermBuf, TermBuf>::new(), result),
+                (IndexMap::<TermBuf, TermBuf>::new(), result),
                 |acc, mut x| {
                     let power = extract_power(&mut x);
                     let (mut powers, mut result) = acc;
@@ -71,7 +72,9 @@ pub fn multiply(root: &mut TermMut, level: NormalizationLevel) -> bool {
                     (powers, result)
                 },
             );
-            #[cfg(test)]
+            // IndexMap keeps insertion order deterministic; sorting by
+            // `ordering` then yields a stable, reproducible factor order (ties
+            // between equally-ranked factors fall back to insertion order).
             let powers = {
                 let mut powers: Vec<_> = powers.into_iter().collect();
                 powers.sort_by(|x, y| ordering(x.0.term(), y.0.term()));
