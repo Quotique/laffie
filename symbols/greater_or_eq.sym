@@ -92,3 +92,10 @@ rule {
     c is even,
     b <= 0;
 }
+
+// Модуль не меньше своего аргумента (безусловно): abs(x) >= x.
+rule {
+    attr level(1),goal(prove(x));
+
+    abs(a) >= a <=> true;
+}
