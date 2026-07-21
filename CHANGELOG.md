@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and product signs. A numeric bound-implication check in the prover's answer
   step (`bound_implies`) closes goals like `x > 0` from `x > 2` directly,
   independent of the rule search. See `doc/ru/inequalities.md`.
+- Inequality proving (stage 2: sign, power, and bounded-estimate lemmas, in
+  rules only — no core changes). Proves goals over bounded variables such as
+  `x^3 + 3 > 0` and `x^2 < 30` on `0 <= x < 5`, `x^3 > 0`, `x^4 >= 0` (for
+  `x >= 0`), `abs(x) >= 0`, and n-ary sums like `x + y + z > 6`. Estimate
+  arithmetic rides in numeric requirements (`b*b <= c`).
 
 ### Changed
 - Numbers are now exact rationals (`num::BigRational`) instead of `BigDecimal`.

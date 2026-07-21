@@ -83,3 +83,11 @@ task { goal prove(x * y >= 0);    x >= 0; y >= 0; }
 task { goal prove(x > z);         x > y; y > z; }
 task { goal prove(1/x > 0);       x > 0; }
 
+// Этап 2 — знаковые/оценочные леммы и оценки на отрезке (см. doc/ru/inequalities.md).
+task { goal prove(x^3 + 3 > 0);   x >= 0; x < 5; }
+task { goal prove(x^2 < 30);      x >= 0; x < 5; }
+task { goal prove(x^3 > 0);       x > 0; }
+task { goal prove(x^4 >= 0);      x >= 0; }
+task { goal prove(abs(x) >= 0); }
+task { goal prove(x + y + z > 6); x > 1; y > 2; z > 3; }
+
