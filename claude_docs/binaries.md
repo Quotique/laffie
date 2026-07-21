@@ -13,6 +13,7 @@ redb-backed `database::Db`, reports statistics.
 - `check.rs` — `--check` domain linter (parse/dangling errors, typo'd params)
 - `run_diff.rs` — `RunDiff`: regression diff of a run vs the task's last stored run
 - `explain.rs` — `ExplainTracer`/`ExplainReport`: `--explain` cycle breakdown
+- `coverage.rs` — `CoverageTracer`/`CoverageReport`: `--coverage` dead-rule list
 
 ### CLI Arguments
 | Flag | Default | Description |
@@ -30,6 +31,7 @@ redb-backed `database::Db`, reports statistics.
 | `--check` | false | Lint the corpus instead of solving; non-zero exit on errors |
 | `--strict` | false | With `--check`, treat warnings as errors |
 | `--explain` | false | Print per-task cycle breakdown (aggregating tracer; best with `--only`) |
+| `--coverage` | false | After the run, list dead rules (0 accepted hypotheses) over the tasks run |
 
 ### Main Flow
 1. Parse args → load settings → init logger.

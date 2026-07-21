@@ -2,6 +2,7 @@
 #![allow(clippy::module_inception)]
 
 mod check;
+mod coverage;
 mod explain;
 mod run_diff;
 mod settings;
@@ -19,7 +20,9 @@ use parser::DirectoryParser;
 use solver::task::{RunControl, SolutionStatus, Solver, Task as SolverTask, TracerHub};
 use view::View;
 
-use crate::{explain::ExplainTracer, run_diff::RunDiff, settings::Settings};
+use crate::{
+    coverage::CoverageTracer, explain::ExplainTracer, run_diff::RunDiff, settings::Settings,
+};
 
 /// Core develop/debug environment
 #[derive(Parser, Debug)]
@@ -79,6 +82,12 @@ struct Args {
     /// (focused terms, rule accept/reject counts, subtasks). Best with --only.
     #[clap(long)]
     explain: bool,
+
+    /// After the run, list loaded rules that produced no accepted hypothesis
+    /// over the tasks run (dead rules), split into never-fired and fired-but-
+    /// useless.
+    #[clap(long)]
+    coverage: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -183,6 +192,7 @@ fn main() -> ExitCode {
 
     let mut stats: HashMap<String, SolveStats> = Default::default();
     let mut diff = RunDiff::default();
+    let coverage = args.coverage.then(CoverageTracer::default);
 
     let only_ids: Vec<&str> = only
         .split(',')
@@ -232,6 +242,9 @@ fn main() -> ExitCode {
                 }
                 if let Some(explain) = &explain {
                     tracer.add_custom(explain.clone());
+                }
+                if let Some(coverage) = &coverage {
+                    tracer.add_custom(coverage.clone());
                 }
                 tracer
             },
@@ -314,6 +327,9 @@ fn main() -> ExitCode {
     }
     println!("total: {total}");
     println!("{diff}");
+    if let Some(coverage) = &coverage {
+        println!("{}", coverage.report(&rules_engine));
+    }
 
     // A wrong answer (vs expected) or a regression (newly failing vs last run)
     // is a hard failure; unsolved tasks on their own are not.

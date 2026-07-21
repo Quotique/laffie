@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   byte-identical (matching the earlier `plus` fix)
 
 ### Added
+- cli: `--coverage` lists, after the run, every loaded rule that produced no
+  accepted hypothesis over the tasks solved (dead rules), split into
+  never-fired and fired-but-useless (generated hypotheses, all rejected) with
+  reject counts. Aggregates over `on_hypothesis_finish` against the full rule
+  set (`RulesEngine::iter`); observation only, so search behaviour is
+  unchanged. Coverage is relative to the tasks actually run (respects `--only`)
 - cli: `--explain` prints a per-task breakdown of where a solve spent its
   cycles — total cycles, the top focused terms (focuses ≈ cycles), each rule's
   accepted/rejected hypothesis counts (surfacing rules that only generate dead
