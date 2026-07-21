@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Commutative / associative-commutative pattern matching is now a lazy
+  backtracking search instead of materializing every permutation / partition:
+  it prunes incompatible candidates, deduplicates results, and is bounded by a
+  search budget that returns partial matches on exhaustion instead of failing
+  the whole match. A large operator term no longer silently stops matching once
+  it exceeds a fixed partition count. Non-linear pattern params (`?a` repeated)
+  are checked by equality rather than a re-match
+
 ### Fixed
 - A procedural (Python) symbol whose result cannot be (de)serialized is now a
   no-op instead of crashing the solver — the failure joins the same skip path
