@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- A procedural (Python) symbol whose result cannot be (de)serialized is now a
+  no-op instead of crashing the solver — the failure joins the same skip path
+  as a Python exception
+- Procedural symbols no longer depend on the current working directory: the
+  sympy helper source is embedded in the binary and injected as
+  `SYMPY_CONVERT_SRC`, so running from any directory (with absolute config
+  paths) works
+- Parser error locations are correct in files with multi-byte (e.g. Cyrillic)
+  content: newline offsets are counted in bytes to match `peg`'s positions, and
+  the column is counted in characters. The last line no longer reports a row one
+  short, and `error_string` no longer panics when the row is past the end
 - Logging no longer stalls the solver: the level filter now runs ahead of the
   async drain, so a suppressed record (e.g. a hot-loop `trace!` at the default
   `Info` level) is dropped on the logging thread instead of being serialized

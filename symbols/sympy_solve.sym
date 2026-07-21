@@ -1,7 +1,7 @@
 symbol sympy_solve {
     py
 "
-exec(open('symbols/py/sympy_convert.py').read())
+exec(SYMPY_CONVERT_SRC)
 
 def calculator(root, level):
     if root.symbol != 'sympy_solve' or len(root) != 2:

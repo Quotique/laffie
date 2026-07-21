@@ -1,7 +1,8 @@
 """Conversion utilities between Laffie Term trees and sympy expressions.
 
-Usage from .sym files:
-    exec(open('symbols/py/sympy_convert.py').read())
+This file is embedded into the binary at compile time and injected into the
+Python environment as `SYMPY_CONVERT_SRC`. Usage from .sym files:
+    exec(SYMPY_CONVERT_SRC)
     # now `to_sympy(node, x_sym)` and `from_sympy(expr, var_name, Term)` are available
 """
 

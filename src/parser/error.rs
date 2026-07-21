@@ -38,7 +38,7 @@ impl From<PegError> for ParserError {
                     0
                 },
                 row: value.location.line,
-                len: value.location.offset,
+                len: 0, // `offset` is an absolute position, not a length
             },
             msg: format!("expected: {}", value.expected),
         }
@@ -55,8 +55,10 @@ impl ParserError {
             .map(|(n, s)| format!("{:>count_len$}: {s}", n + 1))
             .collect();
 
+        // Clamp: a row past the end (EOF) must not index out of bounds.
+        let insert_at = self.loc.row.min(lines.len());
         lines.insert(
-            self.loc.row,
+            insert_at,
             format!(
                 "{}^~~: {}",
                 " ".repeat(self.loc.col + count_len + 2),
@@ -64,8 +66,8 @@ impl ParserError {
             ),
         );
 
-        let first_line = self.loc.row.saturating_sub(LINES_AROUND);
-        let last_line = std::cmp::min(lines.len(), self.loc.row + LINES_AROUND);
+        let first_line = insert_at.saturating_sub(LINES_AROUND);
+        let last_line = std::cmp::min(lines.len(), insert_at + LINES_AROUND + 1);
 
         format!(
             "\n{}:{}:{}: error: parsing error\n{}",

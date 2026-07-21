@@ -2,6 +2,7 @@ use std::{ffi::CString, str::FromStr};
 
 use log::*;
 use pyo3::{
+    exceptions::PyValueError,
     prelude::*,
     types::{IntoPyDict, PyDict},
 };
@@ -45,6 +46,12 @@ impl<'a> SymbolParser<'a> {
                     let locals = PyDict::new(py);
                     // Инжектируем класс Term в окружение пользовательского кода
                     locals.set_item("Term", get_term_class(py))?;
+                    // Исходник sympy-хелперов вкомпилен: .sym делают `exec(SYMPY_CONVERT_SRC)`
+                    // вместо чтения файла с диска (не зависит от CWD).
+                    locals.set_item(
+                        "SYMPY_CONVERT_SRC",
+                        include_str!("../../symbols/py/sympy_convert.py"),
+                    )?;
                     let code = CString::new(program.as_str())?;
                     py.run(&code, Some(&locals), None)?;
 
@@ -65,8 +72,9 @@ impl<'a> SymbolParser<'a> {
                             let calc_fn = calc_fn.as_ref().unwrap();
 
                             // Сериализуем терм в JSON-dict и оборачиваем в Term
-                            let json_str = serde_json::to_string(&root.as_ref())
-                                .expect("Unable to serialize term");
+                            let json_str = serde_json::to_string(&root.as_ref()).map_err(|e| {
+                                PyValueError::new_err(format!("serialize term: {e}"))
+                            })?;
                             let json_mod = py.import("json")?;
                             let json_dict = json_mod.call_method1("loads", (json_str.as_str(),))?;
                             let term_cls = get_term_class(py);
@@ -83,8 +91,10 @@ impl<'a> SymbolParser<'a> {
                             let json_dict = result.call_method0("_to_json")?;
                             let json_str: String =
                                 json_mod.call_method1("dumps", (json_dict,))?.extract()?;
-                            let mut term: TermBuf = serde_json::from_str(&json_str)
-                                .expect("Unable to parse procedure result");
+                            let mut term: TermBuf =
+                                serde_json::from_str(&json_str).map_err(|e| {
+                                    PyValueError::new_err(format!("parse procedure result: {e}"))
+                                })?;
                             root.swap(&mut term.term_mut());
 
                             Ok(true)
@@ -192,5 +202,28 @@ pub mod tests {
 ";
         }"#;
         let _states = lang::symbol(test_str).unwrap();
+    }
+
+    #[test]
+    fn malformed_calculator_result_is_a_noop() {
+        use solver::NormalizationLevel;
+
+        // A procedural calculator whose result can't be deserialized must be a
+        // no-op, not a panic: the term stays put and the solver keeps running.
+        let test_str = r#"symbol foo {
+            py "
+def calculator(root, level):
+    return Term.number('not_a_number')
+";
+        }"#;
+        let states = lang::symbol(test_str).unwrap();
+        let program = SymbolParser::from(&states).parse().unwrap();
+
+        let mut term = TermBuf::variable("x");
+        let original = term.clone();
+        let changed = (program.calculator)(&mut term.term_mut(), NormalizationLevel::max());
+
+        assert!(!changed, "a failing calculator must report no change");
+        assert_eq!(term, original, "the term must be left untouched");
     }
 }

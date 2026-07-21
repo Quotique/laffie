@@ -6,7 +6,7 @@
 symbol solve_with_odz {
     py
 "
-exec(open('symbols/py/sympy_convert.py').read())
+exec(SYMPY_CONVERT_SRC)
 
 def calculator(root, level):
     if root.symbol != 'solve_with_odz' or len(root) != 2:
