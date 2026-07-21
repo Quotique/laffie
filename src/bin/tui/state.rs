@@ -293,20 +293,8 @@ impl State {
     }
 
     pub fn mark_to_solve(&mut self, node_id: TreeIndex) {
-        let Some(node) = self.tasks.get(&node_id) else {
-            return;
-        };
-
-        match node.data() {
-            TasksNode::Task(_) => {
-                self.solve_queue.push(node_id);
-            }
-            TasksNode::Directory(_) => {
-                let mut tasks = Vec::new();
-                collect_task_ids(node, &mut tasks);
-                self.solve_queue.extend(tasks);
-            }
-        }
+        self.solve_queue
+            .extend(collect_to_solve(&self.tasks, node_id));
     }
 
     pub fn update_task_solution(&mut self, idx: &TreeIndex, solution: SharedSolution) {
@@ -327,6 +315,22 @@ impl State {
 
         let upd = DirectoryStatUpdate::for_transition(Some(from), Some(to));
         self.counters_update(idx, upd);
+    }
+}
+
+/// Task ids to enqueue when solving `node_id`: the node itself if it is a task,
+/// otherwise every leaf task beneath it (recursively, at any depth).
+fn collect_to_solve(tasks: &Tree<TasksNode>, node_id: TreeIndex) -> Vec<TreeIndex> {
+    let Some(node) = tasks.get(&node_id) else {
+        return Vec::new();
+    };
+    match node.data() {
+        TasksNode::Task(_) => vec![node_id],
+        TasksNode::Directory(_) => {
+            let mut out = Vec::new();
+            collect_task_ids(node, &mut out);
+            out
+        }
     }
 }
 
@@ -370,7 +374,52 @@ fn collect_known_task_ids(node: &Node<TasksNode>, out: &mut HashSet<u64>) {
 
 #[cfg(test)]
 mod tests {
+    use solver::{
+        task::{Solution, Task, TermProps},
+        term::TermBuf,
+    };
+    use trees::{Tree, tr};
+
     use super::*;
+
+    fn dummy_task_state() -> TaskState {
+        let goal = TermBuf::symbol("find").arg(TermBuf::variable("x"));
+        let task = Task::from(TermProps::from(goal));
+        TaskState {
+            solution:          Solution::new(task).into(),
+            previous_solution: None,
+            solution_pos:      Default::default(),
+            tracing_state:     Vec::new(),
+        }
+    }
+
+    // root ├─ sub ├─ task ; direct task hangs off root, tasks live two levels deep.
+    //      │      └─ task
+    //      └─ task
+    fn two_level_tree() -> Tree<TasksNode> {
+        let mut sub = Tree::new(TasksNode::new_directory("sub".into()));
+        sub.push_back(tr(TasksNode::new_task(dummy_task_state())));
+        sub.push_back(tr(TasksNode::new_task(dummy_task_state())));
+
+        let mut root = Tree::new(TasksNode::new_directory("root".into()));
+        root.push_back(sub);
+        root.push_back(tr(TasksNode::new_task(dummy_task_state())));
+        root
+    }
+
+    #[test]
+    fn solve_all_reaches_nested_tasks() {
+        let tasks = two_level_tree();
+        let ids = collect_to_solve(&tasks, tasks.root().id());
+        assert_eq!(ids.len(), 3, "two nested tasks + one direct task");
+    }
+
+    #[test]
+    fn solving_a_task_node_enqueues_only_itself() {
+        let tasks = two_level_tree();
+        let direct = tasks.root().iter().nth(1).unwrap().id();
+        assert_eq!(collect_to_solve(&tasks, direct.clone()), vec![direct]);
+    }
 
     fn upd_tuple(u: &DirectoryStatUpdate) -> (isize, isize, isize, isize) {
         (
