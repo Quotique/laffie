@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- A rule with more than one `solve(...) == Param` requirement now binds every
+  parameter: bindings are accumulated and applied in a single substitution
+  instead of keeping only the last, which left the earlier params free and
+  silently dropped the hypothesis
 - Search-loop panics are now recoverable: a term-stack overflow propagates as
   `SolveError::StackOverflow`, subtask build failures surface as an errored
   subtask solution (`SolveError::Internal`), and a subtask condition whose

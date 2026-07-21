@@ -616,7 +616,7 @@ impl Solver {
         state: &mut SolutionState,
     ) -> Option<Hypothesis> {
         let mut new_reqs = Vec::with_capacity(hyp.requirements.len());
-        let mut binding: Option<(Param, TermBuf)> = None;
+        let mut bindings: Vec<(Param, TermBuf)> = Vec::new();
         for req in hyp.requirements.drain(..) {
             let Some((solve_call, param_atom)) = match_solve_eq_param(&req) else {
                 new_reqs.push(req);
@@ -641,11 +641,11 @@ impl Solver {
 
             // `bind_equality_params` would still refuse a value that
             // contains params, so substitute directly into the hypothesis.
-            binding = Some((param_atom, answer_buf));
+            bindings.push((param_atom, answer_buf));
         }
         hyp.requirements = new_reqs;
-        if let Some((p, value)) = binding {
-            let subst: crate::term::ParamSubstitution = [(p, value)].into_iter().collect();
+        if !bindings.is_empty() {
+            let subst: crate::term::ParamSubstitution = bindings.into_iter().collect();
             hyp.substitute(&subst);
         }
         Some(hyp)
@@ -1107,5 +1107,64 @@ mod parents_tests {
         let before = hyp.requirements.clone();
         resolve_parents_in_hypothesis(&mut hyp, &term_with_vars("a == b"));
         assert_eq!(hyp.requirements, before);
+    }
+}
+
+#[cfg(test)]
+mod resolve_solve_tests {
+    use std::{
+        sync::Arc,
+        time::{Duration, Instant},
+    };
+
+    use crate::{
+        rule::{Hypothesis, RulesEngine, parse_rule},
+        task::{Solution, Solver, TracerHub, parse_task},
+        term::{ParamSubstitution, TermBuf, TermPath, term_with_vars},
+    };
+
+    use super::SolutionState;
+
+    /// Two `solve(...) == Param` requirements must both reach the resolution.
+    /// The old single-binding code kept only the last and dropped the first.
+    #[test]
+    fn two_solve_bindings_both_apply() {
+        let solver = Solver::new(Arc::new(RulesEngine::default()));
+        let parent = Solution::new(parse_task("task { goal find(z); }"));
+        let mut state = SolutionState {
+            execution_deadline: usize::MAX,
+            deadline_at:        Instant::now() + Duration::from_secs(60),
+            cycle_counter:      0,
+            cache:              Default::default(),
+            tracer:             TracerHub::default(),
+        };
+
+        let solve_eq_param = |block: &'static str, param: &str| {
+            TermBuf::symbol("==")
+                .arg(term_with_vars(block))
+                .arg(TermBuf::param(param))
+        };
+        let hyp = Hypothesis {
+            rule:          Arc::new(parse_rule(
+                "rule { attr level(1); a + x == 0 => x == -a; a!=0; }",
+            )),
+            resolution:    TermBuf::symbol("&&")
+                .arg(TermBuf::param("p"))
+                .arg(TermBuf::param("q")),
+            free_params:   Default::default(),
+            params:        ParamSubstitution::default(),
+            requirements:  vec![
+                solve_eq_param("solve(find(x), x == 1)", "p"),
+                solve_eq_param("solve(find(y), y == 2)", "q"),
+            ],
+            blocked_rules: vec![],
+            pos:           TermPath::from(vec![]),
+        };
+
+        let resolved = solver
+            .resolve_solve_in_hypothesis(hyp, &parent, &mut state)
+            .expect("hypothesis dropped");
+
+        assert_eq!(resolved.resolution, term_with_vars("x == 1 && y == 2"));
     }
 }
