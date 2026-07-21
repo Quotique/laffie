@@ -3,7 +3,9 @@
 
 mod settings;
 
-use std::{collections::HashMap, convert::TryFrom, fmt, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap, convert::TryFrom, fmt, path::PathBuf, process::ExitCode, sync::Arc,
+};
 
 use clap::Parser;
 use colored::*;
@@ -79,46 +81,38 @@ impl fmt::Display for SolveStats {
     }
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = Args::parse();
     let only = args.only;
 
-    let settings = Settings::new(args.config)
-        .map_err(|e| {
+    let settings = match Settings::new(args.config) {
+        Ok(settings) => settings,
+        Err(e) => {
             println!("Config error: {e:?}");
-            e
-        })
-        .unwrap_or_else(|_| {
-            std::process::exit(-1);
-        });
+            return ExitCode::FAILURE;
+        }
+    };
     let _log_guard = settings.logger.init();
 
-    let parser = DirectoryParser::new(
-        args.symbols
-            .clone()
-            .or(settings.symbols_dir)
-            .unwrap_or_else(|| {
-                println!("Symbols dir is not specified");
-                std::process::exit(-1);
-            }),
-        args.tasks
-            .clone()
-            .or(settings.tasks_dir)
-            .unwrap_or_else(|| {
-                println!("Tasks dir is not specified");
-                std::process::exit(-1);
-            }),
-    );
+    let Some(symbols_dir) = args.symbols.clone().or(settings.symbols_dir) else {
+        println!("Symbols dir is not specified");
+        return ExitCode::FAILURE;
+    };
+    let Some(tasks_dir) = args.tasks.clone().or(settings.tasks_dir) else {
+        println!("Tasks dir is not specified");
+        return ExitCode::FAILURE;
+    };
+    let parser = DirectoryParser::new(symbols_dir, tasks_dir);
 
     let Ok(rules_engine) = parser
         .load_rules()
         .map(Arc::new)
         .inspect_err(|e| eprintln!("{e}"))
     else {
-        return;
+        return ExitCode::FAILURE;
     };
     let Ok(tasks) = parser.load_tasks().inspect_err(|e| eprintln!("{e}")) else {
-        return;
+        return ExitCode::FAILURE;
     };
 
     if let Some(parent) = args.db_path.parent() &&
@@ -126,19 +120,23 @@ fn main() {
         let Err(e) = std::fs::create_dir_all(parent)
     {
         println!("Cannot create db parent dir: {e}");
-        return;
+        return ExitCode::FAILURE;
     }
-    let db = Db::open(&args.db_path).unwrap_or_else(|e| {
-        println!("Db open error: {e:?}");
-        std::process::exit(-1);
-    });
+    let db = match Db::open(&args.db_path) {
+        Ok(db) => db,
+        Err(e) => {
+            println!("Db open error: {e:?}");
+            return ExitCode::FAILURE;
+        }
+    };
 
     if !args.remove.is_empty() {
         let id = id_from_hex(&args.remove).expect("bad task id");
         if let Err(e) = db.remove_task(id) {
             println!("task remove error: {e:?}");
+            return ExitCode::FAILURE;
         }
-        return;
+        return ExitCode::SUCCESS;
     }
 
     let mut stats: HashMap<String, SolveStats> = Default::default();
@@ -191,13 +189,14 @@ fn main() {
         );
         match solution.status {
             SolutionStatus::Answer(_) => {
-                stats.entry(db_task.group.clone()).or_default().solved += 1;
                 println!(
                     "{}\n{}",
                     "Solution:".italic().blue(),
                     View::try_from(solution.as_ref()).unwrap()
                 );
-                if !solution.validate_answer() {
+                if solution.validate_answer() {
+                    stats.entry(db_task.group.clone()).or_default().solved += 1;
+                } else {
                     stats
                         .entry(db_task.group.clone())
                         .or_default()
@@ -219,7 +218,15 @@ fn main() {
                     View::try_from(solution.as_ref()).unwrap()
                 );
             }
-            _ => unreachable!(),
+            SolutionStatus::NotDone => {
+                stats.entry(db_task.group.clone()).or_default().not_solved += 1;
+                println!(
+                    "{} {}\n{}",
+                    "Solution:".italic().blue(),
+                    "not done".yellow(),
+                    View::try_from(solution.as_ref()).unwrap()
+                );
+            }
         };
 
         let run = Run::from_solution(db_task.id, &solution);
@@ -236,4 +243,11 @@ fn main() {
         println!("{group}: {stats}");
     }
     println!("total: {total}");
+
+    // Only a wrong answer is a hard failure; unsolved tasks are not.
+    if total.answer_changed > 0 {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
 }

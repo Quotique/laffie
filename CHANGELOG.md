@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- cli: exit with a non-zero code on failure — a rule/task load error, a
+  broken config/paths/db, or any wrong answer in the corpus. Unsolved tasks
+  are not treated as failures. A wrong answer is now counted only under
+  `wrong answer`, no longer double-counted as `solved`
+
 ## [0.6.0] - 2026-07-09
 
 ### Added
