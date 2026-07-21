@@ -11,7 +11,7 @@ use itertools::Itertools;
 
 use super::{Goal, Task, TermProps};
 use crate::{
-    CompactString,
+    CompactString, NormLevel,
     rule::Level,
     term::{Atom, SharedTerm, Term, TermBuf, match_term},
 };
@@ -104,7 +104,12 @@ impl Solution {
         for i in conditions.into_iter() {
             let _ = solution.add_term(i);
         }
-        let goal_term = solution.goal.term().clone();
+        let mut goal_term = solution.goal.term().clone();
+        let goal_buf = Arc::make_mut(&mut goal_term.term);
+        // Canonicalize the goal (commutative arg order etc.) so the syntactic
+        // match in `check_prove_answer` sees derived terms — which are always
+        // normalized — in the same shape as the goal.
+        goal_buf.term_mut().normalize(NormLevel::Full);
         let _ = solution.add_term(goal_term);
 
         trace!(target: "subtask", "Subtask: {}, [{}]",

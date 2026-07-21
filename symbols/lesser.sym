@@ -59,3 +59,12 @@ rule {
     a >= 0,
     b * b <= c;
 }
+
+// Линейное убывание с верхней границей: e - a > f из a < b при e - b >= f.
+rule {
+    attr level(2),goal(prove(e - a > f));
+
+    a < b => e - a > f;
+
+    e - b >= f;
+}

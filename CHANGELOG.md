@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `<expr> is even` predicate, enabling unconditional even-power lemmas
   (`x^4 >= 0`, `x^2 + y^2 + 1 > 0`) — an even integer exponent makes the power
   nonnegative for any base.
+- Monotone scaling (`x*z > y*z` from `x > y, z > 0`) and bounded-above linear
+  (`6 - x > 0` from `x < 5`) inequality lemmas.
+
+### Fixed
+- The prove-goal answer check is now stable under commutative argument order:
+  the goal term is normalized before it enters the goal index, so a derived
+  term equal to the goal modulo `+`/`*` reordering (e.g. `-x + 6 > 0` vs
+  `6 - x > 0`) is recognized. Previously such proofs were silently missed.
 
 ### Changed
 - Numbers are now exact rationals (`num::BigRational`) instead of `BigDecimal`.

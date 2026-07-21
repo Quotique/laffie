@@ -126,3 +126,13 @@ rule {
     c is even,
     d > b;
 }
+
+// Монотонное масштабирование на положительный множитель: x*z > y*z при
+// x > y, z > 0.
+rule {
+    attr level(2),goal(prove(a * c > b * c));
+
+    a > b => a * c > b * c;
+
+    c > 0;
+}
