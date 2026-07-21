@@ -93,29 +93,26 @@ impl Iterator for Steps {
                 });
             }
 
-            if let Some(next_id) = self.terms_queue.last() {
-                for r in self.solution[*next_id]
-                    .inference
-                    .requirements()
-                    .filter(|x| !self.rendered.borrow().contains(&x.task.goal.term))
-                {
-                    self.rendered
-                        .borrow_mut()
-                        .insert(r.task.goal.term.as_ref().clone());
-                    let mut steps = Steps::from(r.clone());
-                    steps.rendered = self.rendered.clone();
-                    self.subtasks.push_back(steps);
-                }
-                if self.subtasks.is_empty() {
-                    let id = self.terms_queue.pop().unwrap();
-                    return Some(if self.terms_queue.is_empty() {
-                        Visit::Answer(self.solution[id].term.clone())
-                    } else {
-                        Visit::Term(self.solution[id].term.clone())
-                    });
-                }
-            } else {
-                return None;
+            let next_id = self.terms_queue.last()?;
+            for r in self.solution[*next_id]
+                .inference
+                .requirements()
+                .filter(|x| !self.rendered.borrow().contains(&x.task.goal.term))
+            {
+                self.rendered
+                    .borrow_mut()
+                    .insert(r.task.goal.term.as_ref().clone());
+                let mut steps = Steps::from(r.clone());
+                steps.rendered = self.rendered.clone();
+                self.subtasks.push_back(steps);
+            }
+            if self.subtasks.is_empty() {
+                let id = self.terms_queue.pop().unwrap();
+                return Some(if self.terms_queue.is_empty() {
+                    Visit::Answer(self.solution[id].term.clone())
+                } else {
+                    Visit::Term(self.solution[id].term.clone())
+                });
             }
         }
     }

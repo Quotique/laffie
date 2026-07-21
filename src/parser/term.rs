@@ -53,7 +53,7 @@ impl TermParser {
         } else if node.degree() != 0 {
             return Err(ParserError {
                 loc: node.data().location.clone(),
-                msg: format!("Node {} can't contains children!", &node.data().symbol),
+                msg: format!("Node {} can't contains children!", node.data().symbol),
             });
         }
         for p in params {
