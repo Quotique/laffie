@@ -1,6 +1,9 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -38,16 +41,75 @@ pub const EXECUTION_DEADLINE_DEFAULT: usize = 100_000;
 /// Default wall-clock budget for a solving run (effectively unlimited).
 pub const TIME_LIMIT_DEFAULT: Duration = Duration::from_secs(24 * 60 * 60);
 
-/// How often (in grounded hypotheses) `produce` polls the wall-clock deadline.
+/// How often (in grounded hypotheses) `produce` polls the run limits.
 const DEADLINE_CHECK_INTERVAL: usize = 64;
 
-struct SolutionState {
+/// External cancellation handle. Cloning shares the same flag, so a caller can
+/// hold a clone and cancel a run from another thread.
+#[derive(Clone, Default)]
+pub struct CancelToken(Arc<AtomicBool>);
+
+impl CancelToken {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Signals cancellation; every clone observes it.
+    pub fn cancel(&self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+
+/// Stop conditions for a solving run: cycle budget, wall-clock deadline, and
+/// external cancellation — checked together on every cycle.
+#[derive(Clone)]
+pub struct RunControl {
     execution_deadline: usize,
-    /// Wall-clock deadline for the whole run.
     deadline_at:        Instant,
-    cycle_counter:      usize,
-    cache:              HashMap<TermBuf, SharedSolution>,
-    tracer:             TracerHub,
+    cancel:             CancelToken,
+}
+
+impl RunControl {
+    /// Builds a control and returns a [`CancelToken`] sharing its cancel flag.
+    ///
+    /// * `execution_deadline` – max cycles before
+    ///   `SolveError::ExecutionDeadline`.
+    /// * `time_limit` – wall-clock budget before `SolveError::TimeDeadline`.
+    pub fn init(execution_deadline: usize, time_limit: Duration) -> (Self, CancelToken) {
+        let cancel = CancelToken::new();
+        let control = Self {
+            execution_deadline,
+            deadline_at: Instant::now() + time_limit,
+            cancel: cancel.clone(),
+        };
+        (control, cancel)
+    }
+
+    /// `Err` with the specific reason if the run must stop at `cycle`.
+    /// Cancellation takes precedence over the budgets.
+    fn check(&self, cycle: usize) -> Result<(), SolveError> {
+        if self.cancel.is_cancelled() {
+            return Err(SolveError::Canceled);
+        }
+        if cycle > self.execution_deadline {
+            return Err(SolveError::ExecutionDeadline);
+        }
+        if Instant::now() >= self.deadline_at {
+            return Err(SolveError::TimeDeadline);
+        }
+        Ok(())
+    }
+}
+
+struct SolutionState {
+    control:       RunControl,
+    cycle_counter: usize,
+    cache:         HashMap<TermBuf, SharedSolution>,
+    tracer:        TracerHub,
 }
 
 pub struct Solver {
@@ -75,26 +137,17 @@ impl Solver {
     /// # Parameters
     ///
     /// * `task` – The task to be solved.
-    /// * `tracer` – A `TracerHub` used for instrumentation and cancellation.
-    /// * `execution_deadline` – Maximum number of cycles the solver may execute
-    ///   before aborting with `SolveError::ExecutionDeadline`.
-    /// * `time_limit` – Wall-clock budget for the run; when exceeded the solver
-    ///   aborts with `SolveError::TimeDeadline`. Pass a large value to disable.
+    /// * `tracer` – A `TracerHub` used for instrumentation.
+    /// * `control` – Run limits (cycle budget, wall-clock deadline,
+    ///   cancellation); build one with [`RunControl::init`].
     ///
     /// The method initializes a fresh `Solution` and `SolutionState`, and then
     /// runs the main solving loop. The resulting `SharedSolution` contains
     /// either the answer or an error status.
-    pub fn solve(
-        &mut self,
-        task: Task,
-        tracer: TracerHub,
-        execution_deadline: usize,
-        time_limit: Duration,
-    ) -> SharedSolution {
+    pub fn solve(&mut self, task: Task, tracer: TracerHub, control: RunControl) -> SharedSolution {
         let mut solution = Solution::new(task);
         let mut state = SolutionState {
-            execution_deadline,
-            deadline_at: Instant::now() + time_limit,
+            control,
             cycle_counter: Default::default(),
             cache: Default::default(),
             tracer,
@@ -120,9 +173,6 @@ impl Solver {
         let mut main_loop = || loop {
             state.increment_cycle_counter()?;
             let index = self.try_focus_term(solution, state)?;
-            if state.tracer.is_cancelled() {
-                return Err(SolveError::Canceled);
-            }
             if self.try_simplify(index, solution, state)? {
                 continue;
             }
@@ -333,10 +383,8 @@ impl Solver {
             };
             for hypothesis in h.ground() {
                 grounded_seen += 1;
-                if grounded_seen.is_multiple_of(DEADLINE_CHECK_INTERVAL) &&
-                    Instant::now() >= state.deadline_at
-                {
-                    return Err(SolveError::TimeDeadline);
+                if grounded_seen.is_multiple_of(DEADLINE_CHECK_INTERVAL) {
+                    state.control.check(state.cycle_counter)?;
                 }
                 let is_dub = if is_goal {
                     s.goal_index.contains_key(&hypothesis.resolution)
@@ -943,13 +991,7 @@ impl SolutionState {
 
     fn increment_cycle_counter(&mut self) -> Result<(), SolveError> {
         self.cycle_counter += 1;
-        if self.current_cycle() > self.execution_deadline {
-            return Err(SolveError::ExecutionDeadline);
-        }
-        if Instant::now() >= self.deadline_at {
-            return Err(SolveError::TimeDeadline);
-        }
-        Ok(())
+        self.control.check(self.cycle_counter)
     }
 }
 
@@ -1023,7 +1065,7 @@ mod solution_tests {
 
     use crate::{
         rule::RulesEngine,
-        task::{Solver, TIME_LIMIT_DEFAULT, parse_task},
+        task::{RunControl, Solver, TIME_LIMIT_DEFAULT, parse_task},
         term::term_with_vars,
     };
 
@@ -1032,7 +1074,11 @@ mod solution_tests {
         let task = parse_task("task { goal find(x); x == 1; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules);
-        let solution = solver.solve(task, Default::default(), usize::MAX, TIME_LIMIT_DEFAULT);
+        let solution = solver.solve(
+            task,
+            Default::default(),
+            RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+        );
         assert_eq!(
             *solution.answer().expect("task is not solved"),
             term_with_vars("x == 1")
@@ -1044,7 +1090,11 @@ mod solution_tests {
         let task = parse_task("task { goal prove(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules);
-        let solution = solver.solve(task, Default::default(), usize::MAX, TIME_LIMIT_DEFAULT);
+        let solution = solver.solve(
+            task,
+            Default::default(),
+            RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+        );
         assert!(solution.answer().is_some());
     }
 
@@ -1053,11 +1103,31 @@ mod solution_tests {
         let task = parse_task("task { goal find(x, y); x == 3; y == 4; }");
         let rules = Arc::new(RulesEngine::default());
         let mut solver = Solver::new(rules);
-        let solution = solver.solve(task, Default::default(), usize::MAX, TIME_LIMIT_DEFAULT);
+        let solution = solver.solve(
+            task,
+            Default::default(),
+            RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+        );
         let answer = solution
             .answer()
             .expect("multi-var find task is not solved");
         assert_eq!(*answer, term_with_vars("x == 3 && y == 4"));
+    }
+
+    #[test]
+    fn cancelled_token_aborts_solve() {
+        use crate::task::{SolutionStatus, SolveError};
+
+        let task = parse_task("task { goal find(x); x == 1; }");
+        let mut solver = Solver::new(Arc::new(RulesEngine::default()));
+        let (control, cancel) = RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT);
+        // Cancel before solving: the first cycle check must abort the run.
+        cancel.cancel();
+        let solution = solver.solve(task, Default::default(), control);
+        assert!(matches!(
+            solution.status,
+            SolutionStatus::Err(SolveError::Canceled)
+        ));
     }
 }
 
@@ -1126,7 +1196,7 @@ mod resolve_solve_tests {
 
     use crate::{
         rule::{Hypothesis, RulesEngine, SharedRule, parse_rule},
-        task::{Solution, Solver, TracerHub, parse_task},
+        task::{CancelToken, RunControl, Solution, Solver, TracerHub, parse_task},
         term::{ParamSubstitution, TermBuf, TermPath, term_with_vars},
     };
 
@@ -1139,11 +1209,10 @@ mod resolve_solve_tests {
         let solver = Solver::new(Arc::new(RulesEngine::default()));
         let parent = Solution::new(parse_task("task { goal find(z); }"));
         let mut state = SolutionState {
-            execution_deadline: usize::MAX,
-            deadline_at:        Instant::now() + Duration::from_secs(60),
-            cycle_counter:      0,
-            cache:              Default::default(),
-            tracer:             TracerHub::default(),
+            control:       RunControl::init(usize::MAX, Duration::from_secs(60)).0,
+            cycle_counter: 0,
+            cache:         Default::default(),
+            tracer:        TracerHub::default(),
         };
 
         let solve_eq_param = |block: &'static str, param: &str| {
@@ -1204,11 +1273,15 @@ mod resolve_solve_tests {
         let rule: SharedRule = Arc::new(parse_rule(rule_src));
 
         let mut state = SolutionState {
-            execution_deadline: usize::MAX,
-            deadline_at:        Instant::now() - Duration::from_secs(1),
-            cycle_counter:      0,
-            cache:              Default::default(),
-            tracer:             TracerHub::default(),
+            // Deadline already in the past: produce's poll must bail out.
+            control:       RunControl {
+                execution_deadline: usize::MAX,
+                deadline_at:        Instant::now() - Duration::from_secs(1),
+                cancel:             CancelToken::default(),
+            },
+            cycle_counter: 0,
+            cache:         Default::default(),
+            tracer:        TracerHub::default(),
         };
 
         let err = solver

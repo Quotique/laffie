@@ -13,7 +13,7 @@ use itertools::Itertools;
 
 use database::{Db, Run, Task as DbTask, id_from_hex, id_to_hex};
 use parser::DirectoryParser;
-use solver::task::{SolutionStatus, Solver, Task as SolverTask, TracerHub};
+use solver::task::{RunControl, SolutionStatus, Solver, Task as SolverTask, TracerHub};
 use view::View;
 
 use crate::settings::Settings;
@@ -200,8 +200,11 @@ fn main() -> ExitCode {
                 }
                 tracer
             },
-            args.exec_deadline,
-            std::time::Duration::from_secs(args.time_limit),
+            RunControl::init(
+                args.exec_deadline,
+                std::time::Duration::from_secs(args.time_limit),
+            )
+            .0,
         );
         match solution.status {
             SolutionStatus::Answer(_) => {

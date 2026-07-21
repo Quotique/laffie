@@ -1,6 +1,6 @@
 use std::sync::{
     Arc,
-    atomic::{AtomicBool, AtomicUsize, Ordering},
+    atomic::{AtomicUsize, Ordering},
 };
 
 use itertools::Itertools;
@@ -18,7 +18,6 @@ pub enum ProgressEvent {
 
 #[derive(Clone)]
 pub struct ProgressReporter {
-    pub cancel: Arc<AtomicBool>,
     pub cycles: Arc<AtomicUsize>,
 }
 
@@ -33,10 +32,6 @@ pub struct SolverProgress {
 impl Tracer for ProgressReporter {
     fn on_term_focus(&mut self, _term: &TermProps, cycle: usize) {
         self.cycles.store(cycle, Ordering::Relaxed);
-    }
-
-    fn is_cancelled(&self) -> bool {
-        self.cancel.load(Ordering::Relaxed)
     }
 }
 

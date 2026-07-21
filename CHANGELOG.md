@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- Cancellation is now a first-class run control instead of riding on the
+  observability `Tracer`: `Solver::solve` takes a `RunControl` bundling the
+  cycle budget, wall-clock deadline, and a `CancelToken`, all checked together
+  each cycle (and while grounding a large operator). `Tracer::is_cancelled` is
+  gone, so the trait is purely observational; the TUI holds the `CancelToken`
+  directly rather than smuggling a flag through a tracer
 - Subterm matching (`find_matching_subterms`) carries each node's path
   incrementally down the BFS instead of recomputing it per node by walking to
   the root and scanning siblings (which was O(n²) over a term), and skips the

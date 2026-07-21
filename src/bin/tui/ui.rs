@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
         mpsc::{self, Receiver, Sender},
     },
     thread::{JoinHandle, spawn},
@@ -16,7 +16,9 @@ use ratatui::{
     widgets::{Block, Borders, Clear, ListState, Paragraph, Wrap},
 };
 
-use solver::task::{SharedSolution, Solution, Solver, TIME_LIMIT_DEFAULT, TracerHub};
+use solver::task::{
+    CancelToken, RunControl, SharedSolution, Solution, Solver, TIME_LIMIT_DEFAULT, TracerHub,
+};
 use utils::{IndexedTree, TreeIndex};
 
 use super::{
@@ -77,7 +79,7 @@ pub struct Ui {
     progress:    SolverProgress,
     progress_tx: Sender<ProgressEvent>,
     progress_rx: Receiver<ProgressEvent>,
-    cancel:      Arc<AtomicBool>,
+    cancel:      CancelToken,
     cycles:      Arc<AtomicUsize>,
 
     pub current_tab: Tab,
@@ -150,7 +152,7 @@ impl Ui {
             progress: SolverProgress::new(state.settings.exec_deadline),
             progress_tx,
             progress_rx,
-            cancel: Arc::new(AtomicBool::new(false)),
+            cancel: CancelToken::new(),
             cycles: Arc::new(AtomicUsize::new(0)),
             state,
         })
@@ -282,15 +284,17 @@ impl Ui {
 
         self.progress.reset(queue.len());
         self.cycles.store(0, Ordering::Relaxed);
-        self.cancel.store(false, Ordering::Relaxed);
+
+        // Fresh control per run; keep the cancel handle to signal from the UI.
+        let (control, cancel) =
+            RunControl::init(self.state.settings.exec_deadline, TIME_LIMIT_DEFAULT);
+        self.cancel = cancel;
 
         let reporter = ProgressReporter {
-            cancel: self.cancel.clone(),
             cycles: self.cycles.clone(),
         };
         let tx = self.progress_tx.clone();
         let rules = self.state.rules_engine.clone();
-        let exec_deadline = self.state.settings.exec_deadline;
         let parallelism = self.state.settings.solve_parallelism.max(1);
         self.worker = Some(spawn(move || {
             let pool = rayon::ThreadPoolBuilder::new()
@@ -306,12 +310,8 @@ impl Ui {
                         hub.add_custom(reporter.clone());
 
                         let _ = tx.send(ProgressEvent::TaskStarted(Box::new(task.task.clone())));
-                        let solution = Solver::new(rules.clone()).solve(
-                            task.task,
-                            hub,
-                            exec_deadline,
-                            TIME_LIMIT_DEFAULT,
-                        );
+                        let solution =
+                            Solver::new(rules.clone()).solve(task.task, hub, control.clone());
                         let _ = tx.send(ProgressEvent::TaskFinished);
                         (idx, solution)
                     })
@@ -373,7 +373,7 @@ impl Ui {
 
         if matches!(command, Command::Cancel) {
             if self.worker.is_some() {
-                self.cancel.store(true, Ordering::Relaxed);
+                self.cancel.cancel();
             }
             return;
         }
