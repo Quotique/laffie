@@ -72,5 +72,11 @@ pub fn parse_task(text: &'static str) -> Task {
     let states = parser::lang::task(text).unwrap();
     let task = parser::TaskParser::from(&states).parse().unwrap();
 
+    // SAFETY: the dev-dependency cycle (solver tests → parser → solver) links a
+    // second instance of this crate, so `parser`'s `Task` is a nominally
+    // distinct type from ours with an identical layout (same source). Unlike
+    // `TermBuf`, `Task` carries a `SharedRule`/solution graph and cannot round
+    // trip through serde, so the reinterpret stays. Freshly parsed here, both
+    // sides are the same compiler's identical layout of the same definition.
     unsafe { std::mem::transmute::<_, Task>(task) }
 }

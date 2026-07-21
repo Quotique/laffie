@@ -20,5 +20,10 @@ pub fn parse_rule(text: &'static str) -> Rule {
     assert_eq!(rules.len(), 1);
     let rule = rules.pop().unwrap();
 
+    // SAFETY: the dev-dependency cycle (solver tests → parser → solver) links a
+    // second instance of this crate, so `parser`'s `Rule` is a nominally
+    // distinct type from ours with an identical layout (same source). `Rule`'s
+    // `attrs`/`pattern` fields have no serde path, so it cannot round trip like
+    // `TermBuf`; the reinterpret between two identical layouts stays.
     unsafe { std::mem::transmute::<_, Rule>(rule) }
 }

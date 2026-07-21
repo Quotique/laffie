@@ -21,7 +21,7 @@ pub fn term_with_params(text: &'static str) -> TermBuf {
     let states = parser::lang::terms(text).unwrap();
     let term = parser::TermParser::default().try_parse(&states[0]).unwrap();
 
-    unsafe { std::mem::transmute::<_, TermBuf>(term) }
+    rebridge(&term)
 }
 
 #[cfg(test)]
@@ -34,5 +34,19 @@ pub fn term_with_vars(text: &'static str) -> TermBuf {
         .try_parse(&states[0])
         .unwrap();
 
-    unsafe { std::mem::transmute::<_, TermBuf>(term) }
+    rebridge(&term)
+}
+
+/// Bridge a value produced by the `parser` dev-dependency into this crate's own
+/// type. The dev-dependency cycle (solver tests → parser → solver) links a
+/// second instance of this crate, so `parser`'s `TermBuf` is a nominally
+/// distinct type from ours. A serde roundtrip crosses the boundary safely: both
+/// instances are the same source, hence share the wire format.
+#[cfg(test)]
+fn rebridge<A, B>(value: &A) -> B
+where
+    A: serde::Serialize,
+    B: serde::de::DeserializeOwned,
+{
+    serde_json::from_str(&serde_json::to_string(value).unwrap()).unwrap()
 }

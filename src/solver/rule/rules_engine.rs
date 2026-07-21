@@ -22,9 +22,6 @@ pub struct RulesEngine {
     max_level:  Level,
 }
 
-unsafe impl Send for RulesEngine {}
-unsafe impl Sync for RulesEngine {}
-
 impl RulesEngine {
     pub fn max_level(&self) -> Level {
         self.max_level
@@ -120,5 +117,17 @@ impl RulesEngine {
                 .or_default()
                 .push(SharedRule::new(rule));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn is_send_sync<T: Send + Sync>() {}
+
+    #[test]
+    fn rules_engine_is_send_sync() {
+        is_send_sync::<RulesEngine>();
     }
 }
