@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Import pipeline for the Iskra (reshatel-api) task book: `scripts/iskra_import.py`
+  (baseline JSON → `.pbl` with reference answers), `scripts/run_report.py`
+  (CLI log → verdict map); pilot corpus `tasks/iskra/` (279 equations + 105 proofs).
 - Mean-inequality lemmas from Iskra's checking operators: QM-AM (pair and
   triple), even-power mean, fraction AM-GM both orientations (`a/b + b/a`
   vs ±2), `a + 1/a` bound for negative base, and the SOS fact
