@@ -385,6 +385,30 @@ pub mod tests {
         );
     }
 
+    // Регрессия к беклогу §6: правило с суммой трёх свободных параметров
+    // внутри составного терма (`(a + b + c)^2`) применяется к идентичной
+    // цели. «Не-матч» в CLI — не свойство rule::apply: goal-терм prove-задачи
+    // до примерки правил переписывается transform-упрощением (раскрытие
+    // скобок), и паттерн в естественной записи цель уже не застаёт.
+    #[test]
+    fn nested_ternary_sum_rule_applies_to_goal() {
+        let rule: SharedRule = Arc::new(parse_rule(
+            r#"rule {
+                attr level(1),goal(prove(x));
+                d <= (a + b + c)^2 <=> true;
+            }"#,
+        ));
+        let term =
+            term_with_vars("3*(x*y + y*z + x*z) <= (x + y + z)^2").normalize(NormLevel::Full);
+        let goal = term_with_vars("prove(3*(x*y + y*z + x*z) <= (x + y + z)^2)")
+            .normalize(NormLevel::Full);
+        let mut filters = TermFilters::from(term.symbols());
+        filters.level = 1.into();
+
+        let hypothesis = rule.apply(&term, &filters, &goal);
+        assert!(hypothesis.is_ok(), "{:?}", hypothesis.unwrap_err());
+    }
+
     #[test]
     fn apply_test() {
         let rule = base_rule();

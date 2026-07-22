@@ -715,7 +715,10 @@ pub(crate) use match_term;
 mod tests {
     use itertools::Itertools;
 
-    use crate::term::{Substitute, Term, term_with_params, term_with_vars};
+    use crate::{
+        NormLevel,
+        term::{Substitute, Term, term_with_params, term_with_vars},
+    };
 
     #[test]
     fn match_term_nullary_literal() {
@@ -837,6 +840,61 @@ mod tests {
             .map_err(|e| println!("Error: {e}"))
             .unwrap();
         insta::assert_snapshot!(maps.iter().format(", "), @"{ a: 2*x^2, b: x-1 }");
+    }
+
+    // Регрессия к беклогу §6: матчер БЕРЁТ сумму трёх свободных параметров
+    // внутри составного терма (под `^`, под `*`) — в т.ч. при нормализации,
+    // зеркалящей продакшен (терм задачи — Full, терм правила — Units), и при
+    // совпадении имён переменных цели с именами параметров правила.
+    // Наблюдавшийся в CLI «не-матч» таких паттернов — не свойство матчера:
+    // goal-терм prove-задачи до примерки Equivalence-правил переписывается
+    // transform-упрощением, раскрывающим скобки.
+    #[test]
+    fn nested_ternary_sum_under_power_matches() {
+        let term =
+            term_with_vars("3*(x*y + y*z + x*z) <= (x + y + z)^2").normalize(NormLevel::Full);
+        let pattern = term_with_params("d <= (a + b + c)^2").normalize(NormLevel::Units);
+
+        let maps = term.term().try_match(pattern.term());
+        assert!(maps.is_ok(), "{}", maps.unwrap_err());
+    }
+
+    #[test]
+    fn nested_ternary_sum_under_product_matches() {
+        let term =
+            term_with_vars("3*(x*y + y*z + x*z) <= (x + y + z)^2").normalize(NormLevel::Full);
+        let pattern = term_with_params("3*(a*b + b*c + a*c) <= d").normalize(NormLevel::Units);
+
+        let maps = term.term().try_match(pattern.term());
+        assert!(maps.is_ok(), "{}", maps.unwrap_err());
+    }
+
+    #[test]
+    fn nested_binary_sum_under_power_matches() {
+        let term = term_with_vars("x*y <= (x + y)^2");
+        let pattern = term_with_params("d <= (a + b)^2");
+
+        let maps = term.term().try_match(pattern.term()).unwrap();
+        assert!(!maps.is_empty());
+    }
+
+    #[test]
+    fn flat_ternary_sum_matches() {
+        let term = term_with_vars("x*y + y*z + x*z <= x^2 + y^2 + z^2");
+        let pattern = term_with_params("a*b + b*c + a*c <= a^2 + b^2 + c^2");
+
+        let maps = term.term().try_match(pattern.term()).unwrap();
+        assert!(!maps.is_empty());
+    }
+
+    #[test]
+    fn nested_ternary_sum_name_collision_matches() {
+        let term =
+            term_with_vars("3*(a*b + b*c + a*c) <= (a + b + c)^2").normalize(NormLevel::Full);
+        let pattern = term_with_params("d <= (a + b + c)^2").normalize(NormLevel::Units);
+
+        let maps = term.term().try_match(pattern.term());
+        assert!(maps.is_ok(), "{}", maps.unwrap_err());
     }
 
     #[test]
