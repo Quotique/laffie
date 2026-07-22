@@ -73,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A condition without variables no longer passes into a `find` answer unchecked: `-√3 ≥ 0 && x == 2` is not solved, `-√3 ≤ 0 && x == 2` gives `x = 2`.
 - A term being simplified is not its own premise, so `sqrt(11.5) >= 3 && x == 2` keeps `x = 2`.
 - A negative literal parses before `*` and `^`: `-2*x`, `x - 2^2`, `x + -2*x`; `-3/x*y` is `(-3/x)·y`.
+- `||` / `&&` normalization dedups equal operands: a root found via two search
+  branches produced `x=0|x=0` and was rejected by the answer check.
 
 ### Removed
 - The TUI's `e` on the Rules tab and the rule window's `Trigger:` line. The

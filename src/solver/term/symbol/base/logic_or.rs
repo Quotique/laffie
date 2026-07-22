@@ -1,12 +1,22 @@
-use super::SymbolProgram;
-use crate::term::{Term, TermRef, Truth, TruthCtx};
+use super::{SymbolProgram, dedup_operands};
+use crate::{
+    NormLevel,
+    term::{Term, TermMut, TermRef, Truth, TruthCtx},
+};
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
         name: "||".into(),
+        calculator: Box::new(dedup),
         truth_checker: Box::new(or),
         ..Default::default()
     }
+}
+
+/// Idempotence: `a | a | b` → `a | b` (a solution found via two branches
+/// must not be rejected by the answer check as `x=0|x=0`).
+pub fn dedup(root: &mut TermMut, _: NormLevel) -> bool {
+    dedup_operands(root, "||")
 }
 
 /// Kleene disjunction: `True` if any operand is `True`; `False` if every
@@ -35,12 +45,24 @@ mod tests {
     use super::or;
     use crate::{
         NormLevel,
-        term::{Truth, TruthCtx, term_with_vars},
+        term::{Term, Truth, TruthCtx, term_with_vars},
     };
 
     fn truth(src: &'static str) -> Truth {
         let t = term_with_vars(src).normalize(NormLevel::Full);
         or(t.term(), TruthCtx::default())
+    }
+
+    #[test]
+    fn dedup_equal_operands() {
+        let t = term_with_vars("x == 0 || x == 0").normalize(NormLevel::Full);
+        assert_eq!(t.term().to_string(), "x==0");
+    }
+
+    #[test]
+    fn dedup_keeps_distinct() {
+        let t = term_with_vars("x == 0 || x == 1 || x == 0").normalize(NormLevel::Full);
+        assert_eq!(t.term().degree(), 2);
     }
 
     #[test]

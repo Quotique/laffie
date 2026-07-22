@@ -22,13 +22,34 @@ pub mod symbolic_eq;
 use std::cmp::Ordering;
 
 pub use super::SymbolProgram;
-use crate::term::{Term, TermRef};
+use crate::term::{Term, TermBuf, TermMut, TermRef};
 
 #[cfg(test)]
-use crate::{
-    NormLevel,
-    term::{TermMut, term_with_params},
-};
+use crate::{NormLevel, term::term_with_params};
+
+/// Removes duplicate operands of an idempotent connective (`||`, `&&`);
+/// collapses to the sole remaining operand.
+pub(super) fn dedup_operands(root: &mut TermMut, name: &str) -> bool {
+    if !root.data().is_symbol_name(name) || root.degree() < 2 {
+        return false;
+    }
+    let mut seen: Vec<TermBuf> = Vec::new();
+    let mut changed = false;
+    for mut child in root.iter_mut() {
+        let owned = child.to_term();
+        if seen.iter().any(|s| s.term() == owned.term()) {
+            child.detach();
+            changed = true;
+        } else {
+            seen.push(owned);
+        }
+    }
+    if changed && root.degree() == 1 {
+        let mut only = root.pop_first_arg().unwrap();
+        root.swap(&mut only.term_mut());
+    }
+    changed
+}
 
 fn compare_numbers(left: TermRef, right: TermRef) -> Option<Ordering> {
     let left_num = left.data().number()?;
