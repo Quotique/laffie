@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   triple), even-power mean, fraction AM-GM both orientations (`a/b + b/a`
   vs ±2), `a + 1/a` bound for negative base, and the SOS fact
   `3ab + 3bc + 3ca <= (a+b+c)^2`; 9 pilot proof tasks solved.
+- Strict-SOS and symmetric AM-GM lemmas: strictness from `a != b`-style
+  premises (`(a-1)^2+(b-1)^2+(c-1)^2`, `(ab-1)^2+(a-b)^2`, difference
+  factorization `(a-b)(a^5-b^5)`), six/nine-term AM-GM, pairwise
+  `a^2 b + a b^2 <= a^3 + b^3`, cubic power mean; pilot proofs 9 → 16.
 - `doc/ru/backlog.md` — беклог находок.
 
 ### Changed
