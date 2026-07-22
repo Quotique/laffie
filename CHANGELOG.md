@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   triple), even-power mean, fraction AM-GM both orientations (`a/b + b/a`
   vs ±2), `a + 1/a` bound for negative base, and the SOS fact
   `3ab + 3bc + 3ca <= (a+b+c)^2`; 9 pilot proof tasks solved.
+- `doc/ru/backlog.md` — беклог находок.
 
 ### Changed
 - Expressions: `x^2y` is `x^2·y`, `2x^2` is `2·(x^2)`, `x^-1`, `2^3^2`, `2(x+1)`

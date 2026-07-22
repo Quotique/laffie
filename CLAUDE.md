@@ -111,6 +111,7 @@ Laffie is a **symbolic mathematical problem solver** — a rule-based reasoning 
 - `tasks/**/*.pbl` — Problem definitions organized by category (test, elementary_algebra)
 - `config/*.yaml|json` — Per-binary configuration
 - `doc/ru/*.md` — Russian-language documentation (source of truth) on terminology, syntax, and architecture; `doc/en/` mirrors it (when populated)
+- `doc/ru/backlog.md` — беклог находок (баги/шероховатости, ждущие исправления); новые находки записывать туда
 
 ## Detailed Navigation (`claude_docs/`)
 
