@@ -81,7 +81,7 @@ impl SolverProgress {
 
         let task_text = if let Some(task) = self.current_task.as_ref() {
             vec![
-                Line::from(Span::styled(task.goal.to_string(), theme.highlighted)),
+                Line::from(Span::styled(task.goal().to_string(), theme.highlighted)),
                 Line::default(),
                 Line::from(Span::styled(
                     task.givens.iter().format(", ").to_string(),

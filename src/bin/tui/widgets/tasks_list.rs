@@ -50,7 +50,7 @@ impl<'a> TasksList<'a> {
 
                 let conditions = format!("[{}]", task.solution.task.givens.iter().format(", "),);
                 Line::from(vec![
-                    Span::styled(task.solution.task.goal.to_string(), line_style),
+                    Span::styled(task.solution.task.goal().to_string(), line_style),
                     Span::from(" "),
                     Span::styled(conditions, default),
                 ])

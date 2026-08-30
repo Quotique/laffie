@@ -1,6 +1,6 @@
 use solver::{
     NormLevel,
-    task::{Task, TaskBuilder, TermProps, content_id},
+    task::{Goal, Task, TaskBuilder, TermProps, content_id},
 };
 
 use crate::ParserError;
@@ -25,25 +25,31 @@ impl<'a> TaskParser<'a> {
                 msg: "expected 'task'".to_owned(),
             });
         }
-        let mut builder = TaskBuilder::default();
+        // The grammar admits exactly one `goal` statement per task.
+        let goal_node = self
+            .syntax_tree
+            .iter()
+            .find(|child| child.data().symbol.as_str() == "Goal")
+            .ok_or_else(|| ParserError {
+                loc: self.syntax_tree.data().location.clone(),
+                msg: "task has no goal".to_owned(),
+            })?;
+        let goal =
+            TermParser::default()
+                .with_variables()
+                .try_parse(goal_node.front().ok_or_else(|| ParserError {
+                    loc: goal_node.data().location.clone(),
+                    msg: "must have one argument".to_owned(),
+                })?)?;
+        let goal = Goal::parse(goal).map_err(|e| ParserError {
+            loc: goal_node.data().location.clone(),
+            msg: e.to_string(),
+        })?;
+        let mut builder = TaskBuilder::from_goal(goal);
 
         for child in self.syntax_tree.iter() {
             match child.data().symbol.as_str() {
-                "Goal" => {
-                    builder = builder
-                        .with_goal(TermProps::from(
-                            TermParser::default().with_variables().try_parse(
-                                child.front().ok_or_else(|| ParserError {
-                                    loc: child.data().location.clone(),
-                                    msg: "must have one argument".to_owned(),
-                                })?,
-                            )?,
-                        ))
-                        .map_err(|e| ParserError {
-                            loc: child.data().location.clone(),
-                            msg: e.to_string(),
-                        })?
-                }
+                "Goal" => {}
                 "Id" => {
                     builder = builder.with_name(
                         child
@@ -90,12 +96,9 @@ impl<'a> TaskParser<'a> {
                 }
             }
         }
-        let mut task = builder.build().map_err(|e| ParserError {
-            loc: self.syntax_tree.data().location.clone(),
-            msg: e.to_string(),
-        })?;
+        let mut task = builder.build();
         // Content id from the parsed terms, not the syntax tree (location-free).
-        task.id = content_id(&task.givens, &task.goal);
+        task.id = content_id(&task.givens, task.goal());
         Ok(task)
     }
 }

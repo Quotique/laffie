@@ -21,10 +21,7 @@ use crate::{
         SharedRule,
     },
     task::{Tracer, solution::SolutionStatus},
-    term::{
-        Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
-        match_term,
-    },
+    term::{Atom, Param, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx, match_term},
 };
 
 /// Maximum depth allowed for nested subtasks.
@@ -142,9 +139,8 @@ impl Solver {
     /// * `control` – Run limits (cycle budget, wall-clock deadline,
     ///   cancellation); build one with [`RunControl::init`].
     ///
-    /// The method initializes a fresh `Solution` and `SolutionState`, and then
-    /// runs the main solving loop. The resulting `SharedSolution` contains
-    /// either the answer or an error status.
+    /// The returned `SharedSolution` carries either the answer or an error
+    /// status.
     pub fn solve(&mut self, task: Task, tracer: TracerHub, control: RunControl) -> SharedSolution {
         let mut solution = Solution::new(task);
         let mut state = SolutionState {
@@ -225,7 +221,7 @@ impl Solver {
         solution: &mut Solution,
         state: &mut SolutionState,
     ) -> Result<bool, SolveError> {
-        if solution.goal.is_transform() {
+        if solution.goal().is_transform() {
             Ok(false)
         } else if let Some(simplified) = self.transform(solution, state, index) {
             solution[index].filters.mark_replaced();
@@ -322,18 +318,18 @@ impl Solver {
         let mut added = false;
         for rule in self.suggest_rules(
             &solution[index],
-            if is_goal && solution.goal.is_prove() {
+            if is_goal && solution.goal().is_prove() {
                 &prove_goal
             } else {
-                &solution.task.goal
+                solution.task.goal()
             },
-            &solution.goal,
+            solution.goal(),
         ) {
             match self.produce(&rule, solution, state, index)? {
                 Some(s) => {
                     trace!("{} => {s}", solution[index]);
                     self.add_term(s, solution, state)?;
-                    if is_goal && solution.goal.is_transform() {
+                    if is_goal && solution.goal().is_transform() {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
                         solution[index].filters.level = self.rules_engine.max_level().next();
                         solution.requeue(index);
@@ -369,10 +365,10 @@ impl Solver {
             rule.clone(),
             &s[index].term,
             &s[index].filters,
-            if is_goal && s.goal.is_prove() {
+            if is_goal && s.goal().is_prove() {
                 &prove_goal
             } else {
-                &s.task.goal.term
+                &s.task.goal().term
             },
         )
         .collect();
@@ -439,14 +435,14 @@ impl Solver {
                     target: "rule_selection",
                     "term {} rejected, requirement not proven {}",
                     hypothesis.resolution,
-                    last.task.goal
+                    last.task.goal()
                 );
                 break;
             }
         }
         for req in iter {
-            req_proofs.push(SharedSolution::new(Solution::new(Task::from(
-                TermProps::from(TermBuf::symbol("prove").arg(req)),
+            req_proofs.push(SharedSolution::new(Solution::new(Task::from_goal(
+                Goal::prove(req),
             ))));
         }
         props.inference = TermInference::Rule {
@@ -478,12 +474,12 @@ impl Solver {
     ) -> SharedSolution {
         is_replace(&mut term.term_mut());
         let term = term.normalize(NormLevel::Full);
-        let prove_goal = SharedTerm::new(TermBuf::symbol("prove").arg(term.clone()));
 
         match term.term().truth(TruthCtx::new(&solution.known_vars)) {
             // The proven term is itself the answer.
             Truth::True => {
-                let mut trivial_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
+                let mut trivial_solution =
+                    Solution::new(Task::from_goal(Goal::prove(term.clone())));
                 trivial_solution.status = match trivial_solution.add_term(TermProps::from(term)) {
                     Ok(idx) => SolutionStatus::Answer(idx),
                     Err(e) => SolutionStatus::Err(e),
@@ -492,11 +488,13 @@ impl Solver {
             }
             // Unprovable — fail fast instead of searching.
             Truth::False => {
-                let mut no_solution = Solution::new(Task::from(TermProps::from(prove_goal)));
+                let mut no_solution = Solution::new(Task::from_goal(Goal::prove(term)));
                 no_solution.status = SolutionStatus::Err(SolveError::NoSolutionsFound);
                 SharedSolution::new(no_solution)
             }
-            Truth::Unknown => self.solve_subtask(solution, prove_goal, HashSet::new(), state),
+            Truth::Unknown => {
+                self.solve_subtask(solution, Goal::prove(term), HashSet::new(), state)
+            }
         }
     }
 
@@ -518,9 +516,9 @@ impl Solver {
         } else {
             term.term.term().to_owned()
         };
-        let task = SharedTerm::new(TermBuf::symbol("transform").arg(to_transform));
         let blocked = solution[index].filters.blocked_rules.clone();
-        let subtask_solution = self.solve_subtask(solution, task.clone(), blocked, state);
+        let subtask_solution =
+            self.solve_subtask(solution, Goal::transform(to_transform), blocked, state);
 
         let mut answer = subtask_solution.answer()?.as_ref().clone();
         if use_answer {
@@ -547,23 +545,24 @@ impl Solver {
         Some(result)
     }
 
+    /// Runs `goal` as a nested task, cached by the goal term.
     fn solve_subtask(
         &self,
         solution: &Solution,
-        task: SharedTerm,
+        goal: Goal,
         blocked_rules: HashSet<RuleId>,
         state: &mut SolutionState,
     ) -> SharedSolution {
-        if let Some(x) = state.cache.get(&task) {
+        let key = goal.to_term();
+        if let Some(x) = state.cache.get(&key) {
             return x.clone();
         }
 
-        let goal = task.term().to_owned();
         if state
             .cache
             .insert(
-                goal.clone(),
-                Solution::new(Task::from(TermProps::from(goal))).into(),
+                key.clone(),
+                Solution::new(Task::from_goal(goal.clone())).into(),
             )
             .is_some()
         {
@@ -571,24 +570,17 @@ impl Solver {
             unimplemented!("subtask recursion");
         }
 
-        let subtask = match Self::subtask(solution, task.clone(), blocked_rules) {
-            Ok(subtask) => subtask,
-            Err(e) => {
-                let sol = Self::errored_subtask(task.term().to_owned(), e);
-                *state.cache.get_mut(&task).unwrap() = sol.clone();
-                return sol;
-            }
-        };
+        let subtask = Self::subtask(solution, &goal, blocked_rules);
 
         let mut subtask_solver = Solver::new(self.rules_engine.clone());
         let mut subtask_solution = Solution::new(subtask);
         subtask_solver.solve_impl(&mut subtask_solution, state);
         let subtask_solution = SharedSolution::new(subtask_solution);
-        *state.cache.get_mut(&task).unwrap() = subtask_solution.clone();
+        *state.cache.get_mut(&key).unwrap() = subtask_solution.clone();
         if let SolutionStatus::Err(e) = subtask_solution.status {
-            trace!("Can't prove {task}: {e}");
+            trace!("Can't prove {key}: {e}");
             if e == SolveError::MaxSubtaskLevelExceed {
-                state.cache.remove(&task);
+                state.cache.remove(&key);
             }
         }
         subtask_solution
@@ -609,52 +601,35 @@ impl Solver {
             return x.clone();
         }
 
+        // The block's own `find(...)` — the cache key is the `solve(...)` call
+        // itself, which is not a goal.
+        let block_goal = match Goal::parse(goal.clone()) {
+            Ok(g) => g,
+            Err(e) => {
+                error!("solve block goal is not a goal: {e}");
+                return Self::errored_subtask(Goal::prove(goal), SolveError::Internal);
+            }
+        };
+
         // Placeholder needs a valid Goal — use the inner `find` term.
         if state
             .cache
             .insert(
                 cache_key.clone(),
-                Solution::new(Task::from(TermProps::from(goal.clone()))).into(),
+                Solution::new(Task::from_goal(block_goal.clone())).into(),
             )
             .is_some()
         {
             unimplemented!("solve-block recursion");
         }
 
-        let mut goal_props = TermProps::from(goal);
-        goal_props.filters.mark_goal();
-
-        let task = match TaskBuilder::default()
-            .with_goal(goal_props)
-            .map(|builder| {
-                let mut builder = builder
-                    .with_level(parent.task.subtask_level + 1)
-                    .with_conditions(
-                        parent
-                            .terms
-                            .iter()
-                            .filter(|x| x.is_proven())
-                            .filter(|x| {
-                                !(x.filters.is_goal() ||
-                                    x.term.term().data().is_symbol_name("answer"))
-                            })
-                            .cloned(),
-                    );
-                for eq in eqs {
-                    builder = builder.with_condition(TermProps::from(eq));
-                }
-                builder
-            })
-            .and_then(TaskBuilder::build)
-        {
-            Ok(task) => task,
-            Err(e) => {
-                error!("can't build solve subtask: {e}");
-                let sol = Self::errored_subtask(cache_key.clone(), SolveError::Internal);
-                *state.cache.get_mut(&cache_key).unwrap() = sol.clone();
-                return sol;
-            }
-        };
+        let mut builder = TaskBuilder::from_goal(block_goal)
+            .with_level(parent.task.subtask_level + 1)
+            .with_conditions(inherited_conditions(parent));
+        for eq in eqs {
+            builder = builder.with_condition(TermProps::from(eq));
+        }
+        let task = builder.build();
 
         let mut subtask_solver = Solver::new(self.rules_engine.clone());
 
@@ -711,41 +686,18 @@ impl Solver {
         Some(hyp)
     }
 
-    fn subtask(
-        solution: &Solution,
-        task: SharedTerm,
-        blocked_rules: HashSet<RuleId>,
-    ) -> Result<Task, SolveError> {
-        let mut goal = TermProps::from(task.clone());
-        goal.filters.blocked_rules = blocked_rules;
-        TaskBuilder::default()
-            .with_goal(goal)
-            .and_then(|builder| {
-                builder
-                    .with_conditions(
-                        solution
-                            .terms
-                            .iter()
-                            .filter(|x| x.is_proven())
-                            .filter(|x| {
-                                !(x.filters.is_goal() ||
-                                    x.term.term().data().is_symbol_name("answer"))
-                            })
-                            .cloned(),
-                    )
-                    .with_level(solution.task.subtask_level + 1)
-                    .build()
-            })
-            .map_err(|e| {
-                error!("can't build subtask: {e}");
-                SolveError::Internal
-            })
+    fn subtask(solution: &Solution, goal: &Goal, blocked_rules: HashSet<RuleId>) -> Task {
+        TaskBuilder::from_goal(goal.clone())
+            .with_blocked_rules(blocked_rules)
+            .with_conditions(inherited_conditions(solution))
+            .with_level(solution.task.subtask_level + 1)
+            .build()
     }
 
     /// A subtask solution carrying only an error status, for when the subtask
     /// could not even be built.
-    fn errored_subtask(goal: TermBuf, e: SolveError) -> SharedSolution {
-        let mut solution = Solution::new(Task::from(TermProps::from(goal)));
+    fn errored_subtask(goal: Goal, e: SolveError) -> SharedSolution {
+        let mut solution = Solution::new(Task::from_goal(goal));
         solution.status = SolutionStatus::Err(e);
         SharedSolution::new(solution)
     }
@@ -759,18 +711,14 @@ impl Solver {
         if solution[index].filters.is_goal() {
             // Prove goal reduced to a trivial truth: solved even with no
             // non-goal term to focus.
-            if solution.goal.is_prove() &&
-                let Some(i) = solution
-                    .goal_index
-                    .values()
-                    .copied()
-                    .find(|i| {
-                        solution[*i]
-                            .term
-                            .term()
-                            .truth(TruthCtx::new(&solution.known_vars))
-                            .is_true()
-                    })
+            if solution.goal().is_prove() &&
+                let Some(i) = solution.goal_index.values().copied().find(|i| {
+                    solution[*i]
+                        .term
+                        .term()
+                        .truth(TruthCtx::new(&solution.known_vars))
+                        .is_true()
+                })
             {
                 solution.status = SolutionStatus::Answer(i);
                 return Ok(true);
@@ -781,7 +729,7 @@ impl Solver {
             return Ok(true);
         }
 
-        Ok(match &solution.goal.clone() {
+        Ok(match &solution.goal().clone() {
             Goal::Find(g) => self.check_find_answer(solution, state, index, g),
             Goal::Prove(_) => self.check_prove_answer(solution, index),
             Goal::Transform(_) => self.check_transform_answer(solution),
@@ -792,7 +740,7 @@ impl Solver {
         let term = &solution[index];
         let term_root = term.term.term();
 
-        if solution.goal.is_transform() {
+        if solution.goal().is_transform() {
             return Ok(false);
         }
         if term_root.data().is_symbol_name("answer") && term_root.degree() == 1 {
@@ -1023,6 +971,17 @@ impl SolutionState {
         self.cycle_counter += 1;
         self.control.check(self.cycle_counter)
     }
+}
+
+/// Proven terms a subtask inherits from its parent: everything except the
+/// parent's own goal side and its `answer(...)` wrappers.
+fn inherited_conditions(parent: &Solution) -> impl Iterator<Item = TermProps> + '_ {
+    parent
+        .terms
+        .iter()
+        .filter(|x| x.is_proven())
+        .filter(|x| !(x.filters.is_goal() || x.term.term().data().is_symbol_name("answer")))
+        .cloned()
 }
 
 /// Resolves the `parents` requirement primitive against the match position:

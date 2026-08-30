@@ -98,7 +98,7 @@ impl View<'_> {
                 if self
                     .rendered
                     .borrow_mut()
-                    .insert(r.task.goal.term.as_ref().clone())
+                    .insert(r.task.goal().term.as_ref().clone())
                 {
                     View {
                         solution: r.as_ref(),
@@ -117,7 +117,7 @@ impl View<'_> {
     pub fn display_impl(&self, renderer: &mut dyn Renderer) -> fmt::Result {
         if let SolutionStatus::Answer(a) = self.solution.status {
             self.display_goal(
-                &self.solution.goal,
+                self.solution.goal(),
                 &self.solution.terms[a].term,
                 self.solution.task.subtask_level,
                 renderer,
@@ -132,7 +132,7 @@ impl View<'_> {
             renderer.dump_frame(&self.solution.terms)?;
         }
         if self.solution.task.subtask_level == 0 {
-            renderer.display_answer(&self.solution.goal, self.solution.answer(), self.solution)?;
+            renderer.display_answer(self.solution.goal(), self.solution.answer(), self.solution)?;
         }
         Ok(())
     }

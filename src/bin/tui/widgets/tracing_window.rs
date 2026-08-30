@@ -36,7 +36,7 @@ impl<'a> Widget for TracingWindow<'a> {
 impl<'a> TracingWindow<'a> {
     fn task_lines<'b>(&'b self, solution: &Solution) -> Vec<Line<'b>> {
         vec![
-            self.key_value_line("Task: ", &solution.goal),
+            self.key_value_line("Task: ", solution.goal()),
             Line::default(),
             self.key_value_line(
                 "Answer: ",
@@ -82,7 +82,7 @@ impl<'a> TracingWindow<'a> {
                 let unproven = self.theme.unproven_requirement;
                 let skipped = self.theme.skipped_requirement;
                 for i in requirements {
-                    let goal = &i.task.goal.term;
+                    let goal = &i.task.goal().term;
                     result.push(Line::from(match i.status {
                         SolutionStatus::Answer(_) => Span::styled(format!("  ☑  {goal}"), proven),
                         SolutionStatus::Err(_) => Span::styled(format!("  ☒  {goal}"), unproven),

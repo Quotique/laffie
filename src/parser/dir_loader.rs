@@ -121,7 +121,7 @@ impl DirectoryParser {
                         trace!(
                             "New task: [{:x}] {} [{}]",
                             t.id,
-                            t.goal,
+                            t.goal(),
                             t.givens.iter().format(", ")
                         );
                         t.group = file.path.with_extension("").display().to_string();

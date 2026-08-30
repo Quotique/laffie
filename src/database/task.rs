@@ -2,7 +2,7 @@ use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
 
 use solver::{
-    task::{Task as SolverTask, TermProps, content_id},
+    task::{Goal, GoalError, Task as SolverTask, TaskBuilder, TermProps, content_id},
     term::TermBuf,
 };
 
@@ -36,7 +36,7 @@ pub struct Task {
 impl From<&SolverTask> for Task {
     fn from(t: &SolverTask) -> Self {
         let givens: Vec<TermBuf> = t.givens.iter().map(|x| (*x.term).clone()).collect();
-        let goal: TermBuf = (*t.goal.term).clone();
+        let goal: TermBuf = (*t.goal().term).clone();
         let id = compute_task_id(&givens, &goal);
 
         Task {
@@ -53,19 +53,19 @@ impl From<&SolverTask> for Task {
     }
 }
 
-impl From<Task> for SolverTask {
-    fn from(t: Task) -> Self {
-        let givens: Vec<TermProps> = t.givens.into_iter().map(TermProps::from).collect();
-        let goal = TermProps::from(t.goal);
-        SolverTask {
-            id: content_id(&givens, &goal),
-            name: t.name,
-            text: t.text,
-            group: t.group,
-            givens,
-            goal,
-            possible_answers: t.possible_answers,
-            subtask_level: 0,
-        }
+impl TryFrom<Task> for SolverTask {
+    type Error = GoalError;
+
+    /// Fails when the stored goal is not a `find`/`prove`/`transform`.
+    fn try_from(t: Task) -> Result<Self, Self::Error> {
+        let mut task = TaskBuilder::from_goal(Goal::parse(t.goal)?)
+            .with_name(t.name)
+            .with_text(t.text)
+            .with_conditions(t.givens.into_iter().map(TermProps::from))
+            .build();
+        task.group = t.group;
+        task.possible_answers = t.possible_answers;
+        task.id = content_id(&task.givens, task.goal());
+        Ok(task)
     }
 }

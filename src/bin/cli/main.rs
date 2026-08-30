@@ -212,7 +212,7 @@ fn main() -> ExitCode {
                 .iter()
                 .map(|t| (*t.term).clone())
                 .collect::<Vec<_>>(),
-            &task.goal.term,
+            &task.goal().term,
         ));
         only_ids
             .iter()
@@ -225,7 +225,16 @@ fn main() -> ExitCode {
             println!("task put error: {e:?}");
         }
 
-        let solver_task: SolverTask = db_task.clone().into();
+        // CONTEXT: dead for a task that came from the loader — its goal was
+        // parsed there — and live for one read straight from the db.
+        let solver_task: SolverTask = match db_task.clone().try_into() {
+            Ok(task) => task,
+            Err(e) => {
+                println!("{} {}: {e}", "Task".bold().red(), id_to_hex(&db_task.id));
+                stats.entry(db_task.group.clone()).or_default().not_solved += 1;
+                continue;
+            }
+        };
         println!("{} {}", "Task".bold().green(), solver_task);
         let task_id_hex = id_to_hex(&db_task.id);
         let task_label = format!("{}/{}", db_task.group, &task_id_hex[..8]);

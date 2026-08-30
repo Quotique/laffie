@@ -37,7 +37,7 @@ impl Renderer for Tui<'_> {
                     " needed: [{}]",
                     term.inference
                         .requirements()
-                        .map(|x| &x.task.goal.term)
+                        .map(|x| &x.task.goal().term)
                         .format(", ")
                 ))
             },

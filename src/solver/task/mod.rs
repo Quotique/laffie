@@ -6,22 +6,26 @@ mod solver;
 mod steps;
 mod tracing;
 
-use crate::term::TermBuf;
+use crate::{rule::RuleId, term::TermBuf};
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{HashSet, hash_map::DefaultHasher},
     fmt,
     hash::{Hash, Hasher},
     iter::Iterator,
 };
 
 pub use builder::TaskBuilder;
-pub use goal::Goal;
+pub use goal::{Goal, GoalError};
 pub use props::{TermInference, TermProps};
 pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError, TermIdx};
 pub use solver::{CancelToken, EXECUTION_DEADLINE_DEFAULT, RunControl, Solver, TIME_LIMIT_DEFAULT};
 pub use steps::{StepsSource, Visit};
 pub use tracing::{Tracer, TracerHub};
 
+/// A problem: what to look for, what is given, how deep in the subtask tree.
+///
+/// The goal is checked at construction and never again, which is what lets
+/// the search assume it is a well-formed `find`/`prove`/`transform`.
 #[derive(Debug, Clone)]
 pub struct Task {
     pub id:    u64,
@@ -29,24 +33,44 @@ pub struct Task {
     pub text:  String,
     pub group: String,
 
-    pub goal:          TermProps,
     pub givens:        Vec<TermProps>,
     pub subtask_level: usize,
 
     pub possible_answers: Vec<TermBuf>,
+
+    /// The goal term as written. Private so `parsed` cannot drift from it.
+    goal:   TermProps,
+    /// The same goal, parsed once.
+    parsed: Goal,
 }
 
-impl From<TermProps> for Task {
-    fn from(value: TermProps) -> Self {
+impl Task {
+    /// Read-only: writing it would invalidate the parse.
+    #[inline]
+    pub fn goal(&self) -> &TermProps {
+        &self.goal
+    }
+
+    #[inline]
+    pub(crate) fn parsed_goal(&self) -> &Goal {
+        &self.parsed
+    }
+
+    pub(crate) fn block_rules(&mut self, rules: HashSet<RuleId>) {
+        self.goal.filters.blocked_rules = rules;
+    }
+
+    pub(crate) fn from_goal(goal: Goal) -> Self {
         Self {
+            goal:             TermProps::from(goal.to_term()),
             id:               Default::default(),
             name:             Default::default(),
             text:             Default::default(),
             group:            Default::default(),
-            goal:             value,
             givens:           Default::default(),
             subtask_level:    Default::default(),
             possible_answers: Default::default(),
+            parsed:           goal,
         }
     }
 }

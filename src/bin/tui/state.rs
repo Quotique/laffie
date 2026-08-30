@@ -375,7 +375,7 @@ fn collect_known_task_ids(node: &Node<TasksNode>, out: &mut HashSet<u64>) {
 #[cfg(test)]
 mod tests {
     use solver::{
-        task::{Solution, Task, TermProps},
+        task::{Goal, Solution, TaskBuilder},
         term::TermBuf,
     };
     use trees::{Tree, tr};
@@ -384,7 +384,7 @@ mod tests {
 
     fn dummy_task_state() -> TaskState {
         let goal = TermBuf::symbol("find").arg(TermBuf::variable("x"));
-        let task = Task::from(TermProps::from(goal));
+        let task = TaskBuilder::from_goal(Goal::parse(goal).expect("find(x) is a goal")).build();
         TaskState {
             solution:          Solution::new(task).into(),
             previous_solution: None,

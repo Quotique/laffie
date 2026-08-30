@@ -18,7 +18,7 @@ src/solver/
 │   └── term_filters.rs       # TermFilters, TermFlags (bitflags: REPLACED, SIMPLIFIED, GOAL)
 ├── task/
 │   ├── mod.rs                # Task struct, re-exports
-│   ├── goal.rs               # FindGoal, Goal enum: Find(FindGoal), Prove, Transform
+│   ├── goal.rs               # Goal enum: Find(FindGoal), Prove, Transform; GoalError; parse/to_term
 │   ├── limits.rs             # CalculationLimits — cycle budgeting with Arc<RwLock>
 │   ├── props.rs              # TermProps, TermInference enum, TermAsRule
 │   ├── solution.rs           # Solution, SolutionStatus, SolveError, SharedSolution
@@ -77,7 +77,7 @@ src/solver/
 ### task/mod.rs
 | Line | Type | Description |
 |------|------|-------------|
-| 20 | `Task` | Fields: id, text, group, goal, givens, subtask_level, possible_answers |
+| 25 | `Task` | Fields: id, name, text, group, givens, subtask_level, possible_answers; goal is private (term + parse), read via `goal()` / `parsed_goal()`. Built only by `TaskBuilder` or `Task::from_goal` — the goal is validated once, at construction |
 
 ### rule/hypothesis.rs
 | Line | Type | Description |
@@ -93,8 +93,13 @@ src/solver/
 ### task/goal.rs
 | Line | Type | Description |
 |------|------|-------------|
-| 14 | `FindGoal` | Fields: targets(Vec\<TermBuf\>), term(TermProps) |
-| 20 | `Goal` | Enum: Find(FindGoal), Prove(TermProps), Transform(TermProps) |
+| 10 | `GoalError` | Enum: NotAGoal(String), WrongArity(String) — why a term is not a goal, rendered as written |
+| 27 | `FindGoal` | Fields: targets(Vec\<TermBuf\>), term(TermProps) |
+| 33 | `Goal` | Enum: Find(FindGoal), Prove(TermProps), Transform(TermProps) |
+| 81 | `Goal::parse()` | The only fallible construction; the boundary that keeps a malformed goal out of the search |
+| 111 | `Goal::prove/transform()` | Infallible constructors for the subtasks the search spawns |
+| 122 | `Goal::to_term()` | Inverse of `parse`, argument order preserved |
+| 136 | `Goal::block_rules()` | Carries a `block(...)` set into the goal-side term |
 
 ### task/solver.rs
 | Line | Type | Description |
@@ -122,7 +127,7 @@ src/solver/
 | 17 | `SharedSolution` | `Arc<Solution>` |
 | 20 | `SolveError` | Enum: StackOverflow, MaxSubtaskLevelExceed, NoConditions, NoSolutionsFound, ExecutionDeadline, Canceled |
 | 30 | `SolutionStatus` | Enum: NotDone, Answer(usize), Err(SolveError) |
-| 39 | `Solution` | Fields: task, goal, status, start/end_cycle, main_index, goal_index, terms, find_bindings, unproven_terms_count |
+| 44 | `Solution` | Fields: task, status, start/end_cycle, main_index, goal_index, terms, find_bindings, unproven_terms_count. `goal()` is derived from `task`, not stored twice; `Solution::new` is infallible |
 
 ### task/props.rs
 | Line | Type | Description |

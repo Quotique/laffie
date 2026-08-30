@@ -11,3 +11,4 @@ dumps*
 *.toc
 doc/**/*.pdf
 tmp/
+.scratch/

@@ -44,7 +44,6 @@ pub enum SolutionStatus {
 #[derive(Debug)]
 pub struct Solution {
     pub task: Task,
-    pub goal: Goal,
 
     pub status:      SolutionStatus,
     pub start_cycle: usize,
@@ -68,27 +67,11 @@ pub struct Solution {
 }
 
 impl Solution {
+    /// Infallible: `task` guarantees a well-formed goal.
     pub fn new(task: Task) -> Self {
-        let mut goal = Goal::try_from((*task.goal.term).clone()).unwrap();
-        // Goal::try_from rebuilds TermProps from a bare TermBuf and drops the
-        // task.goal.filters payload. Carry blocked_rules across so that a
-        // `block(rule_id)` set on the parent term survives into the subtask
-        // (e.g. a transform-subtask whose goal was produced by a rule with
-        // `block(...)` must still skip the blocked rule).
-        let inherited_blocked = task.goal.filters.blocked_rules.clone();
-        if !inherited_blocked.is_empty() {
-            match &mut goal {
-                Goal::Find(g) => g.term.filters.blocked_rules.extend(inherited_blocked),
-                Goal::Prove(t) | Goal::Transform(t) => {
-                    t.filters.blocked_rules.extend(inherited_blocked);
-                }
-            }
-        }
-
         let known_vars = collect_known_set(&task.givens);
         let mut solution = Self {
             task,
-            goal,
             start_cycle: Default::default(),
             end_cycle: Default::default(),
             main_index: Default::default(),
@@ -104,7 +87,12 @@ impl Solution {
         for i in conditions.into_iter() {
             let _ = solution.add_term(i);
         }
-        let mut goal_term = solution.goal.term().clone();
+        let mut goal_term = solution.goal().term().clone();
+        // The task's blocked rules land on the goal term the search starts from.
+        goal_term
+            .filters
+            .blocked_rules
+            .clone_from(&solution.task.goal().filters.blocked_rules);
         let goal_buf = Arc::make_mut(&mut goal_term.term);
         // Canonicalize the goal (commutative arg order etc.) so the syntactic
         // match in `check_prove_answer` sees derived terms — which are always
@@ -113,9 +101,14 @@ impl Solution {
         let _ = solution.add_term(goal_term);
 
         trace!(target: "subtask", "Subtask: {}, [{}]",
-            solution.goal, solution.task.givens.iter().format(", ")
+            solution.goal(), solution.task.givens.iter().format(", ")
         );
         solution
+    }
+
+    #[inline]
+    pub fn goal(&self) -> &Goal {
+        self.task.parsed_goal()
     }
 
     #[inline]

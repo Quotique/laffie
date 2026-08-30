@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- A task's goal is parsed once, when the task is built: a `.pbl` whose goal is
+  not `find`/`prove`/`transform` is now a load error naming the file, the line
+  and the goal, instead of a panic partway through the run.
+- `Task::goal` is an accessor rather than a field, and `Task` is built only
+  through `TaskBuilder`; converting a stored task into a solver task is
+  fallible (`TryFrom`).
+
 ## [0.7.0] - 2026-07-21
 
 ### Added

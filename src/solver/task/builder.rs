@@ -1,29 +1,48 @@
-use std::{collections::HashMap, fmt, iter::Iterator};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::Iterator,
+};
 
-use super::{Task, TermInference, TermProps};
-use crate::term::TermBuf;
+use super::{Goal, Task, TermInference, TermProps};
+use crate::{rule::RuleId, term::TermBuf};
 
-#[derive(Clone, Debug)]
-pub enum TaskBuilderError {
-    OnlyOneGoalAllowed,
-    NoGoalFound,
-}
-
-#[derive(Default)]
 pub struct TaskBuilder {
     id:          u64,
     name:        String,
     text:        String,
     conditions:  Vec<TermProps>,
-    goal:        Option<TermProps>,
+    goal:        Goal,
     term_id_map: HashMap<usize, usize>,
 
+    blocked_rules:    HashSet<RuleId>,
     possible_answers: Vec<TermBuf>,
 
     subtask_level: usize,
 }
 
 impl TaskBuilder {
+    pub fn from_goal(goal: Goal) -> Self {
+        Self {
+            id: Default::default(),
+            name: Default::default(),
+            text: Default::default(),
+            conditions: Default::default(),
+            goal,
+            term_id_map: Default::default(),
+            blocked_rules: Default::default(),
+            possible_answers: Default::default(),
+            subtask_level: Default::default(),
+        }
+    }
+
+    /// A rule that blocked itself on the term a subtask was spawned from stays
+    /// blocked inside that subtask, or it fires again there and the search
+    /// loops.
+    pub(crate) fn with_blocked_rules(mut self, rules: HashSet<RuleId>) -> Self {
+        self.blocked_rules = rules;
+        self
+    }
+
     pub fn with_id(mut self, id: u64) -> Self {
         self.id = id;
         self
@@ -37,14 +56,6 @@ impl TaskBuilder {
     pub fn with_text(mut self, text: String) -> Self {
         self.text = text;
         self
-    }
-
-    pub fn with_goal(mut self, goal: TermProps) -> Result<Self, TaskBuilderError> {
-        if let Some(_x) = self.goal.replace(goal) {
-            Err(TaskBuilderError::OnlyOneGoalAllowed)
-        } else {
-            Ok(self)
-        }
     }
 
     pub fn with_condition(mut self, mut condition: TermProps) -> Self {
@@ -94,25 +105,46 @@ impl TaskBuilder {
     }
 
     #[inline]
-    pub fn build(self) -> Result<Task, TaskBuilderError> {
-        Ok(Task {
-            id:               self.id,
-            name:             self.name,
-            text:             self.text,
-            group:            "".to_owned(),
-            givens:           self.conditions,
-            goal:             self.goal.ok_or(TaskBuilderError::NoGoalFound)?,
-            subtask_level:    self.subtask_level,
-            possible_answers: self.possible_answers,
-        })
+    pub fn build(self) -> Task {
+        let mut task = Task::from_goal(self.goal);
+        task.id = self.id;
+        task.name = self.name;
+        task.text = self.text;
+        task.givens = self.conditions;
+        task.subtask_level = self.subtask_level;
+        task.possible_answers = self.possible_answers;
+        task.block_rules(self.blocked_rules);
+        task
     }
 }
 
-impl fmt::Display for TaskBuilderError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::OnlyOneGoalAllowed => write!(f, "Duplicate goal"),
-            Self::NoGoalFound => write!(f, "No goal found"),
-        }
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::TaskBuilder;
+    use crate::{
+        rule::RuleId,
+        task::{Goal, Solution},
+        term::{TermBuf, term_with_vars},
+    };
+
+    #[test]
+    fn blocked_rules_reach_the_goal_term_the_search_starts_from() {
+        // Or the rule that blocked itself fires again inside the subtask.
+        let blocked = RuleId::new(0, 7);
+        let goal = Goal::parse(TermBuf::symbol("transform").arg(term_with_vars("1 + 2")))
+            .expect("transform(1 + 2) is a goal");
+        let task = TaskBuilder::from_goal(goal)
+            .with_blocked_rules(HashSet::from([blocked]))
+            .build();
+
+        let solution = Solution::new(task);
+        let goal_term = solution
+            .terms
+            .iter()
+            .find(|t| t.filters.is_goal())
+            .expect("the goal term is in the solution");
+        assert!(goal_term.filters.blocked_rules.contains(&blocked));
     }
 }
