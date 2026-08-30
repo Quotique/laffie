@@ -294,7 +294,7 @@ impl Ui {
             cycles: self.cycles.clone(),
         };
         let tx = self.progress_tx.clone();
-        let rules = self.state.rules_engine.clone();
+        let solver = Arc::new(Solver::new(self.state.rules_engine.clone()));
         let parallelism = self.state.settings.solve_parallelism.max(1);
         self.worker = Some(spawn(move || {
             let pool = rayon::ThreadPoolBuilder::new()
@@ -310,8 +310,7 @@ impl Ui {
                         hub.add_custom(reporter.clone());
 
                         let _ = tx.send(ProgressEvent::TaskStarted(Box::new(task.task.clone())));
-                        let solution =
-                            Solver::new(rules.clone()).solve(task.task, hub, control.clone());
+                        let solution = solver.solve(task.task, hub, control.clone());
                         let _ = tx.send(ProgressEvent::TaskFinished);
                         (idx, solution)
                     })

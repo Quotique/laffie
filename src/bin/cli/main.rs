@@ -164,6 +164,7 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     let rules_engine = Arc::new(rules.value);
+    let solver = Solver::new(rules_engine.clone());
     let tasks = tasks.value;
 
     if let Some(parent) = args.db_path.parent() &&
@@ -238,7 +239,6 @@ fn main() -> ExitCode {
         println!("{} {}", "Task".bold().green(), solver_task);
         let task_id_hex = id_to_hex(&db_task.id);
         let task_label = format!("{}/{}", db_task.group, &task_id_hex[..8]);
-        let mut solver = Solver::new(rules_engine.clone());
 
         let explain = args.explain.then(ExplainTracer::default);
         let start = std::time::Instant::now();

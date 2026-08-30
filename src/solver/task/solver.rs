@@ -17,7 +17,7 @@ use super::{
 use crate::{
     NormLevel, Rational,
     rule::{
-        GroundedHypothesis, Hypothesis, HypothesisIterator, RuleAttr, RuleId, RulesEngine,
+        GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr, RuleId, RulesEngine,
         SharedRule,
     },
     task::{Tracer, solution::SolutionStatus},
@@ -41,6 +41,10 @@ pub const TIME_LIMIT_DEFAULT: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// How often (in grounded hypotheses) `produce` polls the run limits.
 const DEADLINE_CHECK_INTERVAL: usize = 64;
+
+/// Id namespace for a frame's own rules, clear of the ids the rule engine
+/// hands out.
+const LOCAL_RULE_MASK: u64 = 0x80_00_00_00_00_00_00_00;
 
 /// External cancellation handle. Cloning shares the same flag, so a caller can
 /// hold a clone and cancel a run from another thread.
@@ -103,17 +107,27 @@ impl RunControl {
     }
 }
 
-struct SolutionState {
-    control:       RunControl,
-    cycle_counter: usize,
-    cache:         HashMap<TermBuf, SharedSolution>,
-    tracer:        TracerHub,
+/// Shared by every frame of one `solve`. Splitting any of it per subtask
+/// changes the cycle count and the cache hits.
+struct Run {
+    control: RunControl,
+    cycle:   usize,
+    cache:   HashMap<TermBuf, SharedSolution>,
+    tracer:  TracerHub,
 }
 
+/// Rules derived from a frame's own terms. Insertion-ordered, because the
+/// order rules are offered in is part of the search's identity.
+#[derive(Default)]
+struct LocalRules {
+    rules:     IndexMap<RuleId, SharedRule>,
+    max_level: Level,
+}
+
+/// The rule set a run is solved against, with no state of its own between
+/// tasks.
 pub struct Solver {
     rules_engine: Arc<RulesEngine>,
-
-    local_rules: IndexMap<RuleId, SharedRule>,
 }
 
 impl Solver {
@@ -125,8 +139,7 @@ impl Solver {
     ///   global rule set used during solving.
     pub fn new(rules: Arc<RulesEngine>) -> Solver {
         Solver {
-            rules_engine: rules.clone(),
-            local_rules:  IndexMap::new(),
+            rules_engine: rules,
         }
     }
 
@@ -141,11 +154,11 @@ impl Solver {
     ///
     /// The returned `SharedSolution` carries either the answer or an error
     /// status.
-    pub fn solve(&mut self, task: Task, tracer: TracerHub, control: RunControl) -> SharedSolution {
+    pub fn solve(&self, task: Task, tracer: TracerHub, control: RunControl) -> SharedSolution {
         let mut solution = Solution::new(task);
-        let mut state = SolutionState {
+        let mut state = Run {
             control,
-            cycle_counter: Default::default(),
+            cycle: Default::default(),
             cache: Default::default(),
             tracer,
         };
@@ -154,78 +167,76 @@ impl Solver {
         solution.into()
     }
 
-    fn solve_impl(&mut self, solution: &mut Solution, state: &mut SolutionState) {
+    /// Runs one (sub)task to a terminal status.
+    fn solve_impl(&self, solution: &mut Solution, run: &mut Run) {
         if solution.task.subtask_level > MAX_SUBTASK_LEVEL {
             solution.status = SolutionStatus::Err(SolveError::MaxSubtaskLevelExceed);
             return;
         }
-        state
-            .tracer
-            .on_subtask_start(&solution.task, state.current_cycle());
+        let mut local = LocalRules::default();
+        run.tracer.on_subtask_start(&solution.task, run.cycle());
 
-        solution.start_cycle = state.cycle_counter;
+        solution.start_cycle = run.cycle;
 
         // TODO: can be replaced with try { .. } in future
         // track: https://github.com/rust-lang/rust/issues/31436
         let mut main_loop = || loop {
-            state.increment_cycle_counter()?;
-            let index = self.try_focus_term(solution, state)?;
-            if self.try_simplify(index, solution, state)? {
+            run.begin_cycle()?;
+            let index = self.try_focus_term(solution, run, &local)?;
+            if self.try_simplify(index, solution, run, &mut local)? {
                 continue;
             }
-            if self.check_if_answer(solution, state, index)? {
+            if self.check_if_answer(solution, run, index)? {
                 let level = solution.task.subtask_level;
                 let answer = solution.answer().unwrap();
                 trace!("Solved {level}. Answer: {answer}",);
                 break Ok(());
             }
-            self.add_local_rule(&mut solution[index]);
-            self.try_infer_new_terms(index, solution, state)?;
+            self.add_local_rule(&mut solution[index], &mut local);
+            self.try_infer_new_terms(index, solution, run, &mut local)?;
         };
         if let Err(e) = main_loop() {
             solution.status = SolutionStatus::Err(e);
         }
-        solution.end_cycle = state.cycle_counter;
-        state.tracer.on_subtask_end(solution);
+        solution.end_cycle = run.cycle;
+        run.tracer.on_subtask_end(solution);
     }
 
     fn try_focus_term(
         &self,
         solution: &mut Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
+        local: &LocalRules,
     ) -> Result<TermIdx, SolveError> {
         let index = solution.pick_next().ok_or(SolveError::NoConditions)?;
-        state
-            .tracer
-            .on_term_focus(&solution[index], state.current_cycle());
+        run.tracer.on_term_focus(&solution[index], run.cycle());
         let level = solution[index].filters.level;
 
         trace!(target: "subtask",
             "[{}]({}) Level: {level} -> {}",
             solution.task.subtask_level,
-            state.current_cycle(),
+            run.cycle(),
             solution[index]
         );
 
-        let local_levels = self.local_rules.values().map(|x| x.level);
-        let max_local = local_levels.max().unwrap_or(0.into());
-        if level > std::cmp::max(max_local, self.rules_engine.max_level()).next() {
+        if level > std::cmp::max(local.max_level, self.rules_engine.max_level()).next() {
             return Err(SolveError::NoSolutionsFound);
         }
         Ok(index)
     }
 
     fn try_simplify(
-        &mut self,
+        &self,
         index: usize,
         solution: &mut Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
+        local: &mut LocalRules,
     ) -> Result<bool, SolveError> {
         if solution.goal().is_transform() {
             Ok(false)
-        } else if let Some(simplified) = self.transform(solution, state, index) {
+        } else if let Some(simplified) = self.transform(solution, run, index) {
             solution[index].filters.mark_replaced();
-            self.add_term(simplified, solution, state)?;
+            self.add_term(simplified, solution, run, local)?;
             Ok(true)
         } else {
             solution[index].filters.mark_simplified();
@@ -234,12 +245,13 @@ impl Solver {
     }
 
     fn add_term(
-        &mut self,
+        &self,
         term: TermProps,
         s: &mut Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
+        local: &mut LocalRules,
     ) -> Result<TermIdx, SolveError> {
-        state.tracer.on_new_term(
+        run.tracer.on_new_term(
             &term,
             &term
                 .inference
@@ -251,21 +263,21 @@ impl Solver {
         let is_goal = term.filters.is_goal();
         let index = s.add_term(term)?;
         if !is_goal {
-            self.add_local_rule(&mut s[index]);
+            self.add_local_rule(&mut s[index], local);
         }
         Ok(index)
     }
 
-    fn add_local_rule(&mut self, term: &mut TermProps) {
+    fn add_local_rule(&self, term: &mut TermProps, local: &mut LocalRules) {
         if term.filters.is_goal() {
             return;
         }
         let level = term.filters.level;
         if let Some(r) = term.rule(
-            RuleId::new(0x80_00_00_00_00_00_00_00, self.local_rules.len() as u64 + 1),
+            RuleId::new(LOCAL_RULE_MASK, local.rules.len() as u64 + 1),
             level.next(),
         ) {
-            self.local_rules.entry(r.id).or_insert(r);
+            local.insert(r);
         }
     }
 
@@ -275,13 +287,14 @@ impl Solver {
         term: &TermProps,
         goal_term: &TermProps,
         goal: &Goal,
+        local: &LocalRules,
     ) -> Vec<SharedRule> {
         if goal.is_transform() && !term.filters.is_goal() {
             return vec![];
         }
 
-        let local_rules = self
-            .local_rules
+        let local_rules = local
+            .rules
             .values()
             .filter(|rule| rule.try_filter(&term.filters, &goal_term.term).is_ok())
             .cloned();
@@ -306,10 +319,11 @@ impl Solver {
     }
 
     fn try_infer_new_terms(
-        &mut self,
+        &self,
         index: TermIdx,
         solution: &mut Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
+        local: &mut LocalRules,
     ) -> Result<(), SolveError> {
         let is_goal = solution[index].filters.is_goal();
         let prove_goal =
@@ -324,11 +338,12 @@ impl Solver {
                 solution.task.goal()
             },
             solution.goal(),
+            local,
         ) {
-            match self.produce(&rule, solution, state, index)? {
+            match self.produce(&rule, solution, run, index)? {
                 Some(s) => {
                     trace!("{} => {s}", solution[index]);
-                    self.add_term(s, solution, state)?;
+                    self.add_term(s, solution, run, local)?;
                     if is_goal && solution.goal().is_transform() {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
                         solution[index].filters.level = self.rules_engine.max_level().next();
@@ -353,7 +368,7 @@ impl Solver {
         &self,
         rule: &SharedRule,
         s: &mut Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
         index: TermIdx,
     ) -> Result<Option<TermProps>, SolveError> {
         let is_goal = s[index].filters.is_goal();
@@ -375,13 +390,13 @@ impl Solver {
         let mut grounded_seen = 0usize;
         for mut h in raw_hypotheses {
             resolve_parents_in_hypothesis(&mut h, s[index].term.as_ref());
-            let Some(h) = self.resolve_solve_in_hypothesis(h, s, state) else {
+            let Some(h) = self.resolve_solve_in_hypothesis(h, s, run) else {
                 continue;
             };
             for hypothesis in h.ground(&s.known_vars) {
                 grounded_seen += 1;
                 if grounded_seen.is_multiple_of(DEADLINE_CHECK_INTERVAL) {
-                    state.control.check(state.cycle_counter)?;
+                    run.control.check(run.cycle)?;
                 }
                 let is_dub = if is_goal {
                     s.goal_index.contains_key(&hypothesis.resolution)
@@ -391,7 +406,7 @@ impl Solver {
                 if is_dub {
                     continue;
                 }
-                let props = self.try_prove_hypothesis(index, s, hypothesis, state);
+                let props = self.try_prove_hypothesis(index, s, hypothesis, run);
                 if props.inference.is_proven() {
                     return Ok(Some(props));
                 }
@@ -407,18 +422,15 @@ impl Solver {
         parent_idx: usize,
         solution: &Solution,
         hypothesis: GroundedHypothesis,
-        state: &mut SolutionState,
+        run: &mut Run,
     ) -> TermProps {
         trace!(
             target: "rule_selection",
             "new hypothesis {hypothesis}, rule {}, term: {}",
             hypothesis.rule, solution[parent_idx]
         );
-        state.tracer.on_new_hypothesis(
-            solution[parent_idx].term.clone(),
-            &hypothesis,
-            state.current_cycle(),
-        );
+        run.tracer
+            .on_new_hypothesis(solution[parent_idx].term.clone(), &hypothesis, run.cycle());
 
         let mut props = TermProps::from(hypothesis.resolution.clone());
         props.filters.blocked_rules = hypothesis.blocked_rules.iter().cloned().collect();
@@ -428,7 +440,7 @@ impl Solver {
         let mut req_proofs = vec![];
         let mut iter = hypothesis.requirements.clone().into_iter();
         for i in iter.by_ref() {
-            req_proofs.push(self.prove(solution, i, state));
+            req_proofs.push(self.prove(solution, i, run));
             let last = req_proofs.last().unwrap();
             if last.answer().is_none() {
                 trace!(
@@ -452,9 +464,8 @@ impl Solver {
             requirements: req_proofs,
         };
 
-        state
-            .tracer
-            .on_hypothesis_finish(&props.inference, state.current_cycle());
+        run.tracer
+            .on_hypothesis_finish(&props.inference, run.cycle());
 
         if props.inference.is_proven() {
             trace!(
@@ -466,12 +477,7 @@ impl Solver {
         props
     }
 
-    fn prove(
-        &self,
-        solution: &Solution,
-        mut term: TermBuf,
-        state: &mut SolutionState,
-    ) -> SharedSolution {
+    fn prove(&self, solution: &Solution, mut term: TermBuf, run: &mut Run) -> SharedSolution {
         is_replace(&mut term.term_mut());
         let term = term.normalize(NormLevel::Full);
 
@@ -492,18 +498,11 @@ impl Solver {
                 no_solution.status = SolutionStatus::Err(SolveError::NoSolutionsFound);
                 SharedSolution::new(no_solution)
             }
-            Truth::Unknown => {
-                self.solve_subtask(solution, Goal::prove(term), HashSet::new(), state)
-            }
+            Truth::Unknown => self.solve_subtask(solution, Goal::prove(term), HashSet::new(), run),
         }
     }
 
-    fn transform(
-        &mut self,
-        solution: &mut Solution,
-        state: &mut SolutionState,
-        index: usize,
-    ) -> Option<TermProps> {
+    fn transform(&self, solution: &mut Solution, run: &mut Run, index: usize) -> Option<TermProps> {
         let term = &mut solution[index];
         if term.filters.is_simplified() {
             return None;
@@ -518,7 +517,7 @@ impl Solver {
         };
         let blocked = solution[index].filters.blocked_rules.clone();
         let subtask_solution =
-            self.solve_subtask(solution, Goal::transform(to_transform), blocked, state);
+            self.solve_subtask(solution, Goal::transform(to_transform), blocked, run);
 
         let mut answer = subtask_solution.answer()?.as_ref().clone();
         if use_answer {
@@ -551,14 +550,14 @@ impl Solver {
         solution: &Solution,
         goal: Goal,
         blocked_rules: HashSet<RuleId>,
-        state: &mut SolutionState,
+        run: &mut Run,
     ) -> SharedSolution {
         let key = goal.to_term();
-        if let Some(x) = state.cache.get(&key) {
+        if let Some(x) = run.cache.get(&key) {
             return x.clone();
         }
 
-        if state
+        if run
             .cache
             .insert(
                 key.clone(),
@@ -572,15 +571,14 @@ impl Solver {
 
         let subtask = Self::subtask(solution, &goal, blocked_rules);
 
-        let mut subtask_solver = Solver::new(self.rules_engine.clone());
         let mut subtask_solution = Solution::new(subtask);
-        subtask_solver.solve_impl(&mut subtask_solution, state);
+        self.solve_impl(&mut subtask_solution, run);
         let subtask_solution = SharedSolution::new(subtask_solution);
-        *state.cache.get_mut(&key).unwrap() = subtask_solution.clone();
+        *run.cache.get_mut(&key).unwrap() = subtask_solution.clone();
         if let SolutionStatus::Err(e) = subtask_solution.status {
             trace!("Can't prove {key}: {e}");
             if e == SolveError::MaxSubtaskLevelExceed {
-                state.cache.remove(&key);
+                run.cache.remove(&key);
             }
         }
         subtask_solution
@@ -595,9 +593,9 @@ impl Solver {
         goal: TermBuf,
         eqs: Vec<TermBuf>,
         parent: &Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
     ) -> SharedSolution {
-        if let Some(x) = state.cache.get(&cache_key) {
+        if let Some(x) = run.cache.get(&cache_key) {
             return x.clone();
         }
 
@@ -612,7 +610,7 @@ impl Solver {
         };
 
         // Placeholder needs a valid Goal — use the inner `find` term.
-        if state
+        if run
             .cache
             .insert(
                 cache_key.clone(),
@@ -631,14 +629,12 @@ impl Solver {
         }
         let task = builder.build();
 
-        let mut subtask_solver = Solver::new(self.rules_engine.clone());
-
         let mut subtask_solution = Solution::new(task);
-        subtask_solver.solve_impl(&mut subtask_solution, state);
+        self.solve_impl(&mut subtask_solution, run);
         let subtask_solution = SharedSolution::new(subtask_solution);
-        *state.cache.get_mut(&cache_key).unwrap() = subtask_solution.clone();
+        *run.cache.get_mut(&cache_key).unwrap() = subtask_solution.clone();
         if let SolutionStatus::Err(SolveError::MaxSubtaskLevelExceed) = subtask_solution.status {
-            state.cache.remove(&cache_key);
+            run.cache.remove(&cache_key);
         }
         subtask_solution
     }
@@ -648,7 +644,7 @@ impl Solver {
         &self,
         mut hyp: Hypothesis,
         parent: &Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
     ) -> Option<Hypothesis> {
         let mut new_reqs = Vec::with_capacity(hyp.requirements.len());
         let mut bindings: Vec<(Param, TermBuf)> = Vec::new();
@@ -666,7 +662,7 @@ impl Solver {
                 .map(|c| c.to_owned())
                 .collect();
 
-            let result = self.run_solve_block(cache_key, goal, eqs, parent, state);
+            let result = self.run_solve_block(cache_key, goal, eqs, parent, run);
             let answer_term = result.answer()?;
             let mut answer_buf: TermBuf = (*answer_term).clone();
             if answer_buf.term().data().is_symbol_name("answer") && answer_buf.term().degree() == 1
@@ -705,7 +701,7 @@ impl Solver {
     fn check_if_answer(
         &self,
         solution: &mut Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
         index: usize,
     ) -> Result<bool, SolveError> {
         if solution[index].filters.is_goal() {
@@ -730,7 +726,7 @@ impl Solver {
         }
 
         Ok(match &solution.goal().clone() {
-            Goal::Find(g) => self.check_find_answer(solution, state, index, g),
+            Goal::Find(g) => self.check_find_answer(solution, run, index, g),
             Goal::Prove(_) => self.check_prove_answer(solution, index),
             Goal::Transform(_) => self.check_transform_answer(solution),
         })
@@ -762,7 +758,7 @@ impl Solver {
     fn check_find_answer(
         &self,
         solution: &mut Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
         index: usize,
         find_goal: &FindGoal,
     ) -> bool {
@@ -770,7 +766,7 @@ impl Solver {
         // (subsumes flat `x == k` / `x in S` and piecewise, recognized atomically).
         if find_goal.targets.len() == 1 {
             let target = find_goal.targets[0].term();
-            if self.is_answer_form(solution[index].term.term(), target, solution, state) {
+            if self.is_answer_form(solution[index].term.term(), target, solution, run) {
                 solution.status = SolutionStatus::Answer(index);
                 return true;
             }
@@ -795,7 +791,7 @@ impl Solver {
         };
         let target = target.clone();
 
-        if !self.is_answer_leaf(solution[index].term.term(), target.term(), solution, state) {
+        if !self.is_answer_leaf(solution[index].term.term(), target.term(), solution, run) {
             return false;
         }
 
@@ -818,14 +814,14 @@ impl Solver {
         term: TermRef,
         target: TermRef,
         solution: &Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
     ) -> bool {
         if term.data().is_symbol_name("||") {
             return term.degree() > 0 &&
                 term.args_iter()
-                    .all(|b| self.is_answer_branch(b, target, solution, state));
+                    .all(|b| self.is_answer_branch(b, target, solution, run));
         }
-        self.is_answer_branch(term, target, solution, state)
+        self.is_answer_branch(term, target, solution, run)
     }
 
     /// An answer leaf, or `&&(guards..., leaf)` with exactly one
@@ -835,9 +831,9 @@ impl Solver {
         branch: TermRef,
         target: TermRef,
         solution: &Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
     ) -> bool {
-        if self.is_answer_leaf(branch, target, solution, state) {
+        if self.is_answer_leaf(branch, target, solution, run) {
             return true;
         }
         if !branch.data().is_symbol_name("&&") {
@@ -845,12 +841,12 @@ impl Solver {
         }
         let mut leaf_seen = false;
         for conjunct in branch.args_iter() {
-            if self.is_answer_leaf(conjunct, target, solution, state) {
+            if self.is_answer_leaf(conjunct, target, solution, run) {
                 if leaf_seen {
                     return false;
                 }
                 leaf_seen = true;
-            } else if !self.is_provably_known(conjunct, solution, state) {
+            } else if !self.is_provably_known(conjunct, solution, run) {
                 return false;
             }
         }
@@ -863,27 +859,22 @@ impl Solver {
         term: TermRef,
         target: TermRef,
         solution: &Solution,
-        state: &mut SolutionState,
+        run: &mut Run,
     ) -> bool {
         let Some((lhs, rhs)) =
             match_term!(term, "=="(lhs, rhs)).or_else(|| match_term!(term, "in"(lhs, rhs)))
         else {
             return false;
         };
-        lhs == target && self.is_provably_known(rhs, solution, state)
+        lhs == target && self.is_provably_known(rhs, solution, run)
     }
 
     /// `true` if `term is known` is provable.
-    fn is_provably_known(
-        &self,
-        term: TermRef,
-        solution: &Solution,
-        state: &mut SolutionState,
-    ) -> bool {
+    fn is_provably_known(&self, term: TermRef, solution: &Solution, run: &mut Run) -> bool {
         let query = TermBuf::symbol("is")
             .arg(term.to_owned())
             .arg(TermBuf::symbol("known"));
-        self.prove(solution, query, state).answer().is_some()
+        self.prove(solution, query, run).answer().is_some()
     }
 
     fn build_multi_find_answer(&self, solution: &Solution, find_goal: &FindGoal) -> TermProps {
@@ -962,14 +953,25 @@ impl Solver {
     }
 }
 
-impl SolutionState {
-    fn current_cycle(&self) -> usize {
-        self.cycle_counter
+impl LocalRules {
+    fn insert(&mut self, rule: SharedRule) {
+        let level = rule.level;
+        if self.rules.insert(rule.id, rule).is_none() {
+            self.max_level = std::cmp::max(self.max_level, level);
+        }
+    }
+}
+
+impl Run {
+    fn cycle(&self) -> usize {
+        self.cycle
     }
 
-    fn increment_cycle_counter(&mut self) -> Result<(), SolveError> {
-        self.cycle_counter += 1;
-        self.control.check(self.cycle_counter)
+    /// Counts the cycle, then checks cancellation, the cycle budget and the
+    /// wall clock, in that order.
+    fn begin_cycle(&mut self) -> Result<(), SolveError> {
+        self.cycle += 1;
+        self.control.check(self.cycle)
     }
 }
 
@@ -1133,7 +1135,7 @@ mod solution_tests {
     fn check_answer_find_test() {
         let task = parse_task("task { goal find(x); x == 1; }");
         let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules);
+        let solver = Solver::new(rules);
         let solution = solver.solve(
             task,
             Default::default(),
@@ -1149,7 +1151,7 @@ mod solution_tests {
     fn check_answer_prove_test() {
         let task = parse_task("task { goal prove(x > 0); x == 2; }");
         let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules);
+        let solver = Solver::new(rules);
         let solution = solver.solve(
             task,
             Default::default(),
@@ -1161,7 +1163,7 @@ mod solution_tests {
     fn prove_solved(src: &'static str) -> bool {
         let task = parse_task(src);
         let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules);
+        let solver = Solver::new(rules);
         let solution = solver.solve(
             task,
             Default::default(),
@@ -1217,7 +1219,7 @@ mod solution_tests {
     fn check_answer_multi_var_find() {
         let task = parse_task("task { goal find(x, y); x == 3; y == 4; }");
         let rules = Arc::new(RulesEngine::default());
-        let mut solver = Solver::new(rules);
+        let solver = Solver::new(rules);
         let solution = solver.solve(
             task,
             Default::default(),
@@ -1229,12 +1231,42 @@ mod solution_tests {
         assert_eq!(*answer, term_with_vars("x == 3 && y == 4"));
     }
 
+    /// A rule derived from the first task's terms may not reach the second.
+    #[test]
+    fn solver_carries_nothing_between_tasks() {
+        let solver = Solver::new(Arc::new(RulesEngine::default()));
+        let control = || RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0;
+
+        let _first = solver.solve(
+            parse_task("task { goal find(x); x == 1; }"),
+            Default::default(),
+            control(),
+        );
+        let second = solver.solve(
+            parse_task("task { goal find(y); y == 2; }"),
+            Default::default(),
+            control(),
+        );
+
+        let fresh = Solver::new(Arc::new(RulesEngine::default())).solve(
+            parse_task("task { goal find(y); y == 2; }"),
+            Default::default(),
+            control(),
+        );
+
+        assert_eq!(
+            *second.answer().expect("solved"),
+            *fresh.answer().expect("solved")
+        );
+        assert_eq!(second.cycles(), fresh.cycles());
+    }
+
     #[test]
     fn cancelled_token_aborts_solve() {
         use crate::task::{SolutionStatus, SolveError};
 
         let task = parse_task("task { goal find(x); x == 1; }");
-        let mut solver = Solver::new(Arc::new(RulesEngine::default()));
+        let solver = Solver::new(Arc::new(RulesEngine::default()));
         let (control, cancel) = RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT);
         // Cancel before solving: the first cycle check must abort the run.
         cancel.cancel();
@@ -1315,7 +1347,7 @@ mod resolve_solve_tests {
         term::{ParamSubstitution, TermBuf, TermPath, term_with_vars},
     };
 
-    use super::SolutionState;
+    use super::Run;
 
     /// Two `solve(...) == Param` requirements must both reach the resolution.
     /// The old single-binding code kept only the last and dropped the first.
@@ -1323,11 +1355,11 @@ mod resolve_solve_tests {
     fn two_solve_bindings_both_apply() {
         let solver = Solver::new(Arc::new(RulesEngine::default()));
         let parent = Solution::new(parse_task("task { goal find(z); }"));
-        let mut state = SolutionState {
-            control:       RunControl::init(usize::MAX, Duration::from_secs(60)).0,
-            cycle_counter: 0,
-            cache:         Default::default(),
-            tracer:        TracerHub::default(),
+        let mut state = Run {
+            control: RunControl::init(usize::MAX, Duration::from_secs(60)).0,
+            cycle:   0,
+            cache:   Default::default(),
+            tracer:  TracerHub::default(),
         };
 
         let solve_eq_param = |block: &'static str, param: &str| {
@@ -1387,16 +1419,16 @@ mod resolve_solve_tests {
         );
         let rule: SharedRule = Arc::new(parse_rule(rule_src));
 
-        let mut state = SolutionState {
+        let mut state = Run {
             // Deadline already in the past: produce's poll must bail out.
-            control:       RunControl {
+            control: RunControl {
                 execution_deadline: usize::MAX,
                 deadline_at:        Instant::now() - Duration::from_secs(1),
                 cancel:             CancelToken::default(),
             },
-            cycle_counter: 0,
-            cache:         Default::default(),
-            tracer:        TracerHub::default(),
+            cycle:   0,
+            cache:   Default::default(),
+            tracer:  TracerHub::default(),
         };
 
         let err = solver

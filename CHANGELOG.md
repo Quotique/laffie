@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Task::goal` is an accessor rather than a field, and `Task` is built only
   through `TaskBuilder`; converting a stored task into a solver task is
   fallible (`TryFrom`).
+- `Solver` carries no state between tasks and solves through `&self`, so one
+  instance serves a whole corpus and can be shared across threads. Rules
+  derived from a task's own terms live and die with that (sub)task.
 
 ## [0.7.0] - 2026-07-21
 
