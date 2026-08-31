@@ -11,8 +11,8 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 
 use super::{
-    Goal, SharedSolution, Solution, SolveError, Task, TaskBuilder, TermIdx, TermProps, TracerHub,
-    goal::FindGoal, props::TermInference,
+    Goal, GoalKind, SharedSolution, Solution, SolveError, Task, TaskBuilder, TermIdx, TermProps,
+    TracerHub, props::TermInference,
 };
 use crate::{
     NormLevel, Rational,
@@ -232,7 +232,7 @@ impl Solver {
         run: &mut Run,
         local: &mut LocalRules,
     ) -> Result<bool, SolveError> {
-        if solution.goal().is_transform() {
+        if solution.goal().kind() == GoalKind::Transform {
             Ok(false)
         } else if let Some(simplified) = self.transform(solution, run, index) {
             solution[index].filters.mark_replaced();
@@ -285,25 +285,23 @@ impl Solver {
     fn suggest_rules(
         &self,
         term: &TermProps,
-        goal_term: &TermProps,
+        goal_term: &TermBuf,
         goal: &Goal,
         local: &LocalRules,
     ) -> Vec<SharedRule> {
-        if goal.is_transform() && !term.filters.is_goal() {
+        if goal.kind() == GoalKind::Transform && !term.filters.is_goal() {
             return vec![];
         }
 
         let local_rules = local
             .rules
             .values()
-            .filter(|rule| rule.try_filter(&term.filters, &goal_term.term).is_ok())
+            .filter(|rule| rule.try_filter(&term.filters, goal_term).is_ok())
             .cloned();
-        let rules = self
-            .rules_engine
-            .suggest_rules(&term.filters, &goal_term.term);
+        let rules = self.rules_engine.suggest_rules(&term.filters, goal_term);
         let rules = rules.into_iter().chain(local_rules);
 
-        let rules: Vec<_> = if goal.is_prove() && term.filters.is_goal() {
+        let rules: Vec<_> = if goal.kind() == GoalKind::Prove && term.filters.is_goal() {
             rules
                 .filter(|rule| rule.contains_attribute(&RuleAttr::Equivalence))
                 .collect()
@@ -326,16 +324,15 @@ impl Solver {
         local: &mut LocalRules,
     ) -> Result<(), SolveError> {
         let is_goal = solution[index].filters.is_goal();
-        let prove_goal =
-            TermProps::from(TermBuf::symbol("prove").arg(solution[index].term.as_ref().clone()));
+        let prove_goal = TermBuf::symbol("prove").arg(solution[index].term.as_ref().clone());
 
         let mut added = false;
         for rule in self.suggest_rules(
             &solution[index],
-            if is_goal && solution.goal().is_prove() {
+            if is_goal && solution.goal().kind() == GoalKind::Prove {
                 &prove_goal
             } else {
-                solution.task.goal()
+                solution.task.goal().term()
             },
             solution.goal(),
             local,
@@ -344,7 +341,7 @@ impl Solver {
                 Some(s) => {
                     trace!("{} => {s}", solution[index]);
                     self.add_term(s, solution, run, local)?;
-                    if is_goal && solution.goal().is_transform() {
+                    if is_goal && solution.goal().kind() == GoalKind::Transform {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
                         solution[index].filters.level = self.rules_engine.max_level().next();
                         solution.requeue(index);
@@ -380,10 +377,10 @@ impl Solver {
             rule.clone(),
             &s[index].term,
             &s[index].filters,
-            if is_goal && s.goal().is_prove() {
+            if is_goal && s.goal().kind() == GoalKind::Prove {
                 &prove_goal
             } else {
-                &s.task.goal().term
+                s.task.goal().term()
             },
         )
         .collect();
@@ -552,7 +549,7 @@ impl Solver {
         blocked_rules: HashSet<RuleId>,
         run: &mut Run,
     ) -> SharedSolution {
-        let key = goal.to_term();
+        let key = (**goal.term()).clone();
         if let Some(x) = run.cache.get(&key) {
             return x.clone();
         }
@@ -707,7 +704,7 @@ impl Solver {
         if solution[index].filters.is_goal() {
             // Prove goal reduced to a trivial truth: solved even with no
             // non-goal term to focus.
-            if solution.goal().is_prove() &&
+            if solution.goal().kind() == GoalKind::Prove &&
                 let Some(i) = solution.goal_index.values().copied().find(|i| {
                     solution[*i]
                         .term
@@ -725,10 +722,17 @@ impl Solver {
             return Ok(true);
         }
 
-        Ok(match &solution.goal().clone() {
-            Goal::Find(g) => self.check_find_answer(solution, run, index, g),
-            Goal::Prove(_) => self.check_prove_answer(solution, index),
-            Goal::Transform(_) => self.check_transform_answer(solution),
+        // The arms need the solution mutably, and the kind is `Copy`.
+        Ok(match solution.goal().kind() {
+            GoalKind::Find => {
+                let targets = solution
+                    .goal()
+                    .targets()
+                    .expect("a find goal carries its targets");
+                self.check_find_answer(solution, run, index, &targets)
+            }
+            GoalKind::Prove => self.check_prove_answer(solution, index),
+            GoalKind::Transform => self.check_transform_answer(solution),
         })
     }
 
@@ -736,7 +740,7 @@ impl Solver {
         let term = &solution[index];
         let term_root = term.term.term();
 
-        if solution.goal().is_transform() {
+        if solution.goal().kind() == GoalKind::Transform {
             return Ok(false);
         }
         if term_root.data().is_symbol_name("answer") && term_root.degree() == 1 {
@@ -760,12 +764,12 @@ impl Solver {
         solution: &mut Solution,
         run: &mut Run,
         index: usize,
-        find_goal: &FindGoal,
+        targets: &[TermBuf],
     ) -> bool {
         // Single target: the term is the answer iff it is an answer form
         // (subsumes flat `x == k` / `x in S` and piecewise, recognized atomically).
-        if find_goal.targets.len() == 1 {
-            let target = find_goal.targets[0].term();
+        if targets.len() == 1 {
+            let target = targets[0].term();
             if self.is_answer_form(solution[index].term.term(), target, solution, run) {
                 solution.status = SolutionStatus::Answer(index);
                 return true;
@@ -782,8 +786,7 @@ impl Solver {
             return false;
         };
 
-        let target = find_goal
-            .targets
+        let target = targets
             .iter()
             .find(|t| lhs == t.term() && !solution.find_bindings.contains_key(*t));
         let Some(target) = target else {
@@ -797,8 +800,8 @@ impl Solver {
 
         solution.find_bindings.insert(target, index);
 
-        if solution.find_bindings.len() == find_goal.targets.len() {
-            let answer = self.build_multi_find_answer(solution, find_goal);
+        if solution.find_bindings.len() == targets.len() {
+            let answer = self.build_multi_find_answer(solution, targets);
             if let Ok(idx) = solution.add_term(answer) {
                 solution.status = SolutionStatus::Answer(idx);
             }
@@ -877,8 +880,8 @@ impl Solver {
         self.prove(solution, query, run).answer().is_some()
     }
 
-    fn build_multi_find_answer(&self, solution: &Solution, find_goal: &FindGoal) -> TermProps {
-        let mut iter = find_goal.targets.iter();
+    fn build_multi_find_answer(&self, solution: &Solution, targets: &[TermBuf]) -> TermProps {
+        let mut iter = targets.iter();
         let first = iter.next().unwrap();
         let mut result = solution[solution.find_bindings[first]]
             .term

@@ -15,7 +15,7 @@ pub use html::Html;
 pub use tui::Tui;
 
 use solver::{
-    task::{Goal, Solution, SolutionStatus, TermProps},
+    task::{Goal, GoalKind, Solution, SolutionStatus, TermProps},
     term::{SharedTerm, TermBuf},
 };
 
@@ -61,9 +61,9 @@ impl View<'_> {
         renderer: &mut dyn Renderer,
     ) -> fmt::Result {
         renderer.display_goal(subtask_level, goal)?;
-        match goal {
-            Goal::Find(_) | Goal::Transform(_) => {}
-            Goal::Prove(_) => {
+        match goal.kind() {
+            GoalKind::Find | GoalKind::Transform => {}
+            GoalKind::Prove => {
                 let answer_idx = self
                     .solution
                     .terms
@@ -98,7 +98,7 @@ impl View<'_> {
                 if self
                     .rendered
                     .borrow_mut()
-                    .insert(r.task.goal().term.as_ref().clone())
+                    .insert((**r.task.goal().term()).clone())
                 {
                     View {
                         solution: r.as_ref(),

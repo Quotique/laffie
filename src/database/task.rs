@@ -36,7 +36,7 @@ pub struct Task {
 impl From<&SolverTask> for Task {
     fn from(t: &SolverTask) -> Self {
         let givens: Vec<TermBuf> = t.givens.iter().map(|x| (*x.term).clone()).collect();
-        let goal: TermBuf = (*t.goal().term).clone();
+        let goal: TermBuf = (**t.goal().term()).clone();
         let id = compute_task_id(&givens, &goal);
 
         Task {
@@ -65,7 +65,7 @@ impl TryFrom<Task> for SolverTask {
             .build();
         task.group = t.group;
         task.possible_answers = t.possible_answers;
-        task.id = content_id(&task.givens, task.goal());
+        task.id = content_id(&task.givens, task.goal().term());
         Ok(task)
     }
 }

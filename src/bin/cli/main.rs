@@ -213,7 +213,7 @@ fn main() -> ExitCode {
                 .iter()
                 .map(|t| (*t.term).clone())
                 .collect::<Vec<_>>(),
-            &task.goal().term,
+            task.goal().term(),
         ));
         only_ids
             .iter()

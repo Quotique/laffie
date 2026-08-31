@@ -3,7 +3,7 @@ use std::fmt;
 use html_escape::encode_text;
 
 use solver::{
-    task::{Goal, Solution, TermProps},
+    task::{Goal, GoalKind, Solution, TermProps},
     term::SharedTerm,
 };
 
@@ -39,11 +39,11 @@ impl Renderer for Html<'_> {
         if let Some(answer) = answer.as_ref() {
             self.output.write_str(&format!(
                 "{} {}\n",
-                match goal {
-                    Goal::Find(_) | Goal::Transform(_) => {
+                match goal.kind() {
+                    GoalKind::Find | GoalKind::Transform => {
                         format!("<b>Answer:</b> {}", encode_text(&answer.to_string()))
                     }
-                    Goal::Prove(_) => {
+                    GoalKind::Prove => {
                         "<b>PROVEN!</b>".to_owned()
                     }
                 },

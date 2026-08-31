@@ -87,12 +87,14 @@ impl Solution {
         for i in conditions.into_iter() {
             let _ = solution.add_term(i);
         }
-        let mut goal_term = solution.goal().term().clone();
+        let mut goal_term = TermProps::from(solution.goal().subject().to_owned());
+        // The search tells goal terms from derived ones by this flag alone.
+        goal_term.filters.mark_goal();
         // The task's blocked rules land on the goal term the search starts from.
         goal_term
             .filters
             .blocked_rules
-            .clone_from(&solution.task.goal().filters.blocked_rules);
+            .clone_from(solution.task.blocked_rules());
         let goal_buf = Arc::make_mut(&mut goal_term.term);
         // Canonicalize the goal (commutative arg order etc.) so the syntactic
         // match in `check_prove_answer` sees derived terms — which are always
@@ -108,7 +110,7 @@ impl Solution {
 
     #[inline]
     pub fn goal(&self) -> &Goal {
-        self.task.parsed_goal()
+        self.task.goal()
     }
 
     #[inline]

@@ -5,7 +5,7 @@ use colored::*;
 use itertools::Itertools;
 
 use solver::{
-    task::{Goal, Solution, TermProps},
+    task::{Goal, GoalKind, Solution, TermProps},
     term::SharedTerm,
 };
 
@@ -33,7 +33,7 @@ impl Renderer for Console<'_, '_> {
                     " needed: [{}]",
                     term.inference
                         .requirements()
-                        .map(|x| &x.task.goal().term)
+                        .map(|x| x.task.goal().term())
                         .format(", ")
                 )
             }
@@ -50,11 +50,11 @@ impl Renderer for Console<'_, '_> {
             writeln!(
                 self.output,
                 "{} {}",
-                match goal {
-                    Goal::Find(_) | Goal::Transform(_) => {
+                match goal.kind() {
+                    GoalKind::Find | GoalKind::Transform => {
                         format!("{} {answer}", "Answer:".green()).bold()
                     }
-                    Goal::Prove(_) => {
+                    GoalKind::Prove => {
                         "PROVEN!".bold().green()
                     }
                 },

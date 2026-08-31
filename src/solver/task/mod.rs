@@ -6,7 +6,10 @@ mod solver;
 mod steps;
 mod tracing;
 
-use crate::{rule::RuleId, term::TermBuf};
+use crate::{
+    rule::RuleId,
+    term::{SharedTerm, TermBuf},
+};
 use std::{
     collections::{HashSet, hash_map::DefaultHasher},
     fmt,
@@ -15,7 +18,7 @@ use std::{
 };
 
 pub use builder::TaskBuilder;
-pub use goal::{Goal, GoalError};
+pub use goal::{Goal, GoalError, GoalKind};
 pub use props::{TermInference, TermProps};
 pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError, TermIdx};
 pub use solver::{CancelToken, EXECUTION_DEADLINE_DEFAULT, RunControl, Solver, TIME_LIMIT_DEFAULT};
@@ -38,39 +41,39 @@ pub struct Task {
 
     pub possible_answers: Vec<TermBuf>,
 
-    /// The goal term as written. Private so `parsed` cannot drift from it.
-    goal:   TermProps,
-    /// The same goal, parsed once.
-    parsed: Goal,
+    goal: Goal,
+
+    /// A rule that blocked itself on the term a subtask was spawned from stays
+    /// blocked inside that subtask.
+    blocked_rules: HashSet<RuleId>,
 }
 
 impl Task {
-    /// Read-only: writing it would invalidate the parse.
     #[inline]
-    pub fn goal(&self) -> &TermProps {
+    pub fn goal(&self) -> &Goal {
         &self.goal
     }
 
     #[inline]
-    pub(crate) fn parsed_goal(&self) -> &Goal {
-        &self.parsed
+    pub(crate) fn blocked_rules(&self) -> &HashSet<RuleId> {
+        &self.blocked_rules
     }
 
     pub(crate) fn block_rules(&mut self, rules: HashSet<RuleId>) {
-        self.goal.filters.blocked_rules = rules;
+        self.blocked_rules = rules;
     }
 
     pub(crate) fn from_goal(goal: Goal) -> Self {
         Self {
-            goal:             TermProps::from(goal.to_term()),
-            id:               Default::default(),
-            name:             Default::default(),
-            text:             Default::default(),
-            group:            Default::default(),
-            givens:           Default::default(),
-            subtask_level:    Default::default(),
+            id: Default::default(),
+            name: Default::default(),
+            text: Default::default(),
+            group: Default::default(),
+            givens: Default::default(),
+            subtask_level: Default::default(),
             possible_answers: Default::default(),
-            parsed:           goal,
+            blocked_rules: Default::default(),
+            goal,
         }
     }
 }
@@ -86,7 +89,7 @@ impl fmt::Display for Task {
             } else {
                 format!("{}\n", self.text)
             },
-            self.goal,
+            self.goal.term(),
             self.givens
                 .iter()
                 .map(|x| x.term.to_string())
@@ -98,7 +101,7 @@ impl fmt::Display for Task {
 
 /// Content-addressed `u64` id from a task's givens (order-independent) and
 /// goal. Formatting- and location-independent. In-memory dedup key only.
-pub fn content_id(givens: &[TermProps], goal: &TermProps) -> u64 {
+pub fn content_id(givens: &[TermProps], goal: &SharedTerm) -> u64 {
     let mut given_hashes: Vec<u64> = givens
         .iter()
         .map(|g| {
@@ -111,7 +114,7 @@ pub fn content_id(givens: &[TermProps], goal: &TermProps) -> u64 {
 
     let mut h = DefaultHasher::new();
     given_hashes.hash(&mut h);
-    goal.term.hash(&mut h);
+    goal.hash(&mut h);
     h.finish()
 }
 

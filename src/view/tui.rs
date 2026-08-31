@@ -4,7 +4,7 @@ use itertools::Itertools;
 use ratatui::{prelude::*, style::Stylize};
 
 use solver::{
-    task::{Goal, Solution, TermProps},
+    task::{Goal, GoalKind, Solution, TermProps},
     term::SharedTerm,
 };
 
@@ -37,7 +37,7 @@ impl Renderer for Tui<'_> {
                     " needed: [{}]",
                     term.inference
                         .requirements()
-                        .map(|x| &x.task.goal().term)
+                        .map(|x| x.task.goal().term())
                         .format(", ")
                 ))
             },
@@ -58,9 +58,9 @@ impl Renderer for Tui<'_> {
             .push(Line::from(if let Some(answer) = answer.as_ref() {
                 vec![
                     Span::style(
-                        match goal {
-                            Goal::Find(_) | Goal::Transform(_) => format!("Answer: {answer}"),
-                            Goal::Prove(_) => "PROVEN!".to_owned(),
+                        match goal.kind() {
+                            GoalKind::Find | GoalKind::Transform => format!("Answer: {answer}"),
+                            GoalKind::Prove => "PROVEN!".to_owned(),
                         }
                         .into(),
                         answer_style,

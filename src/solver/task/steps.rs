@@ -97,11 +97,11 @@ impl Iterator for Steps {
             for r in self.solution[*next_id]
                 .inference
                 .requirements()
-                .filter(|x| !self.rendered.borrow().contains(&x.task.goal.term))
+                .filter(|x| !self.rendered.borrow().contains(x.task.goal().term()))
             {
                 self.rendered
                     .borrow_mut()
-                    .insert(r.task.goal.term.as_ref().clone());
+                    .insert((**r.task.goal().term()).clone());
                 let mut steps = Steps::from(r.clone());
                 steps.rendered = self.rendered.clone();
                 self.subtasks.push_back(steps);

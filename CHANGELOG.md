@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Solver` carries no state between tasks and solves through `&self`, so one
   instance serves a whole corpus and can be shared across threads. Rules
   derived from a task's own terms live and die with that (sub)task.
+- A task carries one goal value instead of a goal term and its parse side by
+  side. `Goal` owns the term it was written as, hands out the subject as a
+  borrow into it, and reports its kind as a `Copy` value.
 
 ## [0.7.0] - 2026-07-21
 

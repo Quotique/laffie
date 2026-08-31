@@ -98,7 +98,7 @@ impl<'a> TaskParser<'a> {
         }
         let mut task = builder.build();
         // Content id from the parsed terms, not the syntax tree (location-free).
-        task.id = content_id(&task.givens, task.goal());
+        task.id = content_id(&task.givens, task.goal().term());
         Ok(task)
     }
 }
