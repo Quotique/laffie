@@ -7,7 +7,10 @@ use ratatui::{
 use trees::Tree;
 use tui_scrollview::{ScrollView, ScrollViewState, ScrollbarVisibility};
 
-use solver::task::{SharedSolution, SolutionStatus, StepsSource, Task, TermInference, Visit};
+use solver::{
+    engine::{SharedSolution, SolutionStatus, StepsSource, TermInference, Visit},
+    task::Task,
+};
 use utils::TreeIndex;
 
 use crate::{

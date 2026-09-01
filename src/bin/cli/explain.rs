@@ -7,8 +7,9 @@ use std::{
 use colored::*;
 
 use solver::{
+    engine::{Solution, TermInference, TermProps, Tracer},
     rule::{RuleId, SharedRule},
-    task::{Solution, Task, TermInference, TermProps, Tracer},
+    task::Task,
 };
 
 const MAX_TERMS: usize = 10;

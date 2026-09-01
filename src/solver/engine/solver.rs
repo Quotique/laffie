@@ -11,16 +11,16 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 
 use super::{
-    Goal, GoalKind, SharedSolution, Solution, SolveError, Task, TermIdx, TermProps, TracerHub,
-    props::TermInference,
+    SharedSolution, Solution, SolveError, TermIdx, TermProps, TracerHub, props::TermInference,
 };
 use crate::{
     NormLevel, Rational,
+    engine::{Tracer, solution::SolutionStatus},
     rule::{
         GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr, RuleId, RulesEngine,
         SharedRule,
     },
-    task::{Tracer, solution::SolutionStatus},
+    task::{Goal, GoalKind, Task},
     term::{
         Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
         match_term,
@@ -1107,8 +1107,9 @@ mod solution_tests {
     use std::sync::Arc;
 
     use crate::{
+        engine::{RunControl, Solver, TIME_LIMIT_DEFAULT},
         rule::RulesEngine,
-        task::{RunControl, Solver, TIME_LIMIT_DEFAULT, parse_task},
+        task::parse_task,
         term::term_with_vars,
     };
 
@@ -1244,7 +1245,7 @@ mod solution_tests {
 
     #[test]
     fn cancelled_token_aborts_solve() {
-        use crate::task::{SolutionStatus, SolveError};
+        use crate::engine::{SolutionStatus, SolveError};
 
         let task = parse_task("task { goal find(x); x == 1; }");
         let solver = Solver::new(Arc::new(RulesEngine::default()));
@@ -1268,7 +1269,8 @@ mod cache_tests {
         SubtaskEntry, Task,
     };
     use crate::{
-        task::{Goal, TracerHub},
+        engine::TracerHub,
+        task::Goal,
         term::{TermBuf, term_with_vars},
     };
 
@@ -1425,8 +1427,9 @@ mod resolve_solve_tests {
     };
 
     use crate::{
+        engine::{CancelToken, RunControl, Solution, Solver, TracerHub},
         rule::{Hypothesis, RulesEngine, SharedRule, parse_rule},
-        task::{CancelToken, RunControl, Solution, Solver, TracerHub, parse_task},
+        task::parse_task,
         term::{ParamSubstitution, TermBuf, TermPath, term_with_vars},
     };
 
@@ -1478,7 +1481,7 @@ mod resolve_solve_tests {
     /// out with `TimeDeadline` instead of walking the whole product.
     #[test]
     fn produce_aborts_on_deadline() {
-        use crate::task::{SolveError, TermProps};
+        use crate::engine::{SolveError, TermProps};
 
         let solver = Solver::new(Arc::new(RulesEngine::default()));
         let mut solution = Solution::new(parse_task("task { goal find(z); }"));

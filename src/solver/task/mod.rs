@@ -1,17 +1,9 @@
 mod builder;
 mod goal;
-mod props;
-mod solution;
-mod solver;
-mod steps;
-mod tracing;
 
-use crate::{
-    rule::RuleId,
-    term::{SharedTerm, TermBuf},
-};
+use crate::term::{SharedTerm, TermBuf};
 use std::{
-    collections::{HashSet, hash_map::DefaultHasher},
+    collections::hash_map::DefaultHasher,
     fmt,
     hash::{Hash, Hasher},
     iter::Iterator,
@@ -19,11 +11,6 @@ use std::{
 
 pub use builder::TaskBuilder;
 pub use goal::{Goal, GoalError, GoalKind};
-pub use props::{TermInference, TermProps};
-pub use solution::{SharedSolution, Solution, SolutionStatus, SolveError, TermIdx};
-pub use solver::{CancelToken, EXECUTION_DEADLINE_DEFAULT, RunControl, Solver, TIME_LIMIT_DEFAULT};
-pub use steps::{StepsSource, Visit};
-pub use tracing::{Tracer, TracerHub};
 
 /// A problem: what to look for, what is given, how deep in the subtask tree.
 ///
@@ -42,25 +29,12 @@ pub struct Task {
     pub possible_answers: Vec<TermBuf>,
 
     goal: Goal,
-
-    /// A rule that blocked itself on the term a subtask was spawned from stays
-    /// blocked inside that subtask.
-    blocked_rules: HashSet<RuleId>,
 }
 
 impl Task {
     #[inline]
     pub fn goal(&self) -> &Goal {
         &self.goal
-    }
-
-    #[inline]
-    pub(crate) fn blocked_rules(&self) -> &HashSet<RuleId> {
-        &self.blocked_rules
-    }
-
-    pub(crate) fn block_rules(&mut self, rules: HashSet<RuleId>) {
-        self.blocked_rules = rules;
     }
 
     pub(crate) fn from_goal(goal: Goal) -> Self {
@@ -72,7 +46,6 @@ impl Task {
             givens: Default::default(),
             subtask_level: Default::default(),
             possible_answers: Default::default(),
-            blocked_rules: Default::default(),
             goal,
         }
     }

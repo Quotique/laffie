@@ -15,7 +15,8 @@ pub use html::Html;
 pub use tui::Tui;
 
 use solver::{
-    task::{Goal, GoalKind, Solution, SolutionStatus, TermProps},
+    engine::{Solution, SolutionStatus, TermProps},
+    task::{Goal, GoalKind},
     term::{SharedTerm, TermBuf},
 };
 

@@ -8,8 +8,9 @@ use tui_tree_widget::TreeState;
 use parser::DirectoryParser;
 use solver::{
     CompactString,
+    engine::{SharedSolution, Solution, SolutionStatus},
     rule::{RulesEngine, SharedRule},
-    task::{SharedSolution, Solution, SolutionStatus, Task},
+    task::Task,
 };
 use utils::{IndexedTree, TreeIndex};
 
@@ -375,7 +376,8 @@ fn collect_known_task_ids(node: &Node<TasksNode>, out: &mut HashSet<u64>) {
 #[cfg(test)]
 mod tests {
     use solver::{
-        task::{Goal, Solution, TaskBuilder},
+        engine::Solution,
+        task::{Goal, TaskBuilder},
         term::TermBuf,
     };
     use trees::{Tree, tr};

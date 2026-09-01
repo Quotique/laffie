@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{List, Widget},
 };
 
-use solver::task::{Solution, SolutionStatus, TermInference};
+use solver::engine::{Solution, SolutionStatus, TermInference};
 
 use crate::{strings, theme::Theme, widgets::tracing_navigation::TermId};
 

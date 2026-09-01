@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate log;
 
+pub mod engine;
 mod rational;
 pub mod rule;
 pub mod task;

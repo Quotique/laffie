@@ -10,7 +10,7 @@ use ratatui::{
 use tui_tree_widget::{Tree, TreeItem};
 
 use crate::{state::TaskState, theme::Theme};
-use solver::task::{SharedSolution, Solution, TermInference, TermProps};
+use solver::engine::{SharedSolution, Solution, TermInference, TermProps};
 
 #[derive(Clone, Debug)]
 pub struct TermId {

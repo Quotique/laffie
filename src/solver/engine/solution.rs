@@ -9,10 +9,11 @@ use std::{
 use derive_more::Display;
 use itertools::Itertools;
 
-use super::{Goal, Task, TaskBuilder, TermInference, TermProps};
+use super::{TermInference, TermProps};
 use crate::{
     CompactString, NormLevel,
     rule::{Level, RuleId},
+    task::{Goal, Task, TaskBuilder},
     term::{Atom, SharedTerm, Term, TermBuf, match_term},
 };
 
@@ -69,7 +70,7 @@ pub struct Solution {
 impl Solution {
     /// Infallible: `task` guarantees a well-formed goal.
     pub fn new(task: Task) -> Self {
-        Self::seeded(task, Vec::new())
+        Self::seeded(task, Vec::new(), HashSet::new())
     }
 
     pub(crate) fn subtask(
@@ -92,16 +93,15 @@ impl Solution {
             .collect();
 
         let task = TaskBuilder::from_goal(goal)
-            .with_blocked_rules(blocked_rules)
             .with_conditions(inherited.iter().map(|x| x.term.clone()).chain(extra))
             .with_level(self.task.subtask_level + 1)
             .build();
-        Self::seeded(task, inherited)
+        Self::seeded(task, inherited, blocked_rules)
     }
 
     /// INVARIANT: `history` holds the props of `task.givens`, same terms in
     /// the same order. [`Solution::subtask`] builds both from one list.
-    fn seeded(task: Task, history: Vec<TermProps>) -> Self {
+    fn seeded(task: Task, history: Vec<TermProps>, blocked_rules: HashSet<RuleId>) -> Self {
         let known_vars = collect_known_set(&task.givens);
         let mut solution = Self {
             task,
@@ -126,10 +126,7 @@ impl Solution {
         // The search tells goal terms from derived ones by this flag alone.
         goal_term.filters.mark_goal();
         // The task's blocked rules land on the goal term the search starts from.
-        goal_term
-            .filters
-            .blocked_rules
-            .clone_from(solution.task.blocked_rules());
+        goal_term.filters.blocked_rules = blocked_rules;
         let goal_buf = Arc::make_mut(&mut goal_term.term);
         // Canonicalize the goal (commutative arg order etc.) so the syntactic
         // match in `check_prove_answer` sees derived terms — which are always
@@ -275,8 +272,32 @@ fn collect_known_set(givens: &[SharedTerm]) -> HashSet<CompactString> {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use super::Solution;
-    use crate::task::parse_task;
+    use crate::{
+        rule::RuleId,
+        task::{Goal, parse_task},
+        term::{TermBuf, term_with_vars},
+    };
+
+    #[test]
+    fn blocked_rules_reach_the_goal_term_the_search_starts_from() {
+        // Or the rule that blocked itself fires again inside the subtask.
+        let blocked = RuleId::new(0, 7);
+        let parent = Solution::new(parse_task("task { goal find(x); x == 1; }"));
+        let goal = Goal::parse(TermBuf::symbol("transform").arg(term_with_vars("1 + 2")))
+            .expect("transform(1 + 2) is a goal");
+
+        let child = parent.subtask(goal, HashSet::from([blocked]), Vec::new());
+
+        let goal_term = child
+            .terms
+            .iter()
+            .find(|t| t.filters.is_goal())
+            .expect("the goal term is in the solution");
+        assert!(goal_term.filters.blocked_rules.contains(&blocked));
+    }
 
     fn is_send_sync<T: Send + Sync>() {}
 

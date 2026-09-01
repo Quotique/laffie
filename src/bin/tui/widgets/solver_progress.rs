@@ -6,7 +6,10 @@ use std::sync::{
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::Paragraph};
 
-use solver::task::{Task, TermProps, Tracer};
+use solver::{
+    engine::{TermProps, Tracer},
+    task::Task,
+};
 
 use super::popup::Popup;
 use crate::theme::Theme;

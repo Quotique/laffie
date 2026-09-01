@@ -16,7 +16,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, ListState, Paragraph, Wrap},
 };
 
-use solver::task::{
+use solver::engine::{
     CancelToken, RunControl, SharedSolution, Solution, Solver, TIME_LIMIT_DEFAULT, TracerHub,
 };
 use utils::{IndexedTree, TreeIndex};

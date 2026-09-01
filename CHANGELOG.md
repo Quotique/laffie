@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   solution instead, so a task carries nothing that only solving produces.
 - The subtask cache has one reserve-and-fill protocol instead of two hand-rolled
   copies, and its key says whether it holds a goal or a `solve(...)` call.
+- The crate's layers run one way: `task` (the problem, its goal) and `rule` both
+  rest on `term` and on nothing else, and the search engine rests on all three.
+  `Solution`, `TermProps`, `Solver`, the tracer and the step walker moved from
+  `solver::task` to `solver::engine`; which rules a subtask may not use is the
+  engine's business rather than the task's.
 
 ## [0.7.0] - 2026-07-21
 

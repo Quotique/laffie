@@ -7,8 +7,8 @@ use std::{
 use colored::*;
 
 use solver::{
+    engine::{TermInference, Tracer},
     rule::{RuleAttr, RuleAttrValue, RuleId, RulesEngine, SharedRule},
-    task::{TermInference, Tracer},
 };
 
 const LABEL_WIDTH: usize = 88;

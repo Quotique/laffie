@@ -4,7 +4,8 @@ use itertools::Itertools;
 use ratatui::{prelude::*, style::Stylize};
 
 use solver::{
-    task::{Goal, GoalKind, Solution, TermProps},
+    engine::{Solution, TermProps},
+    task::{Goal, GoalKind},
     term::SharedTerm,
 };
 

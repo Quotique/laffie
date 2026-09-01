@@ -3,7 +3,8 @@ use std::fmt;
 use html_escape::encode_text;
 
 use solver::{
-    task::{Goal, GoalKind, Solution, TermProps},
+    engine::{Solution, TermProps},
+    task::{Goal, GoalKind},
     term::SharedTerm,
 };
 

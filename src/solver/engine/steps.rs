@@ -4,8 +4,11 @@ use std::{
     sync::Arc,
 };
 
-use super::{SharedSolution, Task, solution::SolutionStatus};
-use crate::term::{SharedTerm, TermBuf};
+use super::{SharedSolution, solution::SolutionStatus};
+use crate::{
+    task::Task,
+    term::{SharedTerm, TermBuf},
+};
 
 pub trait StepsSource {
     fn steps(&self) -> Steps;

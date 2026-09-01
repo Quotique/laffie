@@ -1,6 +1,7 @@
 use crate::{
+    engine::{Solution, TermInference, TermProps},
     rule::GroundedHypothesis,
-    task::{Solution, Task, TermInference, TermProps},
+    task::Task,
     term::SharedTerm,
 };
 

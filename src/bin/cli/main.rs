@@ -17,7 +17,10 @@ use itertools::Itertools;
 
 use database::{Db, Run, Task as DbTask, id_from_hex, id_to_hex};
 use parser::DirectoryParser;
-use solver::task::{RunControl, SolutionStatus, Solver, Task as SolverTask, TracerHub};
+use solver::{
+    engine::{RunControl, SolutionStatus, Solver, TracerHub},
+    task::Task as SolverTask,
+};
 use view::View;
 
 use crate::{

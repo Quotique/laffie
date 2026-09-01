@@ -1,7 +1,7 @@
 use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
 
-use solver::{task::Solution, term::TermBuf};
+use solver::{engine::Solution, term::TermBuf};
 
 use crate::{
     id::TaskId,

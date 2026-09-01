@@ -3,15 +3,15 @@ use std::{collections::HashMap, sync::Arc};
 use serde_derive::{Deserialize, Serialize};
 
 use solver::{
+    engine::{SharedSolution, Solution, SolutionStatus, SolveError, TermInference, TermProps},
     rule::{Rule, RuleAttr, RuleAttrValue},
-    task::{SharedSolution, Solution, SolutionStatus, SolveError, TermInference, TermProps},
     term::{ParamSubstitution, TermBuf},
 };
 
 /// Sub-solution `Arc` identity → its slot in the global arena (dedup).
 type Interner = HashMap<*const Solution, usize>;
 
-/// Read-only mirror of [`solver::task::Solution`] suitable for persistence.
+/// Read-only mirror of [`solver::engine::Solution`] suitable for persistence.
 ///
 /// Strips runtime-only state (caches, `Arc` graphs of `SharedRule`/
 /// `SharedSolution`) and replaces them with index-based references into
@@ -41,7 +41,7 @@ pub enum TraceStatus {
     Err(TraceError),
 }
 
-/// Serializable mirror of [`solver::task::SolveError`]. `Unknown` is the
+/// Serializable mirror of [`solver::engine::SolveError`]. `Unknown` is the
 /// forward-compatible fallback: a variant added to `SolveError` later
 /// deserializes here instead of failing to load an older trace.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

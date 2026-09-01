@@ -1,8 +1,9 @@
 use std::{fs::File, io::prelude::*, path::Path};
 
 use crate::{
+    engine::{Solution, TermProps},
     rule::GroundedHypothesis,
-    task::{Solution, Task, TermProps},
+    task::Task,
     term::SharedTerm,
 };
 
@@ -39,7 +40,7 @@ impl Tracer for FileDumpTracer {
                 format!(
                     "{} {} [{}]\n",
                     self.idention(),
-                    task.goal,
+                    task.goal(),
                     task.givens
                         .iter()
                         .map(|x| x.to_string())
@@ -62,7 +63,7 @@ impl Tracer for FileDumpTracer {
                     "{} [{} cycles] {} Answer: {}\n",
                     self.idention(),
                     status.cycles(),
-                    status.task.goal.to_string().replace("\n", "; "),
+                    status.task.goal().to_string().replace("\n", "; "),
                     status
                         .answer()
                         .map(|x| x.to_string())
