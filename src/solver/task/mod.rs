@@ -36,7 +36,7 @@ pub struct Task {
     pub text:  String,
     pub group: String,
 
-    pub givens:        Vec<TermProps>,
+    pub givens:        Vec<SharedTerm>,
     pub subtask_level: usize,
 
     pub possible_answers: Vec<TermBuf>,
@@ -92,7 +92,7 @@ impl fmt::Display for Task {
             self.goal.term(),
             self.givens
                 .iter()
-                .map(|x| x.term.to_string())
+                .map(|x| x.to_string())
                 .collect::<Vec<String>>()
                 .join("\n  "),
         )
@@ -101,12 +101,12 @@ impl fmt::Display for Task {
 
 /// Content-addressed `u64` id from a task's givens (order-independent) and
 /// goal. Formatting- and location-independent. In-memory dedup key only.
-pub fn content_id(givens: &[TermProps], goal: &SharedTerm) -> u64 {
+pub fn content_id(givens: &[SharedTerm], goal: &Goal) -> u64 {
     let mut given_hashes: Vec<u64> = givens
         .iter()
         .map(|g| {
             let mut h = DefaultHasher::new();
-            g.term.hash(&mut h);
+            g.hash(&mut h);
             h.finish()
         })
         .collect();

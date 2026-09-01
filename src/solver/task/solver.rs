@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, hash_map::Entry},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -11,8 +11,8 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 
 use super::{
-    Goal, GoalKind, SharedSolution, Solution, SolveError, Task, TaskBuilder, TermIdx, TermProps,
-    TracerHub, props::TermInference,
+    Goal, GoalKind, SharedSolution, Solution, SolveError, Task, TermIdx, TermProps, TracerHub,
+    props::TermInference,
 };
 use crate::{
     NormLevel, Rational,
@@ -21,7 +21,10 @@ use crate::{
         SharedRule,
     },
     task::{Tracer, solution::SolutionStatus},
-    term::{Atom, Param, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx, match_term},
+    term::{
+        Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
+        match_term,
+    },
 };
 
 /// Maximum depth allowed for nested subtasks.
@@ -112,9 +115,23 @@ impl RunControl {
 struct Run {
     control: RunControl,
     cycle:   usize,
-    cache:   HashMap<TermBuf, SharedSolution>,
+    cache:   HashMap<CacheKey, SharedSolution>,
     tracer:  TracerHub,
 }
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+enum CacheKey {
+    Goal(Goal),
+    SolveBlock(TermBuf),
+}
+
+enum SubtaskEntry {
+    Occupied(SharedSolution),
+    Vacant(CacheSlot),
+}
+
+#[must_use]
+struct CacheSlot(CacheKey);
 
 /// Rules derived from a frame's own terms. Insertion-ordered, because the
 /// order rules are offered in is part of the search's identity.
@@ -549,36 +566,18 @@ impl Solver {
         blocked_rules: HashSet<RuleId>,
         run: &mut Run,
     ) -> SharedSolution {
-        let key = (**goal.term()).clone();
-        if let Some(x) = run.cache.get(&key) {
-            return x.clone();
-        }
+        let slot = match run.subtask_entry(CacheKey::Goal(goal.clone()), &goal) {
+            SubtaskEntry::Occupied(cached) => return cached,
+            SubtaskEntry::Vacant(slot) => slot,
+        };
 
-        if run
-            .cache
-            .insert(
-                key.clone(),
-                Solution::new(Task::from_goal(goal.clone())).into(),
-            )
-            .is_some()
-        {
-            // TODO: recursion
-            unimplemented!("subtask recursion");
-        }
-
-        let subtask = Self::subtask(solution, &goal, blocked_rules);
-
-        let mut subtask_solution = Solution::new(subtask);
+        let mut subtask_solution = solution.subtask(goal.clone(), blocked_rules, Vec::new());
         self.solve_impl(&mut subtask_solution, run);
         let subtask_solution = SharedSolution::new(subtask_solution);
-        *run.cache.get_mut(&key).unwrap() = subtask_solution.clone();
         if let SolutionStatus::Err(e) = subtask_solution.status {
-            trace!("Can't prove {key}: {e}");
-            if e == SolveError::MaxSubtaskLevelExceed {
-                run.cache.remove(&key);
-            }
+            trace!("Can't prove {}: {e}", goal.term());
         }
-        subtask_solution
+        run.fill(slot, subtask_solution)
     }
 
     /// Runs `solve(find(vars...), eqs...)` as a fresh subtask, cached
@@ -592,12 +591,6 @@ impl Solver {
         parent: &Solution,
         run: &mut Run,
     ) -> SharedSolution {
-        if let Some(x) = run.cache.get(&cache_key) {
-            return x.clone();
-        }
-
-        // The block's own `find(...)` — the cache key is the `solve(...)` call
-        // itself, which is not a goal.
         let block_goal = match Goal::parse(goal.clone()) {
             Ok(g) => g,
             Err(e) => {
@@ -606,34 +599,18 @@ impl Solver {
             }
         };
 
-        // Placeholder needs a valid Goal — use the inner `find` term.
-        if run
-            .cache
-            .insert(
-                cache_key.clone(),
-                Solution::new(Task::from_goal(block_goal.clone())).into(),
-            )
-            .is_some()
-        {
-            unimplemented!("solve-block recursion");
-        }
+        let slot = match run.subtask_entry(CacheKey::SolveBlock(cache_key), &block_goal) {
+            SubtaskEntry::Occupied(cached) => return cached,
+            SubtaskEntry::Vacant(slot) => slot,
+        };
 
-        let mut builder = TaskBuilder::from_goal(block_goal)
-            .with_level(parent.task.subtask_level + 1)
-            .with_conditions(inherited_conditions(parent));
-        for eq in eqs {
-            builder = builder.with_condition(TermProps::from(eq));
-        }
-        let task = builder.build();
-
-        let mut subtask_solution = Solution::new(task);
+        let mut subtask_solution = parent.subtask(
+            block_goal,
+            HashSet::new(),
+            eqs.into_iter().map(SharedTerm::new).collect(),
+        );
         self.solve_impl(&mut subtask_solution, run);
-        let subtask_solution = SharedSolution::new(subtask_solution);
-        *run.cache.get_mut(&cache_key).unwrap() = subtask_solution.clone();
-        if let SolutionStatus::Err(SolveError::MaxSubtaskLevelExceed) = subtask_solution.status {
-            run.cache.remove(&cache_key);
-        }
-        subtask_solution
+        run.fill(slot, SharedSolution::new(subtask_solution))
     }
 
     /// Replaces `solve(...) == Param` requirements with subtask answer.
@@ -677,14 +654,6 @@ impl Solver {
             hyp.substitute(&subst);
         }
         Some(hyp)
-    }
-
-    fn subtask(solution: &Solution, goal: &Goal, blocked_rules: HashSet<RuleId>) -> Task {
-        TaskBuilder::from_goal(goal.clone())
-            .with_blocked_rules(blocked_rules)
-            .with_conditions(inherited_conditions(solution))
-            .with_level(solution.task.subtask_level + 1)
-            .build()
     }
 
     /// A subtask solution carrying only an error status, for when the subtask
@@ -970,23 +939,32 @@ impl Run {
         self.cycle
     }
 
+    fn subtask_entry(&mut self, key: CacheKey, goal: &Goal) -> SubtaskEntry {
+        match self.cache.entry(key) {
+            Entry::Occupied(e) => SubtaskEntry::Occupied(e.get().clone()),
+            Entry::Vacant(e) => {
+                let key = e.key().clone();
+                e.insert(Solution::new(Task::from_goal(goal.clone())).into());
+                SubtaskEntry::Vacant(CacheSlot(key))
+            }
+        }
+    }
+
+    fn fill(&mut self, slot: CacheSlot, solution: SharedSolution) -> SharedSolution {
+        if let SolutionStatus::Err(SolveError::MaxSubtaskLevelExceed) = solution.status {
+            self.cache.remove(&slot.0);
+        } else {
+            self.cache.insert(slot.0, solution.clone());
+        }
+        solution
+    }
+
     /// Counts the cycle, then checks cancellation, the cycle budget and the
     /// wall clock, in that order.
     fn begin_cycle(&mut self) -> Result<(), SolveError> {
         self.cycle += 1;
         self.control.check(self.cycle)
     }
-}
-
-/// Proven terms a subtask inherits from its parent: everything except the
-/// parent's own goal side and its `answer(...)` wrappers.
-fn inherited_conditions(parent: &Solution) -> impl Iterator<Item = TermProps> + '_ {
-    parent
-        .terms
-        .iter()
-        .filter(|x| x.is_proven())
-        .filter(|x| !(x.filters.is_goal() || x.term.term().data().is_symbol_name("answer")))
-        .cloned()
 }
 
 /// Resolves the `parents` requirement primitive against the match position:
@@ -1278,6 +1256,108 @@ mod solution_tests {
             solution.status,
             SolutionStatus::Err(SolveError::Canceled)
         ));
+    }
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use std::time::Duration;
+
+    use super::{
+        CacheKey, Run, RunControl, SharedSolution, Solution, SolutionStatus, SolveError,
+        SubtaskEntry, Task,
+    };
+    use crate::{
+        task::{Goal, TracerHub},
+        term::{TermBuf, term_with_vars},
+    };
+
+    fn run() -> Run {
+        Run {
+            control: RunControl::init(usize::MAX, Duration::from_secs(60)).0,
+            cycle:   0,
+            cache:   Default::default(),
+            tracer:  TracerHub::default(),
+        }
+    }
+
+    fn goal(src: &'static str) -> Goal {
+        Goal::parse(term_with_vars(src)).expect("a goal")
+    }
+
+    #[test]
+    fn a_second_reservation_of_one_key_hits_the_placeholder() {
+        let mut run = run();
+        let g = goal("prove(x > 0)");
+
+        let SubtaskEntry::Vacant(_slot) = run.subtask_entry(CacheKey::Goal(g.clone()), &g) else {
+            panic!("the first reservation takes the key");
+        };
+        let SubtaskEntry::Occupied(placeholder) = run.subtask_entry(CacheKey::Goal(g.clone()), &g)
+        else {
+            panic!("the second must hit, not take the key again");
+        };
+        // No answer, so the caller drops its hypothesis instead of looping.
+        assert!(placeholder.answer().is_none());
+    }
+
+    #[test]
+    fn a_depth_failure_releases_the_key() {
+        let mut run = run();
+        let g = goal("prove(x > 0)");
+        let SubtaskEntry::Vacant(slot) = run.subtask_entry(CacheKey::Goal(g.clone()), &g) else {
+            panic!("reserved");
+        };
+
+        let mut failed = Solution::new(Task::from_goal(g.clone()));
+        failed.status = SolutionStatus::Err(SolveError::MaxSubtaskLevelExceed);
+        run.fill(slot, SharedSolution::new(failed));
+
+        // Met higher up, the same subtask has to be solvable afresh.
+        assert!(matches!(
+            run.subtask_entry(CacheKey::Goal(g.clone()), &g),
+            SubtaskEntry::Vacant(_)
+        ));
+    }
+
+    #[test]
+    fn any_other_failure_stays_cached() {
+        let mut run = run();
+        let g = goal("prove(x > 0)");
+        let SubtaskEntry::Vacant(slot) = run.subtask_entry(CacheKey::Goal(g.clone()), &g) else {
+            panic!("reserved");
+        };
+
+        let mut failed = Solution::new(Task::from_goal(g.clone()));
+        failed.status = SolutionStatus::Err(SolveError::NoSolutionsFound);
+        run.fill(slot, SharedSolution::new(failed));
+
+        let SubtaskEntry::Occupied(cached) = run.subtask_entry(CacheKey::Goal(g.clone()), &g)
+        else {
+            panic!("a settled subtask stays settled");
+        };
+        assert!(matches!(
+            cached.status,
+            SolutionStatus::Err(SolveError::NoSolutionsFound)
+        ));
+    }
+
+    #[test]
+    fn a_goal_and_a_solve_call_are_different_keys() {
+        let mut run = run();
+        let g = goal("find(x)");
+        let call = TermBuf::symbol("solve").arg(term_with_vars("find(x)"));
+
+        let SubtaskEntry::Vacant(_) = run.subtask_entry(CacheKey::Goal(g.clone()), &g) else {
+            panic!("reserved");
+        };
+        assert!(
+            matches!(
+                run.subtask_entry(CacheKey::SolveBlock(call), &g),
+                SubtaskEntry::Vacant(_)
+            ),
+            "a solve(...) call must not collide with the goal inside it"
+        );
     }
 }
 

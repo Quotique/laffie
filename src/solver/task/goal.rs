@@ -1,4 +1,8 @@
-use std::{fmt, sync::Arc};
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 use crate::term::{SharedTerm, Term, TermBuf, TermRef};
 
@@ -34,6 +38,19 @@ enum GoalBody {
     },
     Prove(SharedTerm),
     Transform(SharedTerm),
+}
+
+impl Hash for Goal {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.term().hash(state);
+    }
+}
+
+impl Eq for Goal {}
+impl PartialEq for Goal {
+    fn eq(&self, other: &Self) -> bool {
+        self.term() == other.term()
+    }
 }
 
 impl fmt::Debug for Goal {

@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A task carries one goal value instead of a goal term and its parse side by
   side. `Goal` owns the term it was written as, hands out the subject as a
   borrow into it, and reports its kind as a `Copy` value.
+- A task states its conditions as terms. What a subtask inherits from its
+  parent — which rules were already tried on each condition — travels with the
+  solution instead, so a task carries nothing that only solving produces.
+- The subtask cache has one reserve-and-fill protocol instead of two hand-rolled
+  copies, and its key says whether it holds a goal or a `solve(...)` call.
 
 ## [0.7.0] - 2026-07-21
 

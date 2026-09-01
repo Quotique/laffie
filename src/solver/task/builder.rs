@@ -1,18 +1,17 @@
-use std::{
-    collections::{HashMap, HashSet},
-    iter::Iterator,
+use std::{collections::HashSet, iter::Iterator};
+
+use super::{Goal, Task};
+use crate::{
+    rule::RuleId,
+    term::{SharedTerm, TermBuf},
 };
 
-use super::{Goal, Task, TermInference, TermProps};
-use crate::{rule::RuleId, term::TermBuf};
-
 pub struct TaskBuilder {
-    id:          u64,
-    name:        String,
-    text:        String,
-    conditions:  Vec<TermProps>,
-    goal:        Goal,
-    term_id_map: HashMap<usize, usize>,
+    id:         u64,
+    name:       String,
+    text:       String,
+    conditions: Vec<SharedTerm>,
+    goal:       Goal,
 
     blocked_rules:    HashSet<RuleId>,
     possible_answers: Vec<TermBuf>,
@@ -28,7 +27,6 @@ impl TaskBuilder {
             text: Default::default(),
             conditions: Default::default(),
             goal,
-            term_id_map: Default::default(),
             blocked_rules: Default::default(),
             possible_answers: Default::default(),
             subtask_level: Default::default(),
@@ -58,34 +56,12 @@ impl TaskBuilder {
         self
     }
 
-    pub fn with_condition(mut self, mut condition: TermProps) -> Self {
-        self.term_id_map.insert(condition.id, self.conditions.len());
-        condition.filters.level = 0.into();
-        condition.id = self.conditions.len();
-
-        let parent = match &condition.inference {
-            TermInference::Rule { parent, .. } | TermInference::Transform { parent, .. } => {
-                Some(*parent)
-            }
-            TermInference::Condition => None,
-        };
-        if let Some(parent) = parent {
-            match self.term_id_map.get(&parent) {
-                Some(&new_parent) => match &mut condition.inference {
-                    TermInference::Rule { parent, .. } |
-                    TermInference::Transform { parent, .. } => *parent = new_parent,
-                    TermInference::Condition => {}
-                },
-                // Parent wasn't copied into the subtask: keep the term without one.
-                None => condition.inference = TermInference::Condition,
-            }
-        }
+    pub fn with_condition(mut self, condition: SharedTerm) -> Self {
         self.conditions.push(condition);
         self
     }
 
-    #[inline]
-    pub fn with_conditions(mut self, reqs: impl Iterator<Item = TermProps>) -> Self {
+    pub fn with_conditions(mut self, reqs: impl Iterator<Item = SharedTerm>) -> Self {
         for i in reqs {
             self = self.with_condition(i);
         }

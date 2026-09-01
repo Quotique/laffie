@@ -42,7 +42,7 @@ impl Tracer for FileDumpTracer {
                     task.goal,
                     task.givens
                         .iter()
-                        .map(|x| x.term.to_string())
+                        .map(|x| x.to_string())
                         .collect::<Vec<String>>()
                         .join(";"),
                 )

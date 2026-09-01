@@ -1,6 +1,7 @@
 use solver::{
     NormLevel,
-    task::{Goal, Task, TaskBuilder, TermProps, content_id},
+    task::{Goal, Task, TaskBuilder, content_id},
+    term::SharedTerm,
 };
 
 use crate::ParserError;
@@ -87,7 +88,7 @@ impl<'a> TaskParser<'a> {
                     }
                 }
                 _ => {
-                    builder = builder.with_condition(TermProps::from(
+                    builder = builder.with_condition(SharedTerm::new(
                         TermParser::default()
                             .with_variables()
                             .try_parse(child)?
@@ -98,7 +99,7 @@ impl<'a> TaskParser<'a> {
         }
         let mut task = builder.build();
         // Content id from the parsed terms, not the syntax tree (location-free).
-        task.id = content_id(&task.givens, task.goal().term());
+        task.id = content_id(&task.givens, task.goal());
         Ok(task)
     }
 }
@@ -125,9 +126,9 @@ mod tests {
         let task = result.unwrap();
         assert!(task.name.is_empty());
         assert_eq!(task.givens.len(), 1);
-        println!("{:?}", task.givens[0].term);
+        println!("{:?}", task.givens[0]);
         assert_eq!(
-            *task.givens[0].term,
+            *task.givens[0],
             TermBuf::symbol("==")
                 .arg(
                     TermBuf::symbol("+")

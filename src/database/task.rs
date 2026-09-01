@@ -2,8 +2,8 @@ use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
 
 use solver::{
-    task::{Goal, GoalError, Task as SolverTask, TaskBuilder, TermProps, content_id},
-    term::TermBuf,
+    task::{Goal, GoalError, Task as SolverTask, TaskBuilder, content_id},
+    term::{SharedTerm, TermBuf},
 };
 
 use crate::id::{TaskId, compute_task_id};
@@ -35,7 +35,7 @@ pub struct Task {
 
 impl From<&SolverTask> for Task {
     fn from(t: &SolverTask) -> Self {
-        let givens: Vec<TermBuf> = t.givens.iter().map(|x| (*x.term).clone()).collect();
+        let givens: Vec<TermBuf> = t.givens.iter().map(|x| (**x).clone()).collect();
         let goal: TermBuf = (**t.goal().term()).clone();
         let id = compute_task_id(&givens, &goal);
 
@@ -61,11 +61,11 @@ impl TryFrom<Task> for SolverTask {
         let mut task = TaskBuilder::from_goal(Goal::parse(t.goal)?)
             .with_name(t.name)
             .with_text(t.text)
-            .with_conditions(t.givens.into_iter().map(TermProps::from))
+            .with_conditions(t.givens.into_iter().map(SharedTerm::new))
             .build();
         task.group = t.group;
         task.possible_answers = t.possible_answers;
-        task.id = content_id(&task.givens, task.goal().term());
+        task.id = content_id(&task.givens, task.goal());
         Ok(task)
     }
 }

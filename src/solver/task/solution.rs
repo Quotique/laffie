@@ -9,10 +9,10 @@ use std::{
 use derive_more::Display;
 use itertools::Itertools;
 
-use super::{Goal, Task, TermProps};
+use super::{Goal, Task, TaskBuilder, TermInference, TermProps};
 use crate::{
     CompactString, NormLevel,
-    rule::Level,
+    rule::{Level, RuleId},
     term::{Atom, SharedTerm, Term, TermBuf, match_term},
 };
 
@@ -69,6 +69,39 @@ pub struct Solution {
 impl Solution {
     /// Infallible: `task` guarantees a well-formed goal.
     pub fn new(task: Task) -> Self {
+        Self::seeded(task, Vec::new())
+    }
+
+    pub(crate) fn subtask(
+        &self,
+        goal: Goal,
+        blocked_rules: HashSet<RuleId>,
+        extra: Vec<SharedTerm>,
+    ) -> Self {
+        let inherited: Vec<TermProps> = self
+            .terms
+            .iter()
+            .filter(|x| x.is_proven())
+            .filter(|x| !(x.filters.is_goal() || x.term.term().data().is_symbol_name("answer")))
+            .map(|x| {
+                let mut props = x.clone();
+                props.filters.level = 0.into();
+                props.inference = TermInference::Condition;
+                props
+            })
+            .collect();
+
+        let task = TaskBuilder::from_goal(goal)
+            .with_blocked_rules(blocked_rules)
+            .with_conditions(inherited.iter().map(|x| x.term.clone()).chain(extra))
+            .with_level(self.task.subtask_level + 1)
+            .build();
+        Self::seeded(task, inherited)
+    }
+
+    /// INVARIANT: `history` holds the props of `task.givens`, same terms in
+    /// the same order. [`Solution::subtask`] builds both from one list.
+    fn seeded(task: Task, history: Vec<TermProps>) -> Self {
         let known_vars = collect_known_set(&task.givens);
         let mut solution = Self {
             task,
@@ -84,8 +117,10 @@ impl Solution {
             known_vars,
         };
         let conditions = solution.task.givens.clone();
-        for i in conditions.into_iter() {
-            let _ = solution.add_term(i);
+        let mut history = history.into_iter();
+        for term in conditions {
+            let props = history.next().unwrap_or_else(|| TermProps::from(term));
+            let _ = solution.add_term(props);
         }
         let mut goal_term = TermProps::from(solution.goal().subject().to_owned());
         // The search tells goal terms from derived ones by this flag alone.
@@ -225,10 +260,10 @@ impl IndexMut<TermIdx> for Solution {
 impl error::Error for SolveError {}
 
 /// Collect names declared known via a `V is known` given (V a bare variable).
-fn collect_known_set(givens: &[TermProps]) -> HashSet<CompactString> {
+fn collect_known_set(givens: &[SharedTerm]) -> HashSet<CompactString> {
     let mut set = HashSet::new();
     for g in givens {
-        let Some((lhs,)) = match_term!(g.term.term(), "is"(lhs, "known")) else {
+        let Some((lhs,)) = match_term!(g.term(), "is"(lhs, "known")) else {
             continue;
         };
         if let Atom::Variable(v) = lhs.data() {

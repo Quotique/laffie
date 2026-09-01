@@ -211,7 +211,7 @@ fn main() -> ExitCode {
             &task
                 .givens
                 .iter()
-                .map(|t| (*t.term).clone())
+                .map(|t| (**t).clone())
                 .collect::<Vec<_>>(),
             task.goal().term(),
         ));
