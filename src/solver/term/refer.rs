@@ -652,8 +652,8 @@ impl<'a> fmt::Display for TermRef<'a> {
 ///
 /// Each argument position can be:
 /// - `ident` — binds one child to the variable
-/// - `"symbol"(ident)` — checks that the child is the named symbol, then binds
-///   the entire node to the variable
+/// - `"symbol"(ident)` — checks that the child is the named symbol, then binds the entire node to
+///   the variable
 ///
 /// Returns `Option<(bindings...)>`.
 ///

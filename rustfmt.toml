@@ -1,6 +1,7 @@
 edition = "2024"
 binop_separator = "Back"
 max_width = 100
+comment_width = 100
 merge_derives = false
 imports_granularity = "Crate"
 normalize_comments = true
