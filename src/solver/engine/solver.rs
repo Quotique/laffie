@@ -20,7 +20,7 @@ use crate::{
         GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr, RuleId, RulesEngine,
         SharedRule,
     },
-    task::{Goal, GoalKind, Task},
+    task::{Goal, GoalKind, Task, goal::Recognized},
     term::{
         Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
         match_term,
@@ -693,13 +693,7 @@ impl Solver {
 
         // The arms need the solution mutably, and the kind is `Copy`.
         Ok(match solution.goal().kind() {
-            GoalKind::Find => {
-                let targets = solution
-                    .goal()
-                    .targets()
-                    .expect("a find goal carries its targets");
-                self.check_find_answer(solution, run, index, &targets)
-            }
+            GoalKind::Find => self.check_find_answer(solution, run, index),
             GoalKind::Prove => self.check_prove_answer(solution, index),
             GoalKind::Transform => self.check_transform_answer(solution),
         })
@@ -728,119 +722,46 @@ impl Solver {
         Ok(false)
     }
 
-    fn check_find_answer(
-        &self,
-        solution: &mut Solution,
-        run: &mut Run,
-        index: usize,
-        targets: &[TermBuf],
-    ) -> bool {
-        // Single target: the term is the answer iff it is an answer form
-        // (subsumes flat `x == k` / `x in S` and piecewise, recognized atomically).
-        if targets.len() == 1 {
-            let target = targets[0].term();
-            if self.is_answer_form(solution[index].term.term(), target, solution, run) {
+    fn check_find_answer(&self, solution: &mut Solution, run: &mut Run, index: usize) -> bool {
+        let recognized = {
+            let mut known = |t: TermRef| self.is_provably_known(t, solution, run);
+            solution
+                .goal()
+                .recognize(solution[index].term.term(), &mut known)
+        };
+        match recognized {
+            Recognized::No => false,
+            // Single target: the whole answer at once, flat or piecewise.
+            Recognized::Whole => {
                 solution.status = SolutionStatus::Answer(index);
-                return true;
+                true
             }
-            return false;
-        }
-
-        // Multi target: accumulate one flat binding per target across terms.
-        let term = solution[index].term.term();
-        let (lhs, rhs) = match_term!(term, "=="(lhs, rhs))
-            .or_else(|| match_term!(term, "in"(lhs, rhs)))
-            .unzip();
-        let (Some(lhs), Some(_)) = (lhs, rhs) else {
-            return false;
-        };
-
-        let target = targets
-            .iter()
-            .find(|t| lhs == t.term() && !solution.find_bindings.contains_key(*t));
-        let Some(target) = target else {
-            return false;
-        };
-        let target = target.clone();
-
-        if !self.is_answer_leaf(solution[index].term.term(), target.term(), solution, run) {
-            return false;
-        }
-
-        solution.find_bindings.insert(target, index);
-
-        if solution.find_bindings.len() == targets.len() {
-            let answer = self.build_multi_find_answer(solution, targets);
-            if let Ok(idx) = solution.add_term(answer) {
-                solution.status = SolutionStatus::Answer(idx);
+            Recognized::Binding(target) => {
+                if solution.find_bindings.contains_key(&target) {
+                    return false;
+                }
+                solution.find_bindings.insert(target, index);
+                let targets = solution
+                    .goal()
+                    .targets()
+                    .expect("a find goal carries its targets");
+                if solution.find_bindings.len() < targets.len() {
+                    return false;
+                }
+                let answer = self.build_multi_find_answer(solution, &targets);
+                match solution.add_term(answer) {
+                    Ok(idx) => {
+                        solution.status = SolutionStatus::Answer(idx);
+                        true
+                    }
+                    Err(_) => false,
+                }
             }
-            return true;
         }
-        false
     }
 
     /// One-level answer form for a single `target`: an answer leaf, a `&&`
     /// branch (one leaf + `is known` guards), or a `||` of such branches.
-    fn is_answer_form(
-        &self,
-        term: TermRef,
-        target: TermRef,
-        solution: &Solution,
-        run: &mut Run,
-    ) -> bool {
-        if term.data().is_symbol_name("||") {
-            return term.degree() > 0 &&
-                term.args_iter()
-                    .all(|b| self.is_answer_branch(b, target, solution, run));
-        }
-        self.is_answer_branch(term, target, solution, run)
-    }
-
-    /// An answer leaf, or `&&(guards..., leaf)` with exactly one
-    /// target-resolving leaf and every other conjunct an `is known` guard.
-    fn is_answer_branch(
-        &self,
-        branch: TermRef,
-        target: TermRef,
-        solution: &Solution,
-        run: &mut Run,
-    ) -> bool {
-        if self.is_answer_leaf(branch, target, solution, run) {
-            return true;
-        }
-        if !branch.data().is_symbol_name("&&") {
-            return false;
-        }
-        let mut leaf_seen = false;
-        for conjunct in branch.args_iter() {
-            if self.is_answer_leaf(conjunct, target, solution, run) {
-                if leaf_seen {
-                    return false;
-                }
-                leaf_seen = true;
-            } else if !self.is_provably_known(conjunct, solution, run) {
-                return false;
-            }
-        }
-        leaf_seen
-    }
-
-    /// `target == <known>` or `target in <known>`.
-    fn is_answer_leaf(
-        &self,
-        term: TermRef,
-        target: TermRef,
-        solution: &Solution,
-        run: &mut Run,
-    ) -> bool {
-        let Some((lhs, rhs)) =
-            match_term!(term, "=="(lhs, rhs)).or_else(|| match_term!(term, "in"(lhs, rhs)))
-        else {
-            return false;
-        };
-        lhs == target && self.is_provably_known(rhs, solution, run)
-    }
-
     /// `true` if `term is known` is provable.
     fn is_provably_known(&self, term: TermRef, solution: &Solution, run: &mut Run) -> bool {
         let query = TermBuf::symbol("is")

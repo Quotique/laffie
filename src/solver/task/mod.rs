@@ -1,5 +1,5 @@
 mod builder;
-mod goal;
+pub mod goal;
 
 use crate::term::{SharedTerm, TermBuf};
 use std::{
