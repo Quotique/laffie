@@ -8,32 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- A task's goal is parsed once, when the task is built: a `.pbl` whose goal is
-  not `find`/`prove`/`transform` is now a load error naming the file, the line
-  and the goal, instead of a panic partway through the run.
-- `Task::goal` is an accessor rather than a field, and `Task` is built only
-  through `TaskBuilder`; converting a stored task into a solver task is
-  fallible (`TryFrom`).
-- `Solver` carries no state between tasks and solves through `&self`, so one
-  instance serves a whole corpus and can be shared across threads. Rules
-  derived from a task's own terms live and die with that (sub)task.
-- A task carries one goal value instead of a goal term and its parse side by
-  side. `Goal` owns the term it was written as, hands out the subject as a
-  borrow into it, and reports its kind as a `Copy` value.
-- A task states its conditions as terms. What a subtask inherits from its
-  parent — which rules were already tried on each condition — travels with the
-  solution instead, so a task carries nothing that only solving produces.
-- The subtask cache has one reserve-and-fill protocol instead of two hand-rolled
-  copies, and its key says whether it holds a goal or a `solve(...)` call.
-- A goal recognizes its own answers: whether a term answers it outright, or
-  which of several targets it binds. What counts as known is asked of the
-  search rather than assumed, so the shape of an answer is now testable on its
-  own.
-- The crate's layers run one way: `task` (the problem, its goal) and `rule` both
-  rest on `term` and on nothing else, and the search engine rests on all three.
-  `Solution`, `TermProps`, `Solver`, the tracer and the step walker moved from
-  `solver::task` to `solver::engine`; which rules a subtask may not use is the
-  engine's business rather than the task's.
+- A goal that is not `find`/`prove`/`transform` is a load error naming the file,
+  the line and the goal, instead of a panic partway through the run.
+- A store overflow while assembling a multi-target answer ends the task with an
+  error instead of going unnoticed.
+- A subtask's trace no longer repeats the steps its parent took to reach the
+  conditions it inherited.
+- API: `Task::goal()` replaces the field, a `Task` is built only through
+  `TaskBuilder`, a stored task converts with `TryFrom`, `Solver::solve` takes
+  `&self`, and `Solution`, `TermProps`, `Solver`, `Tracer` and the step walker
+  live in `solver::engine` rather than `solver::task`.
 
 ## [0.7.0] - 2026-07-21
 

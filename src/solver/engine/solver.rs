@@ -81,8 +81,7 @@ pub struct RunControl {
 impl RunControl {
     /// Builds a control and returns a [`CancelToken`] sharing its cancel flag.
     ///
-    /// * `execution_deadline` – max cycles before
-    ///   `SolveError::ExecutionDeadline`.
+    /// * `execution_deadline` – max cycles before `SolveError::ExecutionDeadline`.
     /// * `time_limit` – wall-clock budget before `SolveError::TimeDeadline`.
     pub fn init(execution_deadline: usize, time_limit: Duration) -> (Self, CancelToken) {
         let cancel = CancelToken::new();
@@ -133,6 +132,13 @@ enum SubtaskEntry {
 #[must_use]
 struct CacheSlot(CacheKey);
 
+enum AnswerCheck {
+    No,
+    Found(TermIdx),
+    // A derived answer happens at most once per solve.
+    Derived(Box<TermProps>),
+}
+
 /// Rules derived from a frame's own terms. Insertion-ordered, because the
 /// order rules are offered in is part of the search's identity.
 #[derive(Default)]
@@ -152,8 +158,8 @@ impl Solver {
     ///
     /// # Arguments
     ///
-    /// * `rules` – An `Arc` pointing to a `RulesEngine` that provides the
-    ///   global rule set used during solving.
+    /// * `rules` – An `Arc` pointing to a `RulesEngine` that provides the global rule set used
+    ///   during solving.
     pub fn new(rules: Arc<RulesEngine>) -> Solver {
         Solver {
             rules_engine: rules,
@@ -166,8 +172,8 @@ impl Solver {
     ///
     /// * `task` – The task to be solved.
     /// * `tracer` – A `TracerHub` used for instrumentation.
-    /// * `control` – Run limits (cycle budget, wall-clock deadline,
-    ///   cancellation); build one with [`RunControl::init`].
+    /// * `control` – Run limits (cycle budget, wall-clock deadline, cancellation); build one with
+    ///   [`RunControl::init`].
     ///
     /// The returned `SharedSolution` carries either the answer or an error
     /// status.
@@ -203,10 +209,15 @@ impl Solver {
             if self.try_simplify(index, solution, run, &mut local)? {
                 continue;
             }
-            if self.check_if_answer(solution, run, index)? {
+            let found = match self.check_if_answer(solution, run, index) {
+                AnswerCheck::No => None,
+                AnswerCheck::Found(i) => Some(i),
+                AnswerCheck::Derived(props) => Some(solution.add_term(*props)?),
+            };
+            if let Some(i) = found {
+                solution.status = SolutionStatus::Answer(i);
                 let level = solution.task.subtask_level;
-                let answer = solution.answer().unwrap();
-                trace!("Solved {level}. Answer: {answer}",);
+                trace!("Solved {level}. Answer: {}", solution[i].term);
                 break Ok(());
             }
             self.add_local_rule(&mut solution[index], &mut local);
@@ -664,12 +675,7 @@ impl Solver {
         SharedSolution::new(solution)
     }
 
-    fn check_if_answer(
-        &self,
-        solution: &mut Solution,
-        run: &mut Run,
-        index: usize,
-    ) -> Result<bool, SolveError> {
+    fn check_if_answer(&self, solution: &mut Solution, run: &mut Run, index: usize) -> AnswerCheck {
         if solution[index].filters.is_goal() {
             // Prove goal reduced to a trivial truth: solved even with no
             // non-goal term to focus.
@@ -682,47 +688,46 @@ impl Solver {
                         .is_true()
                 })
             {
-                solution.status = SolutionStatus::Answer(i);
-                return Ok(true);
+                return AnswerCheck::Found(i);
             }
-            return Ok(false);
+            return AnswerCheck::No;
         }
-        if self.check_answer_term(solution, index)? {
-            return Ok(true);
+        if let AnswerCheck::Derived(props) = self.check_answer_term(solution, index) {
+            return AnswerCheck::Derived(props);
         }
 
         // The arms need the solution mutably, and the kind is `Copy`.
-        Ok(match solution.goal().kind() {
+        match solution.goal().kind() {
             GoalKind::Find => self.check_find_answer(solution, run, index),
             GoalKind::Prove => self.check_prove_answer(solution, index),
             GoalKind::Transform => self.check_transform_answer(solution),
-        })
+        }
     }
 
-    fn check_answer_term(&self, solution: &mut Solution, index: usize) -> Result<bool, SolveError> {
+    fn check_answer_term(&self, solution: &Solution, index: usize) -> AnswerCheck {
         let term = &solution[index];
         let term_root = term.term.term();
 
         if solution.goal().kind() == GoalKind::Transform {
-            return Ok(false);
+            return AnswerCheck::No;
         }
-        if term_root.data().is_symbol_name("answer") && term_root.degree() == 1 {
-            let first_arg = term
-                .term
-                .term()
-                .first_arg()
-                .ok_or(SolveError::NoSolutionsFound)?
-                .to_owned();
-            let mut resolution = TermProps::from(first_arg);
-            resolution.inference = term.inference.clone();
-            let idx = solution.add_term(resolution)?;
-            solution.status = SolutionStatus::Answer(idx);
-            return Ok(true);
+        if !term_root.data().is_symbol_name("answer") || term_root.degree() != 1 {
+            return AnswerCheck::No;
         }
-        Ok(false)
+        let Some(inner) = term_root.first_arg() else {
+            return AnswerCheck::No;
+        };
+        let mut resolution = TermProps::from(inner.to_owned());
+        resolution.inference = term.inference.clone();
+        AnswerCheck::Derived(Box::new(resolution))
     }
 
-    fn check_find_answer(&self, solution: &mut Solution, run: &mut Run, index: usize) -> bool {
+    fn check_find_answer(
+        &self,
+        solution: &mut Solution,
+        run: &mut Run,
+        index: usize,
+    ) -> AnswerCheck {
         let recognized = {
             let mut known = |t: TermRef| self.is_provably_known(t, solution, run);
             solution
@@ -730,15 +735,12 @@ impl Solver {
                 .recognize(solution[index].term.term(), &mut known)
         };
         match recognized {
-            Recognized::No => false,
+            Recognized::No => AnswerCheck::No,
             // Single target: the whole answer at once, flat or piecewise.
-            Recognized::Whole => {
-                solution.status = SolutionStatus::Answer(index);
-                true
-            }
+            Recognized::Whole => AnswerCheck::Found(index),
             Recognized::Binding(target) => {
                 if solution.find_bindings.contains_key(&target) {
-                    return false;
+                    return AnswerCheck::No;
                 }
                 solution.find_bindings.insert(target, index);
                 let targets = solution
@@ -746,16 +748,9 @@ impl Solver {
                     .targets()
                     .expect("a find goal carries its targets");
                 if solution.find_bindings.len() < targets.len() {
-                    return false;
+                    return AnswerCheck::No;
                 }
-                let answer = self.build_multi_find_answer(solution, &targets);
-                match solution.add_term(answer) {
-                    Ok(idx) => {
-                        solution.status = SolutionStatus::Answer(idx);
-                        true
-                    }
-                    Err(_) => false,
-                }
+                AnswerCheck::Derived(Box::new(self.build_multi_find_answer(solution, &targets)))
             }
         }
     }
@@ -788,14 +783,14 @@ impl Solver {
         TermProps::from(result)
     }
 
-    fn check_prove_answer(&self, solution: &mut Solution, index: usize) -> bool {
+    fn check_prove_answer(&self, solution: &Solution, index: usize) -> AnswerCheck {
         let term = &solution[index];
 
-        // A candidate with unresolved requirements is not a proof — accepting it
-        // would close circular hypotheses (e.g. `[x^2=a] => x^2=a`) where a
-        // rule's own resolution proves its own requirement.
+        // A candidate with unresolved requirements is not a proof — accepting it would close
+        // circular hypotheses (e.g. `[x^2=a] => x^2=a`) where a rule's own resolution proves its
+        // own requirement.
         if !term.is_proven() {
-            return false;
+            return AnswerCheck::No;
         }
 
         // TODO: теперь тут бывают целевые термы, поэтому надо сделать две проверки:
@@ -803,14 +798,12 @@ impl Solver {
         // что цель тривиальная истина
         for i in solution.goal_index.values() {
             if term.term == solution[*i].term {
-                solution.status = SolutionStatus::Answer(index);
-                return true;
+                return AnswerCheck::Found(index);
             }
             // A derived numeric bound (`x > 2`) proves a weaker goal bound
             // (`x > 0`) on the same expression, even without a syntactic match.
             if bound_implies(term.term.term(), solution[*i].term.term()) {
-                solution.status = SolutionStatus::Answer(index);
-                return true;
+                return AnswerCheck::Found(index);
             }
             if solution[*i]
                 .term
@@ -818,31 +811,33 @@ impl Solver {
                 .truth(TruthCtx::new(&solution.known_vars))
                 .is_true()
             {
-                solution.status = SolutionStatus::Answer(*i);
-                // TODO: надо заполнить правильно
-                // согласовать с выводом решения по шагам
-                // res.inference = TermInference::Condition;
-                return true;
+                // TODO: у этого терма нет происхождения — заполнить, когда вывод решения по шагам
+                // станет его показывать.
+                return AnswerCheck::Found(*i);
             }
         }
-        false
+        AnswerCheck::No
     }
 
-    fn check_transform_answer(&self, solution: &mut Solution) -> bool {
+    fn check_transform_answer(&self, solution: &Solution) -> AnswerCheck {
         let Some(index) = solution.pick_goal_term() else {
-            return false;
+            return AnswerCheck::No;
         };
-
-        if solution[index].filters.level >= self.rules_engine.max_level() {
-            let mut iter = solution.terms.iter().rev().filter(|x| x.is_proven());
-            let res = iter.find(|x| x.filters.is_goal()).map(|x| x.id).unwrap();
-            // TODO: надо заполнить правильно
-            // согласовать с выводом решения по шагам
-            // res.inference = TermInference::Condition;
-            solution.status = SolutionStatus::Answer(res);
-            return true;
+        if solution[index].filters.level < self.rules_engine.max_level() {
+            return AnswerCheck::No;
         }
-        false
+        // TODO: у этого терма нет происхождения — заполнить, когда вывод решения по шагам станет
+        // его показывать.
+        match solution
+            .terms
+            .iter()
+            .rev()
+            .filter(|x| x.is_proven())
+            .find(|x| x.filters.is_goal())
+        {
+            Some(res) => AnswerCheck::Found(res.id),
+            None => AnswerCheck::No,
+        }
     }
 }
 
@@ -1406,8 +1401,8 @@ mod resolve_solve_tests {
 
         let solver = Solver::new(Arc::new(RulesEngine::default()));
         let mut solution = Solution::new(parse_task("task { goal find(z); }"));
-        // Focus term for the rule, plus a term equal to every grounding's
-        // resolution so each hypothesis is a duplicate and the loop keeps going.
+        // Focus term for the rule, plus a term equal to every grounding's resolution so each
+        // hypothesis is a duplicate and the loop keeps going.
         let index = solution
             .add_term(TermProps::from(term_with_vars("y + 1")))
             .unwrap();
