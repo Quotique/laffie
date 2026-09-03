@@ -40,14 +40,23 @@ impl StepsSource for SharedSolution {
 impl From<SharedSolution> for Steps {
     fn from(solution: SharedSolution) -> Self {
         let terms_queue = match solution.status {
-            SolutionStatus::Answer(answer_idx) => {
-                let mut terms_queue: Vec<usize> = vec![answer_idx];
-
-                while let Some(ref parent) =
-                    solution[*terms_queue.last().unwrap()].inference.parent_id()
-                {
-                    terms_queue.push(*parent);
+            SolutionStatus::Answered(ref answer) => {
+                // Every part carries its own chain back to the conditions.
+                let mut terms_queue: Vec<usize> = Vec::new();
+                for part in answer.parts() {
+                    let Some(at) = solution.index_of(&part.term) else {
+                        continue;
+                    };
+                    let start = terms_queue.len();
+                    terms_queue.push(at);
+                    while let Some(ref parent) =
+                        solution[*terms_queue.last().unwrap()].inference.parent_id()
+                    {
+                        terms_queue.push(*parent);
+                    }
+                    terms_queue[start..].reverse();
                 }
+                terms_queue.reverse();
                 terms_queue
             }
             _ => solution

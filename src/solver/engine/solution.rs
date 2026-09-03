@@ -14,7 +14,7 @@ use super::{TermInference, TermProps};
 use crate::{
     CompactString, NormLevel,
     rule::{Level, RuleId},
-    task::{Answer, Goal, Task, TaskBuilder},
+    task::{Answer, AnswerPart, Goal, Task, TaskBuilder},
     term::{Atom, SharedTerm, Term, answer, match_term},
 };
 
@@ -35,11 +35,11 @@ pub enum SolveError {
     Internal,
 }
 
-#[derive(Debug, Display, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum SolutionStatus {
     #[default]
     NotDone,
-    Answer(usize),
+    Answered(Arc<Answer>),
     Err(SolveError),
 }
 
@@ -54,7 +54,7 @@ pub struct Solution {
     pub main_index:       HashMap<SharedTerm, usize>,
     pub goal_index:       IndexMap<SharedTerm, usize>,
     pub terms:            Vec<TermProps>,
-    pub find_answer:      Option<Answer>,
+    bound:                Vec<Option<TermIdx>>,
     unproven_terms_count: usize,
 
     /// Names of variables declared known (`v is known`) among the givens.
@@ -104,7 +104,7 @@ impl Solution {
     /// the same order. [`Solution::subtask`] builds both from one list.
     fn seeded(task: Task, history: Vec<TermProps>, blocked_rules: HashSet<RuleId>) -> Self {
         let known_vars = collect_known_set(&task.givens);
-        let find_answer = task.goal().answer();
+        let bound = vec![None; task.goal().parts()];
         let mut solution = Self {
             task,
             start_cycle: Default::default(),
@@ -112,7 +112,7 @@ impl Solution {
             main_index: Default::default(),
             goal_index: Default::default(),
             terms: Default::default(),
-            find_answer,
+            bound,
             status: Default::default(),
             unproven_terms_count: Default::default(),
             agenda: Default::default(),
@@ -210,37 +210,41 @@ impl Solution {
             .map(|x| x.id)
     }
 
-    #[inline]
-    pub fn answer(&self) -> Option<SharedTerm> {
-        if let SolutionStatus::Answer(i) = self.status {
-            return Some(self.terms[i].term.clone());
-        }
-        None
+    pub fn index_of(&self, term: &SharedTerm) -> Option<TermIdx> {
+        self.main_index
+            .get(term)
+            .or_else(|| self.goal_index.get(term))
+            .copied()
     }
 
-    pub fn validate_answer(&self) -> bool {
-        if self.task.possible_answers.is_empty() {
+    #[inline]
+    pub fn answer(&self) -> Option<&Answer> {
+        match &self.status {
+            SolutionStatus::Answered(a) => Some(a),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn bind_answer(&mut self, part: usize, term: TermIdx) -> bool {
+        if self.bound[part].is_some() {
+            return false;
+        }
+        self.bound[part] = Some(term);
+        if !self.bound.iter().all(Option::is_some) {
             return true;
         }
-
-        if let Some(answer) = self.answer() {
-            if self
-                .task
-                .possible_answers
-                .iter()
-                .any(|x| x == answer.as_ref())
-            {
-                return true;
-            }
-            // TODO: есть проблема с неправильным преобразованием дерева, что приводит к
-            // некорректному прямому сравнению дерева.
-            return self
-                .task
-                .possible_answers
-                .iter()
-                .any(|x| x.to_string() == answer.to_string());
-        }
-        false
+        let goal = self.task.goal();
+        let parts: Vec<AnswerPart> = self
+            .bound
+            .iter()
+            .enumerate()
+            .map(|(part, at)| AnswerPart {
+                asked: goal.asked(part).to_owned(),
+                term:  self.terms[at.expect("every part is bound")].term.clone(),
+            })
+            .collect();
+        self.status = SolutionStatus::Answered(Arc::new(Answer::new(parts)));
+        true
     }
 }
 

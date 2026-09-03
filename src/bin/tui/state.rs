@@ -72,11 +72,13 @@ pub enum TaskStatusKind {
 
 impl TaskStatusKind {
     pub fn of(solution: &Solution) -> Self {
-        match solution.status {
+        match &solution.status {
             SolutionStatus::NotDone => Self::NotStarted,
             SolutionStatus::Err(_) => Self::Unsolved,
-            SolutionStatus::Answer(_) if solution.validate_answer() => Self::Solved,
-            SolutionStatus::Answer(_) => Self::WrongAnswer,
+            SolutionStatus::Answered(a) if a.matches(&solution.task.possible_answers) => {
+                Self::Solved
+            }
+            SolutionStatus::Answered(_) => Self::WrongAnswer,
         }
     }
 }

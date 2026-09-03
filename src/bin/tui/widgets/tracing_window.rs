@@ -42,7 +42,7 @@ impl<'a> TracingWindow<'a> {
                 "Answer: ",
                 solution
                     .answer()
-                    .map(|x| Span::from(x.to_string()))
+                    .map(|x| Span::from(x.term().to_string()))
                     .unwrap_or(Span::styled(strings::solution::NO_ANSWER, self.theme.error)),
             ),
             Line::default(),
@@ -84,7 +84,7 @@ impl<'a> TracingWindow<'a> {
                 for i in requirements {
                     let goal = i.task.goal().term();
                     result.push(Line::from(match i.status {
-                        SolutionStatus::Answer(_) => Span::styled(format!("  ☑  {goal}"), proven),
+                        SolutionStatus::Answered(_) => Span::styled(format!("  ☑  {goal}"), proven),
                         SolutionStatus::Err(_) => Span::styled(format!("  ☒  {goal}"), unproven),
                         SolutionStatus::NotDone => Span::styled(format!("  ☐  {goal}"), skipped),
                     }));

@@ -38,9 +38,9 @@ const LOCAL_RULE_MASK: u64 = 0x80_00_00_00_00_00_00_00;
 
 enum AnswerCheck {
     No,
-    Found(TermIdx),
-    // A derived answer happens at most once per solve.
-    Derived(Box<TermProps>),
+    Bind { part: usize, term: TermIdx },
+    // Unwrapping `answer(x)` yields a term the store does not hold yet.
+    Unwrap { part: usize, props: Box<TermProps> },
 }
 
 /// Rules derived from a frame's own terms. Insertion-ordered, because the
@@ -103,15 +103,17 @@ impl Solver {
             if self.try_simplify(index, solution, run, &mut local)? {
                 continue;
             }
-            let found = match self.check_if_answer(solution, run, index) {
-                AnswerCheck::No => None,
-                AnswerCheck::Found(i) => Some(i),
-                AnswerCheck::Derived(props) => Some(solution.add_term(*props)?),
+            let bound = match self.check_if_answer(solution, run, index) {
+                AnswerCheck::No => false,
+                AnswerCheck::Bind { part, term } => solution.bind_answer(part, term),
+                AnswerCheck::Unwrap { part, props } => {
+                    let term = solution.add_term(*props)?;
+                    solution.bind_answer(part, term)
+                }
             };
-            if let Some(i) = found {
-                solution.status = SolutionStatus::Answer(i);
+            if bound && let Some(answer) = solution.answer() {
                 let level = solution.task.subtask_level;
-                trace!("Solved {level}. Answer: {}", solution[i].term);
+                trace!("Solved {level}. Answer: {}", answer.term());
                 break Ok(());
             }
             self.add_local_rule(&mut solution[index], &mut local);
@@ -396,10 +398,12 @@ impl Solver {
             Truth::True => {
                 let mut trivial_solution =
                     Solution::new(Task::from_goal(Goal::prove(term.clone())));
-                trivial_solution.status = match trivial_solution.add_term(TermProps::from(term)) {
-                    Ok(idx) => SolutionStatus::Answer(idx),
-                    Err(e) => SolutionStatus::Err(e),
-                };
+                match trivial_solution.add_term(TermProps::from(term)) {
+                    Ok(idx) => {
+                        trivial_solution.bind_answer(0, idx);
+                    }
+                    Err(e) => trivial_solution.status = SolutionStatus::Err(e),
+                }
                 SharedSolution::new(trivial_solution)
             }
             // Unprovable — fail fast instead of searching.
@@ -426,7 +430,7 @@ impl Solver {
         let subtask_solution =
             self.solve_subtask(solution, Goal::transform(to_transform), blocked, run);
 
-        let mut transformed = subtask_solution.answer()?.as_ref().clone();
+        let mut transformed = subtask_solution.answer()?.term();
         if use_answer {
             transformed = answer::mark(transformed);
         }
@@ -530,7 +534,7 @@ impl Solver {
                 .collect();
 
             let result = self.run_solve_block(cache_key, goal, eqs, parent, run);
-            let answer_term = result.answer()?;
+            let answer_term = result.answer()?.term();
             let answer_buf = answer::marked(answer_term.term())
                 .unwrap_or(answer_term.term())
                 .to_owned();
@@ -568,12 +572,13 @@ impl Solver {
                         .is_true()
                 })
             {
-                return AnswerCheck::Found(i);
+                return AnswerCheck::Bind { part: 0, term: i };
             }
             return AnswerCheck::No;
         }
-        if let AnswerCheck::Derived(props) = self.check_answer_term(solution, index) {
-            return AnswerCheck::Derived(props);
+        let unwrapped = self.check_answer_term(solution, index);
+        if matches!(unwrapped, AnswerCheck::Unwrap { .. }) {
+            return unwrapped;
         }
 
         // The arms need the solution mutably, and the kind is `Copy`.
@@ -596,7 +601,10 @@ impl Solver {
         };
         let mut resolution = TermProps::from(inner.to_owned());
         resolution.inference = term.inference.clone();
-        AnswerCheck::Derived(Box::new(resolution))
+        AnswerCheck::Unwrap {
+            part:  0,
+            props: Box::new(resolution),
+        }
     }
 
     fn check_find_answer(
@@ -605,28 +613,14 @@ impl Solver {
         run: &mut Run,
         index: usize,
     ) -> AnswerCheck {
-        let at = {
+        let part = {
             let mut known = |t: TermRef| self.is_provably_known(t, solution, run);
             solution
                 .goal()
                 .recognize(solution[index].term.term(), &mut known)
         };
-        let Some(at) = at else {
-            return AnswerCheck::No;
-        };
-        // One unknown: the focused term is the whole answer, flat or piecewise.
-        if solution.goal().parts() == 1 {
-            return AnswerCheck::Found(index);
-        }
-        let term = solution[index].term.clone();
-        let Some(answer) = solution.find_answer.as_mut() else {
-            return AnswerCheck::No;
-        };
-        if !answer.bind(at, term, index) {
-            return AnswerCheck::No;
-        }
-        match answer.term() {
-            Some(term) => AnswerCheck::Derived(Box::new(TermProps::from(term))),
+        match part {
+            Some(part) => AnswerCheck::Bind { part, term: index },
             None => AnswerCheck::No,
         }
     }
@@ -656,12 +650,18 @@ impl Solver {
         // что цель тривиальная истина
         for i in solution.goal_index.values() {
             if term.term == solution[*i].term {
-                return AnswerCheck::Found(index);
+                return AnswerCheck::Bind {
+                    part: 0,
+                    term: index,
+                };
             }
             // A derived numeric bound (`x > 2`) proves a weaker goal bound
             // (`x > 0`) on the same expression, even without a syntactic match.
             if bound_implies(term.term.term(), solution[*i].term.term()) {
-                return AnswerCheck::Found(index);
+                return AnswerCheck::Bind {
+                    part: 0,
+                    term: index,
+                };
             }
             if solution[*i]
                 .term
@@ -671,7 +671,7 @@ impl Solver {
             {
                 // TODO: у этого терма нет происхождения — заполнить, когда вывод решения по шагам
                 // станет его показывать.
-                return AnswerCheck::Found(*i);
+                return AnswerCheck::Bind { part: 0, term: *i };
             }
         }
         AnswerCheck::No
@@ -693,7 +693,10 @@ impl Solver {
             .filter(|x| x.is_proven())
             .find(|x| x.filters.is_goal())
         {
-            Some(res) => AnswerCheck::Found(res.id),
+            Some(res) => AnswerCheck::Bind {
+                part: 0,
+                term: res.id,
+            },
             None => AnswerCheck::No,
         }
     }
@@ -764,7 +767,7 @@ mod solve_tests {
             Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
         );
         assert_eq!(
-            *solution.answer().expect("task is not solved"),
+            solution.answer().expect("task is not solved").term(),
             term_with_vars("x == 1")
         );
     }
@@ -822,7 +825,7 @@ mod solve_tests {
         let answer = solution
             .answer()
             .expect("multi-var find task is not solved");
-        assert_eq!(*answer, term_with_vars("x == 3 && y == 4"));
+        assert_eq!(answer.term(), term_with_vars("x == 3 && y == 4"));
     }
 
     /// A rule derived from the first task's terms may not reach the second.

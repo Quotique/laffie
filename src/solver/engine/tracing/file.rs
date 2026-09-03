@@ -66,6 +66,7 @@ impl Tracer for FileDumpTracer {
                     status.task.goal().to_string().replace("\n", "; "),
                     status
                         .answer()
+                        .map(|a| a.term())
                         .map(|x| x.to_string())
                         .unwrap_or("not solved".to_owned()),
                 )

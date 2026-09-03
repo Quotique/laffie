@@ -10,7 +10,7 @@ use std::{
     iter::Iterator,
 };
 
-pub use answer::Answer;
+pub use answer::{Answer, AnswerPart};
 pub use builder::TaskBuilder;
 pub use goal::{Goal, GoalError, GoalKind};
 

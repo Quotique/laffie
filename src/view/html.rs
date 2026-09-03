@@ -4,8 +4,7 @@ use html_escape::encode_text;
 
 use solver::{
     engine::{Solution, TermProps},
-    task::{Goal, GoalKind},
-    term::SharedTerm,
+    task::{Answer, Goal, GoalKind},
 };
 
 use crate::Renderer;
@@ -34,10 +33,10 @@ impl Renderer for Html<'_> {
     fn display_answer(
         &mut self,
         goal: &Goal,
-        answer: Option<SharedTerm>,
+        answer: Option<&Answer>,
         status: &Solution,
     ) -> fmt::Result {
-        if let Some(answer) = answer.as_ref() {
+        if let Some(answer) = answer.map(Answer::term) {
             self.output.write_str(&format!(
                 "{} {}\n",
                 match goal.kind() {

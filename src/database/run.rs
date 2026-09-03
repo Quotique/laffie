@@ -1,7 +1,7 @@
 use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
 
-use solver::{engine::Solution, term::TermBuf};
+use solver::{engine::Solution, task::Answer, term::TermBuf};
 
 use crate::{
     id::TaskId,
@@ -46,7 +46,7 @@ impl Run {
     /// available sequence number when the run is persisted.
     pub fn from_solution(task_id: TaskId, solution: &Solution) -> Self {
         let trace = SolutionTrace::from(solution);
-        let answer = solution.answer().map(|t| (*t).clone());
+        let answer = solution.answer().map(Answer::term);
         let stats = RunStats {
             cycles: solution.cycles() as u64,
             status: trace.status.clone(),

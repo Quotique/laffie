@@ -3,11 +3,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use super::{
-    Answer,
-    answer::{is_answer_form, is_answer_leaf},
-};
-use crate::term::{SharedTerm, Term, TermBuf, TermRef};
+use crate::term::{SharedTerm, Term, TermBuf, TermRef, match_term};
 
 /// Why a term cannot be a goal.
 #[derive(Clone, Debug)]
@@ -161,13 +157,14 @@ impl Goal {
         unknowns.position(|u| is_answer_leaf(term, u, known))
     }
 
-    /// `None` for anything but a `find`.
-    pub(crate) fn answer(&self) -> Option<Answer> {
+    pub(crate) fn asked(&self, at: usize) -> TermRef<'_> {
         match &self.body {
-            GoalBody::Find(written) => Some(Answer::new(
-                written.term().args_iter().map(|a| a.to_owned()),
-            )),
-            GoalBody::Prove(_) | GoalBody::Transform(_) => None,
+            GoalBody::Find(written) => written
+                .term()
+                .args_iter()
+                .nth(at)
+                .expect("a part index comes from `parts`"),
+            GoalBody::Prove(_) | GoalBody::Transform(_) => self.subject(),
         }
     }
 
@@ -191,6 +188,50 @@ impl Goal {
             body: GoalBody::Transform(SharedTerm::new(TermBuf::symbol("transform").arg(inner))),
         }
     }
+}
+
+fn is_answer_form(term: TermRef, target: TermRef, known: &mut dyn FnMut(TermRef) -> bool) -> bool {
+    if term.data().is_symbol_name("||") {
+        return term.degree() > 0 && term.args_iter().all(|b| is_answer_branch(b, target, known));
+    }
+    is_answer_branch(term, target, known)
+}
+
+/// `target == <known>` or `target in <known>`.
+fn is_answer_leaf(term: TermRef, target: TermRef, known: &mut dyn FnMut(TermRef) -> bool) -> bool {
+    let Some((lhs, rhs)) =
+        match_term!(term, "=="(lhs, rhs)).or_else(|| match_term!(term, "in"(lhs, rhs)))
+    else {
+        return false;
+    };
+    lhs == target && known(rhs)
+}
+
+/// An answer leaf, or `&&(guards..., leaf)` with exactly one target-resolving
+/// leaf and every other conjunct an `is known` guard.
+fn is_answer_branch(
+    branch: TermRef,
+    target: TermRef,
+    known: &mut dyn FnMut(TermRef) -> bool,
+) -> bool {
+    if is_answer_leaf(branch, target, known) {
+        return true;
+    }
+    if !branch.data().is_symbol_name("&&") {
+        return false;
+    }
+    let mut leaf_seen = false;
+    for conjunct in branch.args_iter() {
+        if is_answer_leaf(conjunct, target, known) {
+            if leaf_seen {
+                return false;
+            }
+            leaf_seen = true;
+        } else if !known(conjunct) {
+            return false;
+        }
+    }
+    leaf_seen
 }
 
 #[cfg(test)]
@@ -308,11 +349,14 @@ mod tests {
     }
 
     #[test]
-    fn an_answer_is_asked_for_only_by_a_find() {
-        let goal = Goal::parse(term_with_vars("find(x, y)")).expect("a goal");
-        assert_eq!(goal.answer().expect("a find asks").bindings().count(), 0);
-        assert!(Goal::prove(term_with_vars("x > 0")).answer().is_none());
-        assert!(Goal::transform(term_with_vars("1 + 2")).answer().is_none());
+    fn a_part_asks_for_its_unknown() {
+        let find = goal("find(x, y)");
+        assert_eq!(find.asked(0).to_owned(), term_with_vars("x"));
+        assert_eq!(find.asked(1).to_owned(), term_with_vars("y"));
+        assert_eq!(
+            goal("prove(x > 0)").asked(0).to_owned(),
+            term_with_vars("x > 0")
+        );
     }
 
     #[test]

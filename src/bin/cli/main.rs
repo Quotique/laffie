@@ -19,7 +19,7 @@ use database::{Db, Run, Task as DbTask, id_from_hex, id_to_hex};
 use parser::DirectoryParser;
 use solver::{
     engine::{Limits, SolutionStatus, Solver, TracerHub},
-    task::Task as SolverTask,
+    task::{Answer, Task as SolverTask},
 };
 use view::View;
 
@@ -270,14 +270,14 @@ fn main() -> ExitCode {
         if let Some(explain) = &explain {
             println!("{}", explain.report());
         }
-        match solution.status {
-            SolutionStatus::Answer(_) => {
+        match &solution.status {
+            SolutionStatus::Answered(answer) => {
                 println!(
                     "{}\n{}",
                     "Solution:".italic().blue(),
                     View::try_from(solution.as_ref()).unwrap()
                 );
-                if solution.validate_answer() {
+                if answer.matches(&solution.task.possible_answers) {
                     stats.entry(db_task.group.clone()).or_default().solved += 1;
                 } else {
                     stats
@@ -288,7 +288,7 @@ fn main() -> ExitCode {
                         "{}\nValid answers: [{}]\nObtained: {}",
                         "Answer changed: ".bold().blink().red(),
                         solution.task.possible_answers.iter().format(", "),
-                        solution.answer().unwrap()
+                        answer.term()
                     );
                 }
             }
@@ -317,7 +317,7 @@ fn main() -> ExitCode {
         diff.record(
             &task_label,
             prev.as_ref(),
-            solution.answer().as_deref(),
+            solution.answer().map(Answer::term).as_ref(),
             duration_ms,
         );
 

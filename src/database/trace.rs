@@ -26,19 +26,19 @@ pub struct SolutionTrace {
     /// `requirements` / `sub_solution` indices address it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sub_solutions: Vec<SolutionTrace>,
-
-    /// `(target_var, idx into self.terms)` for `find(x, y, ...)` goals.
-    /// Empty for `prove`/`transform` solutions.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub find_bindings: Vec<(TermBuf, usize)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TraceStatus {
     NotDone,
-    /// Index into [`SolutionTrace::terms`] holding the answer term.
-    Answer(usize),
+    Answered(Vec<TraceAnswerPart>),
     Err(TraceError),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraceAnswerPart {
+    pub asked: TermBuf,
+    pub term:  usize,
 }
 
 /// Serializable mirror of [`solver::engine::SolveError`]. `Unknown` is the
@@ -112,12 +112,22 @@ impl From<&Solution> for SolutionTrace {
     }
 }
 
-impl From<SolutionStatus> for TraceStatus {
-    fn from(s: SolutionStatus) -> Self {
-        match s {
+impl TraceStatus {
+    fn from_solution(s: &Solution) -> Self {
+        match &s.status {
             SolutionStatus::NotDone => Self::NotDone,
-            SolutionStatus::Answer(idx) => Self::Answer(idx),
-            SolutionStatus::Err(e) => Self::Err(e.into()),
+            SolutionStatus::Answered(a) => Self::Answered(
+                a.parts()
+                    .iter()
+                    .filter_map(|p| {
+                        s.index_of(&p.term).map(|at| TraceAnswerPart {
+                            asked: p.asked.clone(),
+                            term:  at,
+                        })
+                    })
+                    .collect(),
+            ),
+            SolutionStatus::Err(e) => Self::Err((*e).into()),
         }
     }
 }
@@ -140,7 +150,7 @@ impl From<SolveError> for TraceError {
 impl TraceStatus {
     /// `true` iff the trace finished without an error or pending state.
     pub fn is_answer(&self) -> bool {
-        matches!(self, Self::Answer(_))
+        matches!(self, Self::Answered(_))
     }
 
     /// Converts back into a [`SolveError`] when the status carries a known one;
@@ -171,16 +181,10 @@ impl SolutionTrace {
             .iter()
             .map(|tp| TraceTerm::from_props(tp, arena, interner))
             .collect();
-        let find_bindings = s
-            .find_answer
-            .as_ref()
-            .map(|a| a.bindings().map(|(t, idx)| (t.clone(), idx)).collect())
-            .unwrap_or_default();
         SolutionTrace {
-            status: TraceStatus::from(s.status),
+            status: TraceStatus::from_solution(s),
             terms,
             sub_solutions: Vec::new(),
-            find_bindings,
         }
     }
 
@@ -200,7 +204,6 @@ impl SolutionTrace {
             status:        TraceStatus::NotDone,
             terms:         Vec::new(),
             sub_solutions: Vec::new(),
-            find_bindings: Vec::new(),
         });
         interner.insert(key, idx);
         let body = SolutionTrace::build(sub.as_ref(), arena, interner);
@@ -326,7 +329,6 @@ mod tests {
                 inference: TraceInference::Condition,
             }],
             sub_solutions: vec![],
-            find_bindings: vec![],
         };
         let json = serde_json::to_vec(&trace).unwrap();
         let back: SolutionTrace = serde_json::from_slice(&json).unwrap();

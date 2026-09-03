@@ -5,8 +5,7 @@ use ratatui::{prelude::*, style::Stylize};
 
 use solver::{
     engine::{Solution, TermProps},
-    task::{Goal, GoalKind},
-    term::SharedTerm,
+    task::{Answer, Goal, GoalKind},
 };
 
 use crate::Renderer;
@@ -49,14 +48,14 @@ impl Renderer for Tui<'_> {
     fn display_answer(
         &mut self,
         goal: &Goal,
-        answer: Option<SharedTerm>,
+        answer: Option<&Answer>,
         status: &Solution,
     ) -> fmt::Result {
         let answer_style = Style::new().fg(Color::Green).bold();
         let not_solved_style = Style::new().fg(Color::Red).bold().slow_blink();
         let cycles_counter_style = Style::new().fg(Color::Yellow);
         self.output
-            .push(Line::from(if let Some(answer) = answer.as_ref() {
+            .push(Line::from(if let Some(answer) = answer.map(Answer::term) {
                 vec![
                     Span::style(
                         match goal.kind() {

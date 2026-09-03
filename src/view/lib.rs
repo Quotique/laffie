@@ -15,9 +15,9 @@ pub use html::Html;
 pub use tui::Tui;
 
 use solver::{
-    engine::{Solution, SolutionStatus, TermProps},
-    task::{Goal, GoalKind},
-    term::{SharedTerm, TermBuf},
+    engine::{Solution, TermProps},
+    task::{Answer, Goal, GoalKind},
+    term::TermBuf,
 };
 
 pub trait Renderer {
@@ -28,7 +28,7 @@ pub trait Renderer {
     fn display_answer(
         &mut self,
         goal: &Goal,
-        answer: Option<SharedTerm>,
+        answer: Option<&Answer>,
         status: &Solution,
     ) -> fmt::Result;
 
@@ -116,19 +116,19 @@ impl View<'_> {
     }
 
     pub fn display_impl(&self, renderer: &mut dyn Renderer) -> fmt::Result {
-        if let SolutionStatus::Answer(a) = self.solution.status {
+        if let Some(answer) = self.solution.answer() {
+            let level = self.solution.task.subtask_level;
             self.display_goal(
                 self.solution.goal(),
-                &self.solution.terms[a].term,
-                self.solution.task.subtask_level,
+                &answer.parts()[0].term,
+                level,
                 renderer,
             )?;
-            self.display_frame(
-                &self.solution.terms,
-                a,
-                self.solution.task.subtask_level,
-                renderer,
-            )?;
+            for part in answer.parts() {
+                if let Some(at) = self.solution.index_of(&part.term) {
+                    self.display_frame(&self.solution.terms, at, level, renderer)?;
+                }
+            }
         } else {
             renderer.dump_frame(&self.solution.terms)?;
         }
