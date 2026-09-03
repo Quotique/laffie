@@ -7,6 +7,7 @@ use std::{
 };
 
 use derive_more::Display;
+use indexmap::IndexMap;
 use itertools::Itertools;
 
 use super::{TermInference, TermProps};
@@ -51,7 +52,7 @@ pub struct Solution {
     pub end_cycle:   usize,
 
     pub main_index:       HashMap<SharedTerm, usize>,
-    pub goal_index:       HashMap<SharedTerm, usize>,
+    pub goal_index:       IndexMap<SharedTerm, usize>,
     pub terms:            Vec<TermProps>,
     pub find_bindings:    HashMap<TermBuf, TermIdx>,
     unproven_terms_count: usize,
@@ -164,15 +165,17 @@ impl Solution {
             return Ok(id);
         }
 
-        let index = if term.filters.is_goal() {
-            &mut self.goal_index
+        if term.filters.is_goal() {
+            if let Some(&existing) = self.goal_index.get(&term.term) {
+                return Ok(existing);
+            }
+            self.goal_index.insert(term.term.clone(), id);
         } else {
-            &mut self.main_index
-        };
-        if let Some(id) = index.get(&term.term) {
-            return Ok(*id);
+            if let Some(&existing) = self.main_index.get(&term.term) {
+                return Ok(existing);
+            }
+            self.main_index.insert(term.term.clone(), id);
         }
-        index.insert(term.term.clone(), id);
 
         self.agenda.push(Reverse((term.filters.level, id)));
         self.terms.push(term);
