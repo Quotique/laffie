@@ -299,7 +299,7 @@ impl Solver {
                 .collect();
         let mut grounded_seen = 0usize;
         for mut h in raw_hypotheses {
-            resolve_parents_in_hypothesis(&mut h, s[index].term.as_ref());
+            h.resolve_parents(s[index].term.as_ref());
             let Some(h) = self.resolve_solve_in_hypothesis(h, s, run) else {
                 continue;
             };
@@ -709,36 +709,6 @@ impl LocalRules {
     }
 }
 
-/// Resolves the `parents` requirement primitive against the match position:
-/// rewrites each `parents` marker into the `set(...)` of the matched term's
-/// ancestor head symbols. Like `solve`, this is computed here rather than by
-/// term normalization.
-fn resolve_parents_in_hypothesis(hyp: &mut Hypothesis, term: &TermBuf) {
-    let marker = TermBuf::symbol("parents");
-    if !hyp
-        .requirements
-        .iter()
-        .any(|r| r.term().contains(&marker.term()))
-    {
-        return;
-    }
-    // `set(...)` of the head symbols of the match position's strict ancestors.
-    let mut set = TermBuf::symbol("set");
-    let mut node = term.term();
-    for &i in &*hyp.pos {
-        if let Some(symbol) = node.data().symbol() {
-            set = set.arg(TermBuf::symbol(symbol.as_str()));
-        }
-        let Some(child) = node.args_iter().nth(i) else {
-            break;
-        };
-        node = child;
-    }
-    for r in &mut hyp.requirements {
-        r.replace(&marker, &set);
-    }
-}
-
 /// Matches `solve(...) == Param` (either argument order).
 fn match_solve_eq_param<'a>(req: &'a TermBuf) -> Option<(TermRef<'a>, Param)> {
     let (lhs, rhs) = match_term!(req.term(), "=="(lhs, rhs))?;
@@ -930,62 +900,6 @@ mod local_rules_tests {
 
         assert_eq!(local.rules.len(), 2);
         assert_eq!(local.max_level, 3.into());
-    }
-}
-
-#[cfg(test)]
-mod parents_tests {
-    use std::sync::Arc;
-
-    use crate::{
-        rule::{Hypothesis, parse_rule},
-        term::{ParamSubstitution, TermBuf, TermPath, term_with_vars},
-    };
-
-    use super::resolve_parents_in_hypothesis;
-
-    fn hypothesis(requirements: Vec<TermBuf>, pos: Vec<usize>) -> Hypothesis {
-        let rule = Arc::new(parse_rule(
-            r#"rule { attr level(1); a + x == 0 => x == -a; a!=0; }"#,
-        ));
-        Hypothesis {
-            rule,
-            resolution: term_with_vars("answer(x == 1)"),
-            free_params: Default::default(),
-            params: ParamSubstitution::default(),
-            requirements,
-            blocked_rules: vec![],
-            pos: TermPath::from(pos),
-        }
-    }
-
-    #[test]
-    fn rewrites_marker_into_ancestor_set() {
-        // `a` sits under `==` inside `||`: a == b || c.
-        let mut hyp = hypothesis(vec![term_with_vars("answer in parents")], vec![0, 0]);
-        resolve_parents_in_hypothesis(&mut hyp, &term_with_vars("a == b || c"));
-
-        let set = TermBuf::symbol("set")
-            .arg(TermBuf::symbol("||"))
-            .arg(TermBuf::symbol("=="));
-        let mut expected = term_with_vars("answer in parents");
-        expected.replace(&TermBuf::symbol("parents"), &set);
-        assert_eq!(hyp.requirements[0], expected);
-    }
-
-    #[test]
-    fn root_match_rewrites_into_empty_set() {
-        let mut hyp = hypothesis(vec![term_with_vars("answer in parents")], vec![]);
-        resolve_parents_in_hypothesis(&mut hyp, &term_with_vars("a == b"));
-        assert_eq!(hyp.requirements[0], term_with_vars("answer in set"));
-    }
-
-    #[test]
-    fn noop_without_marker() {
-        let mut hyp = hypothesis(vec![term_with_vars("a != 0")], vec![0]);
-        let before = hyp.requirements.clone();
-        resolve_parents_in_hypothesis(&mut hyp, &term_with_vars("a == b"));
-        assert_eq!(hyp.requirements, before);
     }
 }
 

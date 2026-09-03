@@ -121,6 +121,33 @@ impl Hypothesis {
         Either::Right(combos)
     }
 
+    /// Rewrites each `parents` marker in the requirements into the `set(...)`
+    /// of the matched term's ancestor head symbols.
+    pub(crate) fn resolve_parents(&mut self, term: &TermBuf) {
+        let marker = TermBuf::symbol("parents");
+        if !self
+            .requirements
+            .iter()
+            .any(|r| r.term().contains(&marker.term()))
+        {
+            return;
+        }
+        let mut set = TermBuf::symbol("set");
+        let mut node = term.term();
+        for &i in &*self.pos {
+            if let Some(symbol) = node.data().symbol() {
+                set = set.arg(TermBuf::symbol(symbol.as_str()));
+            }
+            let Some(child) = node.args_iter().nth(i) else {
+                break;
+            };
+            node = child;
+        }
+        for r in &mut self.requirements {
+            r.replace(&marker, &set);
+        }
+    }
+
     /// Normalizes requirements and drops trivially-true ones.
     fn normalize_requirements(&mut self, ctx: TruthCtx) {
         self.requirements = self
@@ -282,7 +309,7 @@ mod tests {
 
     use crate::{
         rule::parse_rule,
-        term::{ParamSubstitution, TermBuf, param, term_with_params, term_with_vars},
+        term::{ParamSubstitution, TermBuf, TermPath, param, term_with_params, term_with_vars},
     };
 
     use super::Hypothesis;
@@ -309,6 +336,41 @@ mod tests {
 
     fn res(g: &super::GroundedHypothesis) -> String {
         g.resolution.to_string()
+    }
+
+    fn with_pos(requirements: Vec<TermBuf>, pos: Vec<usize>) -> Hypothesis {
+        let mut hyp = make_hypothesis(term_with_vars("answer(x == 1)"), vec![], requirements);
+        hyp.pos = TermPath::from(pos);
+        hyp
+    }
+
+    #[test]
+    fn rewrites_marker_into_ancestor_set() {
+        // `a` sits under `==` inside `||`: a == b || c.
+        let mut hyp = with_pos(vec![term_with_vars("answer in parents")], vec![0, 0]);
+        hyp.resolve_parents(&term_with_vars("a == b || c"));
+
+        let set = TermBuf::symbol("set")
+            .arg(TermBuf::symbol("||"))
+            .arg(TermBuf::symbol("=="));
+        let mut expected = term_with_vars("answer in parents");
+        expected.replace(&TermBuf::symbol("parents"), &set);
+        assert_eq!(hyp.requirements[0], expected);
+    }
+
+    #[test]
+    fn root_match_rewrites_into_empty_set() {
+        let mut hyp = with_pos(vec![term_with_vars("answer in parents")], vec![]);
+        hyp.resolve_parents(&term_with_vars("a == b"));
+        assert_eq!(hyp.requirements[0], term_with_vars("answer in set"));
+    }
+
+    #[test]
+    fn noop_without_marker() {
+        let mut hyp = with_pos(vec![term_with_vars("a != 0")], vec![0]);
+        let before = hyp.requirements.clone();
+        hyp.resolve_parents(&term_with_vars("a == b"));
+        assert_eq!(hyp.requirements, before);
     }
 
     #[test]
