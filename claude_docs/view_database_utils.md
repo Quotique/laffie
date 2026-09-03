@@ -1,5 +1,7 @@
 # View, Database, Utils Crates — Navigation Map
 
+**No line numbers here, on purpose** — see the note in `solver.md`. Grep the name.
+
 ## View Crate
 
 Solution rendering with pluggable backends.
@@ -17,18 +19,18 @@ src/view/
 ### Key Types
 
 #### lib.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 16 | `Renderer` trait | `display_goal()`, `display_term()`, `display_answer()`, `dump_frame()` |
-| 33 | `View<'a>` | `{ solution: &Solution, rendered: HashSet<TermBuf> }` |
-| — | `View::display_impl()` | Iterates solution steps via `StepsSource`, calls renderer methods |
+| Type | What it is |
+|------|------------|
+| `Renderer` trait | `display_goal()`, `display_term()`, `display_answer()`, `dump_frame()` |
+| `View<'a>` | `{ solution: &Solution, rendered: HashSet<TermBuf> }` |
+| `View::display_impl()` | Iterates solution steps via `StepsSource`, calls renderer methods |
 
 #### Implementations
 | File | Struct | Output | Key Dep |
 |------|--------|--------|---------|
-| console.rs:18 | `Console` | Colored text (`fmt::Write`) | `colored` |
-| html.rs:16 | `Html` | HTML string (`fmt::Write`) | `html_escape` |
-| tui.rs:18 | `Tui` | `Vec<Line<'a>>` for ratatui | `ratatui` |
+| console.rs | `Console` | Colored text (`fmt::Write`) | `colored` |
+| html.rs | `Html` | HTML string (`fmt::Write`) | `html_escape` |
+| tui.rs | `Tui` | `Vec<Line<'a>>` for ratatui | `ratatui` |
 
 ---
 
@@ -97,7 +99,7 @@ solver run; `seq` is overwritten by [`Db::add_run`].
 
 ### SolutionTrace
 
-`trace.rs` mirrors `solver::task::Solution` for persistence. Runtime-only
+`trace.rs` mirrors `solver::engine::Solution` for persistence. Runtime-only
 state (caches, `Arc` graphs of `SharedRule`/`SharedSolution`) is stripped;
 sub-solutions and rule references become indices into flat `Vec`s.
 
@@ -106,7 +108,7 @@ SolutionTrace
 ├── status         : TraceStatus (NotDone | Answer(idx) | Err(String))
 ├── terms          : Vec<TraceTerm>
 ├── sub_solutions  : Vec<SolutionTrace>     // pool for recursive references
-└── find_bindings  : Vec<(TermBuf, idx)>    // multi-var find(x, y, …)
+└── find_bindings  : Vec<(TermBuf, idx)>    // from Answer::bindings(), in unknown order
 
 TraceTerm { term, inference: TraceInference }
 
@@ -167,25 +169,25 @@ src/utils/
 ### Key Types
 
 #### subset.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 14 | `SubsetIterator` | Distributes N elements into K subsets. `new(container_len, subset_count)` |
+| Type | What it is |
+|------|------------|
+| `SubsetIterator` | Distributes N elements into K subsets. `new(container_len, subset_count)` |
 
 #### trees_index.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 8 | `TreeIndex(Vec<usize>)` | Path to a node in a generic tree |
-| 10 | `IndexedTree` trait | `get(&TreeIndex)`, `get_mut(&TreeIndex)`, `id()` |
-| 18 | `impl for Node<T>` | Navigate tree by index path |
-| 55 | `impl for Tree<T>` | Same, starting from root |
+| Type | What it is |
+|------|------------|
+| `TreeIndex(Vec<usize>)` | Path to a node in a generic tree |
+| `IndexedTree` trait | `get(&TreeIndex)`, `get_mut(&TreeIndex)`, `id()` |
+| `impl for Node<T>` | Navigate tree by index path |
+| `impl for Tree<T>` | Same, starting from root |
 
 #### logger/config.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 16 | `Config` | Fields: channel_size, filename, level, num_files, file_rotate_bytes, target_levels |
-| — | `Config::init()` | Sets up slog-async + file-rotate + per-module filtering → `GlobalLoggerGuard` |
+| Type | What it is |
+|------|------------|
+| `Config` | Fields: channel_size, filename, level, num_files, file_rotate_bytes, target_levels |
+| `Config::init()` | Sets up slog-async + file-rotate + per-module filtering → `GlobalLoggerGuard` |
 
 #### logger/filter.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 7 | `Filter` | Prefix-based module filtering using patricia_tree. Caches results. |
+| Type | What it is |
+|------|------------|
+| `Filter` | Prefix-based module filtering using patricia_tree. Caches results. |

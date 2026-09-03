@@ -1,131 +1,115 @@
 # Parser Crate — Navigation Map
 
-PEG-based grammar for `.sym` (symbol/rule) and `.pbl` (task) files.
+PEG grammar (the `peg` crate) for `.sym` (symbols + rules) and `.pbl` (tasks).
+
+**No line numbers here, on purpose** — see the note in `solver.md`. Grep the name.
 
 ## File Map
 
 ```
 src/parser/
-├── lib.rs          # Root: Location, NodeData, Tree/Node type aliases, CompactString
-├── error.rs        # ParserError with source location display
-├── grammar.rs      # PEG grammar (peg crate) — tokenization and expression rules
-├── lang.rs         # Public API: wraps grammar with Location annotation
-├── term.rs         # TermParser — AST → TermBuf conversion
-├── rule.rs         # RuleParser — AST → Vec<Rule> via RuleBuilder
-├── symbol.rs       # SymbolParser — AST → SymbolProgram
-├── task.rs         # TaskParser — AST → Task via TaskBuilder
-└── dir_loader.rs   # DirectoryParser — loads .sym/.pbl from filesystem
+├── lib.rs          # Location, NodeData, Tree/Node aliases over trees::Tree<NodeData>
+├── error.rs        # ParserError { loc, msg } + error_string(); PegError
+├── grammar.rs      # the PEG itself: tokens → Tree<Token> with byte offsets
+├── lang.rs         # the five entry points; wraps the grammar and annotates Locations
+├── term.rs         # TermParser  — AST → TermBuf
+├── rule.rs         # RuleParser  — AST → Vec<Rule> via RuleBuilder
+├── symbol.rs       # SymbolParser — AST → SymbolProgram, including embedded Python
+├── task.rs         # TaskParser  — AST → Task via TaskBuilder
+├── py_term.rs      # the `Term` class injected into an embedded Python program
+└── dir_loader.rs   # DirectoryParser — loads a tree of .sym/.pbl, collecting errors
 ```
+
+## Entry points — `lang.rs`
+
+| Function | Parses |
+|----------|--------|
+| `symbol(text)` | one `symbol` declaration |
+| `terms(text)` | semicolon-separated terms |
+| `lang_rule(text)` | one `rule` block |
+| `task(text)` | one `task` block |
+| `any(text)` | mixed content: tasks, rules, symbols |
+
+Each returns `Result<_, ParserError>`, and `ParserError` carries the source
+`Location` (row, col, len) so a message can point at the offending text.
 
 ## Key Types
 
 ### lib.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 23 | `Location` | `{ col, row, len }` — source position |
-| 30 | `NodeData` | `{ symbol: CompactString, location: Location }` — annotated AST node |
-| 35 | `Tree` | `trees::Tree<NodeData>` |
-| 36 | `Node` | `trees::Node<NodeData>` |
+| Type | What it is |
+|------|------------|
+| `Location` | `{ col, row, len }` — where a node came from. |
+| `NodeData` | `{ symbol, location }` — an AST node after annotation. |
+| `Tree` / `Node` | `trees::Tree<NodeData>` / `trees::Node<NodeData>`. |
 
-### error.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 10 | `ParserError` | `{ loc: Location, msg: String }` — with `error_string()` for formatted display |
-
-### lang.rs — Public API
-| Line | Function | Description |
-|------|----------|-------------|
-| 5 | `symbol(text) -> Result<Tree>` | Parse symbol declaration |
-| 15 | `terms(text) -> Result<Vec<Tree>>` | Parse semicolon-separated terms |
-| 30 | `lang_rule(text) -> Result<Tree>` | Parse rule block |
-| 40 | `task(text) -> Result<Tree>` | Parse task block |
-| 50 | `any(text) -> Result<Vec<Tree>>` | Parse mixed content (tasks, rules, symbols) |
-
-### term.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 11 | `TermParser` | `{ params, with_var, last_arglist_id }` |
-| 18 | `with_variables()` | Enable variable parsing (for tasks) |
-| 23 | `with_params()` | Pre-set parameter substitutions |
-| 28 | `try_parse()` | Entry: `&Node → Result<TermBuf>` |
-
-### rule.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 13 | `RuleParser<'a>` | `{ syntax_tree, func_symbol }` |
-| 31 | `parse()` | Entry: parses attributes, term (`=>` / `<=>`), requirements → `Vec<Rule>` |
-| 82 | `parse_attribute()` | Handles: level, goal, zero, one, id, block, normalize, subtree, equivalence, replace |
-
-### symbol.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 7 | `SymbolParser<'a>` | `{ ast }` |
-| 16 | `parse()` | Entry: extracts name + attributes → `SymbolProgram` |
-| 46 | `parse_attr()` | Handles: infix(u64), display(str), associative, commutative |
-
-### task.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 15 | `TaskParser<'a>` | `{ syntax_tree }` |
-| 24 | `parse()` | Entry: extracts goal, text, answers, conditions → `Task` |
+### the four parsers
+| Type | What it is |
+|------|------------|
+| `TermParser` | `with_variables()` for tasks (bare identifiers become variables), `with_params()` for rules; `try_parse(&Node) -> TermBuf`. |
+| `RuleParser` | Reads attributes, the `=>` / `<=>` body, then requirements. Helpers promote `find` targets and collect params out of the body. |
+| `SymbolParser` | Name + attributes → `SymbolProgram`. A `py "…"` block runs at parse time and its `calculator` becomes the symbol's. |
+| `TaskParser` | Goal, id, text, expected answers, conditions → `Task` through `TaskBuilder`. |
 
 ### dir_loader.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 17 | `DirectoryParser` | `{ symbols_path, tasks_path }` |
-| 30 | `load_rules()` | Loads all `.sym` files → `RulesEngine` |
-| 59 | `load_tasks()` | Loads all `.pbl` files → `Vec<Task>` |
-| 81 | `load_symbols()` | First pass: registers SymbolPrograms before rules |
+| Type | What it is |
+|------|------------|
+| `DirectoryParser` | `new(symbols_path, tasks_path)`, then `load_rules()` / `load_tasks()`. |
+| `LoadReport<T>` | `{ value, errors }` — a load **does not** abort on a bad file; the good ones land in `value` and the rest in `errors`. That is how a malformed goal or rule reaches the CLI's `--check` instead of killing the run. |
+| `LoadError` | `{ path, message }`, the message already carrying location and snippet. |
 
-## PEG Grammar — Operator Precedence (grammar.rs)
+## Grammar
 
-From lowest to highest:
-
-| Priority | Rule (line) | Operators | Associativity |
-|----------|-------------|-----------|---------------|
-| 1 | `deduction` (158) | `=>`, `<=>` | — |
-| 2 | `or` (162) | `\|\|` | left (`#cache_left_rec`) |
-| 3 | `and` (167) | `&&` | left (`#cache_left_rec`) |
-| 4 | `predicate` (172) | `is`, `in`, `==`, `!=`, `<=`, `>=`, `<`, `>` | left (`#cache_left_rec`) |
-| 5 | `bind` (176) | `as` | — |
-| 6 | `sum` (181) | `+`, `-` | left (`#cache_left_rec`) |
-| 7 | `unary` (191) | prefix `-`, `+`, `!` | — |
-| 8 | `product` (201) | `*`, `/` | left (`#cache_left_rec`) |
-| 9 | `power` (206) | `^` | right |
-| 10 | `atom` (210) | literals, idents, `(...)`, fn calls | — |
-
-## Top-level Grammar Constructs
+### Top-level shapes
 
 ```
-task   = "task" "{" goal_decl text_decl? answer_decl* term* "}"
-symbol = "symbol" name "{" attr* "}" rule*
-rule   = "rule" "{" attr_block? term ";" requirement* "}"
+task   { goal <term>; [id "…";] [text "…";] [answer <t>, <t>;] <term>; … }
+symbol <name> { [<attrs>;] [py "<python source>";] }
+rule   { [<attrs>;] <term> (=> | <=>) <term>; [<requirement>, …;] }
 ```
 
-## Parsing Pipeline
+Rules are top-level blocks in a `.sym` file, not nested inside `symbol`.
+
+### Operator precedence, lowest first
+
+| Rule | Operators | Associativity |
+|------|-----------|---------------|
+| `deduction` | `=>`, `<=>` | — |
+| `or` | `\|\|` | left (`#cache_left_rec`) |
+| `and` | `&&` | left |
+| `predicate` | `is`, `in`, `==`, `!=`, `<=`, `>=`, `<`, `>` | left |
+| `bind` | `as` | — |
+| `sum` | `+`, `-` | left |
+| `unary` | prefix `-`, `+`, `!` | — |
+| `product` | `*`, `/` | left |
+| `power` | `^` | right |
+| `atom` | literals, identifiers, `(…)`, calls | — |
+
+## Pipeline
 
 ```
-Source text (.sym / .pbl)
-  → grammar.rs (PEG tokenizer) → Tree<Token> with byte offsets
-  → lang.rs (annotation) → Tree<NodeData> with Location(row, col, len)
+.sym / .pbl text
+  → grammar.rs   Tree<Token>     (byte offsets)
+  → lang.rs      Tree<NodeData>  (row/col/len Locations)
   → TermParser / RuleParser / SymbolParser / TaskParser
-  → Solver domain types (TermBuf, Rule, SymbolProgram, Task)
+  → solver types: TermBuf, Rule, SymbolProgram, Task
 ```
 
-## DirectoryParser Flow
+`load_rules()` makes two passes over the `.sym` files: symbols first, so that
+every `SymbolProgram` is in the global registry before any rule mentioning it
+is parsed. Then rules go to `RulesEngine::register_rule`.
 
-```
-DirectoryParser::new(symbols_path, tasks_path)
+## Gotchas worth knowing before you edit
 
-load_rules():
-  1. load_symbols() — first pass, registers SymbolPrograms globally
-  2. Iterate .sym files again:
-     - Parse symbol blocks → SymbolParser → register
-     - Parse rule blocks → RuleParser → RulesEngine.register_rule()
-  → RulesEngine
-
-load_tasks():
-  1. Iterate .pbl files:
-     - Parse task blocks → TaskParser → normalize terms
-  → Vec<Task>
-```
+- **Embedded Python is a real code path.** A `symbol X { py "…" }` block is
+  executed by pyo3 at parse time; the resulting `calculator` serializes the term
+  to a JSON dict, hands it to Python wrapped in the `Term` class from
+  `py_term.rs`, and reads a `Term` back. `symbols/py/sympy_convert.py` is
+  compiled in with `include_str!`, so it does not depend on the working
+  directory. No `.sym` in the corpus uses it yet — it works, but it is untested
+  by the task corpus.
+- **This crate depends on `solver`, and `solver`'s tests depend on this crate.**
+  That cycle links two instances of `solver`, so the types are nominally
+  distinct across the boundary. See the `SAFETY` notes on `parse_rule` /
+  `parse_task` and the serde bridge in `term_with_vars`.
+- **A bad file does not stop a load.** Anything that reads `LoadReport.value`
+  without looking at `.errors` silently drops broken input.
