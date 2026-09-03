@@ -14,7 +14,7 @@ use crate::{
     CompactString, NormLevel,
     rule::{Level, RuleId},
     task::{Goal, Task, TaskBuilder},
-    term::{Atom, SharedTerm, Term, TermBuf, match_term},
+    term::{Atom, SharedTerm, Term, TermBuf, answer, match_term},
 };
 
 pub const STACK_SIZE: usize = 2048;
@@ -83,7 +83,7 @@ impl Solution {
             .terms
             .iter()
             .filter(|x| x.is_proven())
-            .filter(|x| !(x.filters.is_goal() || x.term.term().data().is_symbol_name("answer")))
+            .filter(|x| !(x.filters.is_goal() || answer::marked(x.term.term()).is_some()))
             .map(|x| {
                 let mut props = x.clone();
                 props.filters.level = 0.into();

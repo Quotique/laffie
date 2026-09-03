@@ -23,7 +23,7 @@ use crate::{
     task::{Goal, GoalKind, Task, goal::Recognized},
     term::{
         Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
-        match_term,
+        answer, match_term,
     },
 };
 
@@ -314,10 +314,10 @@ impl Solver {
         &self,
         term: &TermProps,
         goal_term: &TermBuf,
-        goal: &Goal,
+        kind: GoalKind,
         local: &LocalRules,
     ) -> Vec<SharedRule> {
-        if goal.kind() == GoalKind::Transform && !term.filters.is_goal() {
+        if kind == GoalKind::Transform && !term.filters.is_goal() {
             return vec![];
         }
 
@@ -329,7 +329,7 @@ impl Solver {
         let rules = self.rules_engine.suggest_rules(&term.filters, goal_term);
         let rules = rules.into_iter().chain(local_rules);
 
-        let rules: Vec<_> = if goal.kind() == GoalKind::Prove && term.filters.is_goal() {
+        let rules: Vec<_> = if kind == GoalKind::Prove && term.filters.is_goal() {
             rules
                 .filter(|rule| rule.contains_attribute(&RuleAttr::Equivalence))
                 .collect()
@@ -352,27 +352,26 @@ impl Solver {
         local: &mut LocalRules,
     ) -> Result<(), SolveError> {
         let is_goal = solution[index].filters.is_goal();
-        let prove_goal = TermBuf::symbol("prove").arg(solution[index].term.as_ref().clone());
+        let kind = solution.goal().kind();
+        let goal_term = if is_goal && kind == GoalKind::Prove {
+            SharedTerm::new(TermBuf::symbol("prove").arg(solution[index].term.as_ref().clone()))
+        } else {
+            solution.task.goal().term().clone()
+        };
 
         let mut added = false;
-        for rule in self.suggest_rules(
-            &solution[index],
-            if is_goal && solution.goal().kind() == GoalKind::Prove {
-                &prove_goal
-            } else {
-                solution.task.goal().term()
-            },
-            solution.goal(),
-            local,
-        ) {
-            match self.produce(&rule, solution, run, index)? {
+        for rule in self.suggest_rules(&solution[index], goal_term.as_ref(), kind, local) {
+            match self.produce(&rule, solution, run, index, goal_term.as_ref())? {
                 Some(s) => {
                     trace!("{} => {s}", solution[index]);
                     self.add_term(s, solution, run, local)?;
-                    if is_goal && solution.goal().kind() == GoalKind::Transform {
+                    if is_goal && kind == GoalKind::Transform {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
                         solution[index].filters.level = self.rules_engine.max_level().next();
                         solution.requeue(index);
+                        // CONTEXT: the break skips `added = true` on purpose.
+                        // The tail then raises the level again, and the search
+                        // order depends on that.
                         break;
                     }
                     added = true;
@@ -395,23 +394,15 @@ impl Solver {
         s: &mut Solution,
         run: &mut Run,
         index: TermIdx,
+        goal_term: &TermBuf,
     ) -> Result<Option<TermProps>, SolveError> {
         let is_goal = s[index].filters.is_goal();
-        let prove_goal = TermBuf::symbol("prove").arg(s[index].term.as_ref().clone());
         // Collected up front to release the `&s` borrow before the loop mutates
         // `s`. The rest is lazy: `resolve_solve_in_hypothesis` and `ground()`
         // run only for hypotheses actually reached, short-circuiting on proof.
-        let raw_hypotheses: Vec<Hypothesis> = HypothesisIterator::new(
-            rule.clone(),
-            &s[index].term,
-            &s[index].filters,
-            if is_goal && s.goal().kind() == GoalKind::Prove {
-                &prove_goal
-            } else {
-                s.task.goal().term()
-            },
-        )
-        .collect();
+        let raw_hypotheses: Vec<Hypothesis> =
+            HypothesisIterator::new(rule.clone(), &s[index].term, &s[index].filters, goal_term)
+                .collect();
         let mut grounded_seen = 0usize;
         for mut h in raw_hypotheses {
             resolve_parents_in_hypothesis(&mut h, s[index].term.as_ref());
@@ -534,25 +525,22 @@ impl Solver {
         }
         term.filters.mark_simplified();
 
-        let use_answer = term.term.term().data().is_symbol_name("answer");
-        let to_transform = if use_answer {
-            term.term.term().first_arg().unwrap().to_owned()
-        } else {
-            term.term.term().to_owned()
-        };
+        let inner = answer::marked(term.term.term());
+        let use_answer = inner.is_some();
+        let to_transform = inner.unwrap_or(term.term.term()).to_owned();
         let blocked = solution[index].filters.blocked_rules.clone();
         let subtask_solution =
             self.solve_subtask(solution, Goal::transform(to_transform), blocked, run);
 
-        let mut answer = subtask_solution.answer()?.as_ref().clone();
+        let mut transformed = subtask_solution.answer()?.as_ref().clone();
         if use_answer {
-            answer = TermBuf::symbol("answer").arg(answer);
+            transformed = answer::mark(transformed);
         }
 
-        if *solution[index].term == answer {
+        if *solution[index].term == transformed {
             return None;
         }
-        let mut result = TermProps::from(answer);
+        let mut result = TermProps::from(transformed);
         result.inference = TermInference::Transform {
             parent:   index,
             solution: subtask_solution,
@@ -649,11 +637,9 @@ impl Solver {
 
             let result = self.run_solve_block(cache_key, goal, eqs, parent, run);
             let answer_term = result.answer()?;
-            let mut answer_buf: TermBuf = (*answer_term).clone();
-            if answer_buf.term().data().is_symbol_name("answer") && answer_buf.term().degree() == 1
-            {
-                answer_buf = answer_buf.term_mut().pop_first_arg().unwrap();
-            }
+            let answer_buf = answer::marked(answer_term.term())
+                .unwrap_or(answer_term.term())
+                .to_owned();
 
             // `bind_equality_params` would still refuse a value that
             // contains params, so substitute directly into the hypothesis.
@@ -711,10 +697,7 @@ impl Solver {
         if solution.goal().kind() == GoalKind::Transform {
             return AnswerCheck::No;
         }
-        if !term_root.data().is_symbol_name("answer") || term_root.degree() != 1 {
-            return AnswerCheck::No;
-        }
-        let Some(inner) = term_root.first_arg() else {
+        let Some(inner) = answer::marked(term_root) else {
             return AnswerCheck::No;
         };
         let mut resolution = TermProps::from(inner.to_owned());
@@ -1433,8 +1416,9 @@ mod resolve_solve_tests {
             tracer:  TracerHub::default(),
         };
 
+        let goal_term = solution.task.goal().term().clone();
         let err = solver
-            .produce(&rule, &mut solution, &mut state, index)
+            .produce(&rule, &mut solution, &mut state, index, goal_term.as_ref())
             .expect_err("produce should abort on a passed deadline");
         assert!(matches!(err, SolveError::TimeDeadline));
     }

@@ -1,28 +1,37 @@
 use super::SymbolProgram;
 use crate::{
     NormLevel,
-    term::{Term, TermMut},
+    term::{Term, TermBuf, TermMut, TermRef},
 };
+
+const NAME: &str = "answer";
 
 pub fn symbol() -> SymbolProgram {
     SymbolProgram {
-        name: "answer".into(),
+        name: NAME.into(),
         calculator: Box::new(answer),
         ..Default::default()
     }
 }
 
+pub fn mark(inner: TermBuf) -> TermBuf {
+    TermBuf::symbol(NAME).arg(inner)
+}
+
+pub fn marked(root: TermRef) -> Option<TermRef> {
+    if !root.data().is_symbol_name(NAME) || root.degree() != 1 {
+        return None;
+    }
+    root.first_arg()
+}
+
 /// Collapses `answer(answer(...(X)))` of any depth to `answer(X)`.
 pub fn answer(root: &mut TermMut, _: NormLevel) -> bool {
-    if !root.data().is_symbol_name("answer") || root.degree() != 1 {
+    if marked(root.as_ref()).is_none() {
         return false;
     }
     let mut changed = false;
-    while root
-        .first_arg()
-        .map(|f| f.data().is_symbol_name("answer") && f.degree() == 1)
-        .unwrap_or(false)
-    {
+    while root.first_arg().and_then(marked).is_some() {
         let mut inner = root.pop_first_arg().unwrap();
         let x = inner.term_mut().pop_first_arg().unwrap();
         root.push_first_arg(x);
@@ -33,7 +42,21 @@ pub fn answer(root: &mut TermMut, _: NormLevel) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::{NormLevel, term::term_with_vars};
+    use super::{NAME, mark, marked};
+    use crate::{
+        NormLevel,
+        term::{TermBuf, term_with_vars},
+    };
+
+    #[test]
+    fn only_a_one_argument_answer_is_a_marker() {
+        assert!(marked(TermBuf::symbol(NAME).term()).is_none());
+        assert!(marked(mark(TermBuf::one()).term()).is_some());
+        let two_args = TermBuf::symbol(NAME)
+            .arg(TermBuf::one())
+            .arg(TermBuf::one());
+        assert!(marked(two_args.term()).is_none());
+    }
 
     #[test]
     fn answer_collapses_double() {
