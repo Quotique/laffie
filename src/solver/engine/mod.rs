@@ -1,3 +1,4 @@
+mod bounds;
 mod props;
 mod solution;
 mod solver;

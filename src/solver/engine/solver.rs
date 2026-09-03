@@ -11,10 +11,11 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 
 use super::{
-    SharedSolution, Solution, SolveError, TermIdx, TermProps, TracerHub, props::TermInference,
+    SharedSolution, Solution, SolveError, TermIdx, TermProps, TracerHub, bounds::bound_implies,
+    props::TermInference,
 };
 use crate::{
-    NormLevel, Rational,
+    NormLevel,
     engine::{Tracer, solution::SolutionStatus},
     rule::{
         GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr, RuleId, RulesEngine,
@@ -896,77 +897,6 @@ fn resolve_parents_in_hypothesis(hyp: &mut Hypothesis, term: &TermBuf) {
     }
 }
 
-/// A numeric bound on some expression, extracted from a comparison term.
-enum BoundKind {
-    Lower { strict: bool },
-    Upper { strict: bool },
-}
-
-/// Parses a comparison term into (expression, bound kind, numeric bound).
-///
-/// `E > c` / `E >= c` → Lower; `E < c` / `E <= c` → Upper. A number on the
-/// left flips the kind: `c < E` reads as `E > c` → Lower for `E`. Returns
-/// `None` unless exactly one side is a numeric literal.
-fn as_bound<'a>(t: TermRef<'a>) -> Option<(TermRef<'a>, BoundKind, Rational)> {
-    if t.degree() != 2 {
-        return None;
-    }
-    let data = t.data();
-    let strict = if data.is_symbol_name(">") || data.is_symbol_name("<") {
-        true
-    } else if data.is_symbol_name(">=") || data.is_symbol_name("<=") {
-        false
-    } else {
-        return None;
-    };
-    let greaterish = data.is_symbol_name(">") || data.is_symbol_name(">=");
-
-    let lhs = t.first_arg()?;
-    let rhs = t.last_arg()?;
-    if let Some(c) = rhs.data().number() {
-        let kind = if greaterish {
-            BoundKind::Lower { strict }
-        } else {
-            BoundKind::Upper { strict }
-        };
-        Some((lhs, kind, c.clone()))
-    } else if let Some(c) = lhs.data().number() {
-        // A number on the left flips the orientation for the expression `rhs`.
-        let kind = if greaterish {
-            BoundKind::Upper { strict }
-        } else {
-            BoundKind::Lower { strict }
-        };
-        Some((rhs, kind, c.clone()))
-    } else {
-        None
-    }
-}
-
-/// `derived ⇒ goal` for two comparisons over the same expression and numeric
-/// bounds. `x > 2` implies `x > 0`; `x >= 2` implies `x > 0`; `x >= 0` implies
-/// `x >= 0`. Mismatched expressions or bound kinds imply nothing.
-fn bound_implies(derived: TermRef, goal: TermRef) -> bool {
-    let Some((de, dk, dc)) = as_bound(derived) else {
-        return false;
-    };
-    let Some((ge, gk, gc)) = as_bound(goal) else {
-        return false;
-    };
-    if de != ge {
-        return false;
-    }
-    match (dk, gk) {
-        (BoundKind::Lower { strict: ds }, BoundKind::Lower { strict: gs }) => {
-            dc > gc || (dc == gc && (ds || !gs))
-        }
-        (BoundKind::Upper { strict: ds }, BoundKind::Upper { strict: gs }) => {
-            dc < gc || (dc == gc && (ds || !gs))
-        }
-        _ => false,
-    }
-}
-
 /// Matches `solve(...) == Param` (either argument order).
 fn match_solve_eq_param<'a>(req: &'a TermBuf) -> Option<(TermRef<'a>, Param)> {
     let (lhs, rhs) = match_term!(req.term(), "=="(lhs, rhs))?;
@@ -1002,7 +932,7 @@ fn is_replace(root: &mut TermMut) {
 }
 
 #[cfg(test)]
-mod solution_tests {
+mod solve_tests {
     use std::sync::Arc;
 
     use crate::{
@@ -1054,39 +984,11 @@ mod solution_tests {
     }
 
     #[test]
-    fn bound_implies_lower_strict() {
-        // x > 2 proves x > 0.
+    fn a_numeric_bound_reaches_the_prove_check() {
         assert!(prove_solved("task { goal prove(x > 0); x > 2; }"));
-    }
-
-    #[test]
-    fn bound_implies_strict_to_nonstrict_equal() {
-        // x > 0 proves x >= 0 (equal bounds, strict implies non-strict).
-        assert!(prove_solved("task { goal prove(x >= 0); x > 0; }"));
-    }
-
-    #[test]
-    fn bound_implies_upper() {
-        // x <= -1 proves x < 0.
-        assert!(prove_solved("task { goal prove(x < 0); x <= -1; }"));
-    }
-
-    #[test]
-    fn bound_implies_number_on_left() {
-        // 0 < x proves x > 0.
-        assert!(prove_solved("task { goal prove(x > 0); 0 < x; }"));
-    }
-
-    #[test]
-    fn bound_implies_rejects_stronger_goal() {
-        // x > 2 does not prove x > 3.
         assert!(!prove_solved("task { goal prove(x > 3); x > 2; }"));
-    }
-
-    #[test]
-    fn bound_implies_rejects_mismatched_kind() {
-        // x < 5 (upper) does not prove x > 0 (lower).
-        assert!(!prove_solved("task { goal prove(x > 0); x < 5; }"));
+        // The reversed form still works after normalization.
+        assert!(prove_solved("task { goal prove(x > 0); 0 < x; }"));
     }
 
     #[test]
@@ -1156,6 +1058,36 @@ mod solution_tests {
             solution.status,
             SolutionStatus::Err(SolveError::Canceled)
         ));
+    }
+}
+
+#[cfg(test)]
+mod local_rules_tests {
+    use std::sync::Arc;
+
+    use super::LocalRules;
+    use crate::rule::{Level, RuleId, SharedRule, parse_rule};
+
+    fn rule(id: u64, level: u64) -> SharedRule {
+        let mut rule = parse_rule("rule { attr level(1); a + b => a == b; }");
+        rule.id = RuleId::new(0, id);
+        rule.level = level.into();
+        Arc::new(rule)
+    }
+
+    #[test]
+    fn an_empty_set_has_the_lowest_max_level() {
+        assert_eq!(LocalRules::default().max_level, Level::default());
+    }
+
+    #[test]
+    fn the_max_level_is_the_highest_one_inserted() {
+        let mut local = LocalRules::default();
+        local.insert(rule(1, 3));
+        local.insert(rule(2, 1));
+
+        assert_eq!(local.rules.len(), 2);
+        assert_eq!(local.max_level, 3.into());
     }
 }
 
