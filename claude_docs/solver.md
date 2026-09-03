@@ -1,208 +1,171 @@
 # Solver Crate — Navigation Map
 
-Core reasoning engine: term representation, rule system, task-solving algorithm.
+Terms, rules, and the search that solves a task.
+
+**No line numbers here, on purpose.** Measured 2026-09-03: 5 of 66 were still
+correct, most of them stale in files nobody had touched. They rot on every edit
+and point you at the wrong place with a straight face. Grep the name instead.
+
+## Layering
+
+```
+term ──┬── task ──┐
+       └── rule ──┴── engine
+```
+
+- **`term`** — the tree and its symbols. Depends on nothing.
+- **`task`** — what is asked: `Task`, `Goal`, `Answer`. Depends only on `term`.
+- **`rule`** — how terms rewrite: `Rule`, `Hypothesis`. Depends only on `term`.
+- **`task` and `rule` do not know about each other** (no `crate::rule` under
+  `task/`, no `crate::task` under `rule/`). They are siblings, not a chain.
+- **`engine`** — the search. Depends on all three; nothing below depends on it.
+
+A type that needs `Solution` or `TermProps` belongs in `engine` — those are the
+vocabulary of the term store, and pushing them down inverts the layering.
 
 ## File Map
 
 ```
 src/solver/
-├── lib.rs                    # Exports: rule, task, term. Types: NormLevel (Off/Units/ConstFold/Full), Rational (=num::BigRational), CompactString; from_decimal_str, number_to_string
-├── rational.rs               # Rational parsing (decimal literal -> exact ratio) and human-facing rendering (decimal if 2·5-smooth, else p/q)
-├── rule/
-│   ├── mod.rs                # Re-exports all rule types
-│   ├── rule.rs               # Rule, RuleId, Level, SharedRule, ApplyRule trait
-│   ├── builder.rs            # RuleBuilder — fluent API for constructing rules
-│   ├── hypothesis.rs         # Hypothesis, GroundedHypothesis, HypothesisIterator — grounding pipeline
-│   ├── rule_attribute.rs     # RuleAttr enum, RuleAttrValue enum
-│   ├── rules_engine.rs       # RulesEngine — central rule registry and dispatcher
-│   └── term_filters.rs       # TermFilters, TermFlags (bitflags: REPLACED, SIMPLIFIED, GOAL)
-├── task/
-│   ├── mod.rs                # Task struct, re-exports
-│   ├── goal.rs               # Goal enum: Find(FindGoal), Prove, Transform; GoalError; parse/to_term
-│   ├── limits.rs             # CalculationLimits — cycle budgeting with Arc<RwLock>
-│   ├── props.rs              # TermProps, TermInference enum, TermAsRule
-│   ├── solution.rs           # Solution, SolutionStatus, SolveError, SharedSolution
-│   ├── solver.rs             # Solver — main bidirectional search algorithm
-│   ├── steps.rs              # Steps iterator, Visit enum, StepsSource trait
-│   ├── builder.rs            # TaskBuilder — fluent API for constructing tasks
-│   └── tracing/
-│       ├── mod.rs            # Re-exports
-│       ├── tracer.rs         # Tracer trait (callbacks), TracerHub (aggregator)
-│       └── file.rs           # FileDumpTracer — writes trace to file
-└── term/
-    ├── mod.rs                # Re-exports, test helpers: term_with_params(), term_with_vars()
-    ├── atom.rs               # Atom enum (Symbol|Param|Variable|Number|ArgList), Param, Variable, ArgList
-    ├── buffer.rs             # TermBuf (owned tree), SharedTerm (Arc), TermPath
-    ├── refer.rs              # Term trait, TermRef — read-only view, pattern matching, match_term! macro
-    ├── refer_mut.rs          # TermMut — mutable view, normalization, evaluate
-    ├── substitution.rs       # ParamSubstitution, VariableSubstitution
-    └── symbol/
-        ├── mod.rs            # Symbol struct, sym(), try_sym()
-        ├── program.rs        # SymbolProgram, Truth enum, SymbolAttr, SymbolAttrValue
-        ├── container.rs      # Global symbol registry (RwLock<HashMap>), all_func_symbols()
-        └── base/             # Built-in symbol implementations (16 modules)
-            ├── mod.rs         # Re-exports all base symbols
-            ├── equal.rs       # == (truth checker + calculator)
-            ├── inequal.rs     # !=
-            ├── plus.rs        # + (associative, commutative)
-            ├── mul.rs         # * (associative, commutative)
-            ├── divide.rs      # /
-            ├── power.rs       # ^
-            ├── sqrt.rs        # sqrt
-            ├── less.rs        # <
-            ├── more.rs        # >
-            ├── less_or_equal.rs  # <=
-            ├── more_or_equal.rs  # >=
-            ├── is.rs          # is (property assertion)
-            ├── op_true.rs     # true literal
-            ├── op_not.rs      # ! (logical not)
-            ├── op_in.rs       # in (set membership, truth checker + generator)
-            ├── substitute.rs  # substitute(x == val, expr) — variable substitution
-            ├── replace.rs     # replace operation
-            └── symbolic_eq.rs # symbolic equality
+├── lib.rs                  # pub mod engine/rule/task/term; NormLevel, Rational, CompactString
+├── rational.rs             # decimal literal → exact ratio; rendering (decimal if 2·5-smooth, else p/q)
+├── term/                   # the foundation
+│   ├── mod.rs              # re-exports; `answer` symbol module; test helpers term_with_params/vars
+│   ├── atom.rs             # Atom (Symbol|Param|Variable|Number|ArgList), Param, Variable, ArgList
+│   ├── buffer.rs           # TermBuf (owned tree), SharedTerm = Arc<TermBuf>, TermPath
+│   ├── refer.rs            # Term trait, TermRef, match_term! macro, commutative matcher + MATCH_BUDGET
+│   ├── refer_mut.rs        # TermMut: mutation, evaluate, normalize (fixpoint cap)
+│   ├── substitution.rs     # ParamSubstitution, VariableSubstitution, Substitute trait
+│   └── symbol/
+│       ├── mod.rs          # Symbol, sym(), try_sym(), symbol_names()
+│       ├── program.rs      # SymbolProgram + its hooks: Calculator, TruthChecker, Comparator; Truth, TruthCtx, SymbolAttr
+│       ├── container.rs    # global registry (RwLock<HashMap>), all_func_symbols()
+│       └── base/           # 20 built-in symbols, one file each
+│           ├── answer.rs   # the `answer(x)` marker: NAME, mark(), marked() — re-exported as term::answer
+│           ├── equal.rs inequal.rs less.rs less_or_equal.rs more.rs more_or_equal.rs
+│           ├── plus.rs mul.rs divide.rs power.rs sqrt.rs
+│           ├── logic_and.rs logic_or.rs op_not.rs op_true.rs op_in.rs
+│           └── is.rs substitute.rs symbolic_eq.rs
+├── task/                   # what is asked
+│   ├── mod.rs              # Task, content_id(); test helper parse_task
+│   ├── goal.rs             # Goal (private GoalBody), GoalKind, GoalError
+│   ├── answer.rs           # Answer (parts, one per unknown), Recognized
+│   └── builder.rs          # TaskBuilder — infallible once it holds a Goal
+├── rule/                   # how terms rewrite
+│   ├── mod.rs              # re-exports; test helper parse_rule
+│   ├── rule.rs             # Rule, RuleId, Level, SharedRule, ApplyRule, RuleDeclineReason
+│   ├── builder.rs          # RuleBuilder, RuleBuilderError
+│   ├── hypothesis.rs       # Hypothesis → GroundedHypothesis, HypothesisIterator, grounding pipeline
+│   ├── rule_attribute.rs   # RuleAttr, RuleAttrValue
+│   ├── rules_engine.rs     # RulesEngine: rules indexed by Level, suggested by TermFilters
+│   └── term_filters.rs     # TermFilters + TermFlags bits (REPLACED, SIMPLIFIED, GOAL)
+└── engine/                 # the search
+    ├── mod.rs              # the crate's public engine surface
+    ├── solver.rs           # Solver: the cycle, term inference, subtasks, answer checks
+    ├── solution.rs         # Solution, SolutionStatus, SolveError, SharedSolution, TermIdx
+    ├── run.rs              # Run (per-solve state), Limits, CancelToken, subtask cache
+    ├── props.rs            # TermProps, TermInference, TermAsRule
+    ├── bounds.rs           # bound_implies: `x > 2` proves `x > 0`
+    ├── steps.rs            # Steps/Visit/StepsSource — walks a solution for rendering
+    └── tracing/            # Tracer trait, TracerHub aggregator, FileDumpTracer
 ```
 
 ## Key Types
 
-### rule/rule.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 15 | `RuleId(u64)` | Unique rule identifier |
-| 22 | `Level(u64)` | Rule application level (priority) |
-| 30 | `RuleDeclineReason` | Enum: LevelMissmatch, GoalMissmatch, AlreadyApplied, Blocked, ParamSubstitutionErr |
-| 48 | `SharedRule` | `Arc<Rule>` |
-| 50 | `Rule` | Fields: id, level, symbol, attrs, block, term, pattern, replace, requirements, pattern_symbols |
-| 231 | `ApplyRule` trait | `fn apply(&self, term, filters, goal) -> Result<Vec<Hypothesis>, RuleDeclineReason>` |
+### task/goal.rs
+| Type | What it is |
+|------|------------|
+| `Goal` | What a task asks. Wraps a **private** `GoalBody` enum, because a `pub enum`'s variant payloads are constructible from anywhere; the wrapper is what keeps `parse` the only door. |
+| `GoalBody` | `Find`/`Prove`/`Transform`, each holding the goal **as written** (`find(x, y)`, not `x`). |
+| `Goal::parse` | The only fallible constructor, so every `Goal` that exists is well-formed and the search never re-checks. |
+| `Goal::subject` | First argument of the written form; borrows, allocates nothing. |
+| `Goal::answer` | A fresh `Answer` over the unknowns; `None` for anything but a `find`. |
+| `GoalKind` | `Copy` tag for matching without touching the body. |
+
+### task/answer.rs
+| Type | What it is |
+|------|------------|
+| `Answer` | One `Part` per unknown, in the order asked. Self-contained: parts own their terms, so `term()` asks nothing of a `Solution`. |
+| `Part` | `asked` (the unknown) + `got: Option<(SharedTerm, usize)>`. The index only justifies the answer in a trace; nothing else reads it. |
+| `Answer::recognize` | Is this term an answer? One unknown → whole/no; several → which part it binds. Known-ness arrives as an injected predicate, so the check needs no engine. |
+| `Answer::term` | The parts joined with `&&`, or `None` while any is unbound. Exits on the first gap without allocating. |
+| `Recognized` | `No` / `Whole` / `Binding(usize)` — the part's position, not its term. |
 
 ### task/mod.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 25 | `Task` | Fields: id, name, text, group, givens, subtask_level, possible_answers; goal is private (term + parse), read via `goal()` / `parsed_goal()`. Built only by `TaskBuilder` or `Task::from_goal` — the goal is validated once, at construction |
+| Type | What it is |
+|------|------------|
+| `Task` | id, name, text, group, givens, subtask_level, possible_answers, and a **private** goal read via `goal()`. Built only through `TaskBuilder` / `from_goal`. |
+| `content_id` | `u64` from givens (order-independent) + goal. Formatting- and location-independent; in-memory dedup only. |
 
 ### rule/hypothesis.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 13 | `Hypothesis` | Non-ground: rule, resolution, free_params, params, requirements, blocked_rules, pos (match position) |
-| 26 | `GroundedHypothesis` | Ground instance: all params bound, ready for requirement proving |
-| 35 | `HypothesisIterator` | Iterator over hypotheses from `Rule::apply()` |
-| 48 | `ground()` | Grounds hypothesis: bind `==` → cartesian over generators → re-bind `==` per combo |
-| 116 | `bind_equality_params()` | Iteratively binds `param == term` requirements |
-| 160 | `extract_generators()` | Extracts `<param> in set(...)` requirements as generators |
-| 177 | `Substitute for Hypothesis` | Propagates `ParamSubstitution` to resolution, requirements, free_params |
+| Type | What it is |
+|------|------------|
+| `Hypothesis` | Rule application with possibly free params: rule, resolution, free_params, params, requirements, blocked_rules, `pos` (match position in the parent term). |
+| `GroundedHypothesis` | All params bound; ready for requirement proving. |
+| `ground()` | Binds `==` requirements → cartesian product over generators → re-binds per combination. |
+| `resolve_parents()` | Rewrites the `parents` marker into the `set(...)` of the match position's ancestor head symbols. Needs only the hypothesis, which is why it lives here and not in the engine. |
+| `HypothesisIterator` | Iterates the hypotheses `Rule::apply` produced. |
 
-### task/goal.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 10 | `GoalError` | Enum: NotAGoal(String), WrongArity(String) — why a term is not a goal, rendered as written |
-| 27 | `FindGoal` | Fields: targets(Vec\<TermBuf\>), term(TermProps) |
-| 33 | `Goal` | Enum: Find(FindGoal), Prove(TermProps), Transform(TermProps) |
-| 81 | `Goal::parse()` | The only fallible construction; the boundary that keeps a malformed goal out of the search |
-| 111 | `Goal::prove/transform()` | Infallible constructors for the subtasks the search spawns |
-| 122 | `Goal::to_term()` | Inverse of `parse`, argument order preserved |
-| 136 | `Goal::block_rules()` | Carries a `block(...)` set into the goal-side term |
+### engine/solver.rs
+| Type | What it is |
+|------|------------|
+| `Solver` | Holds only the rule set; `solve(&self, …)` carries no state between tasks. |
+| `solve_impl` | The cycle: pick a term → simplify → infer → check for an answer. |
+| `try_infer_new_terms` | Chooses the goal pattern **once per focused term** (`prove(...)` wrapper only on a prove goal's own term), then walks the suggested rules. |
+| `produce` | Grounds one rule's hypotheses, polls the limits every `DEADLINE_CHECK_INTERVAL` groundings. |
+| `AnswerCheck` | `No` / `Found(TermIdx)` / `Derived(Box<TermProps>)`. The checks only answer; the cycle is the single place that writes `SolutionStatus::Answer`. |
+| `LocalRules` | Rules derived from a frame's own terms. `IndexMap`, because the order rules are offered in is part of the search's identity. |
+| `MAX_SUBTASK_LEVEL` | 10 — deeper nesting aborts with `MaxSubtaskLevelExceed`. |
 
-### task/solver.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 20 | `MAX_SUBTASK_LEVEL` | Const: 10 |
-| 26 | `EXECUTION_DEADLINE_DEFAULT` | Const: 100_000 |
-| 44 | `Solver` | Fields: rules_engine, local_rules |
-| 50 | `Solver::new()` | Constructor |
-| 70 | `Solver::solve()` | Entry point: `(task, tracer, deadline) -> SharedSolution` |
-| 94 | `solve_impl()` | Main loop: focus term → simplify → infer → check answer |
-| 248 | `try_infer_new_terms()` | Suggests rules, produces hypotheses, adds new terms |
-| 290 | `produce()` | Applies rule, grounds hypotheses, proves requirements |
-| — | `resolve_parents_in_hypothesis()` | Rewrites `parents` requirement marker → `set(ancestors)` from match pos (like `resolve_solve`) |
-| 331 | `try_prove_hypothesis()` | Proves rule requirements via subtasks |
-| 395 | `prove()` | Creates subtask for proving a term |
-| 440 | `transform()` | Handles Transform goals |
-| 486 | `solve_subtask()` | Recursive subtask solving |
-| 588 | `check_find_answer()` | Incremental multi-var find: binds targets via `==`/`in`, assembles `&&` |
-| 636 | `build_multi_find_answer()` | Builds conjunction answer from find_bindings |
+### engine/run.rs
+| Type | What it is |
+|------|------------|
+| `Run` | Per-`solve` state shared by every frame: limits, cycle counter, subtask cache, tracer. A copy per subtask would change the cycle count and the cache hits. |
+| `Limits` | What stops a run: cycle budget, wall clock, cancellation. `Limits::init` also hands back the `CancelToken`. |
+| `CancelToken` | Every clone shares one flag, so any thread can stop the run. |
+| `CacheKey` | `Goal(Goal)` or `SolveBlock(TermBuf)` — a `solve(...)` call must not collide with the goal inside it. |
+| `CacheSlot` | `#[must_use]`, not `Clone`: reserving a key obliges you to fill it. A depth failure releases the key, any other failure stays cached. |
 
-### task/solution.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 15 | `STACK_SIZE` | Const: 2048 |
-| 17 | `SharedSolution` | `Arc<Solution>` |
-| 20 | `SolveError` | Enum: StackOverflow, MaxSubtaskLevelExceed, NoConditions, NoSolutionsFound, ExecutionDeadline, Canceled |
-| 30 | `SolutionStatus` | Enum: NotDone, Answer(usize), Err(SolveError) |
-| 44 | `Solution` | Fields: task, status, start/end_cycle, main_index, goal_index, terms, find_bindings, unproven_terms_count. `goal()` is derived from `task`, not stored twice; `Solution::new` is infallible |
+### engine/solution.rs
+| Type | What it is |
+|------|------------|
+| `Solution` | task, status, cycles, `terms` arena, two indexes, `find_answer`, `known_vars`, agenda. |
+| `goal_index` | `IndexMap`, not `HashMap`: it is iterated to pick the answer, and a per-process order made the reported answer vary between runs. |
+| `main_index` | Stays a `HashMap` — nothing iterates it, and its `contains_key` is on the hypothesis path. |
+| `agenda` | Min-heap keyed `(level, id)`; stale entries are discarded lazily on peek. |
+| `known_vars` | Names declared `v is known`, kept out of the term so term identity stays independent of known-ness. |
+| `Solution::subtask` | Inherits proven, non-goal, non-`answer` terms as conditions, with level reset and inference dropped. |
+| `SolutionStatus` | `NotDone` / `Answer(TermIdx)` / `Err(SolveError)`. |
 
-### task/props.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 13 | `TermInference` | Enum: Rule{parent,params,rule,requirements}, Transform{parent,solution}, Condition |
-| 37 | `TermProps` | Fields: id, term(SharedTerm), inference, filters, rule(TermAsRule) |
+### engine/props.rs
+| Type | What it is |
+|------|------------|
+| `TermProps` | id, term, inference, filters, and a cached `proven` valid only after the term is added. |
+| `TermInference` | `Rule{parent,params,rule,requirements}` / `Transform{parent,solution}` / `Condition` — how the term was reached, and the spine a trace walks back. |
 
-### term/atom.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 18 | `Param(CompactString)` | Rule parameter placeholder |
-| 20 | `Variable { name }` | Task variable; known-ness lives in `Solution.known_vars`, checked via `TruthCtx` (not a per-atom flag) |
-| 92 | `ArgList(u64)` | Variadic argument placeholder `..` |
-| 102 | `Atom` | Enum: Symbol, Param, Variable, Number(Rational), ArgList |
+### term/refer.rs, refer_mut.rs, buffer.rs
+| Type | What it is |
+|------|------------|
+| `Term` trait | parent, first/last_arg, args_iter, data, degree, truth. Implemented for `TermRef` only; `TermMut` has its own inherent methods plus `as_ref()`. |
+| `TermRef<'a>` | Read-only view; `Copy`. Equality is structural, not pointer-based (`same()` is the pointer test). |
+| `TermMut<'a>` | Mutation, `evaluate`, `normalize` (repeats a pass to a fixpoint under a cap). |
+| `TermBuf` | Owned tree over `trees::Tree<Atom>`. Factories: `symbol`, `number`, `variable`, `param`, `arg`. |
+| `match_term!` | Structural match: `match_term!(term, "=="(lhs, rhs))`. |
 
-### term/buffer.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 14 | `SharedTerm` | `Arc<TermBuf>` |
-| 16 | `TermPath(Vec<usize>)` | Path to a node within a term tree |
-| 19 | `TermBuf` | Owned term tree. Factories: symbol(), number(), variable(), param(), arg() |
-| 62 | `normalize()` | Applies normalization to given level |
+## Gotchas worth knowing before you edit
 
-Param/arglist substitution: see `term/substitution.rs`.
-
-### term/substitution.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 8 | `VariableSubstitution` | `HashMap<Variable, TermBuf>` |
-| 11 | `ParamSubstitution` | `IndexMap<Param, TermBuf>` + arglists |
-| 20 | `Substitute` trait | `substitute()` in-place; `substituted()`, `substitute_iter()` for free |
-
-Implementors: `TermBuf`, `TermMut`, `Hypothesis`.
-
-### term/refer.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 18 | `Term` trait | Generic interface: parent, first/last_arg, args_iter, data, degree, truth |
-| 40 | `TermRef<'a>` | Read-only term view |
-| 135 | `args_permutations()` | Returns all argument permutations for commutative symbols |
-| 176 | `try_match()` | Pattern matching: `self vs pattern → Vec<ParamSubstitution>` |
-| 180 | `find_matching_subterms()` | Finds all subterms matching a pattern |
-| 434 | `match_term!` | Macro for structural matching: `match_term!(term, "=="(lhs, rhs))` |
-
-### term/refer_mut.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 11 | `TermMut<'a>` | Mutable term view |
-| 184 | `evaluate()` | Runs symbol-specific calculator |
-| 288 | `normalize()` | Repeats `normalize_pass` to a fixpoint (cap 8, debug tripwire) |
-| ~ | `normalize_pass()` | One bottom-up sweep: associative nesting, evaluate, commutative reorder |
-
-### term/symbol/program.rs
-| Line | Type | Description |
-|------|------|-------------|
-| 13 | `Truth` | Enum: True, False, Unknown |
-| 20 | `TruthCtx<'a>` | Truth-eval context; carries known-var names for `_ is known` |
-| 20 | `SymbolAttr` | Enum: Infix, Display, Associative, Commutative |
-| 35 | `SymbolProgram` | Symbol definition: name, attrs, arg_cmp, calculator, truth_checker |
-| 79 | `register()` | Registers symbol in global registry |
-
-## Module Dependencies
-
-```
-term (foundation)
- ├── atom, buffer, refer, refer_mut, substitution
- └── symbol (global registry + base implementations)
-
-rule (depends on term)
- ├── rule.rs: ApplyRule uses TermBuf, TermFilters, ParamSubstitution
- ├── hypothesis.rs: wraps rule application results
- └── rules_engine.rs: indexes rules by Level, suggests by TermFilters
-
-task (depends on rule + term)
- ├── solver.rs: orchestrates rule application on terms
- ├── solution.rs: stores terms and tracks status
- └── tracing/: observability hooks
-```
+- **The dev-dependency cycle.** `solver`'s tests use `parser`, which depends on
+  `solver`, so a second instance of this crate is linked and `parser`'s
+  `TermBuf`/`Rule`/`Task` are nominally distinct types. `term_with_vars` bridges
+  by serde roundtrip; `parse_rule`/`parse_task` cannot and use a documented
+  `transmute`. Read the `SAFETY` notes before touching them.
+- **Cycle-for-cycle identity is the refactor invariant.** Any change to term
+  ordering, rule order, or level bumps moves the search, and the corpus notices.
+  The check that catches it: run `tasks/regress` with `--explain`, keep the
+  per-task cycle counts, and compare them plus the rendered output byte for
+  byte against the run before the change.
+- **The `answer` marker has one home.** `term::answer::{mark, marked}`; `marked`
+  requires arity 1, so a malformed `answer` is not a marker rather than a panic.
+- **`transform` on a goal term leaves `added` false on purpose** in
+  `try_infer_new_terms`; the tail's second level bump is what the corpus's
+  search order rests on.

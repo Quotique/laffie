@@ -111,14 +111,14 @@ Laffie is a **symbolic mathematical problem solver** — a rule-based reasoning 
 
 ## Detailed Navigation (`claude_docs/`)
 
-The `claude_docs/` directory contains detailed navigation maps for each crate with file listings, key types, line numbers, and dependency graphs:
+The `claude_docs/` directory contains detailed navigation maps for each crate with file listings, key types, layering, and the gotchas worth knowing before an edit:
 
 - [`claude_docs/solver.md`](claude_docs/solver.md) — solver crate: term representation, rule system, solving algorithm
 - [`claude_docs/parser.md`](claude_docs/parser.md) — parser crate: PEG grammar, operator precedence, parsing pipeline
 - [`claude_docs/view_database_utils.md`](claude_docs/view_database_utils.md) — view, database, utils crates
 - [`claude_docs/binaries.md`](claude_docs/binaries.md) — cli, tui binaries
 
-**Use these docs** when navigating unfamiliar parts of the codebase. **Keep them up to date** when making structural changes (adding/removing/renaming files, types, or public API).
+**Use these docs** when navigating unfamiliar parts of the codebase. **Keep them up to date** when making structural changes (adding/removing/renaming files, types, or public API). No line numbers: they were measured 5-of-66 correct and send a reader to the wrong place; grep the name instead.
 
 ## Language
 
