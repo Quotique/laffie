@@ -16,7 +16,7 @@ use crate::{
         GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr, RuleId, RulesEngine,
         SharedRule,
     },
-    task::{Goal, GoalKind, Task, answer::Recognized},
+    task::{Goal, GoalKind, Task},
     term::{
         Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
         answer, match_term,
@@ -605,30 +605,29 @@ impl Solver {
         run: &mut Run,
         index: usize,
     ) -> AnswerCheck {
-        let recognized = {
-            let Some(answer) = solution.find_answer.as_ref() else {
-                return AnswerCheck::No;
-            };
+        let at = {
             let mut known = |t: TermRef| self.is_provably_known(t, solution, run);
-            answer.recognize(solution[index].term.term(), &mut known)
+            solution
+                .goal()
+                .recognize(solution[index].term.term(), &mut known)
         };
-        match recognized {
-            Recognized::No => AnswerCheck::No,
-            // One unknown: the whole answer at once, flat or piecewise.
-            Recognized::Whole => AnswerCheck::Found(index),
-            Recognized::Binding(at) => {
-                let term = solution[index].term.clone();
-                let Some(answer) = solution.find_answer.as_mut() else {
-                    return AnswerCheck::No;
-                };
-                if !answer.bind(at, term, index) {
-                    return AnswerCheck::No;
-                }
-                match answer.term() {
-                    Some(term) => AnswerCheck::Derived(Box::new(TermProps::from(term))),
-                    None => AnswerCheck::No,
-                }
-            }
+        let Some(at) = at else {
+            return AnswerCheck::No;
+        };
+        // One unknown: the focused term is the whole answer, flat or piecewise.
+        if solution.goal().parts() == 1 {
+            return AnswerCheck::Found(index);
+        }
+        let term = solution[index].term.clone();
+        let Some(answer) = solution.find_answer.as_mut() else {
+            return AnswerCheck::No;
+        };
+        if !answer.bind(at, term, index) {
+            return AnswerCheck::No;
+        }
+        match answer.term() {
+            Some(term) => AnswerCheck::Derived(Box::new(TermProps::from(term))),
+            None => AnswerCheck::No,
         }
     }
 
