@@ -172,10 +172,10 @@ impl SolutionTrace {
             .map(|tp| TraceTerm::from_props(tp, arena, interner))
             .collect();
         let find_bindings = s
-            .find_bindings
-            .iter()
-            .map(|(t, idx)| (t.clone(), *idx))
-            .collect();
+            .find_answer
+            .as_ref()
+            .map(|a| a.bindings().map(|(t, idx)| (t.clone(), idx)).collect())
+            .unwrap_or_default();
         SolutionTrace {
             status: TraceStatus::from(s.status),
             terms,

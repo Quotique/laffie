@@ -21,7 +21,7 @@ use crate::{
         GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr, RuleId, RulesEngine,
         SharedRule,
     },
-    task::{Goal, GoalKind, Task, goal::Recognized},
+    task::{Goal, GoalKind, Task, answer::Recognized},
     term::{
         Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
         answer, match_term,
@@ -713,28 +713,28 @@ impl Solver {
         index: usize,
     ) -> AnswerCheck {
         let recognized = {
+            let Some(answer) = solution.find_answer.as_ref() else {
+                return AnswerCheck::No;
+            };
             let mut known = |t: TermRef| self.is_provably_known(t, solution, run);
-            solution
-                .goal()
-                .recognize(solution[index].term.term(), &mut known)
+            answer.recognize(solution[index].term.term(), &mut known)
         };
         match recognized {
             Recognized::No => AnswerCheck::No,
-            // Single target: the whole answer at once, flat or piecewise.
+            // One unknown: the whole answer at once, flat or piecewise.
             Recognized::Whole => AnswerCheck::Found(index),
-            Recognized::Binding(target) => {
-                if solution.find_bindings.contains_key(&target) {
+            Recognized::Binding(at) => {
+                let term = solution[index].term.clone();
+                let Some(answer) = solution.find_answer.as_mut() else {
+                    return AnswerCheck::No;
+                };
+                if !answer.bind(at, term, index) {
                     return AnswerCheck::No;
                 }
-                solution.find_bindings.insert(target, index);
-                let targets = solution
-                    .goal()
-                    .targets()
-                    .expect("a find goal carries its targets");
-                if solution.find_bindings.len() < targets.len() {
-                    return AnswerCheck::No;
+                match answer.term() {
+                    Some(term) => AnswerCheck::Derived(Box::new(TermProps::from(term))),
+                    None => AnswerCheck::No,
                 }
-                AnswerCheck::Derived(Box::new(self.build_multi_find_answer(solution, &targets)))
             }
         }
     }
@@ -747,24 +747,6 @@ impl Solver {
             .arg(term.to_owned())
             .arg(TermBuf::symbol("known"));
         self.prove(solution, query, run).answer().is_some()
-    }
-
-    fn build_multi_find_answer(&self, solution: &Solution, targets: &[TermBuf]) -> TermProps {
-        let mut iter = targets.iter();
-        let first = iter.next().unwrap();
-        let mut result = solution[solution.find_bindings[first]]
-            .term
-            .term()
-            .to_owned();
-
-        for target in iter {
-            let binding_term = solution[solution.find_bindings[target]]
-                .term
-                .term()
-                .to_owned();
-            result = TermBuf::symbol("&&").arg(result).arg(binding_term);
-        }
-        TermProps::from(result)
     }
 
     fn check_prove_answer(&self, solution: &Solution, index: usize) -> AnswerCheck {

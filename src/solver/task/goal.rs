@@ -1,10 +1,10 @@
 use std::{
     fmt,
     hash::{Hash, Hasher},
-    sync::Arc,
 };
 
-use crate::term::{SharedTerm, Term, TermBuf, TermRef, match_term};
+use super::Answer;
+use crate::term::{SharedTerm, Term, TermBuf, TermRef};
 
 /// Why a term cannot be a goal.
 #[derive(Clone, Debug)]
@@ -13,12 +13,6 @@ pub enum GoalError {
     NotAGoal(String),
     /// `prove` and `transform` take exactly one argument, `find` at least one.
     WrongArity(String),
-}
-
-pub(crate) enum Recognized {
-    No,
-    Whole,
-    Binding(TermBuf),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,12 +30,7 @@ pub struct Goal {
 
 #[derive(Clone, Debug)]
 enum GoalBody {
-    /// Targets are shared, so taking them costs a refcount rather than a copy
-    /// of every target term.
-    Find {
-        written: SharedTerm,
-        targets: Arc<[TermBuf]>,
-    },
+    Find(SharedTerm),
     Prove(SharedTerm),
     Transform(SharedTerm),
 }
@@ -121,10 +110,7 @@ impl Goal {
 
         let written = SharedTerm::new(value);
         let body = match kind {
-            GoalKind::Find => GoalBody::Find {
-                targets: written.term().args_iter().map(|a| a.to_owned()).collect(),
-                written,
-            },
+            GoalKind::Find => GoalBody::Find(written),
             GoalKind::Prove => GoalBody::Prove(written),
             GoalKind::Transform => GoalBody::Transform(written),
         };
@@ -135,8 +121,7 @@ impl Goal {
     #[inline]
     pub fn term(&self) -> &SharedTerm {
         match &self.body {
-            GoalBody::Find { written, .. } => written,
-            GoalBody::Prove(t) | GoalBody::Transform(t) => t,
+            GoalBody::Find(t) | GoalBody::Prove(t) | GoalBody::Transform(t) => t,
         }
     }
 
@@ -149,27 +134,13 @@ impl Goal {
             .expect("a parsed goal has at least one argument")
     }
 
-    pub(crate) fn recognize(
-        &self,
-        term: TermRef,
-        known: &mut dyn FnMut(TermRef) -> bool,
-    ) -> Recognized {
-        let GoalBody::Find { targets, .. } = &self.body else {
-            return Recognized::No;
-        };
-        if let [only] = &targets[..] {
-            return if is_answer_form(term, only.term(), known) {
-                Recognized::Whole
-            } else {
-                Recognized::No
-            };
-        }
-        match targets
-            .iter()
-            .find(|t| is_answer_leaf(term, t.term(), known))
-        {
-            Some(target) => Recognized::Binding(target.clone()),
-            None => Recognized::No,
+    /// `None` for anything but a `find`.
+    pub(crate) fn answer(&self) -> Option<Answer> {
+        match &self.body {
+            GoalBody::Find(written) => Some(Answer::new(
+                written.term().args_iter().map(|a| a.to_owned()),
+            )),
+            GoalBody::Prove(_) | GoalBody::Transform(_) => None,
         }
     }
 
@@ -193,142 +164,12 @@ impl Goal {
             body: GoalBody::Transform(SharedTerm::new(TermBuf::symbol("transform").arg(inner))),
         }
     }
-
-    /// `None` for anything but a `find`.
-    #[inline]
-    pub(crate) fn targets(&self) -> Option<Arc<[TermBuf]>> {
-        match &self.body {
-            GoalBody::Find { targets, .. } => Some(targets.clone()),
-            GoalBody::Prove(_) | GoalBody::Transform(_) => None,
-        }
-    }
-}
-
-fn is_answer_form(term: TermRef, target: TermRef, known: &mut dyn FnMut(TermRef) -> bool) -> bool {
-    if term.data().is_symbol_name("||") {
-        return term.degree() > 0 && term.args_iter().all(|b| is_answer_branch(b, target, known));
-    }
-    is_answer_branch(term, target, known)
-}
-
-/// `target == <known>` or `target in <known>`.
-fn is_answer_leaf(term: TermRef, target: TermRef, known: &mut dyn FnMut(TermRef) -> bool) -> bool {
-    let Some((lhs, rhs)) =
-        match_term!(term, "=="(lhs, rhs)).or_else(|| match_term!(term, "in"(lhs, rhs)))
-    else {
-        return false;
-    };
-    lhs == target && known(rhs)
-}
-
-/// An answer leaf, or `&&(guards..., leaf)` with exactly one target-resolving
-/// leaf and every other conjunct an `is known` guard.
-fn is_answer_branch(
-    branch: TermRef,
-    target: TermRef,
-    known: &mut dyn FnMut(TermRef) -> bool,
-) -> bool {
-    if is_answer_leaf(branch, target, known) {
-        return true;
-    }
-    if !branch.data().is_symbol_name("&&") {
-        return false;
-    }
-    let mut leaf_seen = false;
-    for conjunct in branch.args_iter() {
-        if is_answer_leaf(conjunct, target, known) {
-            if leaf_seen {
-                return false;
-            }
-            leaf_seen = true;
-        } else if !known(conjunct) {
-            return false;
-        }
-    }
-    leaf_seen
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Goal, GoalError, Recognized};
+    use super::{Goal, GoalError};
     use crate::term::{TermBuf, term_with_vars};
-
-    /// A value counts as known unless it mentions one of `unknown`.
-    fn ask(goal: TermBuf, term: &'static str, unknown: &[&str]) -> Recognized {
-        let goal = Goal::parse(goal).expect("a goal");
-        let term = term_with_vars(term);
-        let mut is_known = |x: crate::term::TermRef| {
-            let rendered = x.to_string();
-            !unknown.iter().any(|name| rendered.contains(name))
-        };
-        goal.recognize(term.term(), &mut is_known)
-    }
-
-    fn recognized(term: &'static str, target: &'static str, unknown: &[&str]) -> bool {
-        let goal = TermBuf::symbol("find").arg(term_with_vars(target));
-        matches!(ask(goal, term, unknown), Recognized::Whole)
-    }
-
-    #[test]
-    fn a_flat_binding_is_an_answer() {
-        assert!(recognized("x == 1", "x", &[]));
-        assert!(recognized("x in set(1, 2)", "x", &[]));
-    }
-
-    #[test]
-    fn a_binding_to_an_unknown_value_is_not() {
-        assert!(!recognized("x == y", "x", &["y"]));
-    }
-
-    #[test]
-    fn a_binding_of_another_target_is_not() {
-        assert!(!recognized("y == 1", "x", &[]));
-    }
-
-    #[test]
-    fn a_branch_may_carry_known_guards_beside_one_binding() {
-        assert!(recognized("a != 0 && x == 1", "x", &[]));
-        // Two bindings in one branch are not one answer.
-        assert!(!recognized("x == 1 && x == 2", "x", &[]));
-        // A guard that is not known leaves the branch unresolved.
-        assert!(!recognized("b != 0 && x == 1", "x", &["b"]));
-    }
-
-    #[test]
-    fn several_targets_are_answered_one_binding_at_a_time() {
-        let goal = || {
-            TermBuf::symbol("find")
-                .arg(term_with_vars("x"))
-                .arg(term_with_vars("y"))
-        };
-
-        // A flat binding names which target it resolves.
-        assert!(matches!(
-            ask(goal(), "y == 2", &[]),
-            Recognized::Binding(t) if t == term_with_vars("y")
-        ));
-        // A piecewise form is not a binding: with several targets only flat ones count.
-        assert!(matches!(
-            ask(goal(), "x == 1 || x == 2", &[]),
-            Recognized::No
-        ));
-        // Nor is a binding of something that is not a target.
-        assert!(matches!(ask(goal(), "z == 3", &[]), Recognized::No));
-        // Nor one to an unknown value.
-        assert!(matches!(ask(goal(), "x == z", &["z"]), Recognized::No));
-    }
-
-    #[test]
-    fn a_goal_that_is_not_a_find_recognizes_no_binding() {
-        let prove = TermBuf::symbol("prove").arg(term_with_vars("x > 0"));
-        assert!(matches!(ask(prove, "x == 1", &[]), Recognized::No));
-    }
-
-    #[test]
-    fn a_piecewise_answer_needs_every_branch_to_resolve() {
-        assert!(recognized("x == 1 || x == 2", "x", &[]));
-        assert!(!recognized("x == 1 || x == y", "x", &["y"]));
-    }
 
     #[test]
     fn rejects_a_head_that_is_not_a_goal() {
@@ -366,6 +207,14 @@ mod tests {
             let goal = Goal::parse(term_with_vars(src)).expect("a goal");
             assert_eq!(goal.subject().to_owned(), term_with_vars(subject), "{src}");
         }
+    }
+
+    #[test]
+    fn an_answer_is_asked_for_only_by_a_find() {
+        let goal = Goal::parse(term_with_vars("find(x, y)")).expect("a goal");
+        assert_eq!(goal.answer().expect("a find asks").bindings().count(), 0);
+        assert!(Goal::prove(term_with_vars("x > 0")).answer().is_none());
+        assert!(Goal::transform(term_with_vars("1 + 2")).answer().is_none());
     }
 
     #[test]

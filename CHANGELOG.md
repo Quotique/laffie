@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TaskBuilder`, a stored task converts with `TryFrom`, `Solver::solve` takes
   `&self`, and `Solution`, `TermProps`, `Solver`, `Tracer` and the step walker
   live in `solver::engine` rather than `solver::task`.
+- API: `Solution::find_bindings` becomes `find_answer: Option<task::Answer>` —
+  the `find` answer being assembled, carrying each bound term with it.
 
 ## [0.7.0] - 2026-07-21
 

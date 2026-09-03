@@ -1,3 +1,4 @@
+pub mod answer;
 mod builder;
 pub mod goal;
 
@@ -9,6 +10,7 @@ use std::{
     iter::Iterator,
 };
 
+pub use answer::Answer;
 pub use builder::TaskBuilder;
 pub use goal::{Goal, GoalError, GoalKind};
 

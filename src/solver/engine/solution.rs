@@ -14,8 +14,8 @@ use super::{TermInference, TermProps};
 use crate::{
     CompactString, NormLevel,
     rule::{Level, RuleId},
-    task::{Goal, Task, TaskBuilder},
-    term::{Atom, SharedTerm, Term, TermBuf, answer, match_term},
+    task::{Answer, Goal, Task, TaskBuilder},
+    term::{Atom, SharedTerm, Term, answer, match_term},
 };
 
 pub const STACK_SIZE: usize = 2048;
@@ -54,7 +54,7 @@ pub struct Solution {
     pub main_index:       HashMap<SharedTerm, usize>,
     pub goal_index:       IndexMap<SharedTerm, usize>,
     pub terms:            Vec<TermProps>,
-    pub find_bindings:    HashMap<TermBuf, TermIdx>,
+    pub find_answer:      Option<Answer>,
     unproven_terms_count: usize,
 
     /// Names of variables declared known (`v is known`) among the givens.
@@ -104,6 +104,7 @@ impl Solution {
     /// the same order. [`Solution::subtask`] builds both from one list.
     fn seeded(task: Task, history: Vec<TermProps>, blocked_rules: HashSet<RuleId>) -> Self {
         let known_vars = collect_known_set(&task.givens);
+        let find_answer = task.goal().answer();
         let mut solution = Self {
             task,
             start_cycle: Default::default(),
@@ -111,7 +112,7 @@ impl Solution {
             main_index: Default::default(),
             goal_index: Default::default(),
             terms: Default::default(),
-            find_bindings: Default::default(),
+            find_answer,
             status: Default::default(),
             unproven_terms_count: Default::default(),
             agenda: Default::default(),
