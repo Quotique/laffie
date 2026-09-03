@@ -7,7 +7,7 @@ use super::{
     SharedSolution, Solution, SolveError, TermIdx, TermProps, TracerHub,
     bounds::bound_implies,
     props::TermInference,
-    run::{CacheKey, Run, RunControl, SubtaskEntry},
+    run::{CacheKey, Limits, Run, SubtaskEntry},
 };
 use crate::{
     NormLevel,
@@ -70,21 +70,11 @@ impl Solver {
         }
     }
 
-    /// Attempts to solve the given `task` and returns a `SharedSolution`.
-    ///
-    /// # Parameters
-    ///
-    /// * `task` – The task to be solved.
-    /// * `tracer` – A `TracerHub` used for instrumentation.
-    /// * `control` – Run limits (cycle budget, wall-clock deadline, cancellation); build one with
-    ///   [`RunControl::init`].
-    ///
-    /// The returned `SharedSolution` carries either the answer or an error
-    /// status.
-    pub fn solve(&self, task: Task, tracer: TracerHub, control: RunControl) -> SharedSolution {
+    /// The returned solution carries either the answer or an error status.
+    pub fn solve(&self, task: Task, tracer: TracerHub, limits: Limits) -> SharedSolution {
         let mut solution = Solution::new(task);
         let mut state = Run {
-            control,
+            limits,
             cycle: Default::default(),
             cache: Default::default(),
             tracer,
@@ -316,7 +306,7 @@ impl Solver {
             for hypothesis in h.ground(&s.known_vars) {
                 grounded_seen += 1;
                 if grounded_seen.is_multiple_of(DEADLINE_CHECK_INTERVAL) {
-                    run.control.check(run.cycle)?;
+                    run.limits.check(run.cycle)?;
                 }
                 let is_dub = if is_goal {
                     s.goal_index.contains_key(&hypothesis.resolution)
@@ -788,7 +778,7 @@ mod solve_tests {
     use std::sync::Arc;
 
     use crate::{
-        engine::{RunControl, Solver, TIME_LIMIT_DEFAULT},
+        engine::{Limits, Solver, TIME_LIMIT_DEFAULT},
         rule::RulesEngine,
         task::parse_task,
         term::term_with_vars,
@@ -802,7 +792,7 @@ mod solve_tests {
         let solution = solver.solve(
             task,
             Default::default(),
-            RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+            Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
         );
         assert_eq!(
             *solution.answer().expect("task is not solved"),
@@ -818,7 +808,7 @@ mod solve_tests {
         let solution = solver.solve(
             task,
             Default::default(),
-            RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+            Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
         );
         assert!(solution.answer().is_some());
     }
@@ -830,7 +820,7 @@ mod solve_tests {
         let solution = solver.solve(
             task,
             Default::default(),
-            RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+            Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
         );
         solution.answer().is_some()
     }
@@ -858,7 +848,7 @@ mod solve_tests {
         let solution = solver.solve(
             task,
             Default::default(),
-            RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+            Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
         );
         let answer = solution
             .answer()
@@ -870,23 +860,23 @@ mod solve_tests {
     #[test]
     fn solver_carries_nothing_between_tasks() {
         let solver = Solver::new(Arc::new(RulesEngine::default()));
-        let control = || RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT).0;
+        let limits = || Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0;
 
         let _first = solver.solve(
             parse_task("task { goal find(x); x == 1; }"),
             Default::default(),
-            control(),
+            limits(),
         );
         let second = solver.solve(
             parse_task("task { goal find(y); y == 2; }"),
             Default::default(),
-            control(),
+            limits(),
         );
 
         let fresh = Solver::new(Arc::new(RulesEngine::default())).solve(
             parse_task("task { goal find(y); y == 2; }"),
             Default::default(),
-            control(),
+            limits(),
         );
 
         assert_eq!(
@@ -902,10 +892,10 @@ mod solve_tests {
 
         let task = parse_task("task { goal find(x); x == 1; }");
         let solver = Solver::new(Arc::new(RulesEngine::default()));
-        let (control, cancel) = RunControl::init(usize::MAX, TIME_LIMIT_DEFAULT);
+        let (limits, cancel) = Limits::init(usize::MAX, TIME_LIMIT_DEFAULT);
         // Cancel before solving: the first cycle check must abort the run.
         cancel.cancel();
-        let solution = solver.solve(task, Default::default(), control);
+        let solution = solver.solve(task, Default::default(), limits);
         assert!(matches!(
             solution.status,
             SolutionStatus::Err(SolveError::Canceled)
@@ -1004,7 +994,7 @@ mod resolve_solve_tests {
     use std::{sync::Arc, time::Duration};
 
     use crate::{
-        engine::{RunControl, Solution, Solver, TracerHub},
+        engine::{Limits, Solution, Solver, TracerHub},
         rule::{Hypothesis, RulesEngine, SharedRule, parse_rule},
         task::parse_task,
         term::{ParamSubstitution, TermBuf, TermPath, term_with_vars},
@@ -1019,10 +1009,10 @@ mod resolve_solve_tests {
         let solver = Solver::new(Arc::new(RulesEngine::default()));
         let parent = Solution::new(parse_task("task { goal find(z); }"));
         let mut state = Run {
-            control: RunControl::init(usize::MAX, Duration::from_secs(60)).0,
-            cycle:   0,
-            cache:   Default::default(),
-            tracer:  TracerHub::default(),
+            limits: Limits::init(usize::MAX, Duration::from_secs(60)).0,
+            cycle:  0,
+            cache:  Default::default(),
+            tracer: TracerHub::default(),
         };
 
         let solve_eq_param = |block: &'static str, param: &str| {
@@ -1084,10 +1074,10 @@ mod resolve_solve_tests {
 
         let mut state = Run {
             // Deadline already in the past: produce's poll must bail out.
-            control: RunControl::init(usize::MAX, Duration::ZERO).0,
-            cycle:   0,
-            cache:   Default::default(),
-            tracer:  TracerHub::default(),
+            limits: Limits::init(usize::MAX, Duration::ZERO).0,
+            cycle:  0,
+            cache:  Default::default(),
+            tracer: TracerHub::default(),
         };
 
         let goal_term = solution.task.goal().term().clone();

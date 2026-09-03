@@ -18,7 +18,7 @@ use itertools::Itertools;
 use database::{Db, Run, Task as DbTask, id_from_hex, id_to_hex};
 use parser::DirectoryParser;
 use solver::{
-    engine::{RunControl, SolutionStatus, Solver, TracerHub},
+    engine::{Limits, SolutionStatus, Solver, TracerHub},
     task::Task as SolverTask,
 };
 use view::View;
@@ -260,7 +260,7 @@ fn main() -> ExitCode {
                 }
                 tracer
             },
-            RunControl::init(
+            Limits::init(
                 args.exec_deadline,
                 std::time::Duration::from_secs(args.time_limit),
             )

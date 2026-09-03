@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   live in `solver::engine` rather than `solver::task`.
 - API: `Solution::find_bindings` becomes `find_answer: Option<task::Answer>` —
   the `find` answer being assembled, carrying each bound term with it.
+- API: `RunControl` is now `Limits`; `Limits::init` is unchanged.
 
 ## [0.7.0] - 2026-07-21
 

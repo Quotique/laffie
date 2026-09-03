@@ -17,7 +17,7 @@ use ratatui::{
 };
 
 use solver::engine::{
-    CancelToken, RunControl, SharedSolution, Solution, Solver, TIME_LIMIT_DEFAULT, TracerHub,
+    CancelToken, Limits, SharedSolution, Solution, Solver, TIME_LIMIT_DEFAULT, TracerHub,
 };
 use utils::{IndexedTree, TreeIndex};
 
@@ -285,9 +285,8 @@ impl Ui {
         self.progress.reset(queue.len());
         self.cycles.store(0, Ordering::Relaxed);
 
-        // Fresh control per run; keep the cancel handle to signal from the UI.
-        let (control, cancel) =
-            RunControl::init(self.state.settings.exec_deadline, TIME_LIMIT_DEFAULT);
+        // Fresh limits per run; keep the cancel handle to signal from the UI.
+        let (limits, cancel) = Limits::init(self.state.settings.exec_deadline, TIME_LIMIT_DEFAULT);
         self.cancel = cancel;
 
         let reporter = ProgressReporter {
@@ -310,7 +309,7 @@ impl Ui {
                         hub.add_custom(reporter.clone());
 
                         let _ = tx.send(ProgressEvent::TaskStarted(Box::new(task.task.clone())));
-                        let solution = solver.solve(task.task, hub, control.clone());
+                        let solution = solver.solve(task.task, hub, limits.clone());
                         let _ = tx.send(ProgressEvent::TaskFinished);
                         (idx, solution)
                     })

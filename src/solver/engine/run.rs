@@ -39,22 +39,22 @@ impl CancelToken {
 
 /// What stops a run: cycle budget, wall clock, cancellation.
 #[derive(Clone)]
-pub struct RunControl {
+pub struct Limits {
     execution_deadline: usize,
     deadline_at:        Instant,
     cancel:             CancelToken,
 }
 
-impl RunControl {
+impl Limits {
     /// The returned token shares the cancel flag.
     pub fn init(execution_deadline: usize, time_limit: Duration) -> (Self, CancelToken) {
         let cancel = CancelToken::new();
-        let control = Self {
+        let limits = Self {
             execution_deadline,
             deadline_at: Instant::now() + time_limit,
             cancel: cancel.clone(),
         };
-        (control, cancel)
+        (limits, cancel)
     }
 
     /// Cancellation is checked before the budgets.
@@ -75,10 +75,10 @@ impl RunControl {
 /// Shared by every frame of one `solve`. A copy per subtask would change
 /// the cycle count and the cache hits.
 pub(super) struct Run {
-    pub(super) control: RunControl,
-    pub(super) cycle:   usize,
-    pub(super) cache:   HashMap<CacheKey, SharedSolution>,
-    pub(super) tracer:  TracerHub,
+    pub(super) limits: Limits,
+    pub(super) cycle:  usize,
+    pub(super) cache:  HashMap<CacheKey, SharedSolution>,
+    pub(super) tracer: TracerHub,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -123,7 +123,7 @@ impl Run {
     /// Counts the cycle before checking the limits.
     pub(super) fn begin_cycle(&mut self) -> Result<(), SolveError> {
         self.cycle += 1;
-        self.control.check(self.cycle)
+        self.limits.check(self.cycle)
     }
 }
 
@@ -132,8 +132,8 @@ mod cache_tests {
     use std::time::Duration;
 
     use super::{
-        CacheKey, Run, RunControl, SharedSolution, Solution, SolutionStatus, SolveError,
-        SubtaskEntry, Task,
+        CacheKey, Limits, Run, SharedSolution, Solution, SolutionStatus, SolveError, SubtaskEntry,
+        Task,
     };
     use crate::{
         engine::TracerHub,
@@ -143,10 +143,10 @@ mod cache_tests {
 
     fn run() -> Run {
         Run {
-            control: RunControl::init(usize::MAX, Duration::from_secs(60)).0,
-            cycle:   0,
-            cache:   Default::default(),
-            tracer:  TracerHub::default(),
+            limits: Limits::init(usize::MAX, Duration::from_secs(60)).0,
+            cycle:  0,
+            cache:  Default::default(),
+            tracer: TracerHub::default(),
         }
     }
 
