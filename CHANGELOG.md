@@ -18,9 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `TaskBuilder`, a stored task converts with `TryFrom`, `Solver::solve` takes
   `&self`, and `Solution`, `TermProps`, `Solver`, `Tracer` and the step walker
   live in `solver::engine` rather than `solver::task`.
-- API: `Solution::find_bindings` becomes `find_answer: Option<task::Answer>` —
-  the `find` answer being assembled, carrying each bound term with it.
+- A multi-variable `find` answer shows how each unknown was derived. The
+  answer term is no longer fabricated into the solution's store, so the walk
+  back to the conditions starts from every part.
+- A subtask already shown in the output leaves a reference instead of nothing,
+  so a `needed: [...]` line always points at a derivation that is there.
+- API: `SolutionStatus::Answer(idx)` becomes `Answered(Arc<task::Answer>)`,
+  with one part per unknown; `Solution::find_bindings` and `validate_answer`
+  are gone, the latter replaced by `Answer::matches`. The status is no longer
+  `Copy`, and `Renderer::display_answer` takes the answer rather than a term.
 - API: `RunControl` is now `Limits`; `Limits::init` is unchanged.
+- The run trace schema is version 3. Existing databases are refused with an
+  error naming the mismatch; back them up and recreate.
 
 ## [0.7.0] - 2026-07-21
 
