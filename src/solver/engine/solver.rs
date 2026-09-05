@@ -599,10 +599,13 @@ impl Solver {
         let Some(inner) = answer::marked(term_root) else {
             return AnswerCheck::No;
         };
+        let Some(part) = solution.goal().part_answered_by(inner) else {
+            return AnswerCheck::No;
+        };
         let mut resolution = TermProps::from(inner.to_owned());
         resolution.inference = term.inference.clone();
         AnswerCheck::Unwrap {
-            part:  0,
+            part,
             props: Box::new(resolution),
         }
     }

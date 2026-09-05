@@ -163,6 +163,24 @@ impl Goal {
         unknowns.position(|u| is_answer_leaf(term, u, known))
     }
 
+    /// Which unknown the payload of an `answer(...)` marker resolves.
+    ///
+    /// The rule already claimed it is an answer, so this decides no known-ness
+    /// and spends no cycles, unlike [`Goal::recognize`]. `None` when the payload
+    /// names no unknown of a multi-part `find`.
+    pub(crate) fn part_answered_by(&self, answer: TermRef) -> Option<usize> {
+        let GoalBody::Find(written) = &self.body else {
+            return Some(0);
+        };
+        let written = written.term();
+        if written.degree() == 1 {
+            return Some(0);
+        }
+        written
+            .args_iter()
+            .position(|u| answer_rhs(answer, u).is_some())
+    }
+
     pub(crate) fn asked(&self, at: usize) -> TermRef<'_> {
         match &self.body {
             GoalBody::Find(written) => written
@@ -205,12 +223,15 @@ fn is_answer_form(term: TermRef, target: TermRef, known: &mut dyn FnMut(TermRef)
 
 /// `target == <known>` or `target in <known>`.
 fn is_answer_leaf(term: TermRef, target: TermRef, known: &mut dyn FnMut(TermRef) -> bool) -> bool {
-    let Some((lhs, rhs)) =
-        match_term!(term, "=="(lhs, rhs)).or_else(|| match_term!(term, "in"(lhs, rhs)))
-    else {
-        return false;
-    };
-    lhs == target && known(rhs)
+    answer_rhs(term, target).is_some_and(known)
+}
+
+/// The right-hand side of `target == <rhs>` or `target in <rhs>`. Whether `rhs`
+/// is known is a separate question, and answering it can cost a subsearch.
+fn answer_rhs<'a>(term: TermRef<'a>, target: TermRef<'_>) -> Option<TermRef<'a>> {
+    let (lhs, rhs) =
+        match_term!(term, "=="(lhs, rhs)).or_else(|| match_term!(term, "in"(lhs, rhs)))?;
+    (lhs == target).then_some(rhs)
 }
 
 /// An answer leaf, or `&&(guards..., leaf)` with exactly one target-resolving
@@ -257,6 +278,47 @@ mod tests {
             !unknown.iter().any(|name| rendered.contains(name))
         };
         goal(src).recognize(term.term(), &mut is_known)
+    }
+
+    fn marked(src: &'static str, answer: &'static str) -> Option<usize> {
+        let answer = term_with_vars(answer);
+        goal(src).part_answered_by(answer.term())
+    }
+
+    #[test]
+    fn a_marked_answer_names_the_unknown_it_resolves() {
+        assert_eq!(marked("find(x, y)", "x == 3"), Some(0));
+        assert_eq!(marked("find(x, y)", "y == 2"), Some(1));
+        assert_eq!(marked("find(x, y, z)", "z in set(1, 2)"), Some(2));
+    }
+
+    #[test]
+    fn a_marked_answer_for_one_unknown_needs_no_matching() {
+        assert_eq!(marked("find(x)", "x == 1"), Some(0));
+        assert_eq!(marked("find(x)", "1 + 2"), Some(0));
+        assert_eq!(marked("prove(x > 0)", "x > 0"), Some(0));
+    }
+
+    #[test]
+    fn a_marked_answer_resolving_no_unknown_is_not_an_answer() {
+        assert_eq!(marked("find(x, y)", "z == 1"), None);
+        assert_eq!(marked("find(x, y)", "1 + 2"), None);
+    }
+
+    #[test]
+    fn naming_the_part_costs_no_known_check() {
+        // The oracle can start a subsearch, moving the cycle count the
+        // fingerprint pins.
+        let term = term_with_vars("y == 2");
+        let mut calls = 0;
+        let mut counting = |_: TermRef| {
+            calls += 1;
+            true
+        };
+        goal("find(x, y)").recognize(term.term(), &mut counting);
+        assert!(calls > 0, "recognize does consult the oracle");
+
+        assert_eq!(goal("find(x, y)").part_answered_by(term.term()), Some(1));
     }
 
     #[test]
