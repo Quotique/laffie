@@ -30,6 +30,15 @@ impl Renderer for Html<'_> {
         ))
     }
 
+    fn display_reference(&mut self, subtask_level: usize, goal: &Goal) -> fmt::Result {
+        writeln!(
+            self.output,
+            "<div class=\"goal ref\" style=\"margin-left:{}em\">{} <span class=\"ref-note\">(shown above)</span></div>",
+            subtask_level * 2,
+            encode_text(&goal.to_string())
+        )
+    }
+
     fn display_answer(
         &mut self,
         goal: &Goal,

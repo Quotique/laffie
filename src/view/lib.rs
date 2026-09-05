@@ -32,6 +32,10 @@ pub trait Renderer {
         status: &Solution,
     ) -> fmt::Result;
 
+    fn display_reference(&mut self, _subtask_level: usize, _goal: &Goal) -> fmt::Result {
+        Ok(())
+    }
+
     fn dump_frame(&mut self, _frame: &[TermProps]) -> fmt::Result {
         Ok(())
     }
@@ -106,6 +110,8 @@ impl View<'_> {
                         rendered: self.rendered.clone(),
                     }
                     .display_impl(renderer)?;
+                } else {
+                    renderer.display_reference(subtask_level, r.task.goal())?;
                 }
             }
             if !trace.is_empty() {

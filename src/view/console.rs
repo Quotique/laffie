@@ -40,6 +40,15 @@ impl Renderer for Console<'_, '_> {
         )
     }
 
+    fn display_reference(&mut self, subtask_level: usize, goal: &Goal) -> fmt::Result {
+        writeln!(
+            self.output,
+            "{}{}",
+            "  ".repeat(subtask_level),
+            format!("{goal} (shown above)").dimmed()
+        )
+    }
+
     fn display_answer(
         &mut self,
         goal: &Goal,

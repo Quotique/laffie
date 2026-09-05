@@ -3,6 +3,8 @@ use std::{
     hash::{Hash, Hasher},
 };
 
+use itertools::Itertools;
+
 use crate::term::{SharedTerm, Term, TermBuf, TermRef, match_term};
 
 /// Why a term cannot be a goal.
@@ -62,7 +64,11 @@ impl fmt::Display for Goal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let subject = self.subject();
         match self.kind() {
-            GoalKind::Find => write!(f, "Find: {subject}"),
+            GoalKind::Find => write!(
+                f,
+                "Find: {}",
+                (0..self.parts()).map(|p| self.asked(p)).format(", ")
+            ),
             GoalKind::Prove => write!(f, "Prove: {subject}"),
             GoalKind::Transform => write!(f, "Transform: {subject}"),
         }
