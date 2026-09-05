@@ -210,11 +210,14 @@ impl Solution {
             .map(|x| x.id)
     }
 
-    pub fn index_of(&self, term: &SharedTerm) -> Option<TermIdx> {
-        self.main_index
-            .get(term)
-            .or_else(|| self.goal_index.get(term))
-            .copied()
+    /// The answer's parts, each with the store index it was bound to. Empty
+    /// without one.
+    pub fn answered_parts(&self) -> impl Iterator<Item = (&AnswerPart, TermIdx)> {
+        let parts: &[AnswerPart] = self.answer().map_or(&[], Answer::parts);
+        parts
+            .iter()
+            .zip(self.bound.iter().copied())
+            .map(|(part, at)| (part, at.expect("an assembled answer binds every part")))
     }
 
     #[inline]
@@ -322,5 +325,36 @@ mod test {
         assert!(solution.known_vars.contains("a"));
         assert!(solution.known_vars.contains("b"));
         assert!(!solution.known_vars.contains("x"));
+    }
+
+    #[test]
+    fn an_answer_part_reports_the_index_it_was_bound_to() {
+        // Not synthetic: `Solver::prove` indexes its subject twice on the
+        // trivial-truth arm.
+        let mut solution = Solution::new(parse_task("task { goal prove(x == 1); x == 1; }"));
+        let term = solution
+            .goal_index
+            .keys()
+            .next()
+            .expect("a goal term")
+            .clone();
+        let in_goal = solution.goal_index[&term];
+        let in_main = solution.main_index[&term];
+        assert_ne!(
+            in_goal, in_main,
+            "the two maps must disagree for this test to bite"
+        );
+
+        assert!(solution.bind_answer(0, in_goal));
+
+        let (_, at) = solution.answered_parts().next().expect("one part");
+        assert_eq!(at, in_goal, "the part reports the index it was bound to");
+    }
+
+    #[test]
+    fn a_solution_without_an_answer_yields_no_parts() {
+        let solution = Solution::new(parse_task("task { goal find(x); x == 1; }"));
+
+        assert_eq!(solution.answered_parts().count(), 0);
     }
 }

@@ -267,12 +267,9 @@ fn diff_line(sign: char, count: i32, sig: &str) -> String {
 
 fn step_signatures(solution: &SharedSolution) -> Vec<String> {
     let answer_path = match solution.status {
-        SolutionStatus::Answered(ref answer) => {
+        SolutionStatus::Answered(_) => {
             let mut q = Vec::new();
-            for part in answer.parts() {
-                let Some(at) = solution.index_of(&part.term) else {
-                    continue;
-                };
+            for (_, at) in solution.answered_parts() {
                 q.push(at);
                 while let Some(p) = solution.terms[*q.last().unwrap()].inference.parent_id() {
                     q.push(p);

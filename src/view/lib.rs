@@ -122,10 +122,8 @@ impl View<'_> {
                 level,
                 renderer,
             )?;
-            for part in answer.parts() {
-                if let Some(at) = self.solution.index_of(&part.term) {
-                    self.display_frame(&self.solution.terms, at, level, renderer)?;
-                }
+            for (_, at) in self.solution.answered_parts() {
+                self.display_frame(&self.solution.terms, at, level, renderer)?;
             }
         } else {
             renderer.dump_frame(&self.solution.terms)?;

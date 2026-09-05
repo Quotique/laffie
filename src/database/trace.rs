@@ -116,14 +116,11 @@ impl TraceStatus {
     fn from_solution(s: &Solution) -> Self {
         match &s.status {
             SolutionStatus::NotDone => Self::NotDone,
-            SolutionStatus::Answered(a) => Self::Answered(
-                a.parts()
-                    .iter()
-                    .filter_map(|p| {
-                        s.index_of(&p.term).map(|at| TraceAnswerPart {
-                            asked: p.asked.clone(),
-                            term:  at,
-                        })
+            SolutionStatus::Answered(_) => Self::Answered(
+                s.answered_parts()
+                    .map(|(p, at)| TraceAnswerPart {
+                        asked: p.asked.clone(),
+                        term:  at,
                     })
                     .collect(),
             ),
