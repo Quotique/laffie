@@ -1,18 +1,10 @@
 #[cfg(feature = "console")]
 mod console;
-#[cfg(feature = "html")]
-mod html;
-#[cfg(feature = "tui")]
-mod tui;
 
 use std::{cell::RefCell, collections::HashSet, convert::TryFrom, fmt, sync::Arc};
 
 #[cfg(feature = "console")]
 pub use console::Console;
-#[cfg(feature = "html")]
-pub use html::Html;
-#[cfg(feature = "tui")]
-pub use tui::Tui;
 
 use solver::{
     engine::{Solution, TermProps},
