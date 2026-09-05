@@ -30,6 +30,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API: `RunControl` is now `Limits`; `Limits::init` is unchanged.
 - The run trace schema is version 3. Existing databases are refused with an
   error naming the mismatch; back them up and recreate.
+- API: `Solution::index_of` becomes `Solution::answered_parts`, pairing each
+  answer part with the store index it was bound to.
+
+### Fixed
+- The TUI writes its solver trace again. Its config named `solver::task`, which
+  the search loop left behind when it moved to `solver::engine`.
+- A term wrapped in `answer(...)` binds the unknown it resolves. Under a
+  multi-variable `find` every marked answer bound the first.
+- An answer part's derivation starts from the term the part was bound to. It
+  was found by looking the term up, and one term can hold two store indexes.
+
+### Removed
+- The `html` and `tui` renderers, their features, and the `html-escape`
+  dependency. No workspace member enabled either feature. The `tui` binary
+  renders solutions itself.
 
 ## [0.7.0] - 2026-07-21
 

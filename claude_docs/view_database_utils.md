@@ -4,33 +4,34 @@
 
 ## View Crate
 
-Solution rendering with pluggable backends.
+Solution rendering. One backend ships; `Renderer` is the seam.
 
 ### File Map
 
 ```
 src/view/
 ├── lib.rs       # Renderer trait, View struct
-├── console.rs   # Console impl — colored terminal output
-├── html.rs      # Html impl — HTML-escaped output
-└── tui.rs       # Tui impl — ratatui Line/Span output
+└── console.rs   # Console impl — colored terminal output
 ```
+
+The `html` and `tui` renderers were deleted 2026-09-05: no workspace member
+enabled either feature, so neither was built by `cargo build --workspace`. The
+`tui` binary renders solutions itself, walking `Visit` in
+`bin/tui/widgets/solution_window.rs`, and never touches `Renderer`.
 
 ### Key Types
 
 #### lib.rs
 | Type | What it is |
 |------|------------|
-| `Renderer` trait | `display_goal()`, `display_term()`, `display_answer()`, `dump_frame()` |
-| `View<'a>` | `{ solution: &Solution, rendered: HashSet<TermBuf> }` |
+| `Renderer` trait | `display_goal()`, `display_term()`, `display_answer()`, `display_reference()`, `dump_frame()` — the last two default to no-ops |
+| `View<'a>` | `{ solution: &Solution, rendered: Arc<RefCell<HashSet<TermBuf>>> }` — shared with nested views, so a subtask shown once leaves a reference next time |
 | `View::display_impl()` | Iterates solution steps via `StepsSource`, calls renderer methods |
 
 #### Implementations
 | File | Struct | Output | Key Dep |
 |------|--------|--------|---------|
 | console.rs | `Console` | Colored text (`fmt::Write`) | `colored` |
-| html.rs | `Html` | HTML string (`fmt::Write`) | `html_escape` |
-| tui.rs | `Tui` | `Vec<Line<'a>>` for ratatui | `ratatui` |
 
 ---
 
@@ -57,7 +58,7 @@ pre-versioning (tasks but no marker) file with a clear error.
 src/database/
 ├── lib.rs    # Module wiring + re-exports
 ├── id.rs     # TaskId, compute_task_id (blake3 over Display text), id_to_hex / id_from_hex
-├── task.rs   # Task DTO, From<&solver::Task>, From<Task> for solver::Task
+├── task.rs   # Task DTO, From<&solver::Task>, TryFrom<Task> for solver::Task
 ├── run.rs    # Run, RunStats, Run::from_solution
 ├── trace.rs  # SolutionTrace (mirror), TraceTerm, TraceInference, RuleRef, TraceParams
 ├── codec.rs  # zstd + serde_json encode/decode
@@ -84,7 +85,7 @@ the hash. Convert to/from hex with `id_to_hex` / `id_from_hex`.
 
 `task.rs` — `Task { id, name, text, group, givens, goal, possible_answers, hidden, created_at }`.
 `From<&solver::task::Task>` computes the id and carries `name`; the inverse
-(`From<Task> for solver::Task`) restores `name` and sets `solver::Task::id` via
+(`TryFrom<Task> for solver::Task`, fallible because the stored goal is re-parsed) restores `name` and sets `solver::Task::id` via
 `solver::task::content_id` (location-independent hash of the terms), not by
 truncating the 128-bit `TaskId`.
 
@@ -105,10 +106,9 @@ sub-solutions and rule references become indices into flat `Vec`s.
 
 ```
 SolutionTrace
-├── status         : TraceStatus (NotDone | Answer(idx) | Err(String))
+├── status         : TraceStatus (NotDone | Answered(Vec<TraceAnswerPart>) | Err(TraceError))
 ├── terms          : Vec<TraceTerm>
-├── sub_solutions  : Vec<SolutionTrace>     // pool for recursive references
-└── find_bindings  : Vec<(TermBuf, idx)>    // from Answer::bindings(), in unknown order
+└── sub_solutions  : Vec<SolutionTrace>     // pool for recursive references
 
 TraceTerm { term, inference: TraceInference }
 

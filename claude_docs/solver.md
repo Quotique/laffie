@@ -49,7 +49,7 @@ src/solver/
 ├── task/                   # what is asked
 │   ├── mod.rs              # Task, content_id(); test helper parse_task
 │   ├── goal.rs             # Goal (private GoalBody), GoalKind, GoalError
-│   ├── answer.rs           # Answer (parts, one per unknown), Recognized
+│   ├── answer.rs           # Answer, AnswerPart (one per unknown)
 │   └── builder.rs          # TaskBuilder — infallible once it holds a Goal
 ├── rule/                   # how terms rewrite
 │   ├── mod.rs              # re-exports; test helper parse_rule
@@ -79,17 +79,17 @@ src/solver/
 | `GoalBody` | `Find`/`Prove`/`Transform`, each holding the goal **as written** (`find(x, y)`, not `x`). |
 | `Goal::parse` | The only fallible constructor, so every `Goal` that exists is well-formed and the search never re-checks. |
 | `Goal::subject` | First argument of the written form; borrows, allocates nothing. |
-| `Goal::answer` | A fresh `Answer` over the unknowns; `None` for anything but a `find`. |
+| `Goal::recognize` | Is this term an answer, and which unknown does it bind? One unknown → the whole form; several → the unknown's position. Known-ness arrives as an injected predicate, so the check needs no engine. |
+| `Goal::asked` | The `at`-th unknown of a `find`; the subject for `prove`/`transform`. |
+| `Goal::part_answered_by` | Which unknown the payload of an `answer(...)` marker resolves. A rule has already claimed it is an answer, so no oracle is consulted and no cycles are spent. |
 | `GoalKind` | `Copy` tag for matching without touching the body. |
 
 ### task/answer.rs
 | Type | What it is |
 |------|------------|
-| `Answer` | One `Part` per unknown, in the order asked. Self-contained: parts own their terms, so `term()` asks nothing of a `Solution`. |
-| `Part` | `asked` (the unknown) + `got: Option<(SharedTerm, usize)>`. The index only justifies the answer in a trace; nothing else reads it. |
-| `Answer::recognize` | Is this term an answer? One unknown → whole/no; several → which part it binds. Known-ness arrives as an injected predicate, so the check needs no engine. |
-| `Answer::term` | The parts joined with `&&`, or `None` while any is unbound. Exits on the first gap without allocating. |
-| `Recognized` | `No` / `Whole` / `Binding(usize)` — the part's position, not its term. |
+| `Answer` | One `AnswerPart` per unknown, in the order asked. Self-contained: parts own their terms, so `term()` asks nothing of a `Solution`. |
+| `AnswerPart` | `asked` (the unknown) + `term` (what it was bound to). Carries no store index — `TermIdx` is an engine type and `Answer` sits in `task`. |
+| `Answer::term` | The parts joined with `&&`. An assembled `Answer` binds every part, so there is no gap to report. |
 
 ### task/mod.rs
 | Type | What it is |
@@ -113,7 +113,7 @@ src/solver/
 | `solve_impl` | The cycle: pick a term → simplify → infer → check for an answer. |
 | `try_infer_new_terms` | Chooses the goal pattern **once per focused term** (`prove(...)` wrapper only on a prove goal's own term), then walks the suggested rules. |
 | `produce` | Grounds one rule's hypotheses, polls the limits every `DEADLINE_CHECK_INTERVAL` groundings. |
-| `AnswerCheck` | `No` / `Found(TermIdx)` / `Derived(Box<TermProps>)`. The checks only answer; the cycle is the single place that writes `SolutionStatus::Answer`. |
+| `AnswerCheck` | `No` / `Bind { part, term }` / `Unwrap { part, props }`. The checks only answer; the cycle is the single place that writes `SolutionStatus::Answered`. |
 | `LocalRules` | Rules derived from a frame's own terms. `IndexMap`, because the order rules are offered in is part of the search's identity. |
 | `MAX_SUBTASK_LEVEL` | 10 — deeper nesting aborts with `MaxSubtaskLevelExceed`. |
 
@@ -129,13 +129,15 @@ src/solver/
 ### engine/solution.rs
 | Type | What it is |
 |------|------------|
-| `Solution` | task, status, cycles, `terms` arena, two indexes, `find_answer`, `known_vars`, agenda. |
+| `Solution` | task, status, cycles, `terms` arena, two indexes, `bound`, `known_vars`, agenda. |
 | `goal_index` | `IndexMap`, not `HashMap`: it is iterated to pick the answer, and a per-process order made the reported answer vary between runs. |
 | `main_index` | Stays a `HashMap` — nothing iterates it, and its `contains_key` is on the hypothesis path. |
 | `agenda` | Min-heap keyed `(level, id)`; stale entries are discarded lazily on peek. |
 | `known_vars` | Names declared `v is known`, kept out of the term so term identity stays independent of known-ness. |
 | `Solution::subtask` | Inherits proven, non-goal, non-`answer` terms as conditions, with level reset and inference dropped. |
-| `SolutionStatus` | `NotDone` / `Answer(TermIdx)` / `Err(SolveError)`. |
+| `SolutionStatus` | `NotDone` / `Answered(Arc<Answer>)` / `Err(SolveError)`. Not `Copy`. |
+| `bound` | One slot per unknown, filled as parts are recognised. `bind_answer` assembles the `Answer` only once every slot is `Some`. |
+| `Solution::answered_parts` | The answer's parts paired with the index each was bound to, read straight off `bound`. The only way out: consumers never look a part's term up in a map, because one term can sit in both indexes under two ids. |
 
 ### engine/props.rs
 | Type | What it is |
