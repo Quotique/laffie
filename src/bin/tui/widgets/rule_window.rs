@@ -37,7 +37,6 @@ impl<'a> Widget for RuleWindow<'a> {
                 default,
             ),
             self.pair_line("Level: ", self.rule.level, default),
-            self.pair_line("Trigger: ", &self.rule.symbol, default),
             Line::default(),
             self.pair_line("Attributes:", "", default),
         ]);

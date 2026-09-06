@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- The TUI's `e` on the Rules tab and the rule window's `Trigger:` line. The
+  key opened `symbols/<symbol>.sym`, no such path for an operator symbol.
+
 ### Changed
 - `cli` fails a run whose answer changed against the recorded baseline,
   not only one that stopped being solved. Most tasks declare no expected

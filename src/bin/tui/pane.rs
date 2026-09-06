@@ -181,10 +181,6 @@ impl WidgetCommands for WidgetType {
                     key:   "/",
                     label: "filter",
                 },
-                KeyHint {
-                    key:   "e",
-                    label: "edit .sym",
-                },
             ],
             WidgetType::RuleWindow => &[
                 KeyHint {

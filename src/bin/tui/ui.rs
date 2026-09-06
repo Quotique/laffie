@@ -172,16 +172,6 @@ impl Ui {
 
     fn compute_edit_target(&self) -> Option<PathBuf> {
         match self.current_tab {
-            Tab::Rules => {
-                let idx = self.state.rules_pos.selected()?;
-                let rule = self.state.filtered_rules().into_iter().nth(idx)?;
-                Some(
-                    self.state
-                        .settings
-                        .symbols
-                        .join(format!("{}.sym", rule.symbol.as_str())),
-                )
-            }
             Tab::Tasks => {
                 let selected = self.state.tasks_pos.selected().last()?;
                 let node = self.state.tasks.get(selected)?;
@@ -191,7 +181,7 @@ impl Ui {
                     None
                 }
             }
-            Tab::Tracing | Tab::Settings => None,
+            Tab::Rules | Tab::Tracing | Tab::Settings => None,
         }
     }
 
