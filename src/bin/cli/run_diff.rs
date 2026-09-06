@@ -15,6 +15,9 @@ pub struct RunDiff {
     newly_solved:   Vec<String>,
     answer_changed: Vec<String>,
     slower:         Vec<String>,
+    /// Tasks with nothing to compare against. Counted because an empty
+    /// baseline otherwise reads exactly like a clean diff.
+    no_baseline:    usize,
 }
 
 impl RunDiff {
@@ -27,6 +30,7 @@ impl RunDiff {
         now_ms: u64,
     ) {
         let Some(prev) = prev else {
+            self.no_baseline += 1;
             return;
         };
         let was_solved = prev.stats.status.is_answer();
@@ -48,9 +52,10 @@ impl RunDiff {
         }
     }
 
-    /// `true` when a task that used to be solved no longer is (a regression).
+    /// A changed answer counts: most tasks declare no `answer`, so nothing
+    /// else catches a degraded one.
     pub fn has_regression(&self) -> bool {
-        !self.newly_failing.is_empty()
+        !self.newly_failing.is_empty() || !self.answer_changed.is_empty()
     }
 }
 
@@ -83,11 +88,45 @@ impl fmt::Display for RunDiff {
         section(f, "SLOWER >2x", Color::Magenta, &self.slower)?;
         write!(
             f,
-            "diff vs last run: {} newly failing, {} newly solved, {} answer changed, {} slower",
+            "diff vs last run: {} newly failing, {} newly solved, {} answer changed, \
+             {} slower, {} without a baseline",
             self.newly_failing.len(),
             self.newly_solved.len(),
             self.answer_changed.len(),
             self.slower.len(),
+            self.no_baseline,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_changed_answer_is_a_regression() {
+        let diff = RunDiff {
+            answer_changed: vec!["quadratic/1".to_owned()],
+            ..Default::default()
+        };
+        assert!(diff.has_regression());
+    }
+
+    #[test]
+    fn a_task_with_no_stored_run_is_counted_not_silently_clean() {
+        let mut diff = RunDiff::default();
+        diff.record("quadratic/1", None, None, 10);
+        assert_eq!(diff.no_baseline, 1);
+        assert!(!diff.has_regression());
+    }
+
+    #[test]
+    fn solving_more_or_running_slower_is_not_a_regression() {
+        let diff = RunDiff {
+            newly_solved: vec!["quadratic/1".to_owned()],
+            slower: vec!["quadratic/2 (10ms -> 30ms)".to_owned()],
+            ..Default::default()
+        };
+        assert!(!diff.has_regression());
     }
 }

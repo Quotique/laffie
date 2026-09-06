@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `cli` fails a run whose answer changed against the recorded baseline,
+  not only one that stopped being solved. Most tasks declare no expected
+  answer, so a degraded one used to pass unnoticed.
+- `cli` reports how many tasks had no recorded baseline, so an empty database
+  no longer reads as a clean diff.
 - A goal that is not `find`/`prove`/`transform` is a load error naming the file,
   the line and the goal, instead of a panic partway through the run.
 - A store overflow while assembling a multi-target answer ends the task with an
