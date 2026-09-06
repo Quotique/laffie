@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multi-variable `find` every marked answer bound the first.
 - An answer part's derivation starts from the term the part was bound to. It
   was found by looking the term up, and one term can hold two store indexes.
+- An answer over three or more unknowns is assembled as one flat `&&`, like a
+  declared answer. Nested, it matched only as rendered text.
 
 ### Removed
 - The `html` and `tui` renderers, their features, and the `html-escape`

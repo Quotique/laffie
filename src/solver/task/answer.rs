@@ -1,4 +1,7 @@
-use crate::term::{SharedTerm, TermBuf};
+use crate::{
+    NormLevel,
+    term::{SharedTerm, TermBuf},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Answer {
@@ -12,32 +15,29 @@ pub struct AnswerPart {
 }
 
 impl Answer {
+    /// The answer as one term, shaped like a declared answer
     pub fn term(&self) -> TermBuf {
-        let mut parts = self.parts.iter();
-        let first = parts
-            .next()
+        let (first, rest) = self
+            .parts
+            .split_first()
             .expect("an answer has a part per asked unknown");
-        let mut result = first.term.as_ref().clone();
-        for part in parts {
-            result = TermBuf::symbol("&&")
-                .arg(result)
-                .arg(part.term.as_ref().clone());
+        if rest.is_empty() {
+            return first.term.as_ref().clone();
         }
-        result
+        let mut result = TermBuf::symbol("&&").arg(first.term.as_ref().clone());
+        for part in rest {
+            result = result.arg(part.term.as_ref().clone());
+        }
+        result.normalize(NormLevel::Full)
     }
 
     pub fn parts(&self) -> &[AnswerPart] {
         &self.parts
     }
 
+    /// Whether the answer is one the task declares; declaring none accepts any.
     pub fn matches(&self, expected: &[TermBuf]) -> bool {
-        if expected.is_empty() {
-            return true;
-        }
-        let term = self.term();
-        // TODO: есть проблема с неправильным преобразованием дерева, что приводит к
-        // некорректному прямому сравнению дерева.
-        expected.contains(&term) || expected.iter().any(|x| x.to_string() == term.to_string())
+        expected.is_empty() || expected.contains(&self.term())
     }
 
     pub(crate) fn new(parts: Vec<AnswerPart>) -> Self {
@@ -48,7 +48,7 @@ impl Answer {
 #[cfg(test)]
 mod tests {
     use super::{Answer, AnswerPart};
-    use crate::term::{SharedTerm, term_with_vars};
+    use crate::term::{SharedTerm, TermBuf, term_with_vars};
 
     fn answer(parts: &[(&'static str, &'static str)]) -> Answer {
         Answer::new(
@@ -72,6 +72,18 @@ mod tests {
         assert_eq!(
             answer(&[("x", "x == 1"), ("y", "y == 2")]).term(),
             term_with_vars("x == 1 && y == 2")
+        );
+    }
+
+    // A declared `p && q && r` parses into one node, so this must not nest.
+    #[test]
+    fn several_parts_join_flat() {
+        assert_eq!(
+            answer(&[("x", "x == 1"), ("y", "y == 2"), ("z", "z == 3")]).term(),
+            TermBuf::symbol("&&")
+                .arg(term_with_vars("x == 1"))
+                .arg(term_with_vars("y == 2"))
+                .arg(term_with_vars("z == 3"))
         );
     }
 
