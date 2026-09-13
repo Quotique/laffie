@@ -9,7 +9,7 @@ pub use builder::RuleBuilder;
 pub use hypothesis::{GroundedHypothesis, Hypothesis, HypothesisIterator};
 pub use rule::{ApplyRule, Level, Rule, RuleDeclineReason, RuleId, SharedRule};
 pub use rule_attribute::{RuleAttr, RuleAttrValue};
-pub use rules_engine::RulesEngine;
+pub use rules_engine::{RuleRejection, RulesEngine};
 pub use term_filters::TermFilters;
 
 #[cfg(test)]

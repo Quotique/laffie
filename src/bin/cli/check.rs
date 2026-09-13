@@ -11,16 +11,12 @@ use solver::{
 
 /// Lints the loaded corpus. Load errors are hard; suspicious params are
 /// warnings (errors under `strict`). Returns the process exit code.
-pub fn run(
-    rules: &LoadReport<RulesEngine>,
-    tasks: &LoadReport<Vec<Task>>,
-    strict: bool,
-) -> ExitCode {
+pub fn run(rules: &RulesEngine, tasks: &LoadReport<Vec<Task>>, strict: bool) -> ExitCode {
     let mut errors: Vec<String> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
 
-    // Parse failures and dangling block(...) refs (loader collects both).
-    for e in rules.errors.iter().chain(tasks.errors.iter()) {
+    // Rule-side failures already aborted the load; only tasks report here.
+    for e in tasks.errors.iter() {
         errors.push(format!("{}: {}", e.path.display(), e.message));
     }
 
@@ -31,7 +27,7 @@ pub fn run(
         .filter(|s| is_word(s))
         .collect();
     let mut seen: HashSet<(String, String)> = HashSet::new();
-    for rule in rules.value.iter() {
+    for rule in rules.iter() {
         for param in rule_param_names(&rule) {
             if let Some(sym) = typo_of(&param, &symbols) &&
                 seen.insert((param.clone(), sym.clone()))

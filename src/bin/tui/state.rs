@@ -153,7 +153,7 @@ impl State {
     pub fn try_new(settings: Settings) -> io::Result<Self> {
         let parser = DirectoryParser::new(settings.symbols.clone(), settings.tasks.clone());
 
-        let rules = Arc::new(parser.load_rules()?.value);
+        let rules = Arc::new(parser.load_rules().map_err(io::Error::other)?);
         let tasks = parser.load_tasks()?.value;
         let mut result = Self {
             rules_engine: rules,
@@ -189,10 +189,12 @@ impl State {
     }
 
     pub fn reload(&mut self) -> io::Result<()> {
+        // Assigned only on success: a broken `.sym` leaves the previous base
+        // in place, so the tab keeps working while the error is on screen.
         self.rules_engine = Arc::new(
             DirectoryParser::new(&self.settings.symbols, &self.settings.tasks)
-                .load_rules()?
-                .value,
+                .load_rules()
+                .map_err(io::Error::other)?,
         );
         Ok(())
     }

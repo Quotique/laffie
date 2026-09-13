@@ -31,12 +31,7 @@ fn corpus() -> (Arc<Solver>, Vec<Task>) {
     let root = repo_root();
     let parser = DirectoryParser::new(root.join("symbols"), root.join("tasks/regress"));
 
-    let rules = parser.load_rules().expect("symbols dir readable");
-    assert!(
-        rules.errors.is_empty(),
-        "{} rule load error(s)",
-        rules.errors.len()
-    );
+    let rules = parser.load_rules().expect("the symbols corpus loads clean");
     let tasks = parser.load_tasks().expect("tasks dir readable");
     assert!(
         tasks.errors.is_empty(),
@@ -45,7 +40,7 @@ fn corpus() -> (Arc<Solver>, Vec<Task>) {
     );
     assert!(!tasks.value.is_empty(), "the regress corpus is empty");
 
-    (Arc::new(Solver::new(Arc::new(rules.value))), tasks.value)
+    (Arc::new(Solver::new(Arc::new(rules))), tasks.value)
 }
 
 fn solve_once(solver: &Solver, task: &Task) -> Print {

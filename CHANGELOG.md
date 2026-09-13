@@ -7,11 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Removed
-- The TUI's `e` on the Rules tab and the rule window's `Trigger:` line. The
-  key opened `symbols/<symbol>.sym`, no such path for an operator symbol.
-
 ### Changed
+- A `.sym` corpus with any problem yields no rule base, and every problem is
+  listed. The TUI shows them and keeps the previous base.
 - `cli` fails a run whose answer changed against the recorded baseline,
   not only one that stopped being solved. Most tasks declare no expected
   answer, so a degraded one used to pass unnoticed.
@@ -53,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declared answer. Nested, it matched only as rendered text.
 
 ### Removed
+- The TUI's `e` on the Rules tab and the rule window's `Trigger:` line. The
+  key opened `symbols/<symbol>.sym`, no such path for an operator symbol.
 - The `html` and `tui` renderers, their features, and the `html-escape`
   dependency. No workspace member enabled either feature. The `tui` binary
   renders solutions itself.

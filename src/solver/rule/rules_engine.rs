@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    iter::once,
-};
+use std::{collections::HashMap, fmt, iter::once};
 
 use itertools::Itertools;
 
@@ -13,13 +10,20 @@ use crate::{
 
 type LevelRules = HashMap<Symbol, Vec<SharedRule>>;
 
+/// A rule the base could not file. Returned instead of the base, so nothing
+/// runs against a rule set that is not what the `.sym` files say.
+#[derive(Debug)]
+pub enum RuleRejection {
+    UndefinedId {
+        rule: Rule,
+        ids:  Vec<CompactString>,
+    },
+}
+
 #[derive(Default)]
 pub struct RulesEngine {
-    all_rules:  HashMap<Level, LevelRules>,
-    rule_queue: VecDeque<Rule>,
-    id_map:     HashMap<CompactString, RuleId>,
-    last_id:    RuleId,
-    max_level:  Level,
+    all_rules: HashMap<Level, LevelRules>,
+    max_level: Level,
 }
 
 impl RulesEngine {
@@ -31,17 +35,6 @@ impl RulesEngine {
         self.all_rules
             .values()
             .flat_map(|x| x.values().flat_map(|x| x.iter().cloned()))
-    }
-
-    pub fn register_rule(&mut self, mut rule: Rule) {
-        self.last_id.increment();
-        rule.id = self.last_id;
-        debug!("New rule: {rule}");
-        if let Some(RuleAttrValue::Str(s)) = rule.attribute(&RuleAttr::Id).next() {
-            self.id_map.insert(s.clone(), rule.id);
-        }
-        self.add_rule(rule);
-        self.process_queue();
     }
 
     pub fn suggest_rules(&self, filters: &TermFilters, goal: &TermBuf) -> Vec<SharedRule> {
@@ -63,59 +56,68 @@ impl RulesEngine {
         }
         result
     }
+}
 
-    /// Rules that never resolved their `block(...)` references, described with
-    /// the ids that stayed undefined. Empty once every reference is registered.
-    pub fn dangling_ids(&self) -> Vec<String> {
-        self.rule_queue
-            .iter()
-            .map(|rule| {
-                let missing: Vec<&str> = rule
-                    .attribute(&RuleAttr::Block)
-                    .filter_map(RuleAttrValue::str)
-                    .filter(|x| !self.id_map.contains_key(*x))
-                    .collect();
-                format!(
-                    "rule {rule} references undefined block(s): {}",
-                    missing.join(", ")
-                )
-            })
-            .collect()
-    }
-
-    fn process_queue(&mut self) {
-        let mut queue_len = self.rule_queue.len();
-
-        while let Some(rule) = self.rule_queue.pop_front() {
-            self.add_rule(rule);
-            queue_len -= 1;
-            if queue_len == 0 {
-                break;
-            }
+impl fmt::Display for RuleRejection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::UndefinedId { rule, ids } => write!(
+                f,
+                "rule {rule} references undefined block(s): {}",
+                ids.iter().format(", ")
+            ),
         }
     }
+}
 
-    fn add_rule(&mut self, mut rule: Rule) {
-        if !rule
-            .attribute(&RuleAttr::Block)
-            .filter_map(RuleAttrValue::str)
-            .all(|x| self.id_map.contains_key(x))
-        {
-            self.rule_queue.push_back(rule);
-        } else {
-            self.max_level = std::cmp::max(self.max_level, rule.level);
+impl FromIterator<Rule> for Result<RulesEngine, Vec<RuleRejection>> {
+    fn from_iter<I: IntoIterator<Item = Rule>>(iter: I) -> Self {
+        let mut rules: Vec<Rule> = iter.into_iter().collect();
+
+        let mut id_map: HashMap<CompactString, RuleId> = HashMap::new();
+        let mut last_id = RuleId::default();
+        for rule in &mut rules {
+            last_id.increment();
+            rule.id = last_id;
+            if let Some(RuleAttrValue::Str(s)) = rule.attribute(&RuleAttr::Id).next() {
+                id_map.insert(s.clone(), rule.id);
+            }
+        }
+
+        let mut engine = RulesEngine::default();
+        let mut rejected = Vec::new();
+        for mut rule in rules {
+            let ids: Vec<CompactString> = rule
+                .attribute(&RuleAttr::Block)
+                .filter_map(RuleAttrValue::str)
+                .filter(|x| !id_map.contains_key(*x))
+                .map(CompactString::from)
+                .collect();
+            if !ids.is_empty() {
+                rejected.push(RuleRejection::UndefinedId { rule, ids });
+                continue;
+            }
+            debug!("New rule: {rule}");
             rule.block = rule
                 .attribute(&RuleAttr::Block)
                 .filter_map(RuleAttrValue::str)
-                .map(|x| *self.id_map.get(x).unwrap())
+                .map(|x| *id_map.get(x).unwrap())
                 .unique()
                 .collect();
-            self.all_rules
+            engine.max_level = std::cmp::max(engine.max_level, rule.level);
+            engine
+                .all_rules
                 .entry(rule.level)
                 .or_default()
                 .entry(rule.symbol.clone())
                 .or_default()
                 .push(SharedRule::new(rule));
+        }
+
+        if rejected.is_empty() {
+            Ok(engine)
+        } else {
+            Err(rejected)
         }
     }
 }

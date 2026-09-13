@@ -138,8 +138,8 @@ fn main() -> ExitCode {
     };
     let parser = DirectoryParser::new(symbols_dir, tasks_dir);
 
-    let rules = match parser.load_rules() {
-        Ok(report) => report,
+    let rules_engine = match parser.load_rules() {
+        Ok(engine) => engine,
         Err(e) => {
             eprintln!("{e}");
             return ExitCode::FAILURE;
@@ -154,19 +154,18 @@ fn main() -> ExitCode {
     };
 
     if args.check {
-        return check::run(&rules, &tasks, args.strict);
+        return check::run(&rules_engine, &tasks, args.strict);
     }
 
-    // A broken corpus is not a valid run: report every load error and bail out.
-    let load_errors: Vec<_> = rules.errors.iter().chain(tasks.errors.iter()).collect();
-    if !load_errors.is_empty() {
-        for e in &load_errors {
+    // A broken corpus is not a valid run; the rules already bailed out above.
+    if !tasks.errors.is_empty() {
+        for e in &tasks.errors {
             eprintln!("{}: {}", e.path.display(), e.message);
         }
-        eprintln!("{} load error(s)", load_errors.len());
+        eprintln!("{} load error(s)", tasks.errors.len());
         return ExitCode::FAILURE;
     }
-    let rules_engine = Arc::new(rules.value);
+    let rules_engine = Arc::new(rules_engine);
     let solver = Solver::new(rules_engine.clone());
     let tasks = tasks.value;
 

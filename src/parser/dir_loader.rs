@@ -6,13 +6,13 @@ use std::{
 use itertools::Itertools;
 
 use solver::{
-    rule::RulesEngine,
+    rule::{Rule, RulesEngine},
     task::Task,
     term::{Symbol, try_sym},
 };
 
 use crate::{
-    ParserError, RuleParser, SymbolParser, TaskParser, Tree,
+    LoadError, LoadFailure, ParserError, RuleParser, SymbolParser, TaskParser, Tree,
     grammar::{TOKEN_DECLARE, TOKEN_RULE, TOKEN_SYMBOL, TOKEN_TASK},
     lang,
 };
@@ -21,12 +21,6 @@ use crate::{
 pub struct LoadReport<T> {
     pub value:  T,
     pub errors: Vec<LoadError>,
-}
-
-/// A non-fatal load failure; `message` carries the source location and snippet.
-pub struct LoadError {
-    pub path:    PathBuf,
-    pub message: String,
 }
 
 pub struct DirectoryParser {
@@ -42,7 +36,7 @@ impl DirectoryParser {
         }
     }
 
-    pub fn load_rules(&self) -> io::Result<LoadReport<RulesEngine>> {
+    pub fn load_rules(&self) -> Result<RulesEngine, LoadFailure> {
         info!(target: "init", "Reading rules: {:?}", self.symbols_path);
 
         let (files, mut errors) = Self::gather(&self.symbols_path, &["sym"])?;
@@ -65,7 +59,7 @@ impl DirectoryParser {
 
         // Pass 2: parse rules, each attached to the most recent symbol in its
         // file. Symbols are looked up, not re-parsed (no double Python).
-        let mut engine = RulesEngine::default();
+        let mut parsed: Vec<Rule> = Vec::new();
         for file in &files {
             let mut last_sym: Option<Symbol> = None;
             for block in &file.blocks {
@@ -83,7 +77,7 @@ impl DirectoryParser {
                             .with_func_symbol(func_symbol)
                             .parse()
                         {
-                            Ok(rules) => rules.into_iter().for_each(|r| engine.register_rule(r)),
+                            Ok(rules) => parsed.extend(rules),
                             Err(e) => errors.push(file.error(&e)),
                         }
                     }
@@ -92,19 +86,21 @@ impl DirectoryParser {
             }
         }
 
-        // Rules whose block(...) references never resolved would have panicked
-        // suggest_rules at solve time; surface them as load errors instead.
-        for message in engine.dangling_ids() {
-            errors.push(LoadError {
-                path: self.symbols_path.clone(),
-                message,
-            });
-        }
+        let engine = match parsed.into_iter().collect::<Result<RulesEngine, _>>() {
+            Ok(engine) => Some(engine),
+            Err(rejected) => {
+                errors.extend(rejected.iter().map(|r| LoadError {
+                    path:    self.symbols_path.clone(),
+                    message: r.to_string(),
+                }));
+                None
+            }
+        };
 
-        Ok(LoadReport {
-            value: engine,
-            errors,
-        })
+        match engine {
+            Some(engine) if errors.is_empty() => Ok(engine),
+            _ => Err(LoadFailure::Corpus(errors)),
+        }
     }
 
     pub fn load_tasks(&self) -> io::Result<LoadReport<Vec<Task>>> {
@@ -217,7 +213,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dangling_block_is_a_load_error_not_a_panic() {
+    fn a_dangling_block_yields_no_base_at_all() {
         let dir = std::env::temp_dir().join("laffie_dir_loader_dangling");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -225,23 +221,55 @@ mod tests {
             dir.join("t.sym"),
             "symbol qq { attr infix(10); }\n\
              rule {\n\
-                 attr block(nonexistent);\n\
+                 attr level(0),block(nonexistent);\n\
                  qq(x) => x;\n\
              }\n",
         )
         .unwrap();
 
-        // The block reference never resolves; this used to panic suggest_rules
-        // at solve time. Now it is a load error, and loading itself completes.
-        let report = DirectoryParser::new(&dir, &dir).load_rules().unwrap();
+        // Running against a base that silently dropped this rule would answer
+        // by a rule set that is not what the file says.
+        let Err(LoadFailure::Corpus(errors)) = DirectoryParser::new(&dir, &dir).load_rules() else {
+            panic!("a dangling block must not yield a base");
+        };
         assert!(
-            report
-                .errors
-                .iter()
-                .any(|e| e.message.contains("nonexistent")),
-            "expected a dangling-block load error, got: {:?}",
-            report.errors.iter().map(|e| &e.message).collect::<Vec<_>>()
+            errors.iter().any(|e| e.message.contains("nonexistent")),
+            "expected the undefined id in the message, got: {:?}",
+            errors.iter().map(|e| &e.message).collect::<Vec<_>>()
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_block_defined_in_a_later_file_still_resolves() {
+        let dir = std::env::temp_dir().join("laffie_dir_loader_forward");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        // `a.sym` sorts first, so its reference points at a rule not yet read.
+        fs::write(
+            dir.join("a.sym"),
+            "symbol aa { attr infix(10); }\n\
+             rule {\n\
+                 attr level(0),block(defined_later);\n\
+                 aa(x) => x;\n\
+             }\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("b.sym"),
+            "symbol bb { attr infix(10); }\n\
+             rule {\n\
+                 attr level(0),id(defined_later);\n\
+                 bb(x) => x;\n\
+             }\n",
+        )
+        .unwrap();
+
+        let engine = DirectoryParser::new(&dir, &dir)
+            .load_rules()
+            .expect("a forward reference resolves without deferral");
+        assert_eq!(engine.iter().count(), 2);
 
         let _ = fs::remove_dir_all(&dir);
     }

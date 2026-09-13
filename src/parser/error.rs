@@ -1,4 +1,9 @@
-use std::{convert::From, error::Error, fmt, path::Path};
+use std::{
+    convert::From,
+    error::Error,
+    fmt, io,
+    path::{Path, PathBuf},
+};
 
 use crate::Location;
 
@@ -6,10 +11,46 @@ type PegError = peg::error::ParseError<peg::str::LineCol>;
 
 const LINES_AROUND: usize = 5;
 
+/// A non-fatal load failure; `message` carries the source location and snippet.
+#[derive(Debug)]
+pub struct LoadError {
+    pub path:    PathBuf,
+    pub message: String,
+}
+
+/// `Corpus` lists every problem, not the first: `.sym` fixes go in one pass.
+#[derive(Debug)]
+pub enum LoadFailure {
+    Io(io::Error),
+    Corpus(Vec<LoadError>),
+}
+
 #[derive(Clone, Debug)]
 pub struct ParserError {
     pub loc: Location,
     pub msg: String,
+}
+
+impl fmt::Display for LoadFailure {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Io(e) => write!(f, "{e}"),
+            Self::Corpus(errors) => {
+                for e in errors {
+                    writeln!(f, "{}: {}", e.path.display(), e.message)?;
+                }
+                write!(f, "{} load error(s)", errors.len())
+            }
+        }
+    }
+}
+
+impl Error for LoadFailure {}
+
+impl From<io::Error> for LoadFailure {
+    fn from(e: io::Error) -> Self {
+        Self::Io(e)
+    }
 }
 
 impl fmt::Display for ParserError {
