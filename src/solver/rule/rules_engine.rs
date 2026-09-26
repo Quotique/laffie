@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fmt};
 
+use indexmap::IndexMap;
 use itertools::Itertools;
 
 use super::{Rule, RuleAttr, RuleAttrValue, RuleId, SharedRule, TermFilters, rule::Level};
@@ -8,7 +9,7 @@ use crate::{
     term::{Symbol, TermBuf},
 };
 
-type LevelRules = HashMap<Symbol, Vec<SharedRule>>;
+type LevelRules = IndexMap<Symbol, Vec<SharedRule>>;
 
 /// A rule the base could not file. Returned instead of the base, so nothing
 /// runs against a rule set that is not what the `.sym` files say.
@@ -24,7 +25,7 @@ pub enum RuleRejection {
 
 #[derive(Default)]
 pub struct RulesEngine {
-    all_rules: HashMap<Level, LevelRules>,
+    all_rules: IndexMap<Level, LevelRules>,
     max_level: Level,
 }
 
@@ -33,6 +34,7 @@ impl RulesEngine {
         self.max_level
     }
 
+    /// Same order every run: both maps are `IndexMap`.
     pub fn iter(&self) -> impl Iterator<Item = SharedRule> + '_ {
         self.all_rules
             .values()
