@@ -96,7 +96,9 @@ Rules are top-level blocks in a `.sym` file, not nested inside `symbol`.
 
 `load_rules()` makes two passes over the `.sym` files: symbols first, so that
 every `SymbolProgram` is in the global registry before any rule mentioning it
-is parsed. Then rules go to `RulesEngine::register_rule`.
+is parsed. Then every rule, paired with its block's location, is collected
+into a `RulesEngine` in one go; a rejection comes back with the rule's input
+position, which `load_rules` maps to the file and line.
 
 ## Gotchas worth knowing before you edit
 
