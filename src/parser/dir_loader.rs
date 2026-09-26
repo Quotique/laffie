@@ -8,12 +8,11 @@ use itertools::Itertools;
 use solver::{
     rule::{Rule, RulesEngine},
     task::Task,
-    term::{Symbol, try_sym},
 };
 
 use crate::{
     LoadError, LoadFailure, ParserError, RuleParser, SymbolParser, TaskParser, Tree,
-    grammar::{TOKEN_DECLARE, TOKEN_RULE, TOKEN_SYMBOL, TOKEN_TASK},
+    grammar::{TOKEN_DECLARE, TOKEN_RULE, TOKEN_TASK},
     lang,
 };
 
@@ -57,31 +56,16 @@ impl DirectoryParser {
             }
         }
 
-        // Pass 2: parse rules, each attached to the most recent symbol in its
-        // file. Symbols are looked up, not re-parsed (no double Python).
+        // Pass 2: parse rules.
         let mut parsed: Vec<Rule> = Vec::new();
         for file in &files {
-            let mut last_sym: Option<Symbol> = None;
             for block in &file.blocks {
-                match block.data().symbol.as_str() {
-                    TOKEN_DECLARE => last_sym = declare_name(block).and_then(try_sym),
-                    TOKEN_RULE => {
-                        let Some(func_symbol) = last_sym.clone() else {
-                            errors.push(file.error(&ParserError {
-                                loc: block.data().location.clone(),
-                                msg: "rule appears before any symbol declaration".to_owned(),
-                            }));
-                            continue;
-                        };
-                        match RuleParser::from(block)
-                            .with_func_symbol(func_symbol)
-                            .parse()
-                        {
-                            Ok(rules) => parsed.extend(rules),
-                            Err(e) => errors.push(file.error(&e)),
-                        }
-                    }
-                    _ => {}
+                if block.data().symbol != TOKEN_RULE {
+                    continue;
+                }
+                match RuleParser::from(block).parse() {
+                    Ok(rules) => parsed.extend(rules),
+                    Err(e) => errors.push(file.error(&e)),
                 }
             }
         }
@@ -195,15 +179,6 @@ impl ParsedFile {
             message: e.error_string(&self.src, Some(&self.path)),
         }
     }
-}
-
-/// Name of a `Declare` block's symbol, if present.
-fn declare_name(block: &Tree) -> Option<&str> {
-    block
-        .iter()
-        .find(|c| c.data().symbol == TOKEN_SYMBOL)
-        .and_then(|c| c.front())
-        .map(|n| n.data().symbol.as_str())
 }
 
 #[cfg(test)]

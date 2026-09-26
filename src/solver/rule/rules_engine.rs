@@ -1,11 +1,11 @@
-use std::{collections::HashMap, fmt, iter::once};
+use std::{collections::HashMap, fmt};
 
 use itertools::Itertools;
 
 use super::{Rule, RuleAttr, RuleAttrValue, RuleId, SharedRule, TermFilters, rule::Level};
 use crate::{
     CompactString,
-    term::{Symbol, TermBuf, sym},
+    term::{Symbol, TermBuf},
 };
 
 type LevelRules = HashMap<Symbol, Vec<SharedRule>>;
@@ -18,6 +18,8 @@ pub enum RuleRejection {
         rule: Rule,
         ids:  Vec<CompactString>,
     },
+    /// Rejected rather than tried against every term.
+    PatternWithoutSymbols { rule: Rule },
 }
 
 #[derive(Default)]
@@ -40,8 +42,9 @@ impl RulesEngine {
     pub fn suggest_rules(&self, filters: &TermFilters, goal: &TermBuf) -> Vec<SharedRule> {
         let empty_level = LevelRules::new();
         let level = self.all_rules.get(&filters.level).unwrap_or(&empty_level);
-        let result: Vec<_> = once(&sym("AnySymbol"))
-            .chain(filters.symbols.iter())
+        let result: Vec<_> = filters
+            .symbols
+            .iter()
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())
             .filter(|rule| rule.try_filter(filters, goal).is_ok())
@@ -66,6 +69,9 @@ impl fmt::Display for RuleRejection {
                 "rule {rule} references undefined block(s): {}",
                 ids.iter().format(", ")
             ),
+            Self::PatternWithoutSymbols { rule } => {
+                write!(f, "rule {rule} has no function symbol in its pattern")
+            }
         }
     }
 }
@@ -84,6 +90,14 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<RuleRejection>> {
             }
         }
 
+        let mut uses: HashMap<&Symbol, usize> = HashMap::new();
+        for rule in &rules {
+            for s in rule.pattern_symbols.iter() {
+                *uses.entry(s).or_default() += 1;
+            }
+        }
+        let uses: HashMap<Symbol, usize> = uses.into_iter().map(|(s, n)| (s.clone(), n)).collect();
+
         let mut engine = RulesEngine::default();
         let mut rejected = Vec::new();
         for mut rule in rules {
@@ -97,7 +111,11 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<RuleRejection>> {
                 rejected.push(RuleRejection::UndefinedId { rule, ids });
                 continue;
             }
-            debug!("New rule: {rule}");
+            let Some(cell) = cell_of(&rule, &uses) else {
+                rejected.push(RuleRejection::PatternWithoutSymbols { rule });
+                continue;
+            };
+            debug!("New rule on `{cell}`: {rule}");
             rule.block = rule
                 .attribute(&RuleAttr::Block)
                 .filter_map(RuleAttrValue::str)
@@ -109,7 +127,7 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<RuleRejection>> {
                 .all_rules
                 .entry(rule.level)
                 .or_default()
-                .entry(rule.symbol.clone())
+                .entry(cell)
                 .or_default()
                 .push(SharedRule::new(rule));
         }
@@ -120,6 +138,17 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<RuleRejection>> {
             Err(rejected)
         }
     }
+}
+
+/// The pattern symbol the fewest rules use, ties broken by name.
+///
+/// Any pattern symbol is sound, since a term without it cannot match; the
+/// rarest wastes the fewest scans. The name keeps search order deterministic.
+fn cell_of(rule: &Rule, uses: &HashMap<Symbol, usize>) -> Option<Symbol> {
+    rule.pattern_symbols
+        .iter()
+        .min_by_key(|s| (uses.get(*s).copied().unwrap_or(0), s.as_str()))
+        .cloned()
 }
 
 #[cfg(test)]

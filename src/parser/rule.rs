@@ -3,7 +3,7 @@ use std::{collections::HashSet, str::FromStr};
 use solver::{
     CompactString,
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
-    term::{Atom, Symbol, Term, TermBuf, TermMut, TermRef, var},
+    term::{Atom, Term, TermBuf, TermMut, TermRef, var},
 };
 
 use crate::ParserError;
@@ -12,24 +12,15 @@ use super::{Node, Tree, term::TermParser};
 
 pub struct RuleParser<'a> {
     syntax_tree: &'a Tree,
-    func_symbol: Symbol,
 }
 
 impl<'a> From<&'a Tree> for RuleParser<'a> {
     fn from(syntax_tree: &'a Tree) -> Self {
-        Self {
-            syntax_tree,
-            func_symbol: Default::default(),
-        }
+        Self { syntax_tree }
     }
 }
 
 impl<'a> RuleParser<'a> {
-    pub fn with_func_symbol(mut self, func_symbol: Symbol) -> Self {
-        self.func_symbol = func_symbol;
-        self
-    }
-
     pub fn parse(self) -> Result<Vec<Rule>, ParserError> {
         if self.syntax_tree.root().data().symbol != "Rule" {
             return Err(ParserError {
@@ -94,13 +85,10 @@ impl<'a> RuleParser<'a> {
             builder = builder.with_attribute(attr, value);
         }
 
-        builder
-            .with_func_symbol(self.func_symbol)
-            .build()
-            .map_err(|e| ParserError {
-                loc: self.syntax_tree.data().location.clone(),
-                msg: e.to_string(),
-            })
+        builder.build().map_err(|e| ParserError {
+            loc: self.syntax_tree.data().location.clone(),
+            msg: e.to_string(),
+        })
     }
 
     fn parse_attribute(attr: &Node) -> Result<(RuleAttr, RuleAttrValue), ParserError> {

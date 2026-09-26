@@ -4,7 +4,7 @@ use multimap::MultiMap;
 
 use crate::{
     NormLevel,
-    term::{Symbol, Term, TermBuf, sym},
+    term::{Term, TermBuf},
 };
 
 use super::{Rule, RuleAttr, RuleAttrValue, RuleId};
@@ -17,12 +17,12 @@ pub enum RuleBuilderError {
     MissingLevelAttribute,
 }
 
+#[derive(Default)]
 pub struct RuleBuilder {
     rule_id:      RuleId,
     term:         Option<TermBuf>,
     requirements: Vec<TermBuf>,
     attributes:   Vec<(RuleAttr, RuleAttrValue)>,
-    symbol:       Symbol,
 
     replaces: Vec<(RuleAttr, TermBuf)>,
 }
@@ -44,27 +44,9 @@ impl fmt::Display for RuleBuilderError {
     }
 }
 
-impl Default for RuleBuilder {
-    fn default() -> Self {
-        RuleBuilder {
-            rule_id:      RuleId::default(),
-            term:         None,
-            requirements: Default::default(),
-            attributes:   Default::default(),
-            symbol:       sym("AnySymbol"),
-            replaces:     Default::default(),
-        }
-    }
-}
-
 impl RuleBuilder {
     pub fn with_id(mut self, id: RuleId) -> Self {
         self.rule_id = id;
-        self
-    }
-
-    pub fn with_func_symbol(mut self, func_symbol: Symbol) -> Self {
-        self.symbol = func_symbol;
         self
     }
 
@@ -150,7 +132,6 @@ impl RuleBuilder {
             result.push(Rule {
                 id: self.rule_id,
                 level: (*level).into(),
-                symbol: self.symbol.clone(),
                 attrs: attrs.clone(),
                 block: Default::default(),
                 pattern_symbols: term.term().first_arg().unwrap().symbols(),

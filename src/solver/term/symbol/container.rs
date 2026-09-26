@@ -38,7 +38,6 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
         add_symbol_impl(&mut result, ops::is::symbol());
         SymbolProgram::add_with_name(&mut result, "known");
         add_symbol_impl(&mut result, ops::op_in::symbol());
-        SymbolProgram::add_with_name(&mut result, "AnySymbol");
         add_symbol_impl(
             &mut result,
             SymbolProgram {

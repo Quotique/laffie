@@ -47,9 +47,8 @@ pub type SharedRule = Arc<Rule>;
 /// A rewriting rule.
 #[derive(Clone, Debug)]
 pub struct Rule {
-    pub id:     RuleId,
-    pub level:  Level,
-    pub symbol: Symbol,
+    pub id:    RuleId,
+    pub level: Level,
 
     pub attrs: MultiMap<RuleAttr, RuleAttrValue>,
     pub block: Vec<RuleId>,
