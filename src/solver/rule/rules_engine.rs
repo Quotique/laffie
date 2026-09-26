@@ -78,7 +78,8 @@ impl fmt::Display for RuleRejection {
     }
 }
 
-impl FromIterator<Rule> for Result<RulesEngine, Vec<RuleRejection>> {
+/// On failure, each rejection comes with the rule's position in the input.
+impl FromIterator<Rule> for Result<RulesEngine, Vec<(usize, RuleRejection)>> {
     fn from_iter<I: IntoIterator<Item = Rule>>(iter: I) -> Self {
         let mut rules: Vec<Rule> = iter.into_iter().collect();
 
@@ -102,7 +103,7 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<RuleRejection>> {
 
         let mut engine = RulesEngine::default();
         let mut rejected = Vec::new();
-        for mut rule in rules {
+        for (at, mut rule) in rules.into_iter().enumerate() {
             let ids: Vec<CompactString> = rule
                 .attribute(&RuleAttr::Block)
                 .filter_map(RuleAttrValue::str)
@@ -110,11 +111,11 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<RuleRejection>> {
                 .map(CompactString::from)
                 .collect();
             if !ids.is_empty() {
-                rejected.push(RuleRejection::UndefinedId { rule, ids });
+                rejected.push((at, RuleRejection::UndefinedId { rule, ids }));
                 continue;
             }
             let Some(cell) = cell_of(&rule, &uses) else {
-                rejected.push(RuleRejection::PatternWithoutSymbols { rule });
+                rejected.push((at, RuleRejection::PatternWithoutSymbols { rule }));
                 continue;
             };
             debug!("New rule on `{cell}`: {rule}");

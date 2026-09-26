@@ -11,7 +11,7 @@ use solver::{
 };
 
 use crate::{
-    LoadError, LoadFailure, ParserError, RuleParser, SymbolParser, TaskParser, Tree,
+    LoadError, LoadFailure, Location, ParserError, RuleParser, SymbolParser, TaskParser, Tree,
     grammar::{TOKEN_DECLARE, TOKEN_RULE, TOKEN_TASK},
     lang,
 };
@@ -57,25 +57,32 @@ impl DirectoryParser {
         }
 
         // Pass 2: parse rules.
-        let mut parsed: Vec<Rule> = Vec::new();
+        let mut parsed: Vec<(Rule, (&ParsedFile, &Location))> = Vec::new();
         for file in &files {
             for block in &file.blocks {
                 if block.data().symbol != TOKEN_RULE {
                     continue;
                 }
                 match RuleParser::from(block).parse() {
-                    Ok(rules) => parsed.extend(rules),
+                    Ok(rules) => {
+                        let origin = (file, &block.data().location);
+                        parsed.extend(rules.into_iter().map(|r| (r, origin)));
+                    }
                     Err(e) => errors.push(file.error(&e)),
                 }
             }
         }
 
-        let engine = match parsed.into_iter().collect::<Result<RulesEngine, _>>() {
+        let (rules, origin): (Vec<_>, Vec<_>) = parsed.into_iter().unzip();
+        let engine = match rules.into_iter().collect::<Result<RulesEngine, _>>() {
             Ok(engine) => Some(engine),
             Err(rejected) => {
-                errors.extend(rejected.iter().map(|r| LoadError {
-                    path:    self.symbols_path.clone(),
-                    message: r.to_string(),
+                errors.extend(rejected.iter().map(|(at, r)| {
+                    let (file, loc) = origin[*at];
+                    file.error(&ParserError {
+                        loc: loc.clone(),
+                        msg: r.to_string(),
+                    })
                 }));
                 None
             }
@@ -187,31 +194,121 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn a_dangling_block_yields_no_base_at_all() {
-        let dir = std::env::temp_dir().join("laffie_dir_loader_dangling");
+    /// Writes `files` into a fresh directory named after `test`.
+    fn corpus(test: &str, files: &[(&str, &str)]) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("laffie_dir_loader_{test}"));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        fs::write(
-            dir.join("t.sym"),
-            "symbol qq { attr infix(10); }\n\
+        for (name, text) in files {
+            fs::write(dir.join(name), text).unwrap();
+        }
+        dir
+    }
+
+    fn corpus_errors(dir: &Path) -> Vec<String> {
+        let Err(LoadFailure::Corpus(errors)) = DirectoryParser::new(dir, dir).load_rules() else {
+            panic!("a rejected rule must not yield a base");
+        };
+        errors.into_iter().map(|e| e.message).collect()
+    }
+
+    #[test]
+    fn a_dangling_block_yields_no_base_at_all() {
+        let dir = corpus(
+            "dangling",
+            &[(
+                "t.sym",
+                "symbol qq { attr infix(10); }\n\
              rule {\n\
                  attr level(0),block(nonexistent);\n\
                  qq(x) => x;\n\
              }\n",
-        )
-        .unwrap();
+            )],
+        );
 
         // Running against a base that silently dropped this rule would answer
         // by a rule set that is not what the file says.
-        let Err(LoadFailure::Corpus(errors)) = DirectoryParser::new(&dir, &dir).load_rules() else {
-            panic!("a dangling block must not yield a base");
-        };
+        let errors = corpus_errors(&dir);
+        let at = format!("{}:2:", dir.join("t.sym").display());
         assert!(
-            errors.iter().any(|e| e.message.contains("nonexistent")),
-            "expected the undefined id in the message, got: {:?}",
-            errors.iter().map(|e| &e.message).collect::<Vec<_>>()
+            errors
+                .iter()
+                .any(|e| e.contains("nonexistent") && e.contains(&at)),
+            "expected the undefined id at {at}, got: {errors:?}"
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_pattern_without_symbols_names_its_file_and_line() {
+        let dir = corpus(
+            "no_symbols",
+            &[(
+                "t.sym",
+                "rule {\n\
+                 attr level(0);\n\
+                 a => b;\n\
+             }\n",
+            )],
+        );
+
+        let errors = corpus_errors(&dir);
+        let at = format!("{}:1:", dir.join("t.sym").display());
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("no function symbol") && e.contains(&at)),
+            "expected the rejection at {at}, got: {errors:?}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_rejected_expansion_points_at_its_own_block() {
+        // `one(a)` turns `a * b => a` into a second rule `b => 1`, which has no
+        // symbol. The block after it must not take the blame.
+        let dir = corpus(
+            "expansion",
+            &[(
+                "t.sym",
+                "rule {\n\
+                 attr level(0),one(a);\n\
+                 a * b => a;\n\
+             }\n\
+             rule {\n\
+                 attr level(0);\n\
+                 a + b == 0 => a == -b;\n\
+             }\n",
+            )],
+        );
+
+        let errors = corpus_errors(&dir);
+        let path = dir.join("t.sym").display().to_string();
+        assert_eq!(errors.len(), 1, "got: {errors:?}");
+        assert!(
+            errors[0].contains(&format!("{path}:1:")),
+            "expected line 1, got: {errors:?}"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_with_rules_only_loads() {
+        let dir = corpus(
+            "rules_only",
+            &[
+                ("a.sym", "rule {\n attr level(0);\n bb(x) => x;\n}\n"),
+                ("b.sym", "symbol bb { attr infix(10); }\n"),
+            ],
+        );
+
+        let engine = DirectoryParser::new(&dir, &dir)
+            .load_rules()
+            .expect("symbols resolve across files");
+        assert_eq!(engine.iter().count(), 1);
 
         let _ = fs::remove_dir_all(&dir);
     }
