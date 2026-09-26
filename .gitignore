@@ -4,6 +4,7 @@ dumps*
 /logs
 **/*.rs.bk
 /target
+__pycache__/
 
 # LaTeX build artifacts
 *.aux
