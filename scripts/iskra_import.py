@@ -17,6 +17,8 @@ from pathlib import Path
 
 DEFAULT_ISKRA = Path(__file__).resolve().parents[1] / ".." / ".." / "reshatel-api"
 
+LosTerm = None  # ставит load_losterm() на старте
+
 # Бинарные/n-арные головы: терм Искры -> (шаблон, приоритет)
 CMP = {
     "равно": "==",
@@ -72,7 +74,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    sys.path.insert(0, str(args.iskra / "scripts"))
+    load_losterm(args.iskra)
 
     baseline = args.iskra / "baseline" / "zadachnik_block2.json"
     tasks = load_section(baseline, args.section.split())
@@ -108,10 +110,18 @@ def load_section(baseline, want):
     return out
 
 
+def load_losterm(iskra):
+    """Парсер термов Искры лежит в соседнем чекауте (--iskra)."""
+    global LosTerm
+    sys.path.insert(0, str(iskra / "scripts"))
+    try:
+        from losterm import LosTerm
+    except ImportError:
+        sys.exit(f"не найден losterm.py в {iskra / 'scripts'}; путь задаётся --iskra")
+
+
 def convert_task(t):
     """Задача baseline -> dict {id, goal, answer, givens}. Unsupported => исключение."""
-    from losterm import LosTerm
-
     goals = t["task"].get("цели", [])
     premises = [LosTerm.parse(s) for s in t["task"].get("посылка", [])]
     conditions = [LosTerm.parse(s) for s in t["task"].get("условие", [])]
@@ -195,7 +205,7 @@ class VarNames:
 
     @staticmethod
     def is_var(head):
-        h = head.replace("х", "x")
+        h = VarNames._norm(head)
         return len(h) > 1 and h[0] == "x" and h[1:].isdigit()
 
 

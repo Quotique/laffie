@@ -36,12 +36,13 @@ def main():
     for r in rows:
         by_verdict.setdefault(r["verdict"], []).append(r)
 
-    for verdict in ("solved", "wrong_answer", "not_solved"):
+    for verdict in ("solved", "wrong_answer", "not_solved", "no_verdict"):
         group = by_verdict.get(verdict, [])
         print(f"== {verdict}: {len(group)}")
         for r in group if verdict == "solved" else group[:15]:
+            cycles = f"  [{r['cycles']} cycles]" if r["cycles"] is not None else ""
             extra = f"  получено: {r['obtained']}" if r.get("obtained") else ""
-            print(f"   {r['id']}  [{r['cycles']} cycles]{extra}")
+            print(f"   {r['id']}{cycles}{extra}")
         if verdict != "solved" and len(group) > 15:
             print(f"   ... ещё {len(group) - 15}")
 
@@ -60,15 +61,24 @@ def pbl_ids(tasks_dir):
     return ids
 
 
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+# Вердикт — последняя такая строка чанка: подзадачи печатают свои раньше.
+VERDICT = re.compile(r"^(PROVEN!|NOT SOLVED!|Answer: .*?) \[(\d+) cycles\]$", re.M)
+
+
 def log_records(text):
     """Лог CLI -> [{verdict, cycles, obtained}] в порядке обработки."""
-    chunks = re.split(r"^Task ", text, flags=re.M)[1:]
+    chunks = re.split(r"^Task ", ANSI.sub("", text), flags=re.M)[1:]
     records = []
     for c in chunks:
-        cycles = None
-        m = re.search(r"\[(\d+) cycles\]", c)
-        if m:
-            cycles = int(m.group(1))
+        verdicts = VERDICT.findall(c)
+        if not verdicts:
+            # Оборванный чанк тоже даёт запись: main сверяет длину со списком .pbl-id.
+            records.append({"verdict": "no_verdict", "cycles": None})
+            continue
+        last, cycles = verdicts[-1]
+        cycles = int(cycles)
         if "Answer changed:" in c:
             om = re.search(r"^Obtained: (.*)$", c, re.M)
             records.append(
@@ -78,7 +88,7 @@ def log_records(text):
                     "obtained": om.group(1) if om else None,
                 }
             )
-        elif "NOT SOLVED!" in c or "NoSolutionsFound" in c or "not done" in c:
+        elif last == "NOT SOLVED!":
             records.append({"verdict": "not_solved", "cycles": cycles})
         else:
             records.append({"verdict": "solved", "cycles": cycles})
