@@ -45,7 +45,7 @@ impl RulesEngine {
         let empty_level = LevelRules::new();
         let level = self.all_rules.get(&filters.level).unwrap_or(&empty_level);
         let result: Vec<_> = filters
-            .symbols
+            .symbols()
             .iter()
             .flat_map(|symbol| level.get(symbol).into_iter())
             .flat_map(|i| i.iter())

@@ -17,7 +17,7 @@ bitflags! {
 
 #[derive(Debug, Clone, Default)]
 pub struct TermFilters {
-    pub symbols:       Vec<Symbol>,
+    symbols:           Vec<Symbol>,
     pub applied_rules: HashSet<RuleId>,
     pub blocked_rules: HashSet<RuleId>,
     pub level:         Level,
@@ -37,6 +37,15 @@ impl<I: IntoIterator<Item = Symbol>> From<I> for TermFilters {
 }
 
 impl TermFilters {
+    /// Sorted and deduplicated.
+    pub fn symbols(&self) -> &[Symbol] {
+        &self.symbols
+    }
+
+    pub fn contains_symbol(&self, symbol: &Symbol) -> bool {
+        self.symbols.binary_search(symbol).is_ok()
+    }
+
     pub fn is_replaced(&self) -> bool {
         self.flags & TermFlags::REPLACED == TermFlags::REPLACED
     }

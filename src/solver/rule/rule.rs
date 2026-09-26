@@ -36,9 +36,10 @@ pub enum RuleDeclineReason {
     AlreadyApplied,
     /// The rule is explicitly blocked for the term.
     Blocked,
-    /// An error occurred while trying to map parameters;
-    /// contains a human‑readable message.
-    ParamSubstitutionErr(String),
+    #[display("symbol {_0} not in term")]
+    MissingSymbol(Symbol),
+    /// The pattern matches no subterm.
+    NoMatch,
 }
 
 /// Convenient alias for a reference‑counted rule.
@@ -178,10 +179,8 @@ impl Rule {
         }
 
         for s in self.pattern_symbols.iter() {
-            if !filters.symbols.contains(s) {
-                return Err(RuleDeclineReason::ParamSubstitutionErr(format!(
-                    "symbol: {s} not found"
-                )));
+            if !filters.contains_symbol(s) {
+                return Err(RuleDeclineReason::MissingSymbol(s.clone()));
             }
         }
 
@@ -268,7 +267,7 @@ impl ApplyRule for SharedRule {
             })
             .collect();
         if maps.is_empty() {
-            return Err(RuleDeclineReason::ParamSubstitutionErr("no match".into()));
+            return Err(RuleDeclineReason::NoMatch);
         }
 
         let mut result = vec![];
