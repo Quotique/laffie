@@ -205,7 +205,7 @@ impl Solver {
         }
     }
 
-    // TODO: единый обьект для goal
+    // TODO: a single object for goal
     fn suggest_rules(
         &self,
         term: &TermProps,
@@ -266,7 +266,7 @@ impl Solver {
                         break;
                     }
                     if is_goal && kind == GoalKind::Transform {
-                        // TODO: унифицировать weight = MAX_LEVEL и REPLACED
+                        // TODO: unify weight = MAX_LEVEL and REPLACED
                         solution[index].filters.level = self.rules_engine.max_level().next();
                         solution.requeue(index);
                         // CONTEXT: the break skips `added = true` on purpose.
@@ -655,9 +655,8 @@ impl Solver {
             return AnswerCheck::No;
         }
 
-        // TODO: теперь тут бывают целевые термы, поэтому надо сделать две проверки:
-        // что терм есть среди целей
-        // что цель тривиальная истина
+        // TODO: goal terms now reach here, so check both that the term is among the goals and
+        // that the goal is trivially true
         for i in solution.goal_index.values() {
             if term.term == solution[*i].term {
                 return AnswerCheck::Bind {
@@ -679,8 +678,7 @@ impl Solver {
                 .truth(TruthCtx::new(&solution.known_vars))
                 .is_true()
             {
-                // TODO: у этого терма нет происхождения — заполнить, когда вывод решения по шагам
-                // станет его показывать.
+                // TODO: this term has no origin — fill it in once the step-by-step output shows it.
                 return AnswerCheck::Bind { part: 0, term: *i };
             }
         }
@@ -694,8 +692,7 @@ impl Solver {
         if solution[index].filters.level < self.rules_engine.max_level() {
             return AnswerCheck::No;
         }
-        // TODO: у этого терма нет происхождения — заполнить, когда вывод решения по шагам станет
-        // его показывать.
+        // TODO: this term has no origin — fill it in once the step-by-step output shows it.
         match solution
             .terms
             .iter()

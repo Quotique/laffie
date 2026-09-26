@@ -43,7 +43,7 @@ Before `git commit`:
 2. **Clippy clean**: `cargo clippy --workspace --release --all-targets -- -D warnings`
 3. **Tests**: `cargo test --workspace --release` + CLI smoke (`cli -c config/cli.yaml -p tasks/regress`, then `-p tasks/sympy_comparison`: no answer may change)
 4. **File structure**: `pub` → `pub(super)` → private `fn` (top-down within each `.rs`); tests at the end
-5. **Comments**: concise; no doc-essays; Rustdoc in English
+5. **Comments**: concise; no doc-essays; Rust comments in English
 6. **`CHANGELOG.md`**: update `[Unreleased]` section if user-visible change
 7. **Commit body**: subject + ≤5 lines
 
@@ -126,4 +126,4 @@ The `claude_docs/` directory contains detailed navigation maps for each crate wi
 
 ## Language
 
-Project documentation and comments are primarily in Russian. Rustdoc comments (`///`, `//!`) must always be written in English.
+Project documentation (`doc/ru/`) and comments in `.sym`, `.pbl`, `.py` files are in Russian. Rust comments are in English.

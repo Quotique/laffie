@@ -53,7 +53,7 @@ impl syntax::PySource {
         let (locals, has_calculator) = Python::attach(|py| -> PyResult<(Py<PyDict>, bool)> {
             let locals = PyDict::new(py);
             locals.set_item("Term", get_term_class(py))?;
-            // `.sym` делают `exec(SYMPY_CONVERT_SRC)`: исходник вкомпилен, CWD не важен.
+            // .sym files `exec(SYMPY_CONVERT_SRC)`: the source is compiled in, CWD does not matter.
             locals.set_item(
                 "SYMPY_CONVERT_SRC",
                 include_str!("../../symbols/py/sympy_convert.py"),
@@ -85,7 +85,7 @@ impl syntax::PySource {
 
                 let result = calc_fn.call1((py_term, level.to_string()))?;
 
-                // None — без изменений, Term — новый терм
+                // None — unchanged, Term — the new term
                 if result.is_none() {
                     return Ok(false);
                 }
