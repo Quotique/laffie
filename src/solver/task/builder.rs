@@ -1,6 +1,6 @@
 use std::iter::Iterator;
 
-use super::{Goal, Task};
+use super::{Goal, Premises, Task};
 use crate::term::{SharedTerm, TermBuf};
 
 pub struct TaskBuilder {
@@ -13,6 +13,7 @@ pub struct TaskBuilder {
     possible_answers: Vec<TermBuf>,
 
     subtask_level: usize,
+    premises:      Premises,
 }
 
 impl TaskBuilder {
@@ -25,6 +26,7 @@ impl TaskBuilder {
             goal,
             possible_answers: Default::default(),
             subtask_level: Default::default(),
+            premises: Default::default(),
         }
     }
 
@@ -62,6 +64,11 @@ impl TaskBuilder {
     }
 
     #[inline]
+    pub fn with_premises(mut self, premises: Premises) -> Self {
+        self.premises = premises;
+        self
+    }
+
     pub fn with_level(mut self, level: usize) -> Self {
         self.subtask_level = level;
         self
@@ -76,6 +83,7 @@ impl TaskBuilder {
         task.givens = self.conditions;
         task.subtask_level = self.subtask_level;
         task.possible_answers = self.possible_answers;
+        *task.premises_mut() = self.premises;
         task
     }
 }

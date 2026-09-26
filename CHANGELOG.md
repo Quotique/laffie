@@ -8,17 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Import pipeline for the Iskra (reshatel-api) task book: `scripts/iskra_import.py`
-  (baseline JSON → `.pbl` with reference answers), `scripts/run_report.py`
-  (CLI log → verdict map); pilot corpus `tasks/iskra/` (279 equations + 105 proofs).
-- Mean-inequality lemmas from Iskra's checking operators: QM-AM (pair and
-  triple), even-power mean, fraction AM-GM both orientations (`a/b + b/a`
-  vs ±2), `a + 1/a` bound for negative base, and the SOS fact
-  `3ab + 3bc + 3ca <= (a+b+c)^2`; 9 pilot proof tasks solved.
-- Strict-SOS and symmetric AM-GM lemmas: strictness from `a != b`-style
-  premises (`(a-1)^2+(b-1)^2+(c-1)^2`, `(ab-1)^2+(a-b)^2`, difference
-  factorization `(a-b)(a^5-b^5)`), six/nine-term AM-GM, pairwise
-  `a^2 b + a b^2 <= a^3 + b^3`, cubic power mean; pilot proofs 9 → 16.
+- Iskra task book import: `scripts/iskra_import.py`, `scripts/run_report.py`, pilot
+  corpus `tasks/iskra/`.
+- Definedness conditions (ОДЗ) of a `prove` task: `attr premise` rules read
+  them off the statement before the search; every subtask inherits them
+  (`doc/ru/domain.md`).
+- `denom(r)` — denominator of a rational literal.
+- `<expr> is number` — true only for a numeric literal.
+- Inequality lemmas: power means, AM-GM variants, SOS facts with strictness
+  from `a != b` premises.
 - `doc/ru/backlog.md` — беклог находок.
 
 ### Changed
@@ -46,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer, so a degraded one used to pass unnoticed.
 - `cli` reports how many tasks had no recorded baseline, so an empty database
   no longer reads as a clean diff.
+- Definedness conditions are seeded as flagged premises instead of
+  `domain(...)` terms; a `find` answer check skips them.
 - A goal that is not `find`/`prove`/`transform` is a load error naming the file,
   the line and the goal, instead of a panic partway through the run.
 - A store overflow while assembling a multi-target answer ends the task with an
@@ -87,12 +87,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A condition without variables no longer passes into a `find` answer unchecked: `-√3 ≥ 0 && x == 2` is not solved, `-√3 ≤ 0 && x == 2` gives `x = 2`.
 - A term being simplified is not its own premise, so `sqrt(11.5) >= 3 && x == 2` keeps `x = 2`.
 - A negative literal parses before `*` and `^`: `-2*x`, `x - 2^2`, `x + -2*x`; `-3/x*y` is `(-3/x)·y`.
+- A rule whose requirement is already false emits no hypothesis, so no nested
+  `NOT SOLVED!` in a solved task's output.
+- `attr subtree` is a load error instead of a loader panic.
 - `||` / `&&` normalization dedups equal operands: a root found via two search
   branches produced `x=0|x=0` and was rejected by the answer check.
 
 ### Removed
 - The TUI's `e` on the Rules tab and the rule window's `Trigger:` line. The
   key opened `symbols/<symbol>.sym`, no such path for an operator symbol.
+- Rule attributes `project` and `toplevel`, superseded by `premise`.
 - The `html` and `tui` renderers, their features, and the `html-escape`
   dependency. No workspace member enabled either feature. The `tui` binary
   renders solutions itself.

@@ -16,7 +16,7 @@ use crate::{
         GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr, RuleId, RulesEngine,
         SharedRule,
     },
-    task::{Goal, GoalKind, Task},
+    task::{Goal, GoalKind, Premises, Task},
     term::{
         Atom, Param, SharedTerm, Substitute, Term, TermBuf, TermMut, TermRef, Truth, TruthCtx,
         answer, match_term,
@@ -71,7 +71,8 @@ impl Solver {
     }
 
     /// The returned solution carries either the answer or an error status.
-    pub fn solve(&self, task: Task, tracer: TracerHub, limits: Limits) -> SharedSolution {
+    pub fn solve(&self, mut task: Task, tracer: TracerHub, limits: Limits) -> SharedSolution {
+        *task.premises_mut() = Premises::derive(&self.rules_engine, &task);
         let mut solution = Solution::new(task);
         let mut state = Run {
             limits,
@@ -226,6 +227,7 @@ impl Solver {
         let rules = rules.into_iter().chain(local_rules);
 
         let rules: Vec<_> = if kind == GoalKind::Prove && term.filters.is_goal() {
+            // Rewriting a goal must preserve truth.
             rules
                 .filter(|rule| rule.contains_attribute(&RuleAttr::Equivalence))
                 .collect()
@@ -314,6 +316,7 @@ impl Solver {
                 if grounded_seen.is_multiple_of(DEADLINE_CHECK_INTERVAL) {
                     run.limits.check(run.cycle)?;
                 }
+                // The duplicate lives where `add_term` will store the resolution.
                 let is_dub = if is_goal {
                     s.goal_index.contains_key(&hypothesis.resolution)
                 } else {
@@ -322,9 +325,19 @@ impl Solver {
                 if is_dub {
                     continue;
                 }
+                // Decided before the hypothesis is consumed, acted on after, so
+                // the tracer still counts the rule as fired.
+                let refuted = hypothesis.is_refuted(&s.known_vars);
                 let props = self.try_prove_hypothesis(index, s, hypothesis, run);
                 if props.inference.is_proven() {
                     return Ok(Some(props));
+                }
+                if refuted {
+                    trace!(
+                        target: "rule_selection",
+                        "hypothesis dropped, requirement is false"
+                    );
+                    continue;
                 }
                 // TODO: option to disable
                 s.add_term(props)?;
@@ -623,6 +636,10 @@ impl Solver {
         run: &mut Run,
         index: usize,
     ) -> AnswerCheck {
+        // Answering "what is x" with "x is real" would close the search.
+        if solution[index].filters.is_premise() {
+            return AnswerCheck::No;
+        }
         let part = {
             let mut known = |t: TermRef| self.is_provably_known(t, solution, run);
             solution
@@ -760,8 +777,26 @@ mod solve_tests {
         engine::{Limits, Solver, TIME_LIMIT_DEFAULT},
         rule::{RulesEngine, parse_rule},
         task::parse_task,
-        term::term_with_vars,
+        term::{SharedTerm, TruthCtx, term_with_vars},
     };
+
+    /// Seeded into a `find`, a premise like `x in Reals` would close it.
+    #[test]
+    fn a_premise_does_not_answer_a_find() {
+        let mut task = parse_task("task { goal find(x); x^2 == 4; }");
+        task.premises_mut().insert(
+            term_with_vars("x == 1"),
+            SharedTerm::new(term_with_vars("sqrt(x)")),
+            TruthCtx::default(),
+        );
+        let solver = Solver::new(Arc::new(RulesEngine::default()));
+        let solution = solver.solve(
+            task,
+            Default::default(),
+            Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+        );
+        assert!(solution.answer().is_none());
+    }
 
     #[test]
     fn check_answer_find_test() {

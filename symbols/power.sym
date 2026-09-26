@@ -2,6 +2,16 @@ symbol ^ {
     attr infix(100);
 }
 
+// Пара к domain_sqrt: нормализация не сводит `a^(1/2)` к `sqrt(a)`. Условие
+// даёт только чётный знаменатель; `r is number` отсекает символьный показатель.
+rule {
+    attr id(domain_power),premise;
+
+    a^r => domain(0 <= a);
+
+    r is number, denom(r) is even;
+}
+
 rule {
     attr level(4),goal(find(x, ..)),one(a),one(b),zero(b),zero(c),block(move_left);
 

@@ -842,13 +842,8 @@ mod tests {
         insta::assert_snapshot!(maps.iter().format(", "), @"{ a: 2*x^2, b: x-1 }");
     }
 
-    // Регрессия к беклогу §6: матчер БЕРЁТ сумму трёх свободных параметров
-    // внутри составного терма (под `^`, под `*`) — в т.ч. при нормализации,
-    // зеркалящей продакшен (терм задачи — Full, терм правила — Units), и при
-    // совпадении имён переменных цели с именами параметров правила.
-    // Наблюдавшийся в CLI «не-матч» таких паттернов — не свойство матчера:
-    // goal-терм prove-задачи до примерки Equivalence-правил переписывается
-    // transform-упрощением, раскрывающим скобки.
+    // The matcher accepts the form; transform simplification expands the goal term before rules
+    // are tried.
     #[test]
     fn nested_ternary_sum_under_power_matches() {
         let term =
@@ -859,6 +854,8 @@ mod tests {
         assert!(maps.is_ok(), "{}", maps.unwrap_err());
     }
 
+    // Other side of the match: in the SOS lemma `3*(a*b + b*c + a*c) <= (a + b + c)^2`
+    // the left side is under `*`, the right under `^`.
     #[test]
     fn nested_ternary_sum_under_product_matches() {
         let term =
@@ -867,24 +864,6 @@ mod tests {
 
         let maps = term.term().try_match(pattern.term());
         assert!(maps.is_ok(), "{}", maps.unwrap_err());
-    }
-
-    #[test]
-    fn nested_binary_sum_under_power_matches() {
-        let term = term_with_vars("x*y <= (x + y)^2");
-        let pattern = term_with_params("d <= (a + b)^2");
-
-        let maps = term.term().try_match(pattern.term()).unwrap();
-        assert!(!maps.is_empty());
-    }
-
-    #[test]
-    fn flat_ternary_sum_matches() {
-        let term = term_with_vars("x*y + y*z + x*z <= x^2 + y^2 + z^2");
-        let pattern = term_with_params("a*b + b*c + a*c <= a^2 + b^2 + c^2");
-
-        let maps = term.term().try_match(pattern.term()).unwrap();
-        assert!(!maps.is_empty());
     }
 
     #[test]

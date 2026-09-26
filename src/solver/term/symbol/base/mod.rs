@@ -1,5 +1,7 @@
 pub mod answer;
+pub mod denom;
 pub mod divide;
+pub mod domain;
 pub mod equal;
 pub mod inequal;
 pub mod is;

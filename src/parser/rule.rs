@@ -51,7 +51,7 @@ fn attr(e: &Expr, src: &Source) -> Result<(RuleAttr, RuleAttrValue), ParserError
         _ => Err(src.error(e.span, "must have one argument")),
     };
     let value = match key {
-        RuleAttr::Equivalence | RuleAttr::Replace => RuleAttrValue::None,
+        RuleAttr::Equivalence | RuleAttr::Replace | RuleAttr::Premise => RuleAttrValue::None,
         RuleAttr::Level | RuleAttr::Normalize => RuleAttrValue::UInt(src.uint(arg?.span)?),
         RuleAttr::Goal | RuleAttr::Zero | RuleAttr::One => {
             RuleAttrValue::Goal(TermScope::new(src, Names::Params).term(arg?)?)

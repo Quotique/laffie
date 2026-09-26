@@ -25,8 +25,10 @@ pub enum RuleRejection {
 
 #[derive(Default)]
 pub struct RulesEngine {
-    all_rules: IndexMap<Level, LevelRules>,
-    max_level: Level,
+    all_rules:     IndexMap<Level, LevelRules>,
+    /// Kept out of `all_rules`, so the search cannot be offered one.
+    premise_rules: Vec<SharedRule>,
+    max_level:     Level,
 }
 
 impl RulesEngine {
@@ -34,11 +36,21 @@ impl RulesEngine {
         self.max_level
     }
 
-    /// Same order every run: both maps are `IndexMap`.
+    /// Every registered rule, whatever its role.
     pub fn iter(&self) -> impl Iterator<Item = SharedRule> + '_ {
+        self.search_rules().chain(self.premise_rules())
+    }
+
+    /// Same order every run: both maps are `IndexMap`.
+    pub fn search_rules(&self) -> impl Iterator<Item = SharedRule> + '_ {
         self.all_rules
             .values()
             .flat_map(|x| x.values().flat_map(|x| x.iter().cloned()))
+    }
+
+    /// Rules read off the statement before the search.
+    pub fn premise_rules(&self) -> impl Iterator<Item = SharedRule> + '_ {
+        self.premise_rules.iter().cloned()
     }
 
     pub fn suggest_rules(&self, filters: &TermFilters, goal: &TermBuf) -> Vec<SharedRule> {
@@ -94,7 +106,7 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<(usize, RuleRejection)>> {
         }
 
         let mut uses: HashMap<&Symbol, usize> = HashMap::new();
-        for rule in &rules {
+        for rule in rules.iter().filter(|r| !r.is_premise()) {
             for s in rule.pattern_symbols.iter() {
                 *uses.entry(s).or_default() += 1;
             }
@@ -129,6 +141,10 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<(usize, RuleRejection)>> {
                 })
                 .unique()
                 .collect();
+            if rule.is_premise() {
+                engine.premise_rules.push(SharedRule::new(rule));
+                continue;
+            }
             engine.max_level = std::cmp::max(engine.max_level, rule.level);
             engine
                 .all_rules
@@ -161,11 +177,45 @@ fn cell_of(rule: &Rule, uses: &HashMap<Symbol, usize>) -> Option<Symbol> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rule::parse_rule;
 
     fn is_send_sync<T: Send + Sync>() {}
 
     #[test]
     fn rules_engine_is_send_sync() {
         is_send_sync::<RulesEngine>();
+    }
+
+    fn engine(rule: &'static str) -> RulesEngine {
+        [parse_rule(rule)]
+            .into_iter()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn a_premise_rule_is_kept_out_of_the_search() {
+        let engine = engine(r#"rule { attr premise; sqrt(a) => domain(0 <= a); }"#);
+
+        assert_eq!(engine.premise_rules().count(), 1);
+        assert_eq!(engine.search_rules().count(), 0);
+        assert_eq!(engine.iter().count(), 1);
+    }
+
+    /// A premise rule carries no level, so it must not raise the search's.
+    #[test]
+    fn a_premise_rule_does_not_move_the_max_level() {
+        let engine = engine(r#"rule { attr premise,level(7); sqrt(a) => domain(0 <= a); }"#);
+
+        assert_eq!(engine.max_level(), Level::default());
+    }
+
+    #[test]
+    fn an_ordinary_rule_still_reaches_the_search() {
+        let engine = engine(r#"rule { attr level(0); sqrt(a) => a; }"#);
+
+        assert_eq!(engine.search_rules().count(), 1);
+        assert_eq!(engine.iter().count(), 1);
+        assert_eq!(engine.premise_rules().count(), 0);
     }
 }

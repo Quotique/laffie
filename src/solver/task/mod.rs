@@ -1,10 +1,14 @@
 pub mod answer;
 mod builder;
 pub mod goal;
+pub mod premises;
 
-use crate::term::{SharedTerm, TermBuf};
+use crate::{
+    CompactString,
+    term::{Atom, SharedTerm, Term, TermBuf, match_term},
+};
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{HashSet, hash_map::DefaultHasher},
     fmt,
     hash::{Hash, Hasher},
     iter::Iterator,
@@ -13,6 +17,7 @@ use std::{
 pub use answer::{Answer, AnswerPart};
 pub use builder::TaskBuilder;
 pub use goal::{Goal, GoalError, GoalKind};
+pub use premises::{Premise, Premises};
 
 /// A problem: what to look for, what is given, how deep in the subtask tree.
 ///
@@ -28,6 +33,9 @@ pub struct Task {
     pub givens:        Vec<SharedTerm>,
     pub subtask_level: usize,
 
+    /// Derived by the solver — out of `givens`, out of the id, out of the db.
+    premises: Premises,
+
     pub possible_answers: Vec<TermBuf>,
 
     goal: Goal,
@@ -39,6 +47,28 @@ impl Task {
         &self.goal
     }
 
+    pub fn premises(&self) -> &Premises {
+        &self.premises
+    }
+
+    pub(crate) fn premises_mut(&mut self) -> &mut Premises {
+        &mut self.premises
+    }
+
+    /// Variables the givens declare known (`v is known`).
+    pub fn known_vars(&self) -> HashSet<CompactString> {
+        let mut set = HashSet::new();
+        for g in &self.givens {
+            let Some((lhs,)) = match_term!(g.term(), "is"(lhs, "known")) else {
+                continue;
+            };
+            if let Atom::Variable(v) = lhs.data() {
+                set.insert(v.as_ref().clone());
+            }
+        }
+        set
+    }
+
     pub(crate) fn from_goal(goal: Goal) -> Self {
         Self {
             id: Default::default(),
@@ -47,6 +77,7 @@ impl Task {
             group: Default::default(),
             givens: Default::default(),
             subtask_level: Default::default(),
+            premises: Default::default(),
             possible_answers: Default::default(),
             goal,
         }

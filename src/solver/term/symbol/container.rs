@@ -67,6 +67,7 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
         SymbolProgram::add_with_name(&mut result, "false");
 
         add_symbol_impl(&mut result, ops::sqrt::symbol());
+        add_symbol_impl(&mut result, ops::denom::symbol());
 
         add_symbol_impl(
             &mut result,
@@ -84,6 +85,7 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
         SymbolProgram::add_with_name(&mut result, "variable");
         SymbolProgram::add_with_name(&mut result, "atom");
         SymbolProgram::add_with_name(&mut result, "even");
+        SymbolProgram::add_with_name(&mut result, "number");
 
         add_symbol_impl(&mut result, ops::answer::symbol());
 
@@ -92,6 +94,8 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
         // `parents` is inert (parsing only); resolved per-match in the solver,
         // like `solve`.
         SymbolProgram::add_with_name(&mut result, "parents");
+        // Duplicates `domain.sym`, so the term builds without the corpus.
+        SymbolProgram::add_with_name(&mut result, "domain");
         add_symbol_impl(&mut result, ops::symbolic_eq::symbol());
         add_symbol_impl(&mut result, ops::op_not::symbol());
         RwLock::new(result)

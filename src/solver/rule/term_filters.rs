@@ -12,6 +12,7 @@ bitflags! {
         const REPLACED   = 0b0001;
         const SIMPLIFIED = 0b0010;
         const GOAL       = 0b0100;
+        const PREMISE    = 0b1000;
     }
 }
 
@@ -58,12 +59,20 @@ impl TermFilters {
         self.flags & TermFlags::GOAL == TermFlags::GOAL
     }
 
+    pub fn is_premise(&self) -> bool {
+        self.flags & TermFlags::PREMISE == TermFlags::PREMISE
+    }
+
     pub fn mark_replaced(&mut self) {
         self.flags |= TermFlags::REPLACED;
     }
 
     pub fn mark_simplified(&mut self) {
         self.flags |= TermFlags::SIMPLIFIED;
+    }
+
+    pub fn mark_premise(&mut self) {
+        self.flags |= TermFlags::PREMISE;
     }
 
     pub fn mark_goal(&mut self) {

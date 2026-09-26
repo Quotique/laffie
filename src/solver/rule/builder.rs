@@ -97,7 +97,10 @@ impl RuleBuilder {
         let attrs: MultiMap<RuleAttr, RuleAttrValue> = self.attributes.into_iter().collect();
 
         let level = if let Some(RuleAttrValue::UInt(level)) = attrs.get(&RuleAttr::Level) {
-            level
+            *level
+        } else if attrs.contains_key(&RuleAttr::Premise) {
+            // A premise rule runs before the search, where levels mean nothing.
+            0
         } else {
             return Err(RuleBuilderError::MissingLevelAttribute);
         };
@@ -131,7 +134,7 @@ impl RuleBuilder {
 
             result.push(Rule {
                 id: self.rule_id,
-                level: (*level).into(),
+                level: level.into(),
                 attrs: attrs.clone(),
                 block: Default::default(),
                 pattern_symbols: term.term().first_arg().unwrap().symbols(),

@@ -41,7 +41,7 @@ Before `git commit`:
 
 1. **Format**: `cargo +nightly fmt`
 2. **Clippy clean**: `cargo clippy --workspace --release --all-targets -- -D warnings`
-3. **Tests**: `cargo test --workspace --release` + CLI smoke (`cli -c config/cli.yaml -p tasks/regress`, then `-p tasks/sympy_comparison`: no answer may change)
+3. **Tests**: `cargo test --workspace --release` + CLI smoke (`cli -c config/cli.yaml -p tasks/regress`, then `-p tasks/sympy_comparison`: no answer may change); при правках правил/решателя — ещё `-p tasks/negative`, там ожидание `total: solved: 0`
 4. **File structure**: `pub` → `pub(super)` → private `fn` (top-down within each `.rs`); tests at the end
 5. **Comments**: concise; no doc-essays; Rust comments in English
 6. **`CHANGELOG.md`**: update `[Unreleased]` section if user-visible change

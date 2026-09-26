@@ -292,6 +292,15 @@ impl fmt::Display for Hypothesis {
     }
 }
 
+impl GroundedHypothesis {
+    /// Relies on `ground` having normalized the requirements.
+    pub fn is_refuted(&self, known: &HashSet<CompactString>) -> bool {
+        self.requirements
+            .iter()
+            .any(|req| req.term().truth(TruthCtx::new(known)) == Truth::False)
+    }
+}
+
 impl fmt::Display for GroundedHypothesis {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -312,7 +321,7 @@ mod tests {
         term::{ParamSubstitution, TermBuf, TermPath, param, term_with_params, term_with_vars},
     };
 
-    use super::Hypothesis;
+    use super::{GroundedHypothesis, Hypothesis};
 
     fn make_hypothesis(
         resolution: TermBuf,
@@ -371,6 +380,29 @@ mod tests {
         let before = hyp.requirements.clone();
         hyp.resolve_parents(&term_with_vars("a == b"));
         assert_eq!(hyp.requirements, before);
+    }
+
+    #[test]
+    fn a_false_requirement_refutes_the_hypothesis() {
+        let hypothesis = grounded(vec![term_with_vars("denom(2) is even")]);
+        assert!(hypothesis.is_refuted(&HashSet::new()));
+    }
+
+    #[test]
+    fn an_undecidable_requirement_does_not_refute() {
+        let hypothesis = grounded(vec![term_with_vars("denom(r) is even")]);
+        assert!(!hypothesis.is_refuted(&HashSet::new()));
+    }
+
+    fn grounded(requirements: Vec<TermBuf>) -> GroundedHypothesis {
+        GroundedHypothesis {
+            rule: Arc::new(parse_rule(r#"rule { attr level(0); sqrt(a) => 0 <= a; }"#)),
+            resolution: term_with_vars("0 <= a"),
+            params: ParamSubstitution::default(),
+            requirements,
+            blocked_rules: vec![],
+            pos: TermPath::from(vec![]),
+        }
     }
 
     #[test]

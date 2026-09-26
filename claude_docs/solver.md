@@ -40,16 +40,18 @@ src/solver/
 │       ├── mod.rs          # Symbol, sym(), try_sym(), symbol_names()
 │       ├── program.rs      # SymbolProgram + its hooks: Calculator, TruthChecker, Comparator; Truth, TruthCtx, SymbolAttr
 │       ├── container.rs    # global registry (RwLock<HashMap>), all_func_symbols()
-│       └── base/           # 20 built-in symbols, one file each
+│       └── base/           # 22 built-in symbols, one file each
 │           ├── answer.rs   # the `answer(x)` marker: NAME, mark(), marked() — re-exported as term::answer
+│           ├── domain.rs   # the `domain(c)` premise marker — re-exported as term::domain
 │           ├── equal.rs inequal.rs less.rs less_or_equal.rs more.rs more_or_equal.rs
-│           ├── plus.rs mul.rs divide.rs power.rs sqrt.rs
+│           ├── plus.rs mul.rs divide.rs power.rs sqrt.rs denom.rs
 │           ├── logic_and.rs logic_or.rs op_not.rs op_true.rs op_in.rs
 │           └── is.rs substitute.rs symbolic_eq.rs
 ├── task/                   # what is asked
-│   ├── mod.rs              # Task, content_id(); test helper parse_task
+│   ├── mod.rs              # Task, content_id(), known_vars(); test helper parse_task
 │   ├── goal.rs             # Goal (private GoalBody), GoalKind, GoalError
 │   ├── answer.rs           # Answer, AnswerPart (one per unknown)
+│   ├── premises.rs         # Premises, Premise — what the statement presupposes
 │   └── builder.rs          # TaskBuilder — infallible once it holds a Goal
 ├── rule/                   # how terms rewrite
 │   ├── mod.rs              # re-exports; test helper parse_rule
@@ -61,6 +63,7 @@ src/solver/
 │   └── term_filters.rs     # TermFilters + TermFlags bits (REPLACED, SIMPLIFIED, GOAL)
 └── engine/                 # the search
     ├── mod.rs              # the crate's public engine surface
+    ├── premises.rs         # Premises::derive: reads premises off the statement, before the search
     ├── solver.rs           # Solver: the cycle, term inference, subtasks, answer checks
     ├── solution.rs         # Solution, SolutionStatus, SolveError, SharedSolution, TermIdx
     ├── run.rs              # Run (per-solve state), Limits, CancelToken, subtask cache
@@ -96,6 +99,11 @@ src/solver/
 |------|------------|
 | `Task` | id, name, text, group, givens, subtask_level, possible_answers, and a **private** goal read via `goal()`. Built only through `TaskBuilder` / `from_goal`. |
 | `content_id` | `u64` from givens (order-independent) + goal. Formatting- and location-independent; in-memory dedup only. |
+
+### rule/rule.rs
+| Type | What it is |
+|------|------------|
+| `Rule::is_premise` | `attr premise` — read off the statement before the search, never offered to it; its resolution replaces the whole matched term. |
 
 ### rule/hypothesis.rs
 | Type | What it is |

@@ -15,7 +15,7 @@ use crate::{
     CompactString, NormLevel,
     rule::{Level, RuleId},
     task::{Answer, AnswerPart, Goal, GoalKind, Task, TaskBuilder},
-    term::{Atom, SharedTerm, Term, answer, match_term},
+    term::{SharedTerm, TermRef, TruthCtx, answer, domain},
 };
 
 pub const STACK_SIZE: usize = 2048;
@@ -81,16 +81,38 @@ impl Solution {
         extra: Vec<SharedTerm>,
     ) -> Self {
         // A goal without variables holds or fails on its own; the parent's terms
-        // assume a solution exists, so as premises they would prove it by assumption.
+        // and premises assume a solution exists, so they would prove it by assumption.
         let closed = !goal.term().has_variables();
         // A term rewritten under itself proves its own parts by assumption.
         // TODO: also drop the terms derived from it, once props record their premises.
         let rewritten = (goal.kind() == GoalKind::Transform).then(|| goal.subject());
-        let inherited: Vec<TermProps> = self
-            .terms
+        let (inherited, premises) = if closed {
+            Default::default()
+        } else {
+            (self.inherited(rewritten), self.task.premises().clone())
+        };
+
+        let task = TaskBuilder::from_goal(goal)
+            .with_conditions(inherited.iter().map(|x| x.term.clone()).chain(extra))
+            .with_premises(premises)
+            .with_level(self.task.subtask_level + 1)
+            .build();
+        Self::seeded(task, inherited, blocked_rules)
+    }
+
+    /// Proven terms a subtask starts from.
+    ///
+    /// Premises are left out: the subtask re-seeds them from the inherited
+    /// `Premises`, keeping the flag.
+    fn inherited(&self, rewritten: Option<TermRef>) -> Vec<TermProps> {
+        self.terms
             .iter()
-            .filter(|x| !closed && x.is_proven())
-            .filter(|x| !(x.filters.is_goal() || answer::marked(x.term.term()).is_some()))
+            .filter(|x| x.is_proven())
+            .filter(|x| {
+                !(x.filters.is_goal() ||
+                    x.filters.is_premise() ||
+                    answer::marked(x.term.term()).is_some())
+            })
             .filter(|x| rewritten != Some(x.term.term()))
             .map(|x| {
                 let mut props = x.clone();
@@ -98,19 +120,13 @@ impl Solution {
                 props.inference = TermInference::Condition;
                 props
             })
-            .collect();
-
-        let task = TaskBuilder::from_goal(goal)
-            .with_conditions(inherited.iter().map(|x| x.term.clone()).chain(extra))
-            .with_level(self.task.subtask_level + 1)
-            .build();
-        Self::seeded(task, inherited, blocked_rules)
+            .collect()
     }
 
     /// INVARIANT: `history` holds the props of `task.givens`, same terms in
     /// the same order. [`Solution::subtask`] builds both from one list.
     fn seeded(task: Task, history: Vec<TermProps>, blocked_rules: HashSet<RuleId>) -> Self {
-        let known_vars = collect_known_set(&task.givens);
+        let known_vars = task.known_vars();
         let bound = vec![None; task.goal().parts()];
         let mut solution = Self {
             task,
@@ -131,6 +147,12 @@ impl Solution {
             let props = history.next().unwrap_or_else(|| TermProps::from(term));
             let _ = solution.add_term(props);
         }
+        for premise in solution.task.premises().iter().cloned().collect::<Vec<_>>() {
+            let mut props = TermProps::from(premise.condition);
+            props.filters.mark_premise();
+            let _ = solution.add_term(props);
+        }
+
         let mut goal_buf = solution.goal().subject().to_owned();
         // Canonicalize the goal (commutative arg order etc.) so the syntactic
         // match in `check_prove_answer` sees derived terms — which are always
@@ -161,6 +183,16 @@ impl Solution {
     }
 
     pub fn add_term(&mut self, mut term: TermProps) -> Result<TermIdx, SolveError> {
+        // Only a `.sym` bug gets here: premise rules run before the search.
+        if let Some(condition) = domain::marked(term.term.term()).map(|c| c.to_owned()) {
+            warn!(target: "premises", "a search rule emitted a premise marker: {}", term.term);
+            let ctx = TruthCtx::new(&self.known_vars);
+            self.task
+                .premises_mut()
+                .insert(condition.clone(), term.term.clone(), ctx);
+            term = TermProps::from(condition);
+            term.filters.mark_premise();
+        }
         if self.terms.len() - self.unproven_terms_count + 1 > STACK_SIZE {
             return Err(SolveError::StackOverflow);
         }
@@ -275,20 +307,6 @@ impl IndexMut<TermIdx> for Solution {
 
 impl error::Error for SolveError {}
 
-/// Collect names declared known via a `V is known` given (V a bare variable).
-fn collect_known_set(givens: &[SharedTerm]) -> HashSet<CompactString> {
-    let mut set = HashSet::new();
-    for g in givens {
-        let Some((lhs,)) = match_term!(g.term(), "is"(lhs, "known")) else {
-            continue;
-        };
-        if let Atom::Variable(v) = lhs.data() {
-            set.insert(v.as_ref().clone());
-        }
-    }
-    set
-}
-
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
@@ -297,8 +315,19 @@ mod test {
     use crate::{
         rule::RuleId,
         task::{Goal, parse_task},
-        term::{TermBuf, term_with_vars},
+        term::{SharedTerm, TermBuf, TruthCtx, term_with_vars},
     };
+
+    /// A task whose premises hold `0 <= a`, as the derivation pass will leave it.
+    fn task_with_a_premise() -> crate::task::Task {
+        let mut task = parse_task("task { goal find(x); sqrt(a) == x; }");
+        task.premises_mut().insert(
+            term_with_vars("0 <= a"),
+            SharedTerm::new(term_with_vars("sqrt(a)")),
+            TruthCtx::default(),
+        );
+        task
+    }
 
     #[test]
     fn blocked_rules_reach_the_goal_term_the_search_starts_from() {
@@ -316,6 +345,35 @@ mod test {
             .find(|t| t.filters.is_goal())
             .expect("the goal term is in the solution");
         assert!(goal_term.filters.blocked_rules.contains(&blocked));
+    }
+
+    #[test]
+    fn a_premise_reaches_the_arena_flagged() {
+        let solution = Solution::new(task_with_a_premise());
+
+        let premise = solution
+            .terms
+            .iter()
+            .find(|t| t.filters.is_premise())
+            .expect("the premise is seeded");
+        assert_eq!(premise.term.to_string(), "0<=a");
+    }
+
+    /// Premise terms travel in the structure, not as givens.
+    #[test]
+    fn a_subtask_inherits_premises_as_a_structure() {
+        let parent = Solution::new(task_with_a_premise());
+        let goal = Goal::parse(TermBuf::symbol("prove").arg(term_with_vars("0 <= a")))
+            .expect("prove(0 <= a) is a goal");
+
+        let child = parent.subtask(goal, HashSet::new(), Vec::new());
+
+        assert_eq!(child.task.premises().iter().count(), 1);
+        assert!(
+            !child.task.givens.iter().any(|g| g.to_string() == "0<=a"),
+            "a premise must not travel as a given"
+        );
+        assert!(child.terms.iter().any(|t| t.filters.is_premise()));
     }
 
     fn is_send_sync<T: Send + Sync>() {}

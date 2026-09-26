@@ -44,6 +44,14 @@ pub fn is(root: TermRef, ctx: TruthCtx) -> Truth {
         Atom::Symbol(s) if s == "variable" && matches!(lhs.data(), Atom::Variable(_)) => {
             Truth::True
         }
+        // Unlike `even`, a symbolic operand is False — literalness is decidable.
+        Atom::Symbol(s) if s == "number" => {
+            if lhs.data().number().is_some() {
+                Truth::True
+            } else {
+                Truth::False
+            }
+        }
         // Even iff lhs is an even integer literal; a non-integer number is not
         // even, a symbolic operand is undecidable.
         Atom::Symbol(s) if s == "even" => match lhs.data().number() {
@@ -66,7 +74,10 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
-    use crate::term::{TermBuf, term_with_vars};
+    use crate::{
+        NormLevel,
+        term::{TermBuf, term_with_vars},
+    };
 
     fn names(list: &[&str]) -> HashSet<crate::CompactString> {
         list.iter().map(|s| (*s).into()).collect()
@@ -151,6 +162,32 @@ mod tests {
     fn non_is_term_returns_unknown() {
         let t = term_with_vars("x == 5");
         assert_eq!(is(t.term(), TruthCtx::default()), Truth::Unknown);
+    }
+
+    #[test]
+    fn is_number_true_for_integer() {
+        let t = term_with_vars("5 is number");
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::True);
+    }
+
+    /// A literal fraction folds into one number only after normalization.
+    #[test]
+    fn is_number_true_for_normalized_fraction() {
+        let mut t = term_with_vars("1/2 is number");
+        t.term_mut().normalize(NormLevel::Full);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::True);
+    }
+
+    #[test]
+    fn is_number_false_for_variable() {
+        let t = term_with_vars("x is number");
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
+    }
+
+    #[test]
+    fn is_number_false_for_compound() {
+        let t = term_with_vars("x + 1 is number");
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
     }
 
     #[test]

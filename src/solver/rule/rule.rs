@@ -140,6 +140,11 @@ impl Rule {
         self.pattern_node() == self.replace_node()
     }
 
+    /// See [`RuleAttr::Premise`].
+    pub fn is_premise(&self) -> bool {
+        self.contains_attribute(&RuleAttr::Premise)
+    }
+
     /// Checks whether the rule can be applied under the given term filters and
     /// goal.
     ///
@@ -202,6 +207,10 @@ impl Rule {
                 debug!(target: "rule_selection", "no match goal: {goal}, required: {pattern}");
                 RuleDeclineReason::GoalMismatch
             });
+        }
+        // A premise rule is not in the search, so the transform gate is not for it.
+        if self.is_premise() {
+            return Ok(vec![]);
         }
         if goal.term().data().is_symbol_name("transform") {
             // Only transform rules for transform
@@ -275,9 +284,13 @@ impl ApplyRule for SharedRule {
             for i in maps.into_iter() {
                 let mut replace = self.replace_node().to_owned();
                 replace.substitute(&i);
-                let mut resolution = term.clone();
-                replace.swap(&mut resolution.get_mut(&pos).unwrap());
-                resolution = resolution.normalize(self.norm_level());
+                let resolution = if self.is_premise() {
+                    replace.normalize(self.norm_level())
+                } else {
+                    let mut resolution = term.clone();
+                    replace.swap(&mut resolution.get_mut(&pos).unwrap());
+                    resolution.normalize(self.norm_level())
+                };
 
                 let requirements: Vec<TermBuf> = self
                     .requirements
@@ -338,15 +351,6 @@ pub mod tests {
         ))
     }
 
-    fn subtree_rule() -> SharedRule {
-        Arc::new(parse_rule(
-            r#"rule {
-                attr subtree,level(1);
-                --a <=> a;
-            }"#,
-        ))
-    }
-
     fn rule_with_binds() -> SharedRule {
         Arc::new(parse_rule(
             r#"rule {
@@ -362,10 +366,6 @@ pub mod tests {
 
     fn test_term() -> TermBuf {
         term_with_vars(r#"2 + x == 0"#)
-    }
-
-    fn test_term_subtree() -> TermBuf {
-        term_with_vars(r#"x + (-(-2)) == 0"#)
     }
 
     fn test_goal() -> TermBuf {
@@ -385,11 +385,6 @@ pub mod tests {
         );
     }
 
-    // Регрессия к беклогу §6: правило с суммой трёх свободных параметров
-    // внутри составного терма (`(a + b + c)^2`) применяется к идентичной
-    // цели. «Не-матч» в CLI — не свойство rule::apply: goal-терм prove-задачи
-    // до примерки правил переписывается transform-упрощением (раскрытие
-    // скобок), и паттерн в естественной записи цель уже не застаёт.
     #[test]
     fn nested_ternary_sum_rule_applies_to_goal() {
         let rule: SharedRule = Arc::new(parse_rule(
@@ -435,23 +430,6 @@ pub mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: fix double - autoremove
-    fn subtree_apply_test() {
-        let rule = subtree_rule();
-        let term = test_term_subtree();
-        let goal = test_goal();
-        let mut filters = TermFilters::from(term.symbols());
-
-        filters.level = 1.into();
-        let hypothesis = rule.apply(&term, &filters, &goal);
-        assert!(hypothesis.is_ok());
-        let hypothesis = hypothesis.unwrap();
-        assert_eq!(hypothesis.len(), 1);
-        assert_eq!(hypothesis[0].requirements.len(), 0);
-        assert_eq!(hypothesis[0].resolution, term_with_vars("x + 2 == 0"));
-    }
-
-    #[test]
     fn subtree_apply_test_2() {
         let rule = Arc::new(parse_rule(
             r#"rule {
@@ -475,22 +453,6 @@ pub mod tests {
     }
 
     #[test]
-    #[ignore] // TODO: fix double - autoremove
-    fn twice_apply_test() {
-        let rule = subtree_rule();
-        let term = test_term_subtree();
-        let goal = test_goal();
-        let mut filters = TermFilters::from(term.symbols());
-
-        filters.level = 1.into();
-        assert!(rule.apply(&term, &filters, &goal).is_ok());
-        assert_eq!(
-            rule.apply(&term, &filters, &goal).err(),
-            Some(RuleDeclineReason::AlreadyApplied)
-        );
-    }
-
-    #[test]
     fn bind_apply_test() {
         let rule = rule_with_binds();
         let term = test_term_fraction();
@@ -503,6 +465,43 @@ pub mod tests {
         assert_eq!(
             hypothesis[0].resolution,
             term_with_vars("2 == 0 && x + 1 != 0")
+        );
+    }
+
+    #[test]
+    fn a_premise_rule_without_a_goal_applies_under_transform() {
+        let rule = Arc::new(parse_rule(
+            r#"rule { attr premise; sqrt(a) => domain(0 <= a); }"#,
+        ));
+        let goal = TermBuf::symbol("transform").arg(term_with_vars("sqrt(x) + 1"));
+
+        assert!(rule.goal_mapping(&goal).is_ok());
+    }
+
+    #[test]
+    fn an_ordinary_rule_without_a_goal_stays_out_of_transform() {
+        let rule = Arc::new(parse_rule(r#"rule { attr level(0); a * 1 => a + a; }"#));
+        let goal = TermBuf::symbol("transform").arg(term_with_vars("sqrt(x) + 1"));
+
+        assert_eq!(
+            rule.goal_mapping(&goal).err(),
+            Some(RuleDeclineReason::GoalMismatch)
+        );
+    }
+
+    #[test]
+    fn a_premise_rule_can_still_be_scoped_to_a_goal() {
+        let rule = Arc::new(parse_rule(
+            r#"rule { attr premise,goal(prove(x)); sqrt(a) => domain(0 <= a); }"#,
+        ));
+
+        let prove = TermBuf::symbol("prove").arg(term_with_vars("sqrt(x) > 0"));
+        assert!(rule.goal_mapping(&prove).is_ok());
+
+        let find = TermBuf::symbol("find").arg(term_with_vars("x"));
+        assert_eq!(
+            rule.goal_mapping(&find).err(),
+            Some(RuleDeclineReason::GoalMismatch)
         );
     }
 
@@ -525,5 +524,49 @@ pub mod tests {
         assert!(hypothesis.is_ok());
         let hypothesis = hypothesis.unwrap();
         assert_eq!(hypothesis.len(), 1);
+    }
+
+    fn resolutions(rule_text: &'static str, term_text: &'static str) -> Vec<String> {
+        let rule = Arc::new(parse_rule(rule_text));
+        let term = term_with_vars(term_text);
+        let goal = term_with_vars(r#"prove(x)"#);
+        let mut filters = TermFilters::from(term.symbols());
+        filters.level = 0.into();
+
+        rule.apply(&term, &filters, &goal)
+            .unwrap()
+            .iter()
+            .map(|h| h.resolution.to_string())
+            .collect()
+    }
+
+    const PREMISE_RULE: &str = r#"rule {
+        attr premise;
+        sqrt(a) => 0 <= a;
+    }"#;
+
+    #[test]
+    fn a_premise_rule_discards_the_match_context() {
+        assert_eq!(resolutions(PREMISE_RULE, "sqrt(x) + 1 < 5"), ["0<=x"]);
+    }
+
+    #[test]
+    fn a_premise_rule_fires_once_per_match() {
+        assert_eq!(
+            resolutions(PREMISE_RULE, "sqrt(x) + sqrt(y) < 5"),
+            ["0<=x", "0<=y"]
+        );
+    }
+
+    #[test]
+    fn an_ordinary_rule_still_substitutes_in_place() {
+        let same_rule_without_attr = r#"rule {
+            attr level(0);
+            sqrt(a) => 0 <= a;
+        }"#;
+        assert_eq!(
+            resolutions(same_rule_without_attr, "sqrt(x) + 1 < 5"),
+            ["(0<=x)+1<5"]
+        );
     }
 }
