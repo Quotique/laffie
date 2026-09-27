@@ -127,16 +127,17 @@ impl Solution {
             let props = history.next().unwrap_or_else(|| TermProps::from(term));
             let _ = solution.add_term(props);
         }
-        let mut goal_term = TermProps::from(solution.goal().subject().to_owned());
-        // The search tells goal terms from derived ones by this flag alone.
-        goal_term.filters.mark_goal();
-        // The task's blocked rules land on the goal term the search starts from.
-        goal_term.filters.blocked_rules = blocked_rules;
-        let goal_buf = Arc::make_mut(&mut goal_term.term);
+        let mut goal_buf = solution.goal().subject().to_owned();
         // Canonicalize the goal (commutative arg order etc.) so the syntactic
         // match in `check_prove_answer` sees derived terms — which are always
         // normalized — in the same shape as the goal.
         goal_buf.term_mut().normalize(NormLevel::Full);
+        // After normalizing: the props select rules by the term's symbols.
+        let mut goal_term = TermProps::from(goal_buf);
+        // The search tells goal terms from derived ones by this flag alone.
+        goal_term.filters.mark_goal();
+        // The task's blocked rules land on the goal term the search starts from.
+        goal_term.filters.blocked_rules = blocked_rules;
         let _ = solution.add_term(goal_term);
 
         trace!(target: "subtask", "Subtask: {}, [{}]",

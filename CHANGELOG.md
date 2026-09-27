@@ -60,6 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was found by looking the term up, and one term can hold two store indexes.
 - An answer over three or more unknowns is assembled as one flat `&&`, like a
   declared answer. Nested, it matched only as rendered text.
+- `a^(1/2)` is `sqrt(a)` and `sqrt(n)^2` is `n` for a number `n ≥ 0`, so sympy's roots meet the `sqrt` rules.
+- A goal whose normalization changes its symbols gets the rules for its normalized form.
 - A negative literal parses before `*` and `^`: `-2*x`, `x - 2^2`, `x + -2*x`; `-3/x*y` is `(-3/x)·y`.
 
 ### Removed

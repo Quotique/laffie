@@ -33,3 +33,13 @@ task {
     goal transform((5 - sqrt(29))*(-2) > 0);
     answer 2*sqrt(29) - 10 > 0;
 }
+
+task {
+    goal transform(sqrt(3)*sqrt(3) + 3^(1/2));
+    answer 3 + sqrt(3);
+}
+
+task {
+    goal transform(sqrt(-2)*sqrt(-2));
+    answer sqrt(-2)^2;
+}
