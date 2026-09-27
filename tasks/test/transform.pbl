@@ -28,3 +28,8 @@ task {
 
     x in prime_factors(100);
 }
+
+task {
+    goal transform((5 - sqrt(29))*(-2) > 0);
+    answer 2*sqrt(29) - 10 > 0;
+}

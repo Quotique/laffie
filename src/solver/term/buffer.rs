@@ -96,6 +96,14 @@ impl TermBuf {
             .collect()
     }
 
+    pub fn has_variables(&self) -> bool {
+        self.0
+            .root()
+            .bfs()
+            .iter
+            .any(|x| x.data.variable().is_some())
+    }
+
     #[inline]
     pub fn replace(&mut self, src: &Self, dst: &Self) {
         self.term_mut().replace(src.term(), dst.term())

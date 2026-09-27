@@ -80,10 +80,13 @@ impl Solution {
         blocked_rules: HashSet<RuleId>,
         extra: Vec<SharedTerm>,
     ) -> Self {
+        // A goal without variables holds or fails on its own; the parent's terms
+        // assume a solution exists, so as premises they would prove it by assumption.
+        let closed = !goal.term().has_variables();
         let inherited: Vec<TermProps> = self
             .terms
             .iter()
-            .filter(|x| x.is_proven())
+            .filter(|x| !closed && x.is_proven())
             .filter(|x| !(x.filters.is_goal() || answer::marked(x.term.term()).is_some()))
             .map(|x| {
                 let mut props = x.clone();

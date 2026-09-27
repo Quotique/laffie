@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cli` prints per-group totals in name order.
 - A load error names `file:row:col` once, with its message on that line.
 - Two-root equations solve in the `== 0` form; `move_left` retires the original.
+- A condition without unknowns is no longer proven from the task's own assumptions.
 - A `.sym` corpus with any problem yields no rule base, and every problem is
   listed. The TUI shows them and keeps the previous base.
 - `cli` fails a run whose answer changed against the recorded baseline,

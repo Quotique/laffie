@@ -578,6 +578,9 @@ impl Solver {
             {
                 return AnswerCheck::Bind { part: 0, term: i };
             }
+            if solution.goal().kind() == GoalKind::Transform {
+                return self.check_transform_answer(solution);
+            }
             return AnswerCheck::No;
         }
         let unwrapped = self.check_answer_term(solution, index);
