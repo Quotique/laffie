@@ -44,7 +44,7 @@ src/solver/
 │           ├── answer.rs   # the `answer(x)` marker: NAME, mark(), marked() — re-exported as term::answer
 │           ├── domain.rs   # the `domain(c)` premise marker — re-exported as term::domain
 │           ├── equal.rs inequal.rs less.rs less_or_equal.rs more.rs more_or_equal.rs
-│           ├── plus.rs mul.rs divide.rs power.rs sqrt.rs denom.rs
+│           ├── plus.rs mul.rs divide.rs power.rs sqrt.rs denom.rs abs.rs
 │           ├── logic_and.rs logic_or.rs op_not.rs op_true.rs op_in.rs
 │           └── is.rs substitute.rs symbolic_eq.rs
 ├── task/                   # what is asked

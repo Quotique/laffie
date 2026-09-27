@@ -68,6 +68,7 @@ pub(super) fn all_func_symbols() -> &'static RwLock<HashMap<CompactString, Symbo
 
         add_symbol_impl(&mut result, ops::sqrt::symbol());
         add_symbol_impl(&mut result, ops::denom::symbol());
+        add_symbol_impl(&mut result, ops::abs::symbol());
 
         add_symbol_impl(
             &mut result,

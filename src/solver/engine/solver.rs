@@ -328,7 +328,7 @@ impl Solver {
                 // Decided before the hypothesis is consumed, acted on after, so
                 // the tracer still counts the rule as fired.
                 let refuted = hypothesis.is_refuted(&s.known_vars);
-                let props = self.try_prove_hypothesis(index, s, hypothesis, run);
+                let props = self.try_prove_hypothesis(index, s, hypothesis, refuted, run);
                 if props.inference.is_proven() {
                     return Ok(Some(props));
                 }
@@ -351,6 +351,7 @@ impl Solver {
         parent_idx: usize,
         solution: &Solution,
         hypothesis: GroundedHypothesis,
+        refuted: bool,
         run: &mut Run,
     ) -> TermProps {
         trace!(
@@ -368,17 +369,20 @@ impl Solver {
         }
         let mut req_proofs = vec![];
         let mut iter = hypothesis.requirements.clone().into_iter();
-        for i in iter.by_ref() {
-            req_proofs.push(self.prove(solution, i, run));
-            let last = req_proofs.last().unwrap();
-            if last.answer().is_none() {
-                trace!(
-                    target: "rule_selection",
-                    "term {} rejected, requirement not proven {}",
-                    hypothesis.resolution,
-                    last.task.goal()
-                );
-                break;
+        // A false requirement cannot be proven: no subtask for any of them.
+        if !refuted {
+            for i in iter.by_ref() {
+                req_proofs.push(self.prove(solution, i, run));
+                let last = req_proofs.last().unwrap();
+                if last.answer().is_none() {
+                    trace!(
+                        target: "rule_selection",
+                        "term {} rejected, requirement not proven {}",
+                        hypothesis.resolution,
+                        last.task.goal()
+                    );
+                    break;
+                }
             }
         }
         for req in iter {

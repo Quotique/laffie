@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`doc/ru/domain.md`).
 - `denom(r)` — denominator of a rational literal.
 - `<expr> is number` — true only for a numeric literal.
+- `abs(n)` evaluates on a numeric literal.
 - Inequality lemmas: power means, AM-GM variants, SOS facts with strictness
   from `a != b` premises.
 - `doc/ru/backlog.md` — беклог находок.
