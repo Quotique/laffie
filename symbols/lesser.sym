@@ -167,3 +167,49 @@ rule {
     0 < b,
     0 < c;
 }
+
+// Каноническая форма цели prove: всё в правую часть (беклог §13). Шаблон
+// связан с целью через goal(...): иначе переписал бы и выведенные неравенства.
+rule {
+    attr level(0),goal(prove(a < b));
+
+    a < b <=> 0 < b - a;
+
+    !symbolic_eq(a, 0);
+}
+
+// Поглощение |f·a^j| ≤ |f|/2·(a^k + a^l) при чётных k, l и k + l = 2j;
+// остаток — подзадачей.
+rule {
+    attr id(absorb_pow),level(1),goal(prove(x)),one(e),one(g),zero(l),zero(d);
+
+    0 < e*a^k + f*a^j + g*a^l + d <=> true;
+
+    k is even, l is even, k + l == 2*j,
+    e is number, f is number, g is number,
+    2*e >= abs(f), 2*g >= abs(f),
+    0 < (2*e - abs(f))*a^k + (2*g - abs(f))*a^l + 2*d;
+}
+
+// То же для произвольных A, B: |f·A·B| ≤ |f|/2·(A^2 + B^2).
+rule {
+    attr id(absorb_quad),level(1),goal(prove(x)),one(e),one(f),one(g),zero(d);
+
+    0 < e*A^2 + f*A*B + g*B^2 + d <=> true;
+
+    e is number, f is number, g is number,
+    2*e >= abs(f), 2*g >= abs(f),
+    0 < (2*e - abs(f))*A^2 + (2*g - abs(f))*B^2 + 2*d;
+}
+
+// Чётная степень с неотрицательным коэффициентом плюс положительный остаток.
+rule {
+    attr level(1),goal(prove(x)),one(e);
+
+    0 < e*a^c + d <=> true;
+
+    c is even,
+    e is number,
+    0 <= e,
+    0 < d;
+}
