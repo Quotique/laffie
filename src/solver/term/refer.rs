@@ -23,6 +23,10 @@ use crate::{Rational, number_to_string};
 /// substitutions found so far instead of failing the whole match.
 const MATCH_BUDGET: usize = 10_000;
 
+/// Longest sum or product two group params may split, each of the 2^n splits
+/// being a match.
+const MAX_SPLIT_CHILDREN: usize = 7;
+
 pub trait Term {
     type RefType: Term;
 
@@ -453,7 +457,23 @@ impl<'a> TermRef<'a> {
             assoc,
             needs_dedup,
         };
+        let absorbers = matcher
+            .pat_args
+            .iter()
+            .filter(|a| matcher.absorbs_group(**a))
+            .count();
+        if absorbers > 1 && matcher.children.len() > MAX_SPLIT_CHILDREN {
+            trace!(
+                target: "pattern_match",
+                "split refused: {absorbers} group args over {} children: {pattern}",
+                matcher.children.len()
+            );
+            return;
+        }
         matcher.assign(0, params, out);
+        if matcher.budget == 0 {
+            debug!(target: "pattern_match", "match budget exhausted: {pattern} against {self}");
+        }
     }
 }
 
@@ -495,7 +515,7 @@ impl CommutativeMatcher<'_> {
 
         let arg = self.pat_args[arg_idx];
 
-        if !self.assoc {
+        if !self.assoc || !self.absorbs_group(arg) {
             // Each pattern arg binds exactly one still-unused child.
             for child_idx in 0..self.children.len() {
                 if self.budget == 0 {
@@ -540,7 +560,8 @@ impl CommutativeMatcher<'_> {
         let bits = unused.len();
         let bound: u64 = if bits >= 63 { u64::MAX } else { 1u64 << bits };
 
-        let mut mask: u64 = 1;
+        // A match must use every child, so the last arg takes all the rest.
+        let mut mask: u64 = if remaining_args == 1 { bound - 1 } else { 1 };
         while mask < bound {
             if self.budget == 0 {
                 return;
@@ -582,6 +603,16 @@ impl CommutativeMatcher<'_> {
                     self.used[idx] = false;
                 }
             }
+        }
+    }
+}
+
+impl CommutativeMatcher<'_> {
+    fn absorbs_group(&self, arg: TermRef) -> bool {
+        match arg.data() {
+            Atom::Param(_) => true,
+            Atom::Symbol(s) => *s == self.sym,
+            _ => false,
         }
     }
 }
@@ -995,17 +1026,17 @@ mod tests {
     }
 
     #[test]
-    fn ac_many_children_no_cliff() {
-        // 8 children against a 3-arg pattern: used to blow the 1025-partition
-        // cliff and fail the whole match. Now it returns (budgeted) matches.
+    fn several_groups_split_only_a_short_sum() {
         let pattern = term_with_params("a + b + c");
-        let target = term_with_vars("1 + 2 + 3 + 4 + 5 + 6 + 7 + 8");
-        let maps = target.term().try_match(pattern.term());
-        assert!(maps.is_ok(), "large AC match must not error");
-        assert!(
-            !maps.unwrap().is_empty(),
-            "should find at least one grouping"
-        );
+        let splits = |text: &'static str| {
+            term_with_vars(text)
+                .term()
+                .try_match(pattern.term())
+                .map_or(0, |maps| maps.len())
+        };
+
+        assert!(splits("1 + 2 + 3 + 4 + 5 + 6 + 7") > 0);
+        assert_eq!(splits("1 + 2 + 3 + 4 + 5 + 6 + 7 + 8"), 0);
     }
 
     #[test]
@@ -1021,5 +1052,29 @@ mod tests {
         let goal_single = term_with_params("find(a)");
         let maps_single = goal_single.term().try_match(pattern.term()).unwrap();
         insta::assert_snapshot!(maps_single.iter().format(", "), @"{ x: a, ..1: [] }");
+    }
+
+    /// Must fit the match budget: 13 terms, three structural args and a rest.
+    #[test]
+    fn a_long_sum_yields_the_absorption_grouping() {
+        let term = term_with_vars(
+            "a^12 - a^11 + a^10 - a^9 + a^8 - a^7 + a^6 - a^5 + a^4 - a^3 + a^2 - a + 1",
+        )
+        .normalize(NormLevel::Full);
+        // The `one(e), one(f)` variant; `d` must sort after `a^k` or it enumerates subsets.
+        let pattern = term_with_params("a^k + a^l + g*a^j + d").normalize(NormLevel::Units);
+
+        let maps = term.term().try_match(pattern.term()).unwrap();
+        let bound = |m: &crate::term::ParamSubstitution, p: &str| {
+            m.params
+                .iter()
+                .find(|(k, _)| k.to_string() == p)
+                .map(|(_, v)| v.to_string())
+        };
+        assert!(maps.iter().any(|m| {
+            bound(m, "j").as_deref() == Some("7") &&
+                bound(m, "g").as_deref() == Some("-1") &&
+                [bound(m, "k"), bound(m, "l")].contains(&Some("10".into()))
+        }));
     }
 }
