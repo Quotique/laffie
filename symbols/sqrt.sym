@@ -46,19 +46,37 @@ rule {
     c is known;
 }
 
+// Квадрат `a·√b = −(c·√d + e)` равносилен, только если знаки сторон совпадают.
+// При `a·c < 0` их гарантирует ориентация с `a·e ≤ 0`, при `a·c > 0` — условие
+// `a·e ≤ 0 ∧ c²·d − e² ≤ 0`: без корня и с нулём справа, чтобы его разобрали prove-правила.
 rule {
     attr level(4),goal(find(x, ..)),one(a),one(c);
 
     a*sqrt(b) + c*sqrt(d) + e == 0 => a^2 * b == e^2 + 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0;
 
     a is known,
-    c is known;
+    c is known,
+    e is known,
+    a*c < 0,
+    a*e <= 0;
+}
+
+rule {
+    attr level(4),goal(find(x, ..)),one(a),one(c);
+
+    a*sqrt(b) + c*sqrt(d) + e == 0 =>
+        a*e <= 0 && c^2 * d - e^2 <= 0 && a^2 * b == e^2 + 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0;
+
+    a is known,
+    c is known,
+    e is known,
+    a*c > 0;
 }
 
 rule {
     attr level(2),goal(prove(x));
 
-    sqrt(a) <= b  <=> (b < 0 && a >= 0) || (b >= 0 && a >= 0 && a <= b^2);
+    sqrt(a) <= b <=> b >= 0 && a >= 0 && a <= b^2;
 
     b is known;
 }
@@ -79,6 +97,14 @@ rule {
     b is known;
 }
 
+rule {
+    attr level(2),goal(prove(x));
+
+    sqrt(a) < b <=> b > 0 && a >= 0 && a < b^2;
+
+    b is known;
+}
+
 
 rule {
     attr level(2),goal(prove(x <= 0)),one(a);
@@ -93,6 +119,24 @@ rule {
     attr level(2),goal(prove(x > 0)),one(a);
 
     a*sqrt(b) + c > 0 <=> (a > 0 && sqrt(b) > -c/a) || (a < 0 && sqrt(b) < -c/a);
+
+    a is known,
+    a != 0;
+}
+
+rule {
+    attr level(2),goal(prove(x >= 0)),one(a);
+
+    a*sqrt(b) + c >= 0 <=> (a > 0 && sqrt(b) >= -c/a) || (a < 0 && sqrt(b) <= -c/a);
+
+    a is known,
+    a != 0;
+}
+
+rule {
+    attr level(2),goal(prove(x < 0)),one(a);
+
+    a*sqrt(b) + c < 0 <=> (a > 0 && sqrt(b) < -c/a) || (a < 0 && sqrt(b) > -c/a);
 
     a is known,
     a != 0;

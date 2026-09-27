@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A load error names `file:row:col` once, with its message on that line.
 - Two-root equations solve in the `== 0` form; `move_left` retires the original.
 - A condition without unknowns is no longer proven from the task's own assumptions.
+- Squaring a two-root equation keeps the sides' signs, so it no longer yields a false root.
 - A `.sym` corpus with any problem yields no rule base, and every problem is
   listed. The TUI shows them and keeps the previous base.
 - `cli` fails a run whose answer changed against the recorded baseline,
