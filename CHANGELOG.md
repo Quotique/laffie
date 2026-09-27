@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer, so a degraded one used to pass unnoticed.
 - `cli` reports how many tasks had no recorded baseline, so an empty database
   no longer reads as a clean diff.
+- A hypothesis with an already-false requirement is dropped before its result
+  is normalized, so its calculators never run.
 - Definedness conditions are seeded as flagged premises instead of
   `domain(...)` terms; a `find` answer check skips them.
 - A goal that is not `find`/`prove`/`transform` is a load error naming the file,

@@ -284,12 +284,14 @@ impl ApplyRule for SharedRule {
             for i in maps.into_iter() {
                 let mut replace = self.replace_node().to_owned();
                 replace.substitute(&i);
+                // PERF: left raw; normalizing runs calculators (`sympy_solve`),
+                // wasted on a match its requirements refute.
                 let resolution = if self.is_premise() {
-                    replace.normalize(self.norm_level())
+                    replace
                 } else {
                     let mut resolution = term.clone();
                     replace.swap(&mut resolution.get_mut(&pos).unwrap());
-                    resolution.normalize(self.norm_level())
+                    resolution
                 };
 
                 let requirements: Vec<TermBuf> = self
@@ -404,6 +406,45 @@ pub mod tests {
         assert!(hypothesis.is_ok(), "{:?}", hypothesis.unwrap_err());
     }
 
+    /// Normalizing runs calculators; a match its requirements refute must not pay.
+    #[test]
+    fn apply_leaves_the_resolution_raw() {
+        let rule = Arc::new(parse_rule(
+            r#"rule { attr level(0),goal(find(x)); x*a + b == 0 => x == a + 1; b is known; }"#,
+        ));
+        // `2 + 1` would fold to `3`.
+        let term = term_with_vars("x*2 + y == 0");
+        let mut filters = TermFilters::from(term.symbols());
+        filters.level = 0.into();
+
+        let hypotheses = rule
+            .apply(&term, &filters, &term_with_vars("find(x)"))
+            .unwrap();
+        let raw = &hypotheses[0].resolution;
+        assert_ne!(*raw, raw.clone().normalize(NormLevel::Full));
+    }
+
+    /// `b is known` fails while `y` is unknown, before any grounding.
+    #[test]
+    fn a_false_requirement_refutes_the_raw_hypothesis() {
+        let rule = Arc::new(parse_rule(
+            r#"rule { attr level(0),goal(find(x)); x*a + b == 0 => x == -b/a; a is known, b is known; }"#,
+        ));
+        let term = term_with_vars("x*2 + y == 0");
+        let mut filters = TermFilters::from(term.symbols());
+        filters.level = 0.into();
+        let refuted = |known: &[&str]| {
+            let known = known.iter().map(|v| (*v).into()).collect();
+            let mut h = rule
+                .apply(&term, &filters, &term_with_vars("find(x)"))
+                .unwrap();
+            h[0].try_refute(&known)
+        };
+
+        assert!(refuted(&[]));
+        assert!(!refuted(&["y"]));
+    }
+
     #[test]
     fn apply_test() {
         let rule = base_rule();
@@ -421,7 +462,7 @@ pub mod tests {
         assert_eq!(hypothesis[0].requirements.len(), 1);
         assert_eq!(hypothesis[0].requirements[0], term_with_vars("2 != 0"));
         assert_eq!(
-            hypothesis[0].resolution,
+            hypothesis[0].resolution.clone().normalize(NormLevel::Full),
             term_with_vars("x == -2").normalize(NormLevel::Full)
         );
         assert_eq!(hypothesis[1].requirements.len(), 1);
@@ -463,7 +504,7 @@ pub mod tests {
         let hypothesis = rule.apply(&term, &filters, &goal).unwrap();
         assert_eq!(hypothesis[0].requirements.len(), 0);
         assert_eq!(
-            hypothesis[0].resolution,
+            hypothesis[0].resolution.clone().normalize(NormLevel::Full),
             term_with_vars("2 == 0 && x + 1 != 0")
         );
     }

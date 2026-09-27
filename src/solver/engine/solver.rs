@@ -308,14 +308,20 @@ impl Solver {
         let mut grounded_seen = 0usize;
         for mut h in raw_hypotheses {
             h.resolve_parents(s[index].term.as_ref());
+            // PERF: before `solve(...)` blocks and grounding, wasted on a refuted hypothesis.
+            if h.try_refute(&s.known_vars) {
+                trace!(target: "rule_selection", "hypothesis refuted before grounding: {h}");
+                continue;
+            }
             let Some(h) = self.resolve_solve_in_hypothesis(h, s, run) else {
                 continue;
             };
-            for hypothesis in h.ground(&s.known_vars) {
+            for mut hypothesis in h.ground(&s.known_vars) {
                 grounded_seen += 1;
                 if grounded_seen.is_multiple_of(DEADLINE_CHECK_INTERVAL) {
                     run.limits.check(run.cycle)?;
                 }
+                hypothesis.normalize_resolution();
                 // The duplicate lives where `add_term` will store the resolution.
                 let is_dub = if is_goal {
                     s.goal_index.contains_key(&hypothesis.resolution)
@@ -325,19 +331,9 @@ impl Solver {
                 if is_dub {
                     continue;
                 }
-                // Decided before the hypothesis is consumed, acted on after, so
-                // the tracer still counts the rule as fired.
-                let refuted = hypothesis.is_refuted(&s.known_vars);
-                let props = self.try_prove_hypothesis(index, s, hypothesis, refuted, run);
+                let props = self.try_prove_hypothesis(index, s, hypothesis, run);
                 if props.inference.is_proven() {
                     return Ok(Some(props));
-                }
-                if refuted {
-                    trace!(
-                        target: "rule_selection",
-                        "hypothesis dropped, requirement is false"
-                    );
-                    continue;
                 }
                 // TODO: option to disable
                 s.add_term(props)?;
@@ -351,7 +347,6 @@ impl Solver {
         parent_idx: usize,
         solution: &Solution,
         hypothesis: GroundedHypothesis,
-        refuted: bool,
         run: &mut Run,
     ) -> TermProps {
         trace!(
@@ -369,20 +364,17 @@ impl Solver {
         }
         let mut req_proofs = vec![];
         let mut iter = hypothesis.requirements.clone().into_iter();
-        // A false requirement cannot be proven: no subtask for any of them.
-        if !refuted {
-            for i in iter.by_ref() {
-                req_proofs.push(self.prove(solution, i, run));
-                let last = req_proofs.last().unwrap();
-                if last.answer().is_none() {
-                    trace!(
-                        target: "rule_selection",
-                        "term {} rejected, requirement not proven {}",
-                        hypothesis.resolution,
-                        last.task.goal()
-                    );
-                    break;
-                }
+        for i in iter.by_ref() {
+            req_proofs.push(self.prove(solution, i, run));
+            let last = req_proofs.last().unwrap();
+            if last.answer().is_none() {
+                trace!(
+                    target: "rule_selection",
+                    "term {} rejected, requirement not proven {}",
+                    hypothesis.resolution,
+                    last.task.goal()
+                );
+                break;
             }
         }
         for req in iter {
