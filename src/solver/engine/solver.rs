@@ -261,6 +261,10 @@ impl Solver {
                 Some(s) => {
                     trace!("{} => {s}", solution[index]);
                     self.add_term(s, solution, run, local)?;
+                    if rule.contains_attribute(&RuleAttr::Replace) {
+                        solution[index].filters.mark_replaced();
+                        break;
+                    }
                     if is_goal && kind == GoalKind::Transform {
                         // TODO: унифицировать weight = MAX_LEVEL и REPLACED
                         solution[index].filters.level = self.rules_engine.max_level().next();
@@ -754,7 +758,7 @@ mod solve_tests {
 
     use crate::{
         engine::{Limits, Solver, TIME_LIMIT_DEFAULT},
-        rule::RulesEngine,
+        rule::{RulesEngine, parse_rule},
         task::parse_task,
         term::term_with_vars,
     };
@@ -859,6 +863,37 @@ mod solve_tests {
             *fresh.answer().expect("solved")
         );
         assert_eq!(second.cycles(), fresh.cycles());
+    }
+
+    /// Whether the given of `find(x): x + 1 == 3` ends up `REPLACED` under `rule`.
+    fn given_retired(rule: &'static str) -> bool {
+        let rules: RulesEngine = [parse_rule(rule)]
+            .into_iter()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        let task = parse_task("task { goal find(x); x + 1 == 3; }");
+        let given = task.givens[0].to_string();
+        let solution = Solver::new(Arc::new(rules)).solve(
+            task,
+            Default::default(),
+            Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0,
+        );
+        let term = solution
+            .terms
+            .iter()
+            .find(|t| t.term.to_string() == given)
+            .expect("the given is a term of the solution");
+        term.filters.is_replaced()
+    }
+
+    #[test]
+    fn a_replace_rule_retires_its_source_term() {
+        assert!(given_retired(
+            "rule { attr replace,level(0); a + b == c => a == c - b; }"
+        ));
+        assert!(!given_retired(
+            "rule { attr level(0); a + b == c => a == c - b; }"
+        ));
     }
 
     #[test]

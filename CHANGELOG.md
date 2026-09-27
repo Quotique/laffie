@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   symbol declared above it; a pattern with no function symbol is a load error.
   API: `Rule::symbol`, `with_func_symbol` and the `AnySymbol` symbol are gone.
 - A rejected rule is reported at its file and line.
+- `attr replace` retires the rule's source term again, as documented.
 - A `.sym` corpus with any problem yields no rule base, and every problem is
   listed. The TUI shows them and keeps the previous base.
 - `cli` fails a run whose answer changed against the recorded baseline,
