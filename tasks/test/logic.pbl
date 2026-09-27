@@ -51,3 +51,10 @@ task {
     x in set(6/5, 12/5);
     answer(x in set(6/5, 12/5));
 }
+
+task {
+    goal find(x);
+    answer x == 2;
+
+    sqrt(11.5) >= 3 && x == 2;
+}

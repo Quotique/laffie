@@ -14,7 +14,7 @@ use super::{TermInference, TermProps};
 use crate::{
     CompactString, NormLevel,
     rule::{Level, RuleId},
-    task::{Answer, AnswerPart, Goal, Task, TaskBuilder},
+    task::{Answer, AnswerPart, Goal, GoalKind, Task, TaskBuilder},
     term::{Atom, SharedTerm, Term, answer, match_term},
 };
 
@@ -83,11 +83,15 @@ impl Solution {
         // A goal without variables holds or fails on its own; the parent's terms
         // assume a solution exists, so as premises they would prove it by assumption.
         let closed = !goal.term().has_variables();
+        // A term rewritten under itself proves its own parts by assumption.
+        // TODO: also drop the terms derived from it, once props record their premises.
+        let rewritten = (goal.kind() == GoalKind::Transform).then(|| goal.subject());
         let inherited: Vec<TermProps> = self
             .terms
             .iter()
             .filter(|x| !closed && x.is_proven())
             .filter(|x| !(x.filters.is_goal() || answer::marked(x.term.term()).is_some()))
+            .filter(|x| rewritten != Some(x.term.term()))
             .map(|x| {
                 let mut props = x.clone();
                 props.filters.level = 0.into();
