@@ -9,7 +9,7 @@ cli запускается последовательно: параллельн�
 times.tsv (задача, секунды, код выхода), slow/NNN.out (вывод убитых).
 
 Использование:
-    python scripts/run_corpus.py tasks/iskra/eq_32.pbl --out /tmp/eq
+    python scripts/run_corpus.py tasks/iskra/eq_32.pbl --out /tmp/eq [--cli /tmp/cli]
 """
 
 import argparse
@@ -22,7 +22,6 @@ from pathlib import Path
 from run_report import log_records, pbl_files, pbl_tasks, report
 
 REPO = Path(__file__).resolve().parents[1]
-CLI = REPO / "target" / "release" / "cli"
 
 
 def parse_args():
@@ -32,13 +31,20 @@ def parse_args():
     ap.add_argument("--timeout", type=int, default=40, help="внешний таймаут, с")
     ap.add_argument("--limit", type=int, default=30, help="лимит решателя -l, с")
     ap.add_argument("--json", type=Path, help="полный отчёт в JSON")
+    ap.add_argument(
+        "--cli",
+        type=Path,
+        default=REPO / "target" / "release" / "cli",
+        help="бинарник cli; копия не даёт пересборке испортить долгий прогон",
+    )
     return ap.parse_args()
 
 
 def main():
     args = parse_args()
-    if not CLI.exists():
-        sys.exit(f"нет {CLI}: cargo build --release")
+    if not args.cli.exists():
+        hint = ": cargo build --release" if args.cli == REPO / "target" / "release" / "cli" else ""
+        sys.exit(f"нет {args.cli}{hint}")
 
     tasks = pbl_tasks(pbl_files(args.pbl))
     dirs = split(tasks, args.out / "split")
@@ -46,7 +52,7 @@ def main():
 
     log, times = [], ["task\tsecs\texit"]
     for i, d in enumerate(dirs, 1):
-        secs, code, out = run_one(d, args.timeout, args.limit)
+        secs, code, out = run_one(args.cli, d, args.timeout, args.limit)
         times.append(f"{d.name}\t{secs:.1f}\t{code}")
         if code != 0:
             (args.out / "slow" / f"{d.name}.out").write_text(out, encoding="utf-8")
@@ -72,8 +78,8 @@ def split(tasks, root):
     return dirs
 
 
-def run_one(task_dir, timeout, limit):
-    cmd = [str(CLI), "-c", "config/cli.yaml", "-p", str(task_dir), "-l", str(limit)]
+def run_one(cli, task_dir, timeout, limit):
+    cmd = [str(cli), "-c", "config/cli.yaml", "-p", str(task_dir), "-l", str(limit)]
     start = time.monotonic()
     try:
         p = subprocess.run(
