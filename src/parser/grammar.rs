@@ -201,17 +201,13 @@ peg::parser! {
         rule sum() -> Tree<Token> =
             l:sum() _ p:position!() "+" _ r:product() { Token::new("+", p) /l /r }
             / l:sum() _ p:position!() "+" _ n:number() _ r:product() { Token::new("+", p) /l /(Token::new("*", p) /n /r) }
-            / l:sum() _ p:position!() _ n:minus_number() _ "*" _ r:product() { Token::new("+", p) /l /(Token::new("*", p) /n /r) }
-            / l:sum() _ p:position!() _ n:minus_number() _ "/" _ r:product() { Token::new("+", p) /l /(Token::new("/", p) /n /r) }
-            / l:sum() _ p:position!() _ n:minus_number() _ r:product() { Token::new("+", p) /l /(Token::new("*", p) /n /r) }
-            / l:sum() _ p:position!() _ n:minus_number() { Token::new("+", p) /l /n }
+            / l:sum() _ p:position!() "+" _ r:signed_product() { Token::new("+", p) /l /r }
+            / l:sum() _ p:position!() r:signed_product() { Token::new("+", p) /l /r }
             / l:sum() _ p:position!() "-" _ r:product() { Token::new("+", p) /l /(Token::new("*", p) /Token::new("-1", p) /r) }
             / unary()
 
         rule unary() -> Tree<Token> =
-            p:position!() n:minus_number() _ "/" _ x:product() { Token::new("/", p) /n /x }
-            / p:position!() n:minus_number() _ x:product() { Token::new("*", p) /n /x }
-            / n:minus_number() { n }
+            signed_product()
             / p:position!() "-" _ x:product() { Token::new("*", p) /Token::new("-1", p) /x }
             / p:position!() "+" _ x:product() { Token::new("+", p) /x }
             / p:position!() "!" _ x:product() { Token::new("!", p) /x }
@@ -222,6 +218,18 @@ peg::parser! {
             l:product() _ p:position!() "*" _ r:power() { Token::new("*", p) /l /r }
             / l:product() _ p:position!() "/" _ r:power() { Token::new("/", p) /l /r }
             / power()
+
+        // A product led by a negative literal: `-2*x/y` is `((-2)*x)/y`.
+        #[cache_left_rec]
+        rule signed_product() -> Tree<Token> =
+            l:signed_product() _ p:position!() "*" _ r:power() { Token::new("*", p) /l /r }
+            / l:signed_product() _ p:position!() "/" _ r:power() { Token::new("/", p) /l /r }
+            / signed_factor()
+
+        // The literal binds weaker than `^`: `-2^2` is `-(2^2)`, parsed by `unary`.
+        rule signed_factor() -> Tree<Token> =
+            p:position!() n:minus_number() !(_ "^") _ x:power() { Token::new("*", p) /n /x }
+            / n:minus_number() !(_ "^") { n }
 
         rule power() -> Tree<Token> =
             x:atom() _ p:position!() "^" y:atom() { Token::new("^", p) /x /y }
@@ -462,7 +470,7 @@ mod tests {
                                 (Token::new("^", 1) /
                                     Token::new("x", 0) /
                                     Token::new("4", 2)) /
-                                (Token::new("*", 4) /
+                                (Token::new("*", 8) /
                                     Token::new("-25", 6) /
                                     (Token::new("^", 10) /
                                         Token::new("x", 9) /
@@ -503,7 +511,7 @@ mod tests {
             vec![
                 Token::new("==", 2) /
                     Token::new("x", 0) /
-                    (Token::new("/", 5) / Token::new("-5", 6) / Token::new("3", 8)),
+                    (Token::new("/", 7) / Token::new("-5", 6) / Token::new("3", 8)),
             ],
         );
     }

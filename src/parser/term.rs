@@ -139,4 +139,36 @@ mod tests {
                 )
         );
     }
+
+    fn parse(text: &str) -> Option<TermBuf> {
+        let states = lang::terms(text).ok()?;
+        TermParser::default().try_parse(&states[0]).ok()
+    }
+
+    #[track_caller]
+    fn same(text: &str, explicit: &str) {
+        assert_eq!(parse(text), parse(explicit), "{text} vs {explicit}");
+    }
+
+    #[test]
+    fn a_negative_literal_leads_a_product() {
+        same("-2*x", "(-2)*x");
+        same("-2*x*y", "((-2)*x)*y");
+        same("-3/x*y", "((-3)/x)*y");
+        same("-2*(5 - sqrt(29)) > 0", "(-2)*(5 - sqrt(29)) > 0");
+        same("x + -2*x", "x + (-2)*x");
+    }
+
+    #[test]
+    fn a_negative_literal_binds_weaker_than_power() {
+        same("-2^2", "-1*(2^2)");
+        same("x - 2^2", "x + -1*(2^2)");
+        same("-x^2", "-1*(x^2)");
+    }
+
+    #[test]
+    fn a_double_minus_does_not_parse() {
+        assert_eq!(parse("--2*x"), None);
+        assert_eq!(parse("x - -2"), None);
+    }
 }

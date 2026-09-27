@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was found by looking the term up, and one term can hold two store indexes.
 - An answer over three or more unknowns is assembled as one flat `&&`, like a
   declared answer. Nested, it matched only as rendered text.
+- A negative literal parses before `*` and `^`: `-2*x`, `x - 2^2`, `x + -2*x`; `-3/x*y` is `(-3/x)·y`.
 
 ### Removed
 - The TUI's `e` on the Rules tab and the rule window's `Trigger:` line. The
