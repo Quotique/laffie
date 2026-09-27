@@ -74,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `html` and `tui` renderers, their features, and the `html-escape`
   dependency. No workspace member enabled either feature. The `tui` binary
   renders solutions itself.
+- The `abs.sym` case split `y == (p ± abs(t))/k`: no task reaches it.
 
 ## [0.7.0] - 2026-07-21
 

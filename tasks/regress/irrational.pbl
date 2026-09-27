@@ -93,3 +93,10 @@ task {
 
     sqrt(5-x) + sqrt(8+2*x) == 2;
 }
+task {
+    goal find(x);
+    text "Решить уравнение x + sqrt( (x^2 + 4*x)/(x-2) ) == 0";
+    answer x == -1 || x == 0;
+
+    x + sqrt( (x^2 + 4*x)/(x-2) ) == 0;
+}

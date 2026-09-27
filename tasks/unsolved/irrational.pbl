@@ -12,12 +12,6 @@ task {
 }
 task {
     goal find(x);
-    text "Решить уравнение sqrt(5-x) == sqrt(3) + 2 - x";
-
-    sqrt(5-x) == sqrt(3) + 2 - x;
-}
-task {
-    goal find(x);
     text "Решить уравнение sqrt(x + 1) * sqrt(2*x+3) == x+3";
 
     sqrt(x + 1) * sqrt(2*x+3) == x+3;
@@ -33,12 +27,6 @@ task {
     text "Решить уравнение 2*x - sqrt(x^3 + 2*x^2 - 3*x) == 0";
 
     2*x - sqrt(x^3 + 2*x^2 - 3*x) == 0;
-}
-task {
-    goal find(x);
-    text "Решить уравнение x + sqrt( (x^2 + 4*x)/(x-2) ) == 0";
-
-    x + sqrt( (x^2 + 4*x)/(x-2) ) == 0;
 }
 task {
     goal find(x);
