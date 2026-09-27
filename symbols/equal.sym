@@ -3,10 +3,9 @@ symbol == {
 }
 
 // Канонизация к `== 0`; гард `!(a is atom && b is known)` не трогает уже
-// решённую форму `x == known`, чтобы её распознали как ответ. Без `replace`:
-// с ним tasks/regress/irrational теряет 4 задачи.
+// решённую форму `x == known`, чтобы её распознали как ответ.
 rule {
-    attr level(0),goal(find(x, ..)),id(move_left);
+    attr replace,level(0),goal(find(x, ..)),id(move_left);
 
     a == b <=> a - b == 0;
 

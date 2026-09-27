@@ -47,9 +47,9 @@ rule {
 }
 
 rule {
-    attr level(4),goal(find(x, ..)),one(a),one(c),zero(e);
+    attr level(4),goal(find(x, ..)),one(a),one(c);
 
-    a*sqrt(b) + c*sqrt(d) == e => a^2 * b == e^2 - 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0;
+    a*sqrt(b) + c*sqrt(d) + e == 0 => a^2 * b == e^2 + 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0;
 
     a is known,
     c is known;
@@ -98,13 +98,13 @@ rule {
     a != 0;
 }
 
-// C29-форма: сумма двух радикалов `sqrt(x+p) + sqrt(x+q) = sqrt(r)`.
-// Делегируем `solve_with_odz`: sympy решает формально, ОДЗ-фильтр на
-// каждый кандидат подаёт `arg_i >= 0` после подстановки.
+// C29-форма: сумма двух радикалов `sqrt(x+p) + sqrt(x+q) = sqrt(r)`, уже
+// перенесённая `move_left`. Делегируем `solve_with_odz`: sympy решает
+// формально, ОДЗ-фильтр на каждый кандидат подаёт `arg_i >= 0` после подстановки.
 rule {
     attr level(2),goal(find(x, ..));
 
-    sqrt(x + p) + sqrt(x + q) == sqrt(r) =>
+    sqrt(x + p) + sqrt(x + q) - sqrt(r) == 0 =>
         answer(solve_with_odz(sqrt(x + p) + sqrt(x + q) == sqrt(r), x));
 
     p is known,
