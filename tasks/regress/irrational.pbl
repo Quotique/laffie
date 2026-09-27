@@ -85,3 +85,11 @@ task {
 
     sqrt(3*x + 1) - sqrt(2*x-1) == 7;
 }
+
+task {
+    goal find(x);
+    text "Решить уравнение sqrt(5-x) + sqrt(8+2*x) == 2";
+    answer x in empty_set;
+
+    sqrt(5-x) + sqrt(8+2*x) == 2;
+}

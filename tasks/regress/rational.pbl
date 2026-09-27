@@ -81,3 +81,10 @@ task {
 
     (3*x - 2)/x - 1/(x-2) == (3*x+4)/(x^2 - 2*x);
 }
+task {
+    goal find(x);
+    text "Решить уравнение 3/x + 4/(x-1) == (5-x)/(x^2 - x)";
+    answer x in empty_set;
+
+    3/x + 4/(x-1) == (5-x)/(x^2 - x);
+}

@@ -99,3 +99,14 @@ rule {
 
     abs(a) >= a <=> true;
 }
+
+// Опровергнутое следствие условий: решений нет.
+rule {
+    attr level(1),goal(find(x, ..));
+
+    a >= c => x in empty_set;
+
+    a is known,
+    c is known,
+    a < c;
+}

@@ -29,3 +29,10 @@ task {
 task {
     goal prove(3^(1/2) - 2 <= 0);
 }
+
+task {
+    goal find(x);
+    answer x == 4 || x == -4/9;
+
+    sqrt(5-x) + sqrt(8+2*x) == 5;
+}

@@ -72,3 +72,10 @@ task {
 
     1 - sqrt(3) <= 0 && x == 2 || 1 - sqrt(3) >= 0 && x == 3;
 }
+
+task {
+    goal find(x);
+    answer x in empty_set;
+
+    -sqrt(3) >= 0 && x == 2;
+}
