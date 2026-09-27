@@ -1,9 +1,4 @@
-use std::{
-    convert::From,
-    error::Error,
-    fmt, io,
-    path::{Path, PathBuf},
-};
+use std::{convert::From, error::Error, fmt, io, path::Path};
 
 use crate::Location;
 
@@ -11,10 +6,9 @@ type PegError = peg::error::ParseError<peg::str::LineCol>;
 
 const LINES_AROUND: usize = 5;
 
-/// A non-fatal load failure; `message` carries the source location and snippet.
+/// A non-fatal load failure; `message` starts with the file it is about.
 #[derive(Debug)]
 pub struct LoadError {
-    pub path:    PathBuf,
     pub message: String,
 }
 
@@ -37,7 +31,7 @@ impl fmt::Display for LoadFailure {
             Self::Io(e) => write!(f, "{e}"),
             Self::Corpus(errors) => {
                 for e in errors {
-                    writeln!(f, "{}: {}", e.path.display(), e.message)?;
+                    writeln!(f, "{}", e.message)?;
                 }
                 write!(f, "{} load error(s)", errors.len())
             }
@@ -100,22 +94,19 @@ impl ParserError {
         let insert_at = self.loc.row.min(lines.len());
         lines.insert(
             insert_at,
-            format!(
-                "{}^~~: {}",
-                " ".repeat(self.loc.col + count_len + 2),
-                self.msg
-            ),
+            format!("{}^~~", " ".repeat(self.loc.col + count_len + 2)),
         );
 
         let first_line = insert_at.saturating_sub(LINES_AROUND);
         let last_line = std::cmp::min(lines.len(), insert_at + LINES_AROUND + 1);
 
+        let at = match path {
+            Some(path) => format!("{}:{}:{}", path.display(), self.loc.row, self.loc.col),
+            None => format!("{}:{}", self.loc.row, self.loc.col),
+        };
         format!(
-            "\n{}:{}:{}: error: parsing error\n{}",
-            path.map(|x| x.to_string_lossy().to_string())
-                .unwrap_or_default(),
-            self.loc.row,
-            self.loc.col,
+            "{at}: {}\n{}",
+            self.msg,
             lines[first_line..last_line].join("\n")
         )
     }

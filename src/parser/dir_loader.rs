@@ -153,8 +153,7 @@ impl DirectoryParser {
                     Ok(src) => src,
                     Err(e) => {
                         errors.push(LoadError {
-                            message: format!("cannot read file: {e}"),
-                            path,
+                            message: format!("{}: cannot read file: {e}", path.display()),
                         });
                         continue;
                     }
@@ -163,7 +162,6 @@ impl DirectoryParser {
                     Ok(blocks) => files.push(ParsedFile { path, src, blocks }),
                     Err(e) => errors.push(LoadError {
                         message: e.error_string(&src, Some(&path)),
-                        path,
                     }),
                 }
             }
@@ -182,7 +180,6 @@ struct ParsedFile {
 impl ParsedFile {
     fn error(&self, e: &ParserError) -> LoadError {
         LoadError {
-            path:    self.path.clone(),
             message: e.error_string(&self.src, Some(&self.path)),
         }
     }

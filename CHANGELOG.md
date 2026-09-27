@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   API: `Rule::symbol`, `with_func_symbol` and the `AnySymbol` symbol are gone.
 - A rejected rule is reported at its file and line.
 - `attr replace` retires the rule's source term again, as documented.
+- `cli` prints per-group totals in name order.
+- A load error names `file:row:col` once, with its message on that line.
 - A `.sym` corpus with any problem yields no rule base, and every problem is
   listed. The TUI shows them and keeps the previous base.
 - `cli` fails a run whose answer changed against the recorded baseline,

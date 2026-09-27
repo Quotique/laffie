@@ -8,7 +8,7 @@ mod run_diff;
 mod settings;
 
 use std::{
-    collections::HashMap, convert::TryFrom, fmt, path::PathBuf, process::ExitCode, sync::Arc,
+    collections::BTreeMap, convert::TryFrom, fmt, path::PathBuf, process::ExitCode, sync::Arc,
 };
 
 use clap::Parser;
@@ -160,7 +160,7 @@ fn main() -> ExitCode {
     // A broken corpus is not a valid run; the rules already bailed out above.
     if !tasks.errors.is_empty() {
         for e in &tasks.errors {
-            eprintln!("{}: {}", e.path.display(), e.message);
+            eprintln!("{}", e.message);
         }
         eprintln!("{} load error(s)", tasks.errors.len());
         return ExitCode::FAILURE;
@@ -193,7 +193,7 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    let mut stats: HashMap<String, SolveStats> = Default::default();
+    let mut stats: BTreeMap<String, SolveStats> = Default::default();
     let mut diff = RunDiff::default();
     let coverage = args.coverage.then(CoverageTracer::default);
 

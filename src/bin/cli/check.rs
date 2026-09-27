@@ -17,7 +17,7 @@ pub fn run(rules: &RulesEngine, tasks: &LoadReport<Vec<Task>>, strict: bool) -> 
 
     // Rule-side failures already aborted the load; only tasks report here.
     for e in tasks.errors.iter() {
-        errors.push(format!("{}: {}", e.path.display(), e.message));
+        errors.push(e.message.clone());
     }
 
     // A param close to a symbol name is likely a mistyped symbol.
