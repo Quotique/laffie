@@ -9,7 +9,7 @@ cli запускается последовательно: параллельн�
 times.tsv (задача, секунды, код выхода), slow/NNN.out (вывод убитых).
 
 Использование:
-    python scripts/run_corpus.py tasks/iskra/eq_32.pbl --out /tmp/eq [--cli /tmp/cli]
+    python scripts/run_corpus.py tasks/unsolved/iskra --out /tmp/iskra [--cli /tmp/cli]
 """
 
 import argparse

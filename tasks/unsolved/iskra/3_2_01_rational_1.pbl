@@ -1,0 +1,332 @@
+// 3.2.1. Рациональные уравнения - 1.
+
+task {
+    goal find(x);
+    id "iskra:равно:010";
+    answer (a != b && a + b + a*b^2 - (b^3) != 0 && a + b - (a*b^2) + b^3 != 0 && x == (a + b)/(a - b) || x != -(a^2) && x != a^2 && b == a) && x in Reals;
+
+    (a^2 + x)/(b^2 - x) - ((a^2 - x)/(b^2 + x)) == (4*a*b*x + 2*a^2 - (2*b^2))/(b^4 - (x^2));
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:011";
+    answer a != 0 && x == a*2;
+
+    ((a + 1)/(a*x + 1) + (x + 1)/(x + a^(-1)) - 1)/((a + 1)/((x + a^(-1))*a) - (a*(x + 1)/(a*x + 1)) + 1) == x/2;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:014";
+    answer a != b && x == a*2 - b || a + b != 0 && x == b + a*2;
+
+    1 - (2*a/(x - a)) == (b^2 - (a^2))/(a^2 + x^2 - (2*a*x));
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:016";
+    answer a != 0 && (a != -1 && x == (a - 1)/(a + 1) || a != 1 && x == 1);
+
+    (a - (x^2))/(a - x)^2 - (1/a) == (a - 1)/(a^3 - (a*x*(2*a - x)));
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:017";
+    answer a != 0 && (a != -1 && a != 1 && x == -(a*2) || a != -2 && a != -4 && x == a + 2);
+
+    1/(2*a + a*x) - (1/(2*x - (x^2))) == 2*(a + 3)/(x^3 - (4*x));
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:018";
+    answer b != 1 && (a != 1 && x == (-a + 1)/(-b + 1) || x == 1/(b - 1));
+
+    a/(b*x - x) - ((a - 1)/(x^2 - (2*b*x^2) + b^2*x^2)) == 1;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:019";
+    answer a != -1 && a != 1 && b != a && (a != 0 && b*2 - a != 0 && x == b/(a - b) || b != 0 && a*2 - b != 0 && x == a/(b - a));
+
+    (x + x^2)/(1 - (x^2))/((1 - (a^2))/((1 + a*x)^2 - ((a + x)^2))) == a*b/(b - a)^2;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:020";
+    answer a != 0 && b != 0 && x == a + b || b != a && x == (a + b)/2;
+
+    a/(x - b) + b/(x - a) == 2;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:030";
+    answer b == a && x != a && x in Reals;
+
+    (x - a)/(x - b) + (x - b)/(x - a) == 2;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:001";
+    answer a != 0 && (a != b && b*3 - a != 0 && x == a*(a - b)*7/((a - (b*3))*3) || b == 0) && x in Reals;
+
+    (6*a + 7*b)/(6*a) - (3*b*x/(2*a^2)) == 1 - (b*x/(a^2 - (b*a)));
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:002";
+    answer a != b && a + b != 0 && x == 0;
+
+    (a*x - b)/(a + b) + (b*x + a)/(a - b) == (a^2 + b^2)/(a^2 - (b^2));
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:003";
+    answer b != 0 && c != 0 && (a != 0 && a*b + a*c + b*c != 0 && x == a + b + c || b + c != 0 && a == -(b*c/(b + c))) && x in Reals;
+
+    (x - a - b)/c + (x - b - c)/a + (x - c - a)/b == 3;
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+    c is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:004";
+    answer a != 0 && a*2 + b*3 != 0 && b*3 - (a*2) != 0 && b != 0 && x == a*(4*a^2 - (9*b^2))/(8*a^2 + 27*b^2);
+
+    (a + 3*x)/(4*a^2 + 6*a*b) - ((a - (2*x))/(9*b^2 - (6*a*b))) == (2*a + x)/(4*a^2 - (9*b^2));
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:005";
+    answer a != -1 && a != 1 && x == 3/4;
+
+    (x - 1)/(a - 1) + 2*a^2*(1 - x)/(a^4 - 1) == (2*x - 1)/(1 - (a^4)) - ((1 - x)/(1 + a));
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:006";
+    answer a != -1 && a != 0 && (b == -(a/(3*(a + 1)^2)) && x in Reals || x == a/(a + 1));
+
+    ((3*a*b + 1)/a)*x == 3*a*b/(a + 1) + (2*a + 1)*x/(a*(a + 1)^2) + a^2/(a + 1)^3;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:007";
+    answer a != 0 && a + b != 0 && (c == -(a*b/(3*(a + b)^2)) && x in Reals || x == a*b/(a + b));
+
+    3*a*b*c/(a + b) + a^2*b^2/(a + b)^3 + (2*a + b)*b^2*x/(a*(a + b)^2) == 3*c*x + b*x/a;
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+    c is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:008";
+    answer (b != 0 && (b != c && c != 0 && b + c != 0 && x == a*(b + c)/b || c == 0) || c != 0 && a == 0 && b == 0) && x in Reals;
+
+    (x + a)/(b + c) - (b*x/(b + c)^2) == b*a/(b^2 - (c^2)) - (c^2*x/(b^3 - (b*c^2) + b^2*c - (c^3)));
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+    c is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:009";
+    answer a != 0 && x == a*4;
+
+    a/x + x/a + a*(x - a)/(x*(x + a)) - (x*(x + a)/(a*(x - a))) == a*x/(a^2 - (x^2)) - 2;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:010";
+    answer (a != b && a != 0 && b != 0 && a + b != 0 && x == b^2/a || x != -b && x != 0 && a == 0) && x in Reals;
+
+    a*b/(a - x) + (a + b)*(a*b*x + b*x^2 + x^3)/(x^3 + b*x^2 - (a^2*x) - (a^2*b)) == a*x/(b + x) + b*x^2/(x^2 - (a^2));
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:011";
+    answer (a != 0 && x == 3/(2*a^2) || x != 0 && a == 0) && x in Reals;
+
+    (a + x)/(a^2 + a*x + x^2) - ((a - x)/(a*x - (x^2) - (a^2))) == 3*a/(x*(a^4 + a^2*x^2 + x^4));
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:015";
+    answer a != 0 && (a != -2 && x == -1 || a != 1 && x == (a + 1)/(a - 1));
+
+    (x^2 + 1)/(a^2*x - (2*a)) - (1/(2 - (a*x))) == x/a;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:016";
+    answer a != b && x == a || a + b != 0 && x == a + b*2;
+
+    1 - (2*a/(x - b)) == (b^2 - (a^2))/(b^2 + x^2 - (2*b*x));
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:017";
+    answer a*2 - b != 0 && (b*2 - a != 0 && x == b*2 - a || x == a*2 - b);
+
+    (a + x - (2*b))/(2*a - b) - ((a - (2*b))/x) == 1;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:018";
+    answer a != 0 && a + b != 0 && (a - (b*2) != 0 && x == a*(a + b)*2/(b*2 - a) || a*5 + b*2 != 0 && x == a*(a + b)*2/(a*5 + b*2));
+
+    (((a - x)/x)^2 - ((a/(a + b))^2))/(x^2 + a^2 - (2*a*x)) == 5/(9*x^2);
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:022";
+    answer x != -1 && x != -2 && x != 1 && x != 2 && a == 1 && x in Reals;
+
+    (x - a)/(x - 1) + (x + a)/(x + 1) == (x - (2*a))/(x - 2) + (x + 2*a)/(x + 2) - (6*(a - 1)/5);
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:024";
+    answer a != 0 && x == 1/a || x == -(a^(1/3));
+
+    a*x^4 - (x^3) + a^2*x - a == 0;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:025";
+    answer a != 0 && (a != -1 && a != 1 && x == a || x == -a + 1/a);
+
+    (a^2 - 1)/(a*x - 1) + (a - x)/a == 1;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:028";
+    answer x == 0;
+
+    (x - 1)*(x - 2)*(x - 3)*(x - 4)/((x + 1)*(x + 2)*(x + 3)*(x + 4)) == 1;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:029";
+    answer a != 0 && b != 0 && (a != b && a + b != 0 && x == a*b*2/(a + b) || x == a + b);
+
+    1/(x - a) + 1/(x - b) == 1/a + 1/b;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+

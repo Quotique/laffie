@@ -20,7 +20,7 @@ cargo run --release --bin cli -- -c config/cli.yaml -p tasks/slow
 cargo run --release --bin cli -- -c config/cli.yaml --check            # lint the corpus
 ```
 
-Task sets: `regress` solves, each task in ≤ 3 s; `slow` solves in more, run it now and then; `unsolved` does not solve yet. A task that starts solving moves by its time.
+Task sets: `regress` solves, each task in ≤ 3 s; `slow` solves in more, run it now and then; `unsolved` does not solve yet. A task that starts solving moves by its time. Iskra tasks sit in `tasks/*/iskra/`, a file per task-book section; `scripts/iskra_sort.py` moves the solved ones after a `scripts/run_corpus.py` run.
 
 ## Testing & Linting
 

@@ -1,0 +1,268 @@
+// 3.2.3. Иррациональные уравнения - 1.
+
+task {
+    goal find(x);
+    id "iskra:дробь:044";
+    answer x == a/(-1 + a^(2/3)) && 1 < a;
+
+    sqrt(a + x)/a + sqrt(a + x)/x == sqrt(x);
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:дробь:045";
+    answer x == 7;
+
+    sqrt((2*x + 2)/(x + 2)) - sqrt((x + 2)/(2*x + 2)) == 7/12;
+}
+
+task {
+    goal find(x);
+    id "iskra:минус:044";
+    answer x == 17;
+
+    sqrt(x - 1) + 6*(x - 1)^(1/4) == 16;
+}
+
+task {
+    goal find(x);
+    id "iskra:минус:045";
+    answer x == 5;
+
+    sqrt(x + 4)/sqrt(x - 4) - (2*(sqrt(x - 4)/sqrt(x + 4))) == 7/3;
+}
+
+task {
+    goal find(x);
+    id "iskra:минус:046";
+    answer x == (a + b)/2 && 0 < a - b;
+
+    ((a - x)*(x - b)^(1/4) + (x - b)*(a - x)^(1/4))/((a - x)^(1/4) + (x - b)^(1/4)) == (a - b)/2;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:плюс:043";
+    answer a != 0 && x == a*3/4;
+
+    (sqrt(1 + a^(-2)*x^2) - (x*a^(-1)))/(sqrt(1 + a^(-2)*x^2) + x*a^(-1)) == 1/4;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:плюс:046";
+    answer x == 81;
+
+    (x - 1)/(1 + sqrt(x)) == 4 - ((1 - sqrt(x))/2);
+}
+
+task {
+    goal find(x);
+    id "iskra:плюс:048";
+    answer x == 1/2;
+
+    sqrt(6*x + 1) + sqrt(4*x + 2) == sqrt(8*x) + sqrt(2*x + 3);
+}
+
+task {
+    goal find(x);
+    id "iskra:плюс:119";
+    answer x == -(a + 1);
+
+    (x + a + 1)^(1/3) + (x + a + 2)^(1/3) + (x + a)^(1/3) == 0;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:038";
+    answer x == 3/4;
+
+    (3 + x)/(3*x) == sqrt(1/9 + (1/x)*sqrt(4/9 + 2/x^2));
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:041";
+    answer x == 4;
+
+    x*sqrt(x - 3) + 2*sqrt(x - 3) == 6;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:042";
+    answer x == 6;
+
+    sqrt((x - 5)/(x + 2)) + sqrt((x - 4)/(x + 3)) == (7/(x + 2))*sqrt((x + 2)/(x + 3));
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:044";
+    answer a + b != 0 && x == 0 && 0 <= a && 0 <= b || a == -b && x == b^2;
+
+    sqrt(a^2 - x) + sqrt(b^2 - x) == a + b;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:047";
+    answer a == 0 && x == 0 || x == (-1 + sqrt(a*4 - 3))/2 && 1 <= a;
+
+    sqrt(a - sqrt(a + x)) == x;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:равно:048";
+    answer x == 1 + 2/7;
+
+    ((x + 1)^2)^(1/3) + 2*((x - 1)^2)^(1/3) == 3*(x^2 - 1)^(1/3);
+}
+
+task {
+    goal find(x);
+    id "iskra:степень:043";
+    answer (a != 0 && b != 0 && x == (-1 + b^2)/(a*2*abs(b)) || (b == -1 || b == 1) && a == 0) && x in Reals;
+
+    (sqrt(1 + a^2*x^2) - (a*x))/(sqrt(1 + a^2*x^2) + a*x) == 1/b^2;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:степень:044";
+    answer a == 0 && x == 0 || x == ((a - 1)/2)^2 && 1 <= a;
+
+    sqrt(x + a) == a - sqrt(x);
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:степень:048";
+    answer (x == (-sqrt(a*4 + 1) + 1)/2 && a <= 0 || x == (1 + sqrt(a*4 + 1))/2) && -(1/4) <= a;
+
+    sqrt(a + sqrt(a + x)) == x;
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:умножение:043";
+    answer x in Reals && x <= 10 && 5 <= x;
+
+    sqrt(x + 3 - (4*sqrt(x - 1))) + sqrt(x + 8 - (6*sqrt(x - 1))) == 1;
+}
+
+task {
+    goal find(x);
+    id "iskra:умножение:045";
+    answer x == 8;
+
+    (x*x^(1/3) - 1)/((x^2)^(1/3) - 1) - (((x^2)^(1/3) - 1)/(x^(1/3) + 1)) == 4;
+}
+
+task {
+    goal find(x);
+    id "iskra:уникопия:01";
+    answer x == -2;
+
+    sqrt(x^2 - (3*x) - 2) + sqrt(2*x^2 - 1) == sqrt(2*x^2 + 2*x + 3) + sqrt(x^2 - x + 2);
+}
+
+task {
+    goal find(x);
+    id "iskra:число:037";
+    answer x == 4;
+
+    sqrt(2*x + 1) + sqrt(x - 3) == 2*sqrt(x);
+}
+
+task {
+    goal find(x);
+    id "iskra:число:038";
+    answer x == 21;
+
+    sqrt(2*sqrt(7) + sqrt(x)) - sqrt(2*sqrt(7) - sqrt(x)) == 28^(1/4);
+}
+
+task {
+    goal find(x);
+    id "iskra:число:039";
+    answer x == 1 + 9/16;
+
+    sqrt(x + sqrt(x)) - sqrt(x - sqrt(x)) == (3/2)*sqrt(x/(x + sqrt(x)));
+}
+
+task {
+    goal find(x);
+    id "iskra:число:040";
+    answer x == 1;
+
+    sqrt(2*x - 1) - sqrt(2*x - 2) == sqrt(x + 3) - sqrt(x);
+}
+
+task {
+    goal find(x);
+    id "iskra:число:041";
+    answer x == (1 + sqrt(3))/2;
+
+    sqrt(1 + (2*x + 1)/x^2) == 2*x - 1;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:042";
+    answer x == 5;
+
+    sqrt(x^2 - 16)/sqrt(x - 3) + sqrt(x + 3) == 7/sqrt(x - 3);
+}
+
+task {
+    goal find(x);
+    id "iskra:число:043";
+    answer x == -a && 0 <= a;
+
+    2*sqrt(a + x) + sqrt(a - x) == sqrt(sqrt(x*(a + x)) + a - x);
+    a in Reals;
+    a is known;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:045";
+    answer x == 9;
+
+    (x - 4)/(sqrt(x) + 2) == x - 8;
+}
+
+task {
+    goal find(x);
+    id "iskra:число:046";
+    answer x == -2;
+
+    sqrt(x^2 + 4*x + 8) + sqrt(x^2 + 4*x + 4) == sqrt(2*(x^2 + 4*x + 6));
+}
+

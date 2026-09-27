@@ -1,0 +1,137 @@
+// 3.4.3. Доказательство неравенств - 2.
+
+task {
+    goal prove(a^2 + b^2 > 2);
+    id "iskra:больше:66";
+
+    b in Reals;
+    a in Reals;
+    0 < a;
+    0 < b;
+    a + b > 2;
+}
+
+task {
+    goal prove(a^2 + b^2 + c^2 + 3 > 2*(a + b + c));
+    id "iskra:больше:81";
+
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a != 1 || b != 1 || c != 1;
+}
+
+task {
+    goal prove(a^2*b^2 + a^2 + b^2 + 1 > 4*a*b);
+    id "iskra:больше:82";
+
+    b in Reals;
+    a in Reals;
+    a != 1 || b != 1;
+    0 < a;
+    0 < b;
+}
+
+task {
+    goal prove(a^6 + b^6 > a^5*b + b^5*a);
+    id "iskra:больше:84";
+
+    b in Reals;
+    a in Reals;
+    a > 0;
+    b > 0;
+    a != b;
+}
+
+task {
+    goal prove(a^2/2 <= b^2 + c^2);
+    id "iskra:дробь:079";
+
+    a in Reals;
+    c in Reals;
+    b in Reals;
+    a <= b + c;
+    0 <= a;
+}
+
+task {
+    goal prove(a^8/128 <= b^8 + c^8);
+    id "iskra:дробь:080";
+
+    a in Reals;
+    c in Reals;
+    b in Reals;
+    a <= b + c;
+    0 <= a;
+}
+
+task {
+    goal prove(1/a + a < 1);
+    id "iskra:меньше:56";
+
+    a in Reals;
+    a < 0;
+}
+
+task {
+    goal prove(9*a*b*c <= (a + b + c)*(a^2 + b^2 + c^2));
+    id "iskra:меньшеилиравно:101";
+
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    0 < a;
+    0 < b;
+    0 < c;
+}
+
+task {
+    goal prove(a*b*(a + b) + b*c*(b + c) + a*c*(a + c) <= 2*(a^3 + b^3 + c^3));
+    id "iskra:меньшеилиравно:102";
+
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    0 < a;
+    0 < b;
+    0 < c;
+}
+
+task {
+    goal prove(a/b + b/a <= -2);
+    id "iskra:минус:077";
+
+    b in Reals;
+    a in Reals;
+    a*b < 0;
+}
+
+task {
+    goal prove(2 <= a/b + b/a);
+    id "iskra:плюс:079";
+
+    b in Reals;
+    a in Reals;
+    0 < a*b;
+}
+
+task {
+    goal prove(3 <= a^2 + b^2 + c^2);
+    id "iskra:степень:078";
+
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    3 <= a + b + c;
+}
+
+task {
+    goal prove(a^4/8 <= b^4 + c^4);
+    id "iskra:степень:079";
+
+    a in Reals;
+    c in Reals;
+    b in Reals;
+    a <= b + c;
+    0 <= a;
+}

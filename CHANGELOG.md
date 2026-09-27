@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Inequality absorption lemmas: `|f·A·B| ≤ |f|/2·(A² + B²)`, the rest a subgoal.
 - Iskra task book import: `scripts/iskra_import.py`, `scripts/run_report.py`, pilot
-  corpus `tasks/iskra/`.
+  corpus by the task book's sections in `tasks/*/iskra/`.
 - Definedness conditions (ОДЗ) of a `prove` task: `attr premise` rules read
   them off the statement before the search; every subtask inherits them
   (`doc/ru/domain.md`).

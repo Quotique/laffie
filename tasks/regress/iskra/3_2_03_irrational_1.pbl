@@ -1,0 +1,9 @@
+// 3.2.3. Иррациональные уравнения - 1.
+
+task {
+    goal find(x);
+    id "iskra:умножение:046";
+    answer x in empty_set;
+
+    sqrt(3*x^2 + 5*x - 8) - sqrt(3*x^2 + 5*x + 1) == 1;
+}

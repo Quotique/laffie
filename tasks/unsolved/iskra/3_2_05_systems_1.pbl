@@ -1,0 +1,454 @@
+// 3.2.5. Системы алгебраических уравнений - 1.
+
+task {
+    goal find(x, y, z);
+    id "iskra:,:08";
+    answer x == 9/58 && y == -(6/29) && z == 1 + 4/29;
+
+    sqrt(4*x + y - (3*z) + 7) == 2;
+    (2*y + 5*x + z + 25.5)^(1/3) == 3;
+    sqrt(y + z) - sqrt(6*x) == 0;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:Прямая:01";
+    answer x == -sqrt(29) + 6 && y == 6 + sqrt(29) || x == 6 + sqrt(29) && y == -sqrt(29) + 6 || x == 3 && y == 4 || x == 4 && y == 3;
+
+    x*y + x + y == 19;
+    x*y*(x + y) == 84;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:арккотангенс:08";
+    answer x == 0 && y == 0 || x == 1/2 && y == 1/5;
+
+    x + y == 7*x*y;
+    x - y == 3*x*y;
+}
+
+task {
+    goal find(x, y, z, u);
+    id "iskra:внутренность:02";
+    answer y == 2 && z == 3 && x == 1 && u == 4;
+
+    x + 2*y + 3*z + 4*u == 30;
+    2*x - (3*y) + 5*z - (2*u) == 3;
+    3*x + 4*y - (2*z) - u == 1;
+    4*x - y + 6*z - (3*u) == 8;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:дробь:048";
+    answer x == -2 && y == -4 || x == 0 && y == 0 || x == 4 && y == 2;
+
+    x^2 + y^2 == (5/2)*x*y;
+    x - y == (1/4)*x*y;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:дробь:049";
+    answer x == -4 && y == -3 || x == 4 && y == 3;
+
+    x/y + y/x == 25/12;
+    x^2 - (y^2) == 7;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:дробь:050";
+    answer x == -3 && y == -2 || x == 3 && y == 2;
+
+    (x + y)/(x - y) + (x - y)/(x + y) == 5 + 1/5;
+    x*y == 6;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:дробь:051";
+    answer x == 17 && y == 6;
+
+    12/sqrt(x - 1) + 5/sqrt(y + 1/4) == 5;
+    8/sqrt(x - 1) + 10/sqrt(y + 1/4) == 6;
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:дробь:053";
+    answer x == 1/2 && y == 1/3 && z == 1/6 || x == 1/9 && y == -(4/9) && z == 4/17;
+
+    1/x + 1/y + 1/z == 11;
+    3/x + 4/y == 18;
+    6*x - (3*y) == 2;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:знач:01";
+    answer x == 1 && y == 3 || x == 3 && y == 1;
+
+    x^2 + x*y + y^2 == 13;
+    x + y == 4;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:минус:048";
+    answer x == -5 && y == -4 || x == -sqrt(-10 + sqrt(181)) && y == sqrt(10 + sqrt(181)) || x == 5 && y == 4 || x == sqrt(-10 + sqrt(181)) && y == -sqrt(10 + sqrt(181));
+
+    (x^2 - (y^2))*x*y == 180;
+    x^2 - (x*y) - (y^2) == -11;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:минус:049";
+    answer x == -2 && y == -3 || x == 3 && y == 2;
+
+    x^2 - (x*y) + y^2 == 7;
+    x - y == 1;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:минус:050";
+    answer x == -1 && y == 2 || x == 2 && y == -1;
+
+    x^3 + y^3 == 7;
+    x*y*(x + y) == -2;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:минус:051";
+    answer x == 14 && y == -(5/2);
+
+    (x - 2)*(y + 3) == 6;
+    x*y + 3*x == 7;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:минус:053";
+    answer x == 0 && y == 0 || x == (7*sqrt(33) + 21)/2 && y == (-(7*sqrt(33)) + 21)/2 || x == (-(7*sqrt(33)) + 21)/2 && y == (7*sqrt(33) + 21)/2 || x == 15 && y == 30 || x == 27 && y == 27 || x == 30 && y == 15;
+
+    x^3 == 31*x^2 - (4*y^2);
+    y^3 == 31*y^2 - (4*x^2);
+}
+
+task {
+    goal find(x, y);
+    id "iskra:минус:054";
+    answer x == (-sqrt(5) + 1)/2 && y == -((1 + sqrt(5))/2) || x == (1 + sqrt(5))/2 && y == (-1 + sqrt(5))/2;
+
+    x^2 - (x*y) + y^2 == 2;
+    x^3 - (y^3) == 4;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:плюс:050";
+    answer x == 2 && y == 3 || x == 3 && y == 2;
+
+    x^2 - (x*y) + y^2 == 7;
+    x^3 + y^3 == 35;
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:плюс:051";
+    answer (y == 3 && z == 6 || y == 6 && z == 3) && x == 4;
+
+    x + y + z == 13;
+    x^2 + y^2 + z^2 == 61;
+    x*y + x*z == 2*y*z;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:плюс:052";
+    answer x == -(9/2) && y == -9 || x == 6 && y == 12;
+
+    sqrt(3*x/(x + y)) - 2 + sqrt((x + y)/(3*x)) == 0;
+    x*y - 54 == x + y;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:плюс:053";
+    answer x == -3 && y == 9 || x == 2 && y == 4;
+
+    x^4 + y*x^2 - (2*y^2) == 0;
+    y + x == 6;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:плюс:054";
+    answer x == -3 && y == -5 || x == -5 && y == -3 || x == 3 && y == 5 || x == 5 && y == 3;
+
+    x^2 - (x*y) + y^2 == 19;
+    x^4 + x^2*y^2 + y^4 == 931;
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:плюс:055";
+    answer x == -4 && y == -3 && z == -2 || x == -(10/sqrt(3)) && y == -(1/sqrt(3)) && z == 8/sqrt(3) || x == 4 && y == 3 && z == 2 || x == 10/sqrt(3) && y == 1/sqrt(3) && z == -(8/sqrt(3));
+
+    x^2 + x*y + y^2 == 37;
+    x^2 + x*z + z^2 == 28;
+    y^2 + y*z + z^2 == 19;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:поисктеор:01";
+    answer x == 1 && y == 5 || x == 2 && y == 3 || x == 3 && y == 2 || x == 5 && y == 1;
+
+    x*y + x + y == 11;
+    x^2*y + x*y^2 == 30;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:равно:050";
+    answer (b + d != 0 && x == (a^b*c^d)^(1/(b + d))*(f^d/e^b)^(1/(-(b^2) + d^2)) && y == (a^b*c^d)^(1/(b + d))*(e^d/f^b)^(1/(-(b^2) + d^2)) || b == -d && e == (a/c)^(d*2)/f && x == c*y*f^(1/d)/a && 0 < y) && y in Reals;
+
+    (x/a)^b*(y/c)^d == e;
+    (x/c)^d*(y/a)^b == f;
+    f in Reals;
+    e in Reals;
+    d in Reals;
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a > 0;
+    c > 0;
+    e > 0;
+    f > 0;
+    b != d;
+    a is known;
+    b is known;
+    c is known;
+    d is known;
+    e is known;
+    f is known;
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:равно:051";
+    answer x == 3 + 2/3 && y == -(1/3) && z == 2/3 || x == 2 && y == 3 && z == -1;
+
+    x + y + z == 4;
+    x + 2*y + 3*z == 5;
+    x^2 + y^2 + z^2 == 14;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:равно:052";
+    answer x == 1 && y == 9 || x == 9 && y == 1;
+
+    x + y - (2*sqrt(x*y)) == 4;
+    x + y == 10;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:равно:053";
+    answer x == -7 && y == -10 || x == 10 && y == 7;
+
+    (x - y)*(x^2 + y^2) == 447;
+    x*y*(x - y) == 210;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:равно:054";
+    answer x == -((3*sqrt(119) + 21)/8) && y == (3*sqrt(119) - 21)/8 || x == 3 && y == 5 || x == 5 && y == 3 || x == (3*sqrt(119) - 21)/8 && y == -((3*sqrt(119) + 21)/8);
+
+    15*(x + y) == 8*x*y;
+    x + y + x^2 + y^2 == 42;
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:равно:055";
+    answer x == -4 && y == -3 && z == -2 || x == 4 && y == 3 && z == 2;
+
+    x*(y + z) == 20;
+    y*(x + z) == 18;
+    z*(x + y) == 14;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:степень:049";
+    answer x == -3 && y == -2 || x == -(25/sqrt(113)) && y == 16/sqrt(113) || x == 3 && y == 2 || x == 25/sqrt(113) && y == -(16/sqrt(113));
+
+    3*x^2 - (2*x*y) + 5*y^2 - 35 == 0;
+    5*x^2 - (10*y^2) - 5 == 0;
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:степень:050";
+    answer ((a != c && d == c && x == -y && z == 1 || c != a && d == a && x == -y + 1 && z == 0) && b == a || (b != a && (a != c && b != c && x == (b - d)*(d - c)/((a - b)*(c - a)) && y == (a - d)*(c - d)/((b - a)*(b - c)) && z == (a - d)*(b - d)/((a - c)*(b - c)) || c == b && d == b && x == 0 && y == -z + 1) || (b != a && c == b && x == 1 && y == -z || (b != a && x == -z + 1 && y == 0 || b == a && x == -y - z + 1) && c == a) && d == a || (b != a && d == b && x == -z && y == 1 || b == a && d == a && x == -y - z + 1) && c == a) && z in Reals) && y in Reals;
+
+    x + y + z == 1;
+    a*x + b*y + c*z == d;
+    a^2*x + b^2*y + c^2*z == d^2;
+    d in Reals;
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+    c is known;
+    d is known;
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:степень:051";
+    answer (x == -3 && y == -4 || x == -4 && y == -3) && z == -5 || (x == -((7 + sqrt(113))/2) && y == (-7 + sqrt(113))/2 || x == (-7 + sqrt(113))/2 && y == -((7 + sqrt(113))/2)) && z == -9 || (x == 3 && y == 4 || x == 4 && y == 3) && z == 5 || (x == (-sqrt(113) + 7)/2 && y == (7 + sqrt(113))/2 || x == (7 + sqrt(113))/2 && y == (-sqrt(113) + 7)/2) && z == 9;
+
+    x^2 + y^2 == z^2;
+    x*y + y*z + x*z == 47;
+    (z - x)*(z - y) == 2;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:степень:053";
+    answer x == -2 && y == 3 || x == 3 && y == -2;
+
+    x^3 + y^3 + x*y*(x + y) == 13;
+    x^2*y^2*(x^2 + y^2) == 468;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:степень:054";
+    answer x == 2 && y == 3 || x == 3 && y == 2;
+
+    x*y*(x + y) == 30;
+    x^3 + y^3 == 35;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:умножение:048";
+    answer x == 2 && y == 4 || x == 4 && y == 2;
+
+    x^2 + y^2 == 2*(x*y + 2);
+    x + y == 6;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:умножение:050";
+    answer y == (a^b*c^d)^(1/(b + d))*(e^d/f^b)^(1/(-(b^2) + d^2)) && x == (a^b*c^d)^(1/(b + d))*(f^d/e^b)^(1/(-(b^2) + d^2));
+
+    (x/a)^b*(y/c)^d == e;
+    (x/c)^d*(y/a)^b == f;
+    f in Reals;
+    d in Reals;
+    b in Reals;
+    e in Reals;
+    c in Reals;
+    a in Reals;
+    a > 0;
+    c > 0;
+    e > 0;
+    f > 0;
+    b != d;
+    b > 0;
+    d > 0;
+    a is known;
+    b is known;
+    c is known;
+    d is known;
+    e is known;
+    f is known;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:умножение:051";
+    answer (a != 0 && (a*e - (b*d) != 0 && x == (b*f - (c*e))/(b*d - (a*e)) && y == (a*f - (c*d))/(a*e - (b*d)) || e == b*d/a && f == c*d/a && x == (c - (b*y))/a) || (b != 0 && (d != 0 && x == (b*f - (c*e))/(b*d) || d == 0 && f == c*e/b) && y == c/b || (e != 0 && y == (f - (d*x))/e || (d != 0 && x == f/d || d == 0 && f == 0) && e == 0) && b == 0 && c == 0) && a == 0 && x in Reals) && y in Reals;
+
+    a*x + b*y == c;
+    d*x + e*y == f;
+    f in Reals;
+    e in Reals;
+    d in Reals;
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+    c is known;
+    d is known;
+    e is known;
+    f is known;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:умножение:052";
+    answer x == 2 && y == 8 || x == 8 && y == 2;
+
+    x^2 + x*y + y^2 == 84;
+    x + sqrt(x*y) + y == 14;
+}
+
+task {
+    goal find(x, y);
+    id "iskra:умножение:053";
+    answer x == 0 && y == 0 || x == 3 && y == 2;
+
+    (5*x - 1)*(3*y + 2) == (2*x + 1)*(9*y - 2);
+    (3*x + 2)*(2*y - 9) == -((x + 2)*(y + 9));
+}
+
+task {
+    goal find(x, y);
+    id "iskra:умножение:054";
+    answer x == -3 && y == 5 || x == -sqrt(17) && y == -sqrt(17) || x == 3 && y == -5 || x == sqrt(17) && y == sqrt(17);
+
+    6*x^2 - (3*y^2) == x^2 + 2*x*y;
+    x^2 + y^2 == 34;
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:умножение:055";
+    answer (y == 3 && z == 6 || y == 6 && z == 3) && x == 4;
+
+    x + y + z == 13;
+    x^2 + y^2 + z^2 == 61;
+    2*y*z == x*(y + z);
+}
+
+task {
+    goal find(x, y, z);
+    id "iskra:фикс:02";
+    answer (b != a && (c != a && c != b && x == -(a + b + c) && y == a*b + a*c + b*c && z == -(a*b*c) || (c == a || c == b) && y == -(a*b + x*(a + b) + a^2 + b^2) && z == a*b*(a + b + x)) || (c != a && y == -(a*c + x*(a + c) + a^2 + c^2) && z == a*c*(a + c + x) || c == a && z == -(a*(y + a*x + a^2))) && b == a && y in Reals) && x in Reals;
+
+    a^3 + a^2*x + a*y + z == 0;
+    b^3 + b^2*x + b*y + z == 0;
+    c^3 + c^2*x + c*y + z == 0;
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a is known;
+    b is known;
+    c is known;
+}
+

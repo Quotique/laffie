@@ -6,7 +6,7 @@
 
 Использование:
     python scripts/iskra_import.py --section "3 2" --stats
-    python scripts/iskra_import.py --section "3 2" --out tasks/iskra/eq_32.pbl
+    python scripts/iskra_import.py --section "3 2" --out-dir tasks/unsolved/iskra
 """
 
 import argparse
@@ -18,6 +18,27 @@ from pathlib import Path
 DEFAULT_ISKRA = Path(__file__).resolve().parents[1] / ".." / ".." / "iskra" / "reshatel-api"
 
 LosTerm = None  # ставит load_losterm() на старте
+
+# Подразделы оглавления задачника: путь -> (имя файла, название)
+SECTIONS = {
+    ("3", "2", "1"): ("rational_1", "Рациональные уравнения - 1."),
+    ("3", "2", "2"): ("rational_2", "Рациональные уравнения - 2."),
+    ("3", "2", "3"): ("irrational_1", "Иррациональные уравнения - 1."),
+    ("3", "2", "4"): ("irrational_2", "Иррациональные уравнения - 2."),
+    ("3", "2", "5"): ("systems_1", "Системы алгебраических уравнений - 1."),
+    ("3", "2", "6"): ("systems_2", "Системы алгебраических уравнений - 2."),
+    ("3", "2", "7"): ("systems_3", "Системы алгебраических уравнений - 3."),
+    ("3", "2", "8"): ("systems_4", "Системы алгебраических уравнений - 4."),
+    ("3", "2", "10"): ("exponential", "Показательные уравнения."),
+    ("3", "4", "1"): ("identities", "Доказательство тождеств."),
+    ("3", "4", "2"): ("inequalities_1", "Доказательство неравенств - 1."),
+    ("3", "4", "3"): ("inequalities_2", "Доказательство неравенств - 2."),
+    ("3", "4", "4"): ("inequalities_3", "Доказательство неравенств - 3."),
+}
+
+# Метки оглавления после 9 — словом
+NUMERALS = {"десять": 10, "одиннадцать": 11, "двенадцать": 12, "тринадцать": 13,
+            "четырнадцать": 14, "пятнадцать": 15}
 
 # Бинарные/n-арные головы: терм Искры -> (шаблон, приоритет)
 CMP = {
@@ -67,7 +88,7 @@ def parse_args():
     ap.add_argument("--iskra", type=Path, default=DEFAULT_ISKRA, help="корень reshatel-api")
     ap.add_argument("--section", required=True, help='путь раздела, напр. "3 2"')
     ap.add_argument("--stats", action="store_true", help="только статистика покрытия")
-    ap.add_argument("--out", type=Path, help="целевой .pbl")
+    ap.add_argument("--out-dir", type=Path, help="каталог: по файлу на подраздел")
     ap.add_argument("--limit", type=int, default=0, help="не больше N задач")
     return ap.parse_args()
 
@@ -87,27 +108,41 @@ def main():
             skipped[str(e)] += 1
 
     print(f"раздел {args.section}: всего {len(tasks)}, портируемо {len(converted)}")
-    if args.stats or not args.out:
+    if args.stats or not args.out_dir:
         for reason, n in skipped.most_common(30):
             print(f"  {n:5}  {reason}")
         return
 
     if args.limit:
         converted = converted[: args.limit]
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text("".join(render_task(c) for c in converted), encoding="utf-8")
-    print(f"записано {len(converted)} задач -> {args.out}")
+    by_section = collections.defaultdict(list)
+    for c in converted:
+        by_section[c["section"]].append(c)
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    for section, group in sorted(by_section.items()):
+        path = args.out_dir / section_file(section)
+        head = f"// {'.'.join(section)}. {SECTIONS.get(section, ('', ''))[1]}\n\n"
+        path.write_text(head + "".join(render_task(c) for c in group), encoding="utf-8")
+        print(f"записано {len(group)} задач -> {path}")
 
 
 def load_section(baseline, want):
     data = json.loads(baseline.read_text(encoding="utf-8"))
-    out = []
-    for t in data["tasks"]:
-        p = (t.get("toc_path") or [""])[0]
-        toks = p[p.find("(") + 1 : p.rfind(")")].split() if p else []
-        if toks[: len(want)] == want:
-            out.append(t)
-    return out
+    return [t for t in data["tasks"] if toc(t)[: len(want)] == want]
+
+
+def toc(t):
+    """Путь задачи в оглавлении задачника: ['3', '2', '1', ...]; числительные — цифрами."""
+    p = (t.get("toc_path") or [""])[0]
+    toks = p[p.find("(") + 1 : p.rfind(")")].split() if p else []
+    return [str(NUMERALS.get(x, x)) for x in toks]
+
+
+def section_file(section):
+    """3_2_01_rational_1.pbl: номер подраздела в два знака держит порядок оглавления."""
+    *head, last = section
+    slug = SECTIONS.get(section, ("",))[0]
+    return "_".join([*head, last.zfill(2)] + ([slug] if slug else [])) + ".pbl"
 
 
 def load_losterm(iskra):
@@ -139,6 +174,7 @@ def convert_task(t):
 
     names = VarNames(unknowns)
     task_id = f"iskra:{t['symbol']}:{t['node']}"
+    section = tuple(toc(t)[:3])
 
     if "доказать" in goals:
         stmt = " && ".join(render(c, P_AND, names) for c in conditions)
@@ -172,7 +208,7 @@ def convert_task(t):
     else:
         raise Unsupported(f"цели: {' '.join(goals) or '<пусто>'}")
 
-    return {"id": task_id, "goal": goal, "answer": answer, "givens": givens}
+    return {"id": task_id, "section": section, "goal": goal, "answer": answer, "givens": givens}
 
 
 def render_task(c):

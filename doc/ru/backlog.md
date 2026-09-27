@@ -56,7 +56,7 @@
 Воспроизведение:
 
 ```bash
-cargo run --release --bin cli -- -c config/cli.yaml -p tasks/iskra --only "iskra:,:30" -l 5
+cargo run --release --bin cli -- -c config/cli.yaml -p tasks/unsolved/iskra --only "iskra:,:30" -l 5
 # работает много дольше 5 секунд
 ```
 
