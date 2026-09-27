@@ -54,8 +54,9 @@ Each returns `Result<_, ParserError>`, and `ParserError` carries the source
 | Type | What it is |
 |------|------------|
 | `DirectoryParser` | `new(symbols_path, tasks_path)`, then `load_rules()` / `load_tasks()`. |
-| `LoadReport<T>` | `{ value, errors }` — a load **does not** abort on a bad file; the good ones land in `value` and the rest in `errors`. That is how a malformed goal or rule reaches the CLI's `--check` instead of killing the run. |
-| `LoadError` | `{ path, message }`, the message already carrying location and snippet. |
+| `LoadReport<T>` | `{ value, errors }` from `load_tasks()`: a bad task file lands in `errors`, the good tasks in `value`. |
+| `LoadFailure` | `load_rules()`'s error: `Io`, or `Corpus(errors)` — any problem in the `.sym` corpus yields no rule base, and every problem is listed. |
+| `LoadError` | `{ message }`, starting with `file:row:col` and carrying the snippet. |
 
 ## Grammar
 
@@ -113,5 +114,6 @@ position, which `load_rules` maps to the file and line.
   That cycle links two instances of `solver`, so the types are nominally
   distinct across the boundary. See the `SAFETY` notes on `parse_rule` /
   `parse_task` and the serde bridge in `term_with_vars`.
-- **A bad file does not stop a load.** Anything that reads `LoadReport.value`
-  without looking at `.errors` silently drops broken input.
+- **A bad task file does not stop `load_tasks`.** Anything that reads
+  `LoadReport.value` without looking at `.errors` silently drops broken tasks.
+  `load_rules` is the opposite: one bad rule means no base.

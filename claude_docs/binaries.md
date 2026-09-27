@@ -37,9 +37,9 @@ redb-backed `database::Db`, reports statistics.
 
 ### Flow
 1. Args → settings → logger.
-2. `DirectoryParser::new()` → `load_rules()`, `load_tasks()`. **Both return a
-   `LoadReport`**, and `main` prints `.errors` before solving — a broken file
-   does not abort the run.
+2. `DirectoryParser::new()` → `load_rules()` (`Result<RulesEngine, LoadFailure>`)
+   and `load_tasks()` (`LoadReport`). Any rule or task load error is printed
+   and stops the run before solving.
 3. `Db::open(db_path)`, creating the parent directory if missing.
 4. Per task (filtered by `--only`): store the task, `Solver::solve`, render
    through `View` to the console, validate against `answer` if the task

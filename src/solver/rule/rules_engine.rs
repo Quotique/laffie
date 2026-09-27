@@ -122,7 +122,11 @@ impl FromIterator<Rule> for Result<RulesEngine, Vec<(usize, RuleRejection)>> {
             rule.block = rule
                 .attribute(&RuleAttr::Block)
                 .filter_map(RuleAttrValue::str)
-                .map(|x| *id_map.get(x).unwrap())
+                .map(|x| {
+                    *id_map
+                        .get(x)
+                        .expect("an undefined id rejected the rule above")
+                })
                 .unique()
                 .collect();
             engine.max_level = std::cmp::max(engine.max_level, rule.level);

@@ -41,7 +41,7 @@ Before `git commit`:
 
 1. **Format**: `cargo +nightly fmt`
 2. **Clippy clean**: `cargo clippy --workspace --release --all-targets -- -D warnings`
-3. **Tests**: `cargo test --workspace --release` + CLI smoke (`cli -c config/cli.yaml -p tasks/regress`)
+3. **Tests**: `cargo test --workspace --release` + CLI smoke (`cli -c config/cli.yaml -p tasks/regress`, then `-p tasks/sympy_comparison`: no answer may change)
 4. **File structure**: `pub` → `pub(super)` → private `fn` (top-down within each `.rs`); tests at the end
 5. **Comments**: concise; no doc-essays; Rustdoc in English
 6. **`CHANGELOG.md`**: update `[Unreleased]` section if user-visible change
@@ -63,9 +63,10 @@ Each `.rs` file follows this order:
    - Workspace crates (`solver`, `utils`, etc.)
    - `crate` / `super`
 2. **Public** constants, traits, functions, structs
-3. **Private** constants, traits, functions, structs
+3. **Private** constants, traits, structs
 4. **`impl` blocks** — `pub` methods first, then private
-5. **`#[cfg(test)] mod tests`** — always at the end of the file
+5. **Private** functions
+6. **`#[cfg(test)] mod tests`** — always at the end of the file
 
 ### Formatting
 
