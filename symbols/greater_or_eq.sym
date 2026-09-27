@@ -26,6 +26,20 @@ rule {
     b - c <= 0;
 }
 
+// Трёхчлен со старшим a > 0 и неположительным дискриминантом неотрицателен.
+rule {
+    attr level(1),goal(prove(t)),one(a),one(b);
+
+    a*x^2 + b*x + c >= d <=> true;
+
+    a is known,
+    b is known,
+    c is known,
+    d is known,
+    a > 0,
+    b^2 - 4*a*(c - d) <= 0;
+}
+
 rule {
     attr level(1),goal(prove(a >= c));
 

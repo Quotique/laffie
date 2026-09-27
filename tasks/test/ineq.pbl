@@ -97,3 +97,10 @@ task { goal prove(6 - x > 0);      x < 5; }
 task { goal prove(x * y > 6);      x > 2; y > 3; }
 task { goal prove(abs(x) >= x); }
 
+task {
+    goal prove((x-1)^2 >= 0);
+}
+
+task {
+    goal prove(2*x^2 + x + 1 > 0);
+}

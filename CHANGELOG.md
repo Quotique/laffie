@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declared answer. Nested, it matched only as rendered text.
 - `a^(1/2)` is `sqrt(a)` and `sqrt(n)^2` is `n` for a number `n ≥ 0`, so sympy's roots meet the `sqrt` rules.
 - A goal whose normalization changes its symbols gets the rules for its normalized form.
+- `prove` shows a quadratic with a positive leading coefficient and a negative discriminant is positive: `(x-1)^2 + 3 > 2`.
 - A refuted comparison without variables derived from the givens answers `x ∈ ∅`: `√(5−x)+√(8+2x)=2` solves.
 - A condition without variables no longer passes into a `find` answer unchecked: `-√3 ≥ 0 && x == 2` is not solved, `-√3 ≤ 0 && x == 2` gives `x = 2`.
 - A term being simplified is not its own premise, so `sqrt(11.5) >= 3 && x == 2` keeps `x = 2`.
