@@ -22,6 +22,13 @@ task {
 
     sqrt(x + 1) * sqrt(2*x+3) == x+3;
 }
+// TODO: перенести в `test`, когда отброшенная ветвь даст `x ∈ ∅`.
+task {
+    goal find(x);
+    answer x in empty_set;
+
+    -sqrt(3) >= 0 && x == 2;
+}
 task {
     goal find(x);
     text "Решить уравнение sqrt(5-x) + sqrt(8+2*x) == 2";

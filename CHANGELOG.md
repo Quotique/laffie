@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declared answer. Nested, it matched only as rendered text.
 - `a^(1/2)` is `sqrt(a)` and `sqrt(n)^2` is `n` for a number `n ≥ 0`, so sympy's roots meet the `sqrt` rules.
 - A goal whose normalization changes its symbols gets the rules for its normalized form.
+- A condition without variables no longer passes into a `find` answer unchecked: `-√3 ≥ 0 && x == 2` is not solved, `-√3 ≤ 0 && x == 2` gives `x = 2`.
 - A term being simplified is not its own premise, so `sqrt(11.5) >= 3 && x == 2` keeps `x = 2`.
 - A negative literal parses before `*` and `^`: `-2*x`, `x - 2^2`, `x + -2*x`; `-3/x*y` is `(-3/x)·y`.
 

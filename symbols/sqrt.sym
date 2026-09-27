@@ -107,7 +107,7 @@ rule {
 
 
 rule {
-    attr level(2),goal(prove(x <= 0)),one(a);
+    attr level(2),goal(prove(x <= 0)),one(a),zero(c);
 
     a*sqrt(b) + c <= 0 <=> (a > 0 && sqrt(b) <= -c/a) || (a < 0 && sqrt(b) >= -c/a);
 
@@ -116,7 +116,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(prove(x > 0)),one(a);
+    attr level(2),goal(prove(x > 0)),one(a),zero(c);
 
     a*sqrt(b) + c > 0 <=> (a > 0 && sqrt(b) > -c/a) || (a < 0 && sqrt(b) < -c/a);
 
@@ -125,7 +125,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(prove(x >= 0)),one(a);
+    attr level(2),goal(prove(x >= 0)),one(a),zero(c);
 
     a*sqrt(b) + c >= 0 <=> (a > 0 && sqrt(b) >= -c/a) || (a < 0 && sqrt(b) <= -c/a);
 
@@ -134,7 +134,7 @@ rule {
 }
 
 rule {
-    attr level(2),goal(prove(x < 0)),one(a);
+    attr level(2),goal(prove(x < 0)),one(a),zero(c);
 
     a*sqrt(b) + c < 0 <=> (a > 0 && sqrt(b) < -c/a) || (a < 0 && sqrt(b) > -c/a);
 

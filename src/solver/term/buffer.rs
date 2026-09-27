@@ -96,12 +96,9 @@ impl TermBuf {
             .collect()
     }
 
+    #[inline]
     pub fn has_variables(&self) -> bool {
-        self.0
-            .root()
-            .bfs()
-            .iter
-            .any(|x| x.data.variable().is_some())
+        self.term().has_variables()
     }
 
     #[inline]

@@ -58,3 +58,17 @@ task {
 
     sqrt(11.5) >= 3 && x == 2;
 }
+
+task {
+    goal find(x);
+    answer x == 2;
+
+    -sqrt(3) <= 0 && x == 2;
+}
+
+task {
+    goal find(x);
+    answer x == 2;
+
+    1 - sqrt(3) <= 0 && x == 2 || 1 - sqrt(3) >= 0 && x == 3;
+}

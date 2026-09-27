@@ -235,7 +235,8 @@ fn answer_rhs<'a>(term: TermRef<'a>, target: TermRef<'_>) -> Option<TermRef<'a>>
 }
 
 /// An answer leaf, or `&&(guards..., leaf)` with exactly one target-resolving
-/// leaf and every other conjunct an `is known` guard.
+/// leaf and every other conjunct an `is known` guard over a variable: a closed
+/// conjunct is known whether it holds or not.
 fn is_answer_branch(
     branch: TermRef,
     target: TermRef,
@@ -254,7 +255,7 @@ fn is_answer_branch(
                 return false;
             }
             leaf_seen = true;
-        } else if !known(conjunct) {
+        } else if !conjunct.has_variables() || !known(conjunct) {
             return false;
         }
     }
@@ -352,6 +353,15 @@ mod tests {
         assert_eq!(ask("find(x)", "x == 1 && x == 2", &[]), None);
         // A guard that is not known leaves the branch unresolved.
         assert_eq!(ask("find(x)", "b != 0 && x == 1", &["b"]), None);
+    }
+
+    #[test]
+    fn a_closed_condition_is_no_guard() {
+        assert_eq!(ask("find(x)", "sqrt(3) - 2 <= 0 && x == 1", &[]), None);
+        assert_eq!(
+            ask("find(x)", "sqrt(3) - 2 <= 0 && x == 1 || x == 2", &[]),
+            None
+        );
     }
 
     #[test]

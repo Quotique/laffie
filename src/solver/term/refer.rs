@@ -213,6 +213,10 @@ impl<'a> TermRef<'a> {
     pub fn contains_params(&self) -> bool {
         self.bfs().any(|v| v.data.param().is_some())
     }
+
+    pub fn has_variables(&self) -> bool {
+        self.bfs().any(|v| v.data.variable().is_some())
+    }
 }
 
 impl<'a> TermRef<'a> {
