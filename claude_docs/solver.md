@@ -59,7 +59,7 @@ src/solver/
 │   ├── builder.rs          # RuleBuilder, RuleBuilderError
 │   ├── hypothesis.rs       # Hypothesis → GroundedHypothesis, HypothesisIterator, grounding pipeline
 │   ├── rule_attribute.rs   # RuleAttr, RuleAttrValue
-│   ├── rules_engine.rs     # RulesEngine: rules by Level, then the pattern's rarest symbol; RuleRejection
+│   ├── rules_engine.rs     # RulesEngine: rules by Level, then the pattern's rarest symbol; premise rules apart; RuleRejection
 │   └── term_filters.rs     # TermFilters + TermFlags bits (REPLACED, SIMPLIFIED, GOAL)
 └── engine/                 # the search
     ├── mod.rs              # the crate's public engine surface
