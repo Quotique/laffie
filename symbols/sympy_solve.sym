@@ -23,15 +23,18 @@ def calculator(root, level):
         rhs = to_sympy(eq_node[1], var_map, kinds)
         if lhs is None or rhs is None:
             return None
-        sympy_eq = sympy.Eq(lhs, rhs)
+        expr = lhs - rhs
     else:
         expr = to_sympy(eq_node, var_map, kinds)
         if expr is None:
             return None
-        sympy_eq = expr
+
+    # Только многочлен от var: на радикалах sympy.solve может не завершиться.
+    if not expr.is_polynomial(sympy_var):
+        return None
 
     try:
-        solutions = sympy.solve(sympy_eq, sympy_var)
+        solutions = sympy.solve(expr, sympy_var)
     except Exception:
         return None
 
