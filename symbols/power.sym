@@ -102,12 +102,3 @@ rule {
 
     a^2 + 2*a*b + b^2 => (a + b)^2;
 }
-
-rule {
-    attr replace,level(3),goal(find(x, ..)),one(a);
-
-    a*x^2 == b => ( a*b >= 0 && x in set( sqrt(b/a), -sqrt(b/a) ) ) || 
-                  ( a*b < 0 && x in empty_set );
-
-    a != 0;
-}

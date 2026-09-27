@@ -64,3 +64,24 @@ task {
 
     sqrt( (x+1)*(2x+3) ) == x+3;
 }
+task {
+    goal find(x);
+    text "Решить уравнение sqrt(2*x + 5) - sqrt(x+6) == 1"; 
+    answer x == 10;
+
+    sqrt(2*x + 5) - sqrt(x+6) == 1;
+}
+task {
+    goal find(x);
+    text "Решить уравнение sqrt(x^2-7*x+1) == sqrt(2*x^2-15*x+8)";
+    answer x == 7;
+
+    sqrt(x^2-7*x+1) == sqrt(2*x^2-15*x+8);
+}
+task {
+    goal find(x);
+    text "Решить уравнение sqrt(3*x + 1) - sqrt(2*x-1) == 7";
+    answer x == 481;
+
+    sqrt(3*x + 1) - sqrt(2*x-1) == 7;
+}

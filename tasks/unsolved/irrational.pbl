@@ -18,25 +18,14 @@ task {
 }
 task {
     goal find(x);
-    text "Решить уравнение sqrt(x^2-7*x+1) == sqrt(2*x^2-15*x+8)";
-
-    sqrt(x^2-7*x+1) == sqrt(2*x^2-15*x+8);
-}
-task {
-    goal find(x);
     text "Решить уравнение sqrt(x + 1) * sqrt(2*x+3) == x+3";
 
     sqrt(x + 1) * sqrt(2*x+3) == x+3;
 }
 task {
     goal find(x);
-    text "Решить уравнение sqrt(3*x + 1) - sqrt(2*x-1) == 7";
-
-    sqrt(3*x + 1) - sqrt(2*x-1) == 7;
-}
-task {
-    goal find(x);
     text "Решить уравнение sqrt(5-x) + sqrt(8+2*x) == 2";
+    answer x in empty_set;
 
     sqrt(5-x) + sqrt(8+2*x) == 2;
 }

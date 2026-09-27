@@ -82,14 +82,6 @@ rule {
 }
 
 rule {
-    attr replace,level(5),goal(find(x, ..));
-
-    a + b == c <=> a + b - c == 0;
-
-    !symbolic_eq(c, 0);
-}
-
-rule {
     attr level(1),goal(find(x, ..)),one(a),zero(b),block(move_left);
 
     x*a + b == 0 => x == - b/a;
