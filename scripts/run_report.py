@@ -3,10 +3,10 @@
 
 Сопоставляет записи лога CLI (в порядке обработки) с задачами .pbl
 (сортированный обход каталога + порядок в файле — тот же порядок)
-и печатает раскладку по вердиктам с иходными id Искры.
+и печатает раскладку по вердиктам с исходными id Искры.
 
 Использование:
-    python scripts/run_report.py <run.log> <tasks_dir> [--json out.json]
+    python scripts/run_report.py <run.log> <.pbl или каталог>... [--json out.json]
 """
 
 import argparse
@@ -19,15 +19,20 @@ from pathlib import Path
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("log", type=Path)
-    ap.add_argument("tasks_dir", type=Path)
+    ap.add_argument("tasks", type=Path, nargs="+", help=".pbl-файлы или каталоги")
     ap.add_argument("--json", type=Path, help="полный отчёт в JSON")
     return ap.parse_args()
 
 
 def main():
     args = parse_args()
-    ids = pbl_ids(args.tasks_dir)
+    ids = pbl_ids(pbl_files(args.tasks))
     records = log_records(args.log.read_text(encoding="utf-8"))
+    report(ids, records, args.json)
+
+
+def report(ids, records, json_path=None):
+    """Раскладка по вердиктам; json_path — полный отчёт в JSON."""
     if len(ids) != len(records):
         sys.exit(f"рассинхрон: {len(ids)} задач в .pbl, {len(records)} записей в логе")
 
@@ -46,19 +51,35 @@ def main():
         if verdict != "solved" and len(group) > 15:
             print(f"   ... ещё {len(group) - 15}")
 
-    if args.json:
-        args.json.write_text(
-            json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8"
-        )
-        print(f"JSON -> {args.json}")
+    if json_path:
+        json_path.write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"JSON -> {json_path}")
 
 
-def pbl_ids(tasks_dir):
-    ids = []
-    for f in sorted(tasks_dir.glob("*.pbl")):
-        for m in re.finditer(r'^\s*id "([^"]+)";', f.read_text(encoding="utf-8"), re.M):
-            ids.append(m.group(1))
-    return ids
+def pbl_files(paths):
+    """Каталог — сортированный обход; этот же порядок у run_corpus.py."""
+    files = []
+    for p in paths:
+        files += sorted(p.glob("*.pbl")) if p.is_dir() else [p]
+    return files
+
+
+TASK = re.compile(r"^task \{.*?^\}\n", re.M | re.S)
+TASK_ID = re.compile(r'^\s*id "([^"]+)";', re.M)
+
+
+def pbl_tasks(files):
+    """[(id, блок task {…})] в порядке прогона; без `id` — `каталог/файл#номер`."""
+    out = []
+    for f in files:
+        for n, block in enumerate(TASK.findall(f.read_text(encoding="utf-8"))):
+            m = TASK_ID.search(block)
+            out.append((m.group(1) if m else f"{f.parent.name}/{f.name}#{n}", block))
+    return out
+
+
+def pbl_ids(files):
+    return [i for i, _ in pbl_tasks(files)]
 
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")

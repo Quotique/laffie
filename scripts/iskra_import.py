@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-DEFAULT_ISKRA = Path(__file__).resolve().parents[1] / ".." / ".." / "reshatel-api"
+DEFAULT_ISKRA = Path(__file__).resolve().parents[1] / ".." / ".." / "iskra" / "reshatel-api"
 
 LosTerm = None  # ставит load_losterm() на старте
 
@@ -126,11 +126,16 @@ def convert_task(t):
     premises = [LosTerm.parse(s) for s in t["task"].get("посылка", [])]
     conditions = [LosTerm.parse(s) for s in t["task"].get("условие", [])]
 
-    unknowns = []
+    unknowns, inputs = [], None
     for g in goals:
         gt = LosTerm.parse(g)
         if gt.head == "неизвестные":
             unknowns = [a.head for a in gt.args]
+        elif gt.head == "известно":
+            # исходные данные: только они вправе войти в ответ
+            inputs = {VarNames._norm(a.head) for a in gt.args or []}
+    if "пример" in goals:
+        raise Unsupported("цель пример")
 
     names = VarNames(unknowns)
     task_id = f"iskra:{t['symbol']}:{t['node']}"
@@ -158,6 +163,12 @@ def convert_task(t):
         answer = [render(LosTerm.parse(a), P_OR, names) for a in t.get("answer") or []]
         if not answer:
             raise Unsupported("нет ответа-эталона")
+        if answer == ["false"]:
+            if len(unknowns) > 1:
+                raise Unsupported("нет решений при нескольких неизвестных")
+            answer = [f"{names.get(unknowns[0])} in empty_set"]
+        # без `is known` параметр — ещё одна неизвестная
+        givens += [f"{p} is known" for p in names.params_used(inputs)]
     else:
         raise Unsupported(f"цели: {' '.join(goals) or '<пусто>'}")
 
@@ -189,6 +200,14 @@ class VarNames:
                 raise Unsupported("слишком много неизвестных")
             self.map[self._norm(u)] = self.UNKNOWN_LETTERS[i]
         self.params = iter(self.PARAM_LETTERS)
+
+    def params_used(self, only=None):
+        """Буквы параметров; only — ключи исходных данных цели `известно`."""
+        return [
+            v
+            for k, v in self.map.items()
+            if v not in self.UNKNOWN_LETTERS and (only is None or k in only)
+        ]
 
     def get(self, head):
         key = self._norm(head)
