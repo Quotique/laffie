@@ -1,4 +1,4 @@
-//! The whole corpus lowers to the same symbols, rules and tasks through the
+//! The whole corpus gives the same symbols, rules and tasks through the
 //! reference pipeline and the pipeline under change: task ids are computed from
 //! the parsed terms, so any drift changes answers' baselines silently.
 
@@ -100,7 +100,7 @@ impl Pipeline for Current {
 }
 
 #[test]
-fn every_corpus_block_lowers_the_same_through_both_pipelines() {
+fn every_corpus_block_is_the_same_through_both_pipelines() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()

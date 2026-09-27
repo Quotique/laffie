@@ -13,7 +13,10 @@ pub mod lang;
 mod legacy;
 mod py_term;
 mod rule;
+mod scope;
+mod source;
 mod symbol;
+mod syntax;
 mod task;
 mod term;
 
@@ -23,10 +26,18 @@ pub use self::{
     dir_loader::{DirectoryParser, LoadReport},
     error::{LoadError, LoadFailure, ParserError},
     rule::RuleParser,
+    scope::Names,
     symbol::SymbolParser,
     task::TaskParser,
     term::TermParser,
 };
+
+/// One term, as a test or a tool writes it.
+pub fn term(text: &str, names: Names) -> Result<solver::term::TermBuf, ParserError> {
+    let expr = syntax::grammar::syn::one_term(text).map_err(ParserError::from)?;
+    let src = source::Source::new(text);
+    scope::TermScope::new(&src, names).term(&expr)
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Location {

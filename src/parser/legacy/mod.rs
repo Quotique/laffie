@@ -10,5 +10,5 @@ mod symbol;
 mod task;
 mod term;
 
-pub(crate) use self::{rule::RuleParser, symbol::SymbolParser, task::TaskParser};
+pub(crate) use self::{rule::RuleParser, symbol::SymbolParser, task::TaskParser, term::TermParser};
 use crate::{Node, ParserError, Tree};

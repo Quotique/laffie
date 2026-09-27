@@ -18,6 +18,9 @@ src/parser/
 ├── task.rs         # TaskParser  — AST → Task via TaskBuilder
 ├── py_term.rs      # the `Term` class injected into an embedded Python program
 ├── dir_loader.rs   # DirectoryParser — loads a tree of .sym/.pbl, collecting errors
+├── syntax/         # the rewrite's grammar (precedence!) and `Expr`, not yet used by the loader
+├── scope.rs        # TermScope — `Expr` → TermBuf, resolving names; `parser::term` goes through it
+├── source.rs       # Source — spans back to Locations
 ├── legacy/         # test-only: verbatim copy of the pre-rewrite pipeline (grammar … task)
 └── corpus_diff.rs  # test-only: the corpus must lower identically through legacy and current
 ```
