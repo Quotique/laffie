@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Two-root equations solve in the `== 0` form; `move_left` retires the original.
 - A condition without unknowns is no longer proven from the task's own assumptions.
 - Squaring a two-root equation keeps the sides' signs, so it no longer yields a false root.
+- A parametric case split turns `a² − 4 ≠ 0` into `a ≠ 2 ∧ a ≠ −2` again.
 - A `.sym` corpus with any problem yields no rule base, and every problem is
   listed. The TUI shows them and keeps the previous base.
 - `cli` fails a run whose answer changed against the recorded baseline,
