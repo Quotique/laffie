@@ -3,10 +3,14 @@ extern crate log;
 
 use std::fmt;
 
+#[cfg(test)]
+mod corpus_diff;
 mod dir_loader;
 mod error;
 mod grammar;
 pub mod lang;
+#[cfg(test)]
+mod legacy;
 mod py_term;
 mod rule;
 mod symbol;
