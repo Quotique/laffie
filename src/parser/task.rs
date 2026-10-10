@@ -4,7 +4,12 @@ use solver::{
     term::SharedTerm,
 };
 
-use crate::ParserError;
+use crate::{
+    Names, ParserError,
+    scope::TermScope,
+    source::Source,
+    syntax::{self, Expr},
+};
 
 use super::{Tree, term::TermParser};
 
@@ -104,6 +109,28 @@ impl<'a> TaskParser<'a> {
     }
 }
 
+impl syntax::Task {
+    pub(crate) fn build(&self, src: &Source) -> Result<Task, ParserError> {
+        let term = |e: &Expr| TermScope::new(src, Names::Variables).term(e);
+        let goal = Goal::parse(term(&self.goal)?).map_err(|e| src.error(self.goal.span, e))?;
+        let mut builder = TaskBuilder::from_goal(goal).with_text(self.text.clone());
+        if let Some(name) = &self.name {
+            builder = builder.with_name(name.clone());
+        }
+        for answer in &self.expected {
+            builder = builder.with_answer(term(answer)?.normalize(NormLevel::Full));
+        }
+        for given in &self.givens {
+            builder =
+                builder.with_condition(SharedTerm::new(term(given)?.normalize(NormLevel::Full)));
+        }
+        let mut task = builder.build();
+        // The id hashes terms only, so moving a task keeps it.
+        task.id = content_id(&task.givens, task.goal());
+        Ok(task)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use solver::term::{TermBuf, var};
@@ -153,5 +180,11 @@ mod tests {
         assert_eq!(task.name, "c26");
         assert_eq!(task.text, "biquadratic");
         assert_eq!(task.givens.len(), 1);
+    }
+
+    #[test]
+    fn a_capitalized_keyword_is_a_plain_condition() {
+        let task = crate::task("task { goal find(x); Goal; Answer; Text; Id; }").unwrap();
+        assert_eq!(task.givens.len(), 4);
     }
 }

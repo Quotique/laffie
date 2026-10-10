@@ -1,9 +1,11 @@
 use solver::from_decimal_str;
 
-use super::{BinOp, CmpOp, DedOp, Expr, ExprKind, JuxtLeft, Span};
+use super::{
+    BinOp, CmpOp, DedOp, Expr, ExprKind, Item, JuxtLeft, PySource, Rule, Span, Symbol, Task,
+};
 
 peg::parser! {
-    pub(crate) grammar syn() for str {
+    pub(crate) grammar parse() for str {
         use peg::ParseLiteral;
 
         rule line_comment() = "//" (!"\n" [_])* ("\n" / ![_])
@@ -22,6 +24,72 @@ peg::parser! {
         rule reserved_word() = ("in" / "is" / "as") word_end()
 
         pub rule one_term() -> Expr = _ t:term() _ (";" _)? { t }
+
+        pub rule one_rule() -> Rule = _ r:rule_item() _ { r }
+
+        pub rule one_task() -> Task = _ t:task_item() _ { t }
+
+        pub rule one_symbol() -> Symbol = _ s:symbol_item() _ { s }
+
+        pub rule file() -> Vec<Item> = items:(_ i:item() { i })* _ { items }
+
+        rule item() -> Item =
+            t:task_item() { Item::Task(t) } / r:rule_item() { Item::Rule(r) } / s:symbol_item() { Item::Symbol(s) }
+
+        rule task_item() -> Task =
+            start:position!() keyword("task") _ "{"
+            _ keyword("goal") _ goal:call() _ ";"
+            name:(_ keyword("id") _ i:string() _ ";" { i })?
+            text:(_ keyword("text") _ t:string() _ ";" { t })?
+            expected:(_ keyword("answer") _ a:commasep(<term()>) _ ";" { a })?
+            givens:semicolonsep(<term()>)
+            _ "}" end:position!() {
+                Task {
+                    span: Span { start, end },
+                    goal,
+                    name,
+                    text: text.unwrap_or_default(),
+                    expected: expected.unwrap_or_default(),
+                    givens,
+                }
+            }
+
+        rule rule_item() -> Rule =
+            start:position!() keyword("rule") _ "{"
+            attrs:(_ a:attrs() _ ";" { a })?
+            _ pattern:logic() _ p:position!() op:ded_op() _ resolution:logic() _ ";"
+            requirements:commasep(<term()>) _ ";"?
+            _ "}" end:position!() {
+                Rule {
+                    span: Span { start, end },
+                    attrs: attrs.unwrap_or_default(),
+                    pattern,
+                    op,
+                    op_span: op_span(p, BinOp::Ded(op)),
+                    resolution,
+                    requirements,
+                }
+            }
+
+        rule symbol_item() -> Symbol =
+            start:position!() keyword("symbol") _
+            name:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '*' | '/' | '^' | '=' | '<' | '>' | '!' | '|' | '&' | '_']+)
+            body:(_ "{" attrs:(_ a:attrs() { a })? _ ";"?
+                  py:(_ ps:position!() keyword("py") _ code:string() _ ";" pe:position!() {
+                      PySource { code, span: Span { start: ps, end: pe } }
+                  })?
+                  _ "}" { (attrs, py) })?
+            _ ";"? end:position!() {
+                let (attrs, py) = body.unwrap_or_default();
+                Symbol {
+                    span: Span { start, end },
+                    name: name.into(),
+                    attrs: attrs.unwrap_or_default(),
+                    py,
+                }
+            }
+
+        rule attrs() -> Vec<Expr> = keyword("attr") _ a:commasep(<term()>) { a }
 
         /// `a`, or one `a => b` / `a <=> b`: a deduction does not chain.
         pub rule term() -> Expr =

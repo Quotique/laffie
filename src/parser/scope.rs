@@ -20,7 +20,7 @@ pub enum Names {
 
 /// Resolves the names of parsed expressions against the symbol registry.
 ///
-/// INVARIANT: one scope spans one task term or a whole rule (pattern and
+/// INVARIANT: one scope spans one task term or a whole rule (action and
 /// requirements share `as` params and `..` ids); task ids depend on it.
 pub(crate) struct TermScope<'s> {
     src:             &'s Source<'s>,
@@ -93,7 +93,9 @@ impl<'s> TermScope<'s> {
                 let value = self.node(expr)?;
                 let param = Param::from_str(name).expect("a name is a valid param");
                 if self.params.insert(param.clone(), value.clone()).is_some() {
-                    return Err(self.error(e.span, format!("Multiple definition of param {param}")));
+                    return Err(self
+                        .src
+                        .error(e.span, format!("Multiple definition of param {param}")));
                 }
                 Ok(value)
             }
@@ -135,7 +137,9 @@ impl<'s> TermScope<'s> {
                 term.term_mut().push_last_arg(arg);
             }
         } else if !args.is_empty() {
-            return Err(self.error(span, format!("Node {name} can't contains children!")));
+            return Err(self
+                .src
+                .error(span, format!("Node {name} can't contains children!")));
         }
         Ok(term)
     }
@@ -157,13 +161,6 @@ impl<'s> TermScope<'s> {
                     Atom::Param(Param::from_str(name).expect("a name is a valid param"))
                 }
             }
-        }
-    }
-
-    fn error(&self, span: Span, msg: String) -> ParserError {
-        ParserError {
-            loc: self.src.loc(span),
-            msg,
         }
     }
 }
@@ -233,7 +230,7 @@ mod tests {
         for form in CORPUS_FORMS {
             let want = reference(form);
             assert!(want.is_some(), "the reference rejects {form}");
-            assert_eq!(lowered(form), want, "{form}");
+            assert_eq!(parsed(form), want, "{form}");
         }
     }
 
@@ -297,7 +294,7 @@ mod tests {
         fails("(a => b)");
     }
 
-    fn lowered(text: &str) -> Option<TermBuf> {
+    fn parsed(text: &str) -> Option<TermBuf> {
         term(text, Names::Params).ok()
     }
 
@@ -308,7 +305,7 @@ mod tests {
 
     #[track_caller]
     fn same(text: &str, explicit: &str) {
-        let (got, want) = (lowered(text), lowered(explicit));
+        let (got, want) = (parsed(text), parsed(explicit));
         assert!(got.is_some(), "{text} does not parse");
         assert_eq!(got, want, "{text} vs {explicit}");
     }

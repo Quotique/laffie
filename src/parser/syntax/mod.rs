@@ -86,6 +86,50 @@ pub(crate) enum DedOp {
     Equiv,
 }
 
+/// A top-level item of a `.sym` or `.pbl` file. Attributes stay expressions until
+/// `build` checks them.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum Item {
+    Task(Task),
+    Rule(Rule),
+    Symbol(Symbol),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Task {
+    pub span:     Span,
+    pub goal:     Expr,
+    pub name:     Option<String>,
+    pub text:     String,
+    pub expected: Vec<Expr>,
+    pub givens:   Vec<Expr>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Rule {
+    pub span:         Span,
+    pub attrs:        Vec<Expr>,
+    pub pattern:      Expr,
+    pub op:           DedOp,
+    pub op_span:      Span,
+    pub resolution:   Expr,
+    pub requirements: Vec<Expr>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Symbol {
+    pub span:  Span,
+    pub name:  CompactString,
+    pub attrs: Vec<Expr>,
+    pub py:    Option<PySource>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PySource {
+    pub code: String,
+    pub span: Span,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum JuxtLeft {
     Number,
@@ -109,6 +153,15 @@ impl Expr {
                 rhs: Box::new(rhs),
             },
             span,
+        }
+    }
+
+    /// `f` or `f(a, …)` as a name and its arguments.
+    pub fn as_call(&self) -> Option<(&str, &[Expr])> {
+        match &self.kind {
+            ExprKind::Name(name) => Some((name, &[])),
+            ExprKind::Call { name, args } => Some((name, args)),
+            _ => None,
         }
     }
 

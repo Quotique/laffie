@@ -7,10 +7,17 @@ use pyo3::{
     types::{IntoPyDict, PyDict},
 };
 
-use solver::term::{SymbolAttr, SymbolAttrValue, SymbolProgram, TermBuf};
+use solver::{
+    NormLevel,
+    term::{SymbolAttr, SymbolAttrValue, SymbolProgram, TermBuf, TermMut},
+};
 
 use super::{Node, ParserError, Tree};
-use crate::py_term::get_term_class;
+use crate::{
+    py_term::get_term_class,
+    source::Source,
+    syntax::{self, Expr, ExprKind},
+};
 
 pub struct SymbolParser<'a> {
     ast: &'a Tree,
@@ -37,74 +44,12 @@ impl<'a> SymbolParser<'a> {
             if sym_child.data().symbol == "Symbol" {
                 symbol_program.name = sym_child.front().unwrap().data().symbol.clone();
             } else if sym_child.data().symbol == "PyProg" {
-                let program = sym_child.front().unwrap().data().symbol.clone();
-                info!("parsing py program {program}");
-
-                Python::initialize();
-
-                let (locals, calc) = Python::attach(|py| -> PyResult<(Py<PyDict>, bool)> {
-                    let locals = PyDict::new(py);
-                    // Инжектируем класс Term в окружение пользовательского кода
-                    locals.set_item("Term", get_term_class(py))?;
-                    // Исходник sympy-хелперов вкомпилен: .sym делают `exec(SYMPY_CONVERT_SRC)`
-                    // вместо чтения файла с диска (не зависит от CWD).
-                    locals.set_item(
-                        "SYMPY_CONVERT_SRC",
-                        include_str!("../../symbols/py/sympy_convert.py"),
-                    )?;
-                    let code = CString::new(program.as_str())?;
-                    py.run(&code, Some(&locals), None)?;
-
-                    let calc = locals.contains("calculator")?;
-                    Ok((locals.unbind(), calc))
-                })
-                .inspect_err(|e| error!("python program error {e}"))
-                .map_err(|e| ParserError {
+                let py_src = sym_child.front().unwrap().data().symbol.clone();
+                if let Some(calculator) = python_calculator(&py_src).map_err(|e| ParserError {
                     loc: sym_child.data().location.clone(),
                     msg: e.to_string(),
-                })?;
-
-                if calc {
-                    symbol_program.calculator = Box::new(move |root, level| {
-                        Python::attach(|py| -> PyResult<bool> {
-                            let l = locals.bind(py);
-                            let calc_fn = l.get_item("calculator").unwrap();
-                            let calc_fn = calc_fn.as_ref().unwrap();
-
-                            // Сериализуем терм в JSON-dict и оборачиваем в Term
-                            let json_str = serde_json::to_string(&root.as_ref()).map_err(|e| {
-                                PyValueError::new_err(format!("serialize term: {e}"))
-                            })?;
-                            let json_mod = py.import("json")?;
-                            let json_dict = json_mod.call_method1("loads", (json_str.as_str(),))?;
-                            let term_cls = get_term_class(py);
-                            let py_term = term_cls
-                                .call((), Some(&[("_raw", json_dict)].into_py_dict(py)?))?;
-
-                            let result = calc_fn.call1((py_term, level.to_string()))?;
-
-                            // None — без изменений, Term — новый терм
-                            if result.is_none() {
-                                return Ok(false);
-                            }
-
-                            let json_dict = result.call_method0("_to_json")?;
-                            let json_str: String =
-                                json_mod.call_method1("dumps", (json_dict,))?.extract()?;
-                            let mut term: TermBuf =
-                                serde_json::from_str(&json_str).map_err(|e| {
-                                    PyValueError::new_err(format!("parse procedure result: {e}"))
-                                })?;
-                            root.swap(&mut term.term_mut());
-
-                            Ok(true)
-                        })
-                        // A failing procedural symbol is a no-op, not a crash.
-                        .unwrap_or_else(|e| {
-                            error!("Procedural symbol failed, skipping: {e}");
-                            false
-                        })
-                    });
+                })? {
+                    symbol_program.calculator = Box::new(calculator);
                 }
             } else if sym_child.data().symbol == "Attrs" {
                 for attr in sym_child.iter() {
@@ -154,6 +99,114 @@ impl<'a> SymbolParser<'a> {
             }),
         }
     }
+}
+
+impl syntax::Symbol {
+    /// Executes the `py` block, if any.
+    pub(crate) fn build(&self, src: &Source) -> Result<SymbolProgram, ParserError> {
+        let mut program = SymbolProgram {
+            name: self.name.clone(),
+            ..Default::default()
+        };
+        if let Some(py) = &self.py &&
+            let Some(calculator) =
+                python_calculator(&py.code).map_err(|e| src.error(py.span, e))?
+        {
+            program.calculator = Box::new(calculator);
+        }
+        for e in &self.attrs {
+            let (key, value) = attr(e, src)?;
+            program.attrs.insert(key, value);
+        }
+        Ok(program)
+    }
+}
+
+fn attr(e: &Expr, src: &Source) -> Result<(SymbolAttr, SymbolAttrValue), ParserError> {
+    let (name, args) = e
+        .as_call()
+        .ok_or_else(|| src.error(e.span, "unknown attribute"))?;
+    match (name, args.first()) {
+        ("infix", Some(arg)) => Ok((
+            SymbolAttr::Infix,
+            SymbolAttrValue::UInt(src.uint(arg.span)?),
+        )),
+        ("display", Some(arg)) => {
+            let shown = match &arg.kind {
+                ExprKind::Str(s) => s.as_str().into(),
+                ExprKind::Name(s) => s.clone(),
+                _ => src.slice(arg.span).into(),
+            };
+            Ok((SymbolAttr::Display, SymbolAttrValue::UStr(shown)))
+        }
+        ("infix" | "display", None) => Err(src.error(e.span, "must have an argument")),
+        ("associative", _) => Ok((SymbolAttr::Associative, SymbolAttrValue::None)),
+        ("commutative", _) => Ok((SymbolAttr::Commutative, SymbolAttrValue::None)),
+        _ => Err(src.error(e.span, "unknown attribute")),
+    }
+}
+
+/// Runs `py_src` once and takes the `calculator` it defines.
+fn python_calculator(
+    py_src: &str,
+) -> PyResult<Option<impl Fn(&mut TermMut, NormLevel) -> bool + Send + Sync + use<>>> {
+    info!("parsing py program {py_src}");
+
+    Python::initialize();
+
+    let (locals, has_calculator) = Python::attach(|py| -> PyResult<(Py<PyDict>, bool)> {
+        let locals = PyDict::new(py);
+        locals.set_item("Term", get_term_class(py))?;
+        // `.sym` делают `exec(SYMPY_CONVERT_SRC)`: исходник вкомпилен, чтобы не зависеть от CWD.
+        locals.set_item(
+            "SYMPY_CONVERT_SRC",
+            include_str!("../../symbols/py/sympy_convert.py"),
+        )?;
+        let code = CString::new(py_src)?;
+        py.run(&code, Some(&locals), None)?;
+
+        let has_calculator = locals.contains("calculator")?;
+        Ok((locals.unbind(), has_calculator))
+    })
+    .inspect_err(|e| error!("python program error {e}"))?;
+
+    if !has_calculator {
+        return Ok(None);
+    }
+    Ok(Some(move |root: &mut TermMut, level: NormLevel| {
+        Python::attach(|py| -> PyResult<bool> {
+            let l = locals.bind(py);
+            let calc_fn = l.get_item("calculator").unwrap();
+            let calc_fn = calc_fn.as_ref().unwrap();
+
+            let json_str = serde_json::to_string(&root.as_ref())
+                .map_err(|e| PyValueError::new_err(format!("serialize term: {e}")))?;
+            let json_mod = py.import("json")?;
+            let json_dict = json_mod.call_method1("loads", (json_str.as_str(),))?;
+            let term_cls = get_term_class(py);
+            let py_term = term_cls.call((), Some(&[("_raw", json_dict)].into_py_dict(py)?))?;
+
+            let result = calc_fn.call1((py_term, level.to_string()))?;
+
+            // None — без изменений, Term — новый терм
+            if result.is_none() {
+                return Ok(false);
+            }
+
+            let json_dict = result.call_method0("_to_json")?;
+            let json_str: String = json_mod.call_method1("dumps", (json_dict,))?.extract()?;
+            let mut term: TermBuf = serde_json::from_str(&json_str)
+                .map_err(|e| PyValueError::new_err(format!("parse procedure result: {e}")))?;
+            root.swap(&mut term.term_mut());
+
+            Ok(true)
+        })
+        // A failing procedural symbol is a no-op, not a crash.
+        .unwrap_or_else(|e| {
+            error!("Procedural symbol failed, skipping: {e}");
+            false
+        })
+    }))
 }
 
 #[cfg(test)]

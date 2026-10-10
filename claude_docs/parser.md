@@ -13,16 +13,16 @@ src/parser/
 ├── grammar.rs      # the PEG itself: tokens → Tree<Token> with byte offsets
 ├── lang.rs         # the five entry points; wraps the grammar and annotates Locations
 ├── term.rs         # TermParser  — AST → TermBuf
-├── rule.rs         # RuleParser  — AST → Vec<Rule> via RuleBuilder
-├── symbol.rs       # SymbolParser — AST → SymbolProgram, including embedded Python
-├── task.rs         # TaskParser  — AST → Task via TaskBuilder
+├── rule.rs         # RuleParser  — AST → Vec<Rule> via RuleBuilder; syntax::Rule::build → Vec<Rule>
+├── symbol.rs       # SymbolParser — AST → SymbolProgram, including embedded Python; syntax::Symbol::build → SymbolProgram
+├── task.rs         # TaskParser  — AST → Task via TaskBuilder; syntax::Task::build → Task
 ├── py_term.rs      # the `Term` class injected into an embedded Python program
 ├── dir_loader.rs   # DirectoryParser — loads a tree of .sym/.pbl, collecting errors
-├── syntax/         # the rewrite's grammar (precedence!) and `Expr`, not yet used by the loader
+├── syntax/         # the rewrite's grammar `parse` (precedence!), `Expr` and `Item` (syntax::Task/Rule/Symbol); not yet used by the loader
 ├── scope.rs        # TermScope — `Expr` → TermBuf, resolving names; `parser::term` goes through it
 ├── source.rs       # Source — spans back to Locations
 ├── legacy/         # test-only: verbatim copy of the pre-rewrite pipeline (grammar … task)
-└── corpus_diff.rs  # test-only: the corpus must lower identically through legacy and current
+└── corpus_diff.rs  # test-only: the corpus must build identically through legacy and current
 ```
 
 ## Entry points — `lang.rs`

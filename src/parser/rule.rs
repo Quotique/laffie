@@ -6,7 +6,12 @@ use solver::{
     term::{Atom, Term, TermBuf, TermMut, TermRef, var},
 };
 
-use crate::ParserError;
+use crate::{
+    Names, ParserError,
+    scope::TermScope,
+    source::Source,
+    syntax::{self, BinOp, Expr, ExprKind},
+};
 
 use super::{Node, Tree, term::TermParser};
 
@@ -181,16 +186,74 @@ impl<'a> RuleParser<'a> {
     }
 }
 
+impl syntax::Rule {
+    pub(crate) fn build(&self, src: &Source) -> Result<Vec<Rule>, ParserError> {
+        let action = Expr::bin(
+            BinOp::Ded(self.op),
+            self.pattern.clone(),
+            self.resolution.clone(),
+            self.op_span,
+        );
+        let mut scope = TermScope::new(src, Names::Params);
+        let mut action = scope.term(&action)?;
+        let mut requirements = self
+            .requirements
+            .iter()
+            .map(|e| scope.term(e))
+            .collect::<Result<Vec<_>, _>>()?;
+        promote_body_find_targets(&mut action, &mut requirements);
+
+        let mut builder = RuleBuilder::from(action);
+        for req in requirements {
+            builder = builder.with_require(req);
+        }
+        for e in &self.attrs {
+            let (key, value) = attr(e, src)?;
+            builder = builder.with_attribute(key, value);
+        }
+        builder.build().map_err(|e| src.error(self.span, e))
+    }
+}
+
+fn attr(e: &Expr, src: &Source) -> Result<(RuleAttr, RuleAttrValue), ParserError> {
+    let (name, args) = e
+        .as_call()
+        .ok_or_else(|| src.error(e.span, "unknown attribute"))?;
+    let key = RuleAttr::from_str(name).map_err(|_| src.error(e.span, "unknown attribute"))?;
+    let arg = match args {
+        [arg] => Ok(arg),
+        _ => Err(src.error(e.span, "must have one argument")),
+    };
+    let value = match key {
+        RuleAttr::Equivalence | RuleAttr::Replace => RuleAttrValue::None,
+        RuleAttr::Level | RuleAttr::Normalize => RuleAttrValue::UInt(src.uint(arg?.span)?),
+        RuleAttr::Goal | RuleAttr::Zero | RuleAttr::One => {
+            RuleAttrValue::Goal(TermScope::new(src, Names::Params).term(arg?)?)
+        }
+        RuleAttr::Id | RuleAttr::Block => {
+            let arg = arg?;
+            let ident = match &arg.kind {
+                ExprKind::Name(s) => s.as_str(),
+                ExprKind::Str(s) => s.as_str(),
+                ExprKind::Call { name, .. } => name.as_str(),
+                _ => src.slice(arg.span),
+            };
+            RuleAttrValue::Str(CompactString::from(ident))
+        }
+    };
+    Ok((key, value))
+}
+
 /// Promotes body `find(...)` targets from Param to Variable unless also matched
 /// as Params on the LHS — avoids the Param↔Variable shuffle at sub-solve edges.
-fn promote_body_find_targets(template: &mut TermBuf, requirements: &mut [TermBuf]) {
+fn promote_body_find_targets(action: &mut TermBuf, requirements: &mut [TermBuf]) {
     let mut lhs_params = HashSet::new();
-    if let Some(lhs) = template.term().first_arg() {
+    if let Some(lhs) = action.term().first_arg() {
         collect_params(lhs, &mut lhs_params);
     }
 
     let mut find_targets = HashSet::new();
-    if let Some(rhs) = template.term().last_arg() {
+    if let Some(rhs) = action.term().last_arg() {
         collect_find_targets(rhs, &mut find_targets);
     }
     for req in requirements.iter() {
@@ -203,7 +266,7 @@ fn promote_body_find_targets(template: &mut TermBuf, requirements: &mut [TermBuf
         return;
     }
 
-    if let Some(mut rhs) = template.term_mut().last_arg_mut() {
+    if let Some(mut rhs) = action.term_mut().last_arg_mut() {
         promote_params_in_place(&mut rhs, &promote_set);
     }
     for req in requirements.iter_mut() {
@@ -398,5 +461,30 @@ mod tests {
             rule.attribute(&RuleAttr::Normalize).collect::<Vec<_>>(),
             vec![&RuleAttrValue::UInt(4)]
         );
+    }
+
+    #[test]
+    fn an_unknown_rule_attribute_is_an_error_at_its_place() {
+        let err = crate::rule("rule { attr foo; a <=> a; }").unwrap_err();
+        assert_eq!(err.msg, "unknown attribute");
+        assert_eq!((err.loc.row, err.loc.col), (1, 12));
+        // `subtree` names no attribute.
+        assert_eq!(
+            crate::rule("rule { attr subtree; a <=> a; }")
+                .unwrap_err()
+                .msg,
+            "unknown attribute"
+        );
+    }
+
+    #[test]
+    fn a_level_is_an_integer_as_written() {
+        assert_eq!(
+            crate::rule("rule { attr level(1.0); a <=> a; }")
+                .unwrap_err()
+                .msg,
+            "must be u64"
+        );
+        assert!(crate::rule("rule { attr level(1); a <=> a; }").is_ok());
     }
 }

@@ -1,6 +1,5 @@
-//! The whole corpus gives the same symbols, rules and tasks through the
-//! reference pipeline and the pipeline under change: task ids are computed from
-//! the parsed terms, so any drift changes answers' baselines silently.
+//! Legacy and current pipelines build the corpus identically: task ids hash the
+//! parsed terms, so a drift silently moves answer baselines.
 
 use std::{
     fs,
@@ -14,16 +13,15 @@ use solver::{
 };
 
 use crate::{
-    CompactString, RuleParser, SymbolParser, TaskParser, Tree,
-    grammar::{TOKEN_DECLARE, TOKEN_RULE, TOKEN_TASK},
-    lang, legacy,
+    CompactString, Tree, legacy,
+    source::Source,
+    syntax::{Item, grammar::parse},
 };
 
 /// Intended differences, as `(file, reason)`; each one needs the user's sign-off.
 const ALLOWED: &[(&str, &str)] = &[];
 
-/// One way to turn corpus text into symbols, rules and tasks. A block that
-/// fails to parse is kept as its message, so both pipelines must fail alike.
+/// A failed item is kept as its message, so both pipelines must fail alike.
 trait Pipeline {
     fn symbols(&self, text: &str) -> Vec<Result<SymbolProgram, String>>;
     fn rules(&self, text: &str) -> Vec<Result<Vec<Rule>, String>>;
@@ -63,7 +61,7 @@ struct TaskView {
 
 impl Pipeline for Legacy {
     fn symbols(&self, text: &str) -> Vec<Result<SymbolProgram, String>> {
-        blocks(
+        legacy_items(
             legacy::lang::any(text),
             legacy::grammar::TOKEN_DECLARE,
             |b| legacy::SymbolParser::from(b).parse(),
@@ -71,13 +69,13 @@ impl Pipeline for Legacy {
     }
 
     fn rules(&self, text: &str) -> Vec<Result<Vec<Rule>, String>> {
-        blocks(legacy::lang::any(text), legacy::grammar::TOKEN_RULE, |b| {
+        legacy_items(legacy::lang::any(text), legacy::grammar::TOKEN_RULE, |b| {
             legacy::RuleParser::from(b).parse()
         })
     }
 
     fn tasks(&self, text: &str) -> Vec<Result<Task, String>> {
-        blocks(legacy::lang::any(text), legacy::grammar::TOKEN_TASK, |b| {
+        legacy_items(legacy::lang::any(text), legacy::grammar::TOKEN_TASK, |b| {
             legacy::TaskParser::from(b).parse()
         })
     }
@@ -85,22 +83,29 @@ impl Pipeline for Legacy {
 
 impl Pipeline for Current {
     fn symbols(&self, text: &str) -> Vec<Result<SymbolProgram, String>> {
-        blocks(lang::any(text), TOKEN_DECLARE, |b| {
-            SymbolParser::from(b).parse()
+        current_items(text, |i, src| match i {
+            Item::Symbol(s) => Some(s.build(src)),
+            _ => None,
         })
     }
 
     fn rules(&self, text: &str) -> Vec<Result<Vec<Rule>, String>> {
-        blocks(lang::any(text), TOKEN_RULE, |b| RuleParser::from(b).parse())
+        current_items(text, |i, src| match i {
+            Item::Rule(r) => Some(r.build(src)),
+            _ => None,
+        })
     }
 
     fn tasks(&self, text: &str) -> Vec<Result<Task, String>> {
-        blocks(lang::any(text), TOKEN_TASK, |b| TaskParser::from(b).parse())
+        current_items(text, |i, src| match i {
+            Item::Task(t) => Some(t.build(src)),
+            _ => None,
+        })
     }
 }
 
 #[test]
-fn every_corpus_block_is_the_same_through_both_pipelines() {
+fn every_corpus_item_is_the_same_through_both_pipelines() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
@@ -115,34 +120,27 @@ fn every_corpus_block_is_the_same_through_both_pipelines() {
     let mut diffs = Vec::new();
     // Rules resolve names against every symbol, so all symbols register first.
     for (path, text) in &sym_files {
-        let reference = Legacy.symbols(text);
+        let legacy = Legacy.symbols(text);
         let current = Current.symbols(text);
-        compare(
-            path,
-            "symbol",
-            &reference,
-            &current,
-            symbol_view,
-            &mut diffs,
-        );
+        compare(path, "symbol", &legacy, &current, symbol_view, &mut diffs);
         for program in current.into_iter().flatten() {
             program.register();
         }
     }
     for (path, text) in &sym_files {
-        let (reference, current) = (Legacy.rules(text), Current.rules(text));
+        let (legacy, current) = (Legacy.rules(text), Current.rules(text));
         compare(
             path,
             "rule",
-            &reference,
+            &legacy,
             &current,
             |r| rule_view(r),
             &mut diffs,
         );
     }
     for (path, text) in &task_files {
-        let (reference, current) = (Legacy.tasks(text), Current.tasks(text));
-        compare(path, "task", &reference, &current, task_view, &mut diffs);
+        let (legacy, current) = (Legacy.tasks(text), Current.tasks(text));
+        compare(path, "task", &legacy, &current, task_view, &mut diffs);
     }
 
     diffs.retain(|d| !ALLOWED.iter().any(|(file, _)| d.contains(file)));
@@ -154,8 +152,7 @@ fn every_corpus_block_is_the_same_through_both_pipelines() {
     );
 }
 
-/// Every block of `kind`, parsed; a file that does not parse is one failed block.
-fn blocks<T, E: ToString>(
+fn legacy_items<T, E: ToString>(
     file: Result<Vec<Tree>, crate::ParserError>,
     kind: &str,
     parse: impl Fn(&Tree) -> Result<T, E>,
@@ -170,28 +167,43 @@ fn blocks<T, E: ToString>(
     }
 }
 
+fn current_items<T>(
+    text: &str,
+    build: impl Fn(&Item, &Source) -> Option<Result<T, crate::ParserError>>,
+) -> Vec<Result<T, String>> {
+    let src = Source::new(text);
+    match parse::file(text) {
+        Ok(items) => items
+            .iter()
+            .filter_map(|i| build(i, &src))
+            .map(|r| r.map_err(|e| e.to_string()))
+            .collect(),
+        Err(e) => vec![Err(crate::ParserError::from(e).to_string())],
+    }
+}
+
 fn compare<T, V: PartialEq + std::fmt::Debug>(
     path: &Path,
     kind: &str,
-    reference: &[Result<T, String>],
+    legacy: &[Result<T, String>],
     current: &[Result<T, String>],
     view: impl Fn(&T) -> V,
     diffs: &mut Vec<String>,
 ) {
     let view = |r: &Result<T, String>| r.as_ref().map(&view).map_err(Clone::clone);
-    if reference.len() != current.len() {
+    if legacy.len() != current.len() {
         diffs.push(format!(
-            "{}: {} {kind} blocks vs {}",
+            "{}: {} {kind} items vs {}",
             path.display(),
-            reference.len(),
+            legacy.len(),
             current.len()
         ));
     }
-    for (at, (r, c)) in reference.iter().zip(current).enumerate() {
-        let (r, c) = (view(r), view(c));
-        if r != c {
+    for (at, (l, c)) in legacy.iter().zip(current).enumerate() {
+        let (l, c) = (view(l), view(c));
+        if l != c {
             diffs.push(format!(
-                "{}: {kind} #{at}\n  was: {r:?}\n  now: {c:?}",
+                "{}: {kind} #{at}\n  was: {l:?}\n  now: {c:?}",
                 path.display()
             ));
         }

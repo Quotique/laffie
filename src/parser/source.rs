@@ -1,4 +1,4 @@
-use crate::{Location, syntax::Span};
+use crate::{Location, ParserError, syntax::Span};
 
 /// Parsed text, for turning spans back into locations.
 pub(crate) struct Source<'a> {
@@ -11,6 +11,24 @@ impl<'a> Source<'a> {
         Self {
             text,
             new_line_poses: Location::new_line_poses(text),
+        }
+    }
+
+    pub fn slice(&self, span: Span) -> &'a str {
+        &self.text[span.start..span.end]
+    }
+
+    /// Read as written: `1.0` is not a u64.
+    pub fn uint(&self, span: Span) -> Result<u64, ParserError> {
+        self.slice(span)
+            .parse()
+            .map_err(|_| self.error(span, "must be u64"))
+    }
+
+    pub fn error(&self, span: Span, msg: impl ToString) -> ParserError {
+        ParserError {
+            loc: self.loc(span),
+            msg: msg.to_string(),
         }
     }
 
