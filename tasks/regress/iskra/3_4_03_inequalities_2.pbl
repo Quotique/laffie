@@ -176,3 +176,13 @@ task {
     0 < b;
     a + b == 1;
 }
+
+task {
+    goal prove(a*b + b*c + c*a <= 0);
+    id "iskra:меньшеилиравно:079";
+
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a + b + c == 0;
+}

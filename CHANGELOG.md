@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- A variable of a linear premise is eliminated: the premise retires, its definition substitutes.
 - Inequality absorption lemmas: `|f·A·B| ≤ |f|/2·(A² + B²)`, the rest a subgoal.
-- Lemmas: a sum of roots, a linear constraint from a premise, a term bounded by a premise, a nonzero product.
+- Lemmas: a sum of roots, a term bounded by a premise, a nonzero product.
 - Iskra task book import: `scripts/iskra_import.py`, `scripts/run_report.py`, pilot
   corpus by the task book's sections in `tasks/*/iskra/`.
 - Definedness conditions (ОДЗ) of a `prove` task: `attr premise` rules read
