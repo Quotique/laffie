@@ -325,7 +325,7 @@ mod test {
 
     /// A task whose premises hold `0 <= a`, as the derivation pass will leave it.
     fn task_with_a_premise() -> crate::task::Task {
-        let mut task = parse_task("task { goal find(x); sqrt(a) == x; }");
+        let mut task = parse_task("task find(x) { sqrt(a) == x; }");
         task.premises_mut().insert(
             term_with_vars("0 <= a"),
             SharedTerm::new(term_with_vars("sqrt(a)")),
@@ -338,7 +338,7 @@ mod test {
     fn blocked_rules_reach_the_goal_term_the_search_starts_from() {
         // Or the rule that blocked itself fires again inside the subtask.
         let blocked = RuleId::new(0, 7);
-        let parent = Solution::new(parse_task("task { goal find(x); x == 1; }"));
+        let parent = Solution::new(parse_task("task find(x) { x == 1; }"));
         let goal = Goal::parse(TermBuf::symbol("transform").arg(term_with_vars("1 + 2")))
             .expect("transform(1 + 2) is a goal");
 
@@ -390,7 +390,7 @@ mod test {
 
     #[test]
     fn known_vars_from_givens() {
-        let task = parse_task("task { goal find(x); a*x == b; a is known; b is known; }");
+        let task = parse_task("task find(x) { a*x == b; a is known; b is known; }");
         let solution = Solution::new(task);
 
         assert!(solution.known_vars.contains("a"));
@@ -402,7 +402,7 @@ mod test {
     fn an_answer_part_reports_the_index_it_was_bound_to() {
         // Not synthetic: `Solver::prove` indexes its subject twice on the
         // trivial-truth arm.
-        let mut solution = Solution::new(parse_task("task { goal prove(x == 1); x == 1; }"));
+        let mut solution = Solution::new(parse_task("task prove(x == 1) { x == 1; }"));
         let term = solution
             .goal_index
             .keys()
@@ -424,7 +424,7 @@ mod test {
 
     #[test]
     fn a_solution_without_an_answer_yields_no_parts() {
-        let solution = Solution::new(parse_task("task { goal find(x); x == 1; }"));
+        let solution = Solution::new(parse_task("task find(x) { x == 1; }"));
 
         assert_eq!(solution.answered_parts().count(), 0);
     }

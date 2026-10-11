@@ -3,16 +3,12 @@ symbol set {
 }
 
 // Нормализация формы множества в case-split-ветвях.
-rule {
+rule a in set(b) <=> a == b {
     attr level(3),goal(transform(x)),replace,block(move_left);
-
-    a in set(b) <=> a == b;
 }
 
-rule {
+rule a in set(b, c) <=> a == b || a == c {
     attr level(3),goal(transform(x)),replace,block(move_left);
-
-    a in set(b, c) <=> a == b || a == c;
 }
 
 symbol empty_set {

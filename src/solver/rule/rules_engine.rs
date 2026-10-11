@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn a_premise_rule_is_kept_out_of_the_search() {
-        let engine = engine(r#"rule { attr premise; sqrt(a) => domain(0 <= a); }"#);
+        let engine = engine(r#"rule sqrt(a) => domain(0 <= a) { attr premise; }"#);
 
         assert_eq!(engine.premise_rules().count(), 1);
         assert_eq!(engine.search_rules().count(), 0);
@@ -205,14 +205,14 @@ mod tests {
     /// A premise rule carries no level, so it must not raise the search's.
     #[test]
     fn a_premise_rule_does_not_move_the_max_level() {
-        let engine = engine(r#"rule { attr premise,level(7); sqrt(a) => domain(0 <= a); }"#);
+        let engine = engine(r#"rule sqrt(a) => domain(0 <= a) { attr premise,level(7); }"#);
 
         assert_eq!(engine.max_level(), Level::default());
     }
 
     #[test]
     fn an_ordinary_rule_still_reaches_the_search() {
-        let engine = engine(r#"rule { attr level(0); sqrt(a) => a; }"#);
+        let engine = engine(r#"rule sqrt(a) => a { attr level(0); }"#);
 
         assert_eq!(engine.search_rules().count(), 1);
         assert_eq!(engine.iter().count(), 1);

@@ -39,8 +39,7 @@ mod tests {
 
     #[test]
     fn a_task_reads_its_conditions_with_variables() {
-        let test = r#"task {
-                        goal find(x);
+        let test = r#"task find(x) {
                         2*x+5 == 0;
                     }"#;
 
@@ -65,8 +64,7 @@ mod tests {
 
     #[test]
     fn a_task_reads_its_id_and_text() {
-        let test = r#"task {
-                        goal find(x);
+        let test = r#"task find(x) {
                         id "c26";
                         text "biquadratic";
                         2*x+5 == 0;
@@ -80,7 +78,7 @@ mod tests {
 
     #[test]
     fn a_capitalized_keyword_is_a_plain_condition() {
-        let task = crate::task("task { goal find(x); Goal; Answer; Text; Id; }").unwrap();
+        let task = crate::task("task find(x) { Goal; Answer; Text; Id; }").unwrap();
         assert_eq!(task.givens.len(), 4);
     }
 }

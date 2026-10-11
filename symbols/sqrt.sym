@@ -3,51 +3,39 @@ symbol sqrt {
 }
 
 // ОДЗ корня: над ℝ определён только при неотрицательном подкоренном.
-rule {
+rule sqrt(a) => domain(0 <= a) {
     attr id(domain_sqrt),premise;
-
-    sqrt(a) => domain(0 <= a);
 }
 
 // sqrt квадрата — модуль. Параметрический знак не теряется (в отличие
 // от `(sqrt(a))^2 => a` с условием a >= 0).
-rule {
+rule sqrt(a^2) => abs(a) {
     attr replace,level(1),goal(transform(x));
-
-    sqrt(a^2) => abs(a);
 }
 
-rule {
+rule a*sqrt(b) + c != 0 <=> c*a > 0 || b != (c/a)^2 {
     attr level(0),goal(prove(x != 0));
-
-    a*sqrt(b) + c != 0 <=> c*a > 0 || b != (c/a)^2;
 
     b >= 0,
     a != 0;
 }
 
-rule {
+rule a*sqrt(b) + c == 0 => a*c <= 0 && b == (c/a)^2 {
     attr level(2),goal(find(x, ..)),one(a);
-
-    a*sqrt(b) + c == 0 => a*c <= 0 && b == (c/a)^2;
 
     a != 0,
     c is known;
 }
 
-rule {
+rule a*sqrt(b) + c*x + d == 0 => a*(c*x + d) <= 0 && b == ((c*x + d)/a)^2 {
     attr level(3),goal(find(x, ..)),one(a),one(c),zero(d);
-
-    a*sqrt(b) + c*x + d == 0 => a*(c*x + d) <= 0 && b == ((c*x + d)/a)^2;
 
     a != 0,
     d is known;
 }
 
-rule {
+rule a*sqrt(b) + c*sqrt(d) == 0 => a*c <= 0 && a^2 * b == c^2 * d && b >= 0 {
     attr level(4),goal(find(x, ..)),one(a),one(c);
-
-    a*sqrt(b) + c*sqrt(d) == 0 => a*c <= 0 && a^2 * b == c^2 * d && b >= 0;
 
     a is known,
     c is known;
@@ -56,10 +44,8 @@ rule {
 // Квадрат `a·√b = −(c·√d + e)` равносилен, только если знаки сторон совпадают.
 // При `a·c < 0` их гарантирует ориентация с `a·e ≤ 0`, при `a·c > 0` — условие
 // `a·e ≤ 0 ∧ c²·d − e² ≤ 0`: без корня и с нулём справа, чтобы его разобрали prove-правила.
-rule {
+rule a*sqrt(b) + c*sqrt(d) + e == 0 => a^2 * b == e^2 + 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0 {
     attr level(4),goal(find(x, ..)),one(a),one(c);
-
-    a*sqrt(b) + c*sqrt(d) + e == 0 => a^2 * b == e^2 + 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0;
 
     a is known,
     c is known,
@@ -68,11 +54,10 @@ rule {
     a*e <= 0;
 }
 
-rule {
+rule a*sqrt(b) + c*sqrt(d) + e == 0 =>
+    a*e <= 0 && c^2 * d - e^2 <= 0 && a^2 * b == e^2 + 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0
+{
     attr level(4),goal(find(x, ..)),one(a),one(c);
-
-    a*sqrt(b) + c*sqrt(d) + e == 0 =>
-        a*e <= 0 && c^2 * d - e^2 <= 0 && a^2 * b == e^2 + 2*e*c*sqrt(d) + c^2*d && d >= 0 && b >= 0;
 
     a is known,
     c is known,
@@ -80,70 +65,54 @@ rule {
     a*c > 0;
 }
 
-rule {
+rule sqrt(a) <= b <=> b >= 0 && a >= 0 && a <= b^2 {
     attr level(2),goal(prove(x));
-
-    sqrt(a) <= b <=> b >= 0 && a >= 0 && a <= b^2;
 
     b is known;
 }
 
-rule {
+rule sqrt(a) >= b <=> (b < 0 && a >= 0) || (b >= 0 && a >= b^2) {
     attr level(2),goal(prove(x));
-
-    sqrt(a) >= b <=> (b < 0 && a >= 0) || (b >= 0 && a >= b^2);
 
     b is known;
 }
 
-rule {
+rule sqrt(a) > b <=> (b < 0 && a >= 0) || (b >= 0 && a > b^2) {
     attr level(2),goal(prove(x));
-
-    sqrt(a) > b <=> (b < 0 && a >= 0) || (b >= 0 && a > b^2);
 
     b is known;
 }
 
-rule {
+rule sqrt(a) < b <=> b > 0 && a >= 0 && a < b^2 {
     attr level(2),goal(prove(x));
-
-    sqrt(a) < b <=> b > 0 && a >= 0 && a < b^2;
 
     b is known;
 }
 
 
-rule {
+rule a*sqrt(b) + c <= 0 <=> (a > 0 && sqrt(b) <= -c/a) || (a < 0 && sqrt(b) >= -c/a) {
     attr level(2),goal(prove(x <= 0)),one(a),zero(c);
 
-    a*sqrt(b) + c <= 0 <=> (a > 0 && sqrt(b) <= -c/a) || (a < 0 && sqrt(b) >= -c/a);
-
     a is known,
     a != 0;
 }
 
-rule {
+rule a*sqrt(b) + c > 0 <=> (a > 0 && sqrt(b) > -c/a) || (a < 0 && sqrt(b) < -c/a) {
     attr level(2),goal(prove(x > 0)),one(a),zero(c);
 
-    a*sqrt(b) + c > 0 <=> (a > 0 && sqrt(b) > -c/a) || (a < 0 && sqrt(b) < -c/a);
-
     a is known,
     a != 0;
 }
 
-rule {
+rule a*sqrt(b) + c >= 0 <=> (a > 0 && sqrt(b) >= -c/a) || (a < 0 && sqrt(b) <= -c/a) {
     attr level(2),goal(prove(x >= 0)),one(a),zero(c);
 
-    a*sqrt(b) + c >= 0 <=> (a > 0 && sqrt(b) >= -c/a) || (a < 0 && sqrt(b) <= -c/a);
-
     a is known,
     a != 0;
 }
 
-rule {
+rule a*sqrt(b) + c < 0 <=> (a > 0 && sqrt(b) < -c/a) || (a < 0 && sqrt(b) > -c/a) {
     attr level(2),goal(prove(x < 0)),one(a),zero(c);
-
-    a*sqrt(b) + c < 0 <=> (a > 0 && sqrt(b) < -c/a) || (a < 0 && sqrt(b) > -c/a);
 
     a is known,
     a != 0;
@@ -152,11 +121,10 @@ rule {
 // C29-форма: сумма двух радикалов `sqrt(x+p) + sqrt(x+q) = sqrt(r)`, уже
 // перенесённая `move_left`. Делегируем `solve_with_odz`: sympy решает
 // формально, ОДЗ-фильтр на каждый кандидат подаёт `arg_i >= 0` после подстановки.
-rule {
+rule sqrt(x + p) + sqrt(x + q) - sqrt(r) == 0 =>
+    answer(solve_with_odz(sqrt(x + p) + sqrt(x + q) == sqrt(r), x))
+{
     attr level(2),goal(find(x, ..));
-
-    sqrt(x + p) + sqrt(x + q) - sqrt(r) == 0 =>
-        answer(solve_with_odz(sqrt(x + p) + sqrt(x + q) == sqrt(r), x));
 
     p is known,
     q is known;

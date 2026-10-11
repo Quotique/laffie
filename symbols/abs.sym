@@ -3,26 +3,20 @@
 
 symbol abs {}
 
-rule {
+rule abs(a) is known <=> true {
     attr level(0),goal(prove(abs(a) is known));
-
-    abs(a) is known <=> true;
 
     a is known;
 }
 
-rule {
+rule abs(a) => a {
     attr replace,level(1),goal(transform(x));
-
-    abs(a) => a;
 
     a >= 0;
 }
 
-rule {
+rule abs(a) => -a {
     attr replace,level(1),goal(transform(x));
-
-    abs(a) => -a;
 
     a < 0;
 }

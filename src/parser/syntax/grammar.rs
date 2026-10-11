@@ -37,8 +37,8 @@ peg::parser! {
             t:task_item() { Item::Task(t) } / r:rule_item() { Item::Rule(r) } / s:symbol_item() { Item::Symbol(s) }
 
         rule task_item() -> Task =
-            start:position!() keyword("task") _ "{"
-            _ keyword("goal") _ goal:call() _ ";"
+            start:position!() keyword("task") _
+            goal:(call() / expected!("a goal, like `find(x)`")) _ "{"
             name:(_ keyword("id") _ i:string() _ ";" { i })?
             text:(_ keyword("text") _ t:string() _ ";" { t })?
             answers:(_ keyword("answer") _ a:commasep(<term()>) _ ";" { a })?
@@ -55,9 +55,9 @@ peg::parser! {
             }
 
         rule rule_item() -> Rule =
-            start:position!() keyword("rule") _ "{"
+            start:position!() keyword("rule") _
+            pattern:logic() _ p:position!() op:deduction_op() _ resolution:logic() _ "{"
             attrs:(_ a:attrs() _ ";" { a })?
-            _ pattern:logic() _ p:position!() op:deduction_op() _ resolution:logic() _ ";"
             requirements:commasep(<term()>) _ ";"?
             _ "}" end:position!() {
                 Rule {

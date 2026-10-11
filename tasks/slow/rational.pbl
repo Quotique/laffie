@@ -1,5 +1,4 @@
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение (x-1/x)*(x-4/x)*(x-9/x) == 0";
     answer x == -2 || x == 2 || x == -1 || x == 1 || x == 3 || x == -3;
 

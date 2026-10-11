@@ -1,13 +1,11 @@
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение в зависимости от параметра 2x-5+t=0";
     answer x == 2.5 - 0.5*t;
 
     2*x-5+t == 0;
     t is known;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение в зависимости от параметра 2x-t=0";
     answer x == 0.5*t;
 

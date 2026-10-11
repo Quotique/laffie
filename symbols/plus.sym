@@ -2,9 +2,7 @@ symbol + {
     attr infix(300),associative,commutative;
 }
 
-rule {
+rule a*x^n + b*x^n + c <=> (a+b)*x^n + c {
     attr level(3),goal(find(x, ..)),one(n),block(brackets_disclosure);
-
-    a*x^n + b*x^n + c <=> (a+b)*x^n + c;
 }
 

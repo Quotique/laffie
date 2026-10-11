@@ -134,9 +134,8 @@ mod tests {
 
     #[test]
     fn a_rule_reads_attributes_action_and_requirements() {
-        let test = r#"rule {
+        let test = r#"rule a + x == 0 => x == -a {
                         attr replace,level(1);
-                        a + x == 0 => x == -a;
                         a!=0;
                       }"#;
 
@@ -181,9 +180,8 @@ mod tests {
 
     #[test]
     fn an_equivalence_marks_the_rule_and_keeps_its_goal() {
-        let test = r#"rule {
+        let test = r#"rule a/b is known <=> true {
                     attr level(0),goal(prove(a/b is known));
-                    a/b is known <=> true;
                     a is known,
                     b is known
                 }"#;
@@ -228,9 +226,8 @@ mod tests {
 
     #[test]
     fn zero_and_one_expand_a_rule_into_three() {
-        let test = r#"rule {
+        let test = r#"rule a * x + b == 0 => x == -b / a {
                         attr replace,level(1),one(a),zero(b);
-                        a * x + b == 0 => x == -b / a;
                         a!=0;
                       }"#;
 
@@ -243,9 +240,8 @@ mod tests {
 
     #[test]
     fn id_block_and_normalize_keep_their_values() {
-        let test = r#"rule {
+        let test = r#"rule a == b => a - b == 0 {
             attr replace,level(1),id(move_left),block(hello),block(world),normalize(4);
-            a == b => a - b == 0;
             b != 0;
         }"#;
 
@@ -274,12 +270,12 @@ mod tests {
 
     #[test]
     fn an_unknown_rule_attribute_is_an_error_at_its_place() {
-        let err = crate::rule("rule { attr foo; a <=> a; }").unwrap_err();
+        let err = crate::rule("rule a <=> a { attr foo; }").unwrap_err();
         assert_eq!(err.msg, "unknown attribute");
-        assert_eq!((err.loc.row, err.loc.col), (1, 12));
+        assert_eq!((err.loc.row, err.loc.col), (1, 20));
         // `subtree` names no attribute.
         assert_eq!(
-            crate::rule("rule { attr subtree; a <=> a; }")
+            crate::rule("rule a <=> a { attr subtree; }")
                 .unwrap_err()
                 .msg,
             "unknown attribute"
@@ -289,11 +285,26 @@ mod tests {
     #[test]
     fn a_level_is_an_integer_as_written() {
         assert_eq!(
-            crate::rule("rule { attr level(1.0); a <=> a; }")
+            crate::rule("rule a <=> a { attr level(1.0); }")
                 .unwrap_err()
                 .msg,
             "must be u64"
         );
-        assert!(crate::rule("rule { attr level(1); a <=> a; }").is_ok());
+        assert!(crate::rule("rule a <=> a { attr level(1); }").is_ok());
+    }
+
+    #[test]
+    fn a_rule_needs_a_body_even_an_empty_one() {
+        assert!(crate::syntax::grammar::parse::one_rule("rule a + b => a {}").is_ok());
+        assert_eq!(
+            crate::rule("rule a + b => a;").unwrap_err().msg,
+            "expected `{`"
+        );
+    }
+
+    #[test]
+    fn a_solve_block_ending_the_head_goes_in_parentheses() {
+        let rule = "rule a + b => (find(x) { x == a }) { attr level(0); b is known; }";
+        assert!(crate::rule(rule).is_ok());
     }
 }

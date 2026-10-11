@@ -7,73 +7,57 @@ symbol < {
 // пускается к goal-терму prove — оттого обязано быть истинной эквивалентностью.
 // `=>` — только forward на не-goal термах. Правило лежит в файле корня паттерна.
 
-rule {
+rule a < b => a < c {
     attr level(1),goal(prove(a < c));
-
-    a < b => a < c;
 
     b <= c,
     !symbolic_eq(b, c);
 }
 
-rule {
+rule a < b => a <= c {
     attr level(1),goal(prove(a <= c));
-
-    a < b => a <= c;
 
     b <= c;
 }
 
-rule {
+rule a < b => a + c < e {
     attr level(2),goal(prove(a + c < e));
-
-    a < b => a + c < e;
 
     c < e - b;
 }
 
 // Отрицательное на отрицательное.
-rule {
+rule a < 0 => a * c > 0 {
     attr level(2),goal(prove(a * c > 0));
-
-    a < 0 => a * c > 0;
 
     c < 0;
 }
 
 // Отрицательное на положительное.
-rule {
+rule a < 0 => a * c < 0 {
     attr level(2),goal(prove(a * c < 0));
-
-    a < 0 => a * c < 0;
 
     c > 0;
 }
 
 // Ограниченный сверху квадрат: a^2 < c из a < b при a >= 0 и b*b <= c.
-rule {
+rule a < b => a^2 < c {
     attr level(2),goal(prove(a^2 < c));
-
-    a < b => a^2 < c;
 
     a >= 0,
     b * b <= c;
 }
 
 // Линейное убывание с верхней границей: e - a > f из a < b при e - b >= f.
-rule {
+rule a < b => e - a > f {
     attr level(2),goal(prove(e - a > f));
-
-    a < b => e - a > f;
 
     e - b >= f;
 }
 
 // Опровергнутое следствие условий: решений нет.
-rule {
+rule a < c => x in empty_set {
     attr level(1),goal(find(x, ..));
-
-    a < c => x in empty_set;
 
     a is known,
     c is known,
@@ -82,30 +66,24 @@ rule {
 
 // AM-GM дробей, нижняя: из 0 < a*b следует c <= a/b + b/a при c <= 2,
 // т.к. a/b + b/a = (a^2 + b^2)/(a*b) >= 2 при a*b > 0.
-rule {
+rule 0 < a * b => c <= a/b + b/a {
     attr level(2),goal(prove(c <= a/b + b/a));
-
-    0 < a * b => c <= a/b + b/a;
 
     c <= 2;
 }
 
 // AM-GM дробей, верхняя: из a*b < 0 следует a/b + b/a <= c при -2 <= c
 // (зеркало нижней: при a*b < 0 сумма не превосходит -2).
-rule {
+rule a * b < 0 => a/b + b/a <= c {
     attr level(2),goal(prove(a/b + b/a <= c));
-
-    a * b < 0 => a/b + b/a <= c;
 
     -2 <= c;
 }
 
 // Сумма с обратным при отрицательном основании: из a < 0 следует
 // a + 1/a < c при -2 < c, т.к. a + 1/a <= -2 при a < 0.
-rule {
+rule a < 0 => a + 1/a < c {
     attr level(2),goal(prove(a + 1/a < c));
-
-    a < 0 => a + 1/a < c;
 
     -2 < c;
 }
@@ -115,10 +93,8 @@ rule {
 
 // (ab-1)^2 + (a-b)^2 > 0 при 0 < a, 0 < b и не(a = b = 1):
 // a^2 b^2 + a^2 + b^2 + 1 > 4ab.
-rule {
+rule 0 < a^2*b^2 + a^2 + b^2 + 1 - 4*a*b <=> true {
     attr level(2),goal(prove(x));
-
-    0 < a^2*b^2 + a^2 + b^2 + 1 - 4*a*b <=> true;
 
     0 < a,
     0 < b,
@@ -126,10 +102,8 @@ rule {
 }
 
 // AM-GM шести членов: 6abc <= a^2 b + a b^2 + a^2 c + a c^2 + b^2 c + b c^2.
-rule {
+rule 0 <= a^2*b + a*b^2 + a^2*c + a*c^2 + b^2*c + b*c^2 - 6*a*b*c <=> true {
     attr level(2),goal(prove(x));
-
-    0 <= a^2*b + a*b^2 + a^2*c + a*c^2 + b^2*c + b*c^2 - 6*a*b*c <=> true;
 
     0 < a,
     0 < b,
@@ -137,10 +111,8 @@ rule {
 }
 
 // AM-GM девяти членов: 9abc <= (a + b + c)*(a^2 + b^2 + c^2).
-rule {
+rule 0 <= a^3 + b^3 + c^3 + a^2*b + a^2*c + a*b^2 + a*c^2 + b^2*c + b*c^2 - 9*a*b*c <=> true {
     attr level(2),goal(prove(x));
-
-    0 <= a^3 + b^3 + c^3 + a^2*b + a^2*c + a*b^2 + a*c^2 + b^2*c + b*c^2 - 9*a*b*c <=> true;
 
     0 < a,
     0 < b,
@@ -149,10 +121,8 @@ rule {
 
 // Попарно a^2 b + a b^2 <= a^3 + b^3 (т.к. (a + b)*(a - b)^2 >= 0):
 // сумма по трём парам — ab(a+b) + bc(b+c) + ac(a+c) <= 2(a^3+b^3+c^3).
-rule {
+rule 0 <= 2*a^3 + 2*b^3 + 2*c^3 - a^2*b - a*b^2 - a^2*c - a*c^2 - b^2*c - b*c^2 <=> true {
     attr level(2),goal(prove(x));
-
-    0 <= 2*a^3 + 2*b^3 + 2*c^3 - a^2*b - a*b^2 - a^2*c - a*c^2 - b^2*c - b*c^2 <=> true;
 
     0 < a,
     0 < b,
@@ -161,11 +131,11 @@ rule {
 
 // Степенная средняя кубов: (a + b + c)^3 <= 9*(a^3 + b^3 + c^3) в раскрытии. Цель
 // буквально: канонический терм цели не раскрывает `- (сумма)`.
-rule {
+rule 0 < a =>
+    a^3 + 3*a^2*b + 3*a^2*c + 3*a*b^2 + 6*a*b*c + 3*a*c^2 + b^3 + 3*b^2*c + 3*b*c^2 + c^3
+        <= 9*a^3 + 9*b^3 + 9*c^3
+{
     attr level(2),goal(prove((a + b + c)^3 <= 9*(a^3 + b^3 + c^3)));
-
-    0 < a => a^3 + 3*a^2*b + 3*a^2*c + 3*a*b^2 + 6*a*b*c + 3*a*c^2 + b^3 + 3*b^2*c + 3*b*c^2 + c^3
-        <= 9*a^3 + 9*b^3 + 9*c^3;
 
     0 < b,
     0 < c;
@@ -173,20 +143,16 @@ rule {
 
 // Каноническая форма цели prove: всё в правую часть (беклог §13). Шаблон
 // связан с целью через goal(...): иначе переписал бы и выведенные неравенства.
-rule {
+rule a < b <=> 0 < b - a {
     attr level(0),goal(prove(a < b));
-
-    a < b <=> 0 < b - a;
 
     !symbolic_eq(a, 0);
 }
 
 // Поглощение |f·a^j| ≤ |f|/2·(a^k + a^l) при чётных k, l и k + l = 2j;
 // остаток — подзадачей.
-rule {
+rule 0 < e*a^k + f*a^j + g*a^l + d <=> true {
     attr id(absorb_pow),level(1),goal(prove(x)),one(e),one(g),zero(l),zero(d);
-
-    0 < e*a^k + f*a^j + g*a^l + d <=> true;
 
     k is even, l is even, k + l == 2*j,
     e is number, f is number, g is number,
@@ -195,10 +161,8 @@ rule {
 }
 
 // То же для произвольных A, B: |f·A·B| ≤ |f|/2·(A^2 + B^2).
-rule {
+rule 0 < e*A^2 + f*A*B + g*B^2 + d <=> true {
     attr id(absorb_quad),level(1),goal(prove(x)),one(e),one(f),one(g),zero(d);
-
-    0 < e*A^2 + f*A*B + g*B^2 + d <=> true;
 
     e is number, f is number, g is number,
     2*e >= abs(f), 2*g >= abs(f),
@@ -206,10 +170,8 @@ rule {
 }
 
 // Чётная степень с неотрицательным коэффициентом плюс положительный остаток.
-rule {
+rule 0 < e*a^c + d <=> true {
     attr level(1),goal(prove(x)),one(e);
-
-    0 < e*a^c + d <=> true;
 
     c is even,
     e is number,
@@ -218,10 +180,8 @@ rule {
 }
 
 // Член с отрицательным коэффициентом оценивается верхней границей из посылки.
-rule {
+rule x < h => 0 < c + f*x {
     attr level(2),goal(prove(0 < c + f*x));
-
-    x < h => 0 < c + f*x;
 
     f is number,
     f < 0,

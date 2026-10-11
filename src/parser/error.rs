@@ -170,16 +170,26 @@ mod tests {
             let msg = message(text);
             assert!(!msg.contains("['") && !msg.contains("[_]"), "{text}: {msg}");
         }
-        for text in [
-            "rule { a b; }",
-            "rule { a => ; }",
-            "task { find(x); x == 1; }",
-        ] {
+        for text in ["rule a b {}", "rule a => {}", "task find(x) { x == ; }"] {
             let msg = ParserError::from(parse::file(text).unwrap_err()).msg;
             assert!(
                 !msg.contains("['") && !msg.contains("unreported"),
                 "{text}: {msg}"
             );
+        }
+    }
+
+    #[test]
+    fn a_block_in_the_old_form_names_the_missing_head() {
+        for (text, msg) in [
+            ("rule { attr level(0); a => b; }", "expected an expression"),
+            (
+                "task { goal find(x); x == 1; }",
+                "expected a goal, like `find(x)`",
+            ),
+        ] {
+            let err = ParserError::from(parse::file(text).unwrap_err());
+            assert_eq!((err.msg.as_str(), err.loc.col), (msg, 5), "{text}");
         }
     }
 

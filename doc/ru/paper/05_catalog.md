@@ -137,14 +137,13 @@ S.Reals)` — `{−|a|, |a|}`.
 правиле квадратного уравнения `a · x² + b · x + c == 0`:
 
 ```
-rule {
+rule a*x^2 + b*x + c == 0 =>
+    answer(
+        (a == 0 && lin) ||
+        (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x))
+    )
+{
     attr level(2), goal(find(x, ..));
-
-    a*x^2 + b*x + c == 0 =>
-        answer(
-            (a == 0 && lin) ||
-            (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x))
-        );
 
     a is known,
     b is known,

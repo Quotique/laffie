@@ -1,7 +1,6 @@
 // 3.2.2. Рациональные уравнения - 2.
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:равно:003";
     answer a != 0 && x == -a;
 

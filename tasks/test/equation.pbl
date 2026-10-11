@@ -1,27 +1,22 @@
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение -x^2+1 == 0";
     answer x == -1 || x == 1, x == 1 || x == -1;
 
     -x^2+1 == 0;
 }
 
-task {
-    goal find(x);
-
+task find(x) {
     - 4 - 2*x <= 0 && -x^2 + 4*x == 0 && 2*x + 1 >= 0 && x >= 0;
 }
 
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение x^3 - 6x^2 + 11x - 6 = 0";
     answer x in set(1, 2, 3), x == 1 || x == 2 || x == 3;
 
     x^3 - 6*x^2 + 11*x - 6 == 0;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     text "Решите систему уравнений: 2x - 6 = 0, 3y + 6 = 0";
     answer x == 3 && y == -2;
 
@@ -29,8 +24,7 @@ task {
     3*y + 6 == 0;
 }
 
-task {
-    goal find(x, y, z);
+task find(x, y, z) {
     text "Решите систему уравнений: 2x - 6 = 0, 3y + 6 = 0, z - 5 = 0";
     answer x == 3 && y == -2 && z == 5;
 
@@ -40,8 +34,7 @@ task {
 }
 
 // TODO: дизъюнктивный ответ в multi-var find
-// task {
-//     goal find(x, y);
+// task find(x, y) {
 //     text "Решите систему уравнений: x^2 - 9 = 0, 2y + 5 = 0";
 //     answer (x == -3 || x == 3) && y == -2.5;
 //

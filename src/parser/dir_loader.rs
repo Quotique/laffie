@@ -208,9 +208,8 @@ mod tests {
             &[(
                 "t.sym",
                 "symbol qq { attr infix(10); }\n\
-             rule {\n\
+             rule qq(x) => x {\n\
                  attr level(0),block(nonexistent);\n\
-                 qq(x) => x;\n\
              }\n",
             )],
         );
@@ -235,9 +234,8 @@ mod tests {
             "no_symbols",
             &[(
                 "t.sym",
-                "rule {\n\
+                "rule a => b {\n\
                  attr level(0);\n\
-                 a => b;\n\
              }\n",
             )],
         );
@@ -262,13 +260,11 @@ mod tests {
             "expansion",
             &[(
                 "t.sym",
-                "rule {\n\
+                "rule a * b => a {\n\
                  attr level(0),one(a);\n\
-                 a * b => a;\n\
              }\n\
-             rule {\n\
+             rule a + b == 0 => a == -b {\n\
                  attr level(0);\n\
-                 a + b == 0 => a == -b;\n\
              }\n",
             )],
         );
@@ -289,7 +285,7 @@ mod tests {
         let dir = corpus(
             "rules_only",
             &[
-                ("a.sym", "rule {\n attr level(0);\n bb(x) => x;\n}\n"),
+                ("a.sym", "rule bb(x) => x {\n attr level(0);\n}\n"),
                 ("b.sym", "symbol bb { attr infix(10); }\n"),
             ],
         );
@@ -311,18 +307,16 @@ mod tests {
         fs::write(
             dir.join("a.sym"),
             "symbol aa { attr infix(10); }\n\
-             rule {\n\
+             rule aa(x) => x {\n\
                  attr level(0),block(defined_later);\n\
-                 aa(x) => x;\n\
              }\n",
         )
         .unwrap();
         fs::write(
             dir.join("b.sym"),
             "symbol bb { attr infix(10); }\n\
-             rule {\n\
+             rule bb(x) => x {\n\
                  attr level(0),id(defined_later);\n\
-                 bb(x) => x;\n\
              }\n",
         )
         .unwrap();

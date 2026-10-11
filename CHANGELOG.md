@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `doc/ru/backlog.md` — беклог находок.
 
 ### Changed
+- A block leads with its head: `rule a => b { attr …; … }`, `task find(x) { … }`; the old form is a parse error.
 - Expressions: `x^2y` is `x^2·y`, `2x^2` is `2·(x^2)`, `x^-1`, `2^3^2`, `2(x+1)`
   and `a * -b` parse, `--x` is `x`; `x y` and `x inside` are errors.
 - An unknown rule attribute is a parse error at its place.

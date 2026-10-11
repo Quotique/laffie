@@ -270,11 +270,10 @@
 члена. Правило формализует следствие теоремы как редукционный шаг:
 
 \begin{lstlisting}
-rule {
+rule F == 0 =>
+    (x == u) || (Q == 0)
+{
     attr level(5), goal(find(x, ..));
-
-    F == 0 =>
-        (x == u) || (Q == 0);
 
     is_polynomial(F, x),
     d == free_term(F, x),
@@ -350,10 +349,8 @@ $\texttt{!symbolic\_eq}(F, P)$ не выполняется, и применен�
 не происходит:
 
 \begin{lstlisting}
-rule {
+rule F == 0 => P == 0 {
     attr level(5), goal(find(x, ..));
-
-    F == 0 => P == 0;
 
     is_polynomial(F, x),
     P == factor(F, x),
@@ -369,10 +366,8 @@ $\texttt{!symbolic\_eq}(F, P)$ выступают предикатами при�
 произвольной факторизации:
 
 \begin{lstlisting}
-rule {
+rule a * b == 0 => (a == 0) || (b == 0) {
     attr level(4), goal(find(x, ..));
-
-    a * b == 0 => (a == 0) || (b == 0);
 }
 \end{lstlisting}
 
@@ -488,15 +483,14 @@ $[1]$, теряя случай $a = 0$, в котором уравнение с�
 В реализации правило выглядит так:
 
 \begin{lstlisting}
-rule {
+rule x*a + b == 0 =>
+    answer(
+        (a == 0 && b == 0 && x in Reals) ||
+        (a == 0 && b != 0 && x in empty_set) ||
+        (a != 0 && x in sympy_solve(x*a + b == 0, x))
+    )
+{
     attr level(2), goal(find(x, ..));
-
-    x*a + b == 0 =>
-        answer(
-            (a == 0 && b == 0 && x in Reals) ||
-            (a == 0 && b != 0 && x in empty_set) ||
-            (a != 0 && x in sympy_solve(x*a + b == 0, x))
-        );
 
     a is known,
     b is known;
@@ -542,14 +536,13 @@ $a = 1$ одновременно обнуляется и линейный коэ
 квадратного уравнения $a \cdot x^2 + b \cdot x + c = 0$:
 
 \begin{lstlisting}
-rule {
+rule a*x^2 + b*x + c == 0 =>
+    answer(
+        (a == 0 && L) ||
+        (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x))
+    )
+{
     attr level(2), goal(find(x, ..));
-
-    a*x^2 + b*x + c == 0 =>
-        answer(
-            (a == 0 && L) ||
-            (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x))
-        );
 
     a is known,
     b is known,

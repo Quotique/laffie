@@ -7,26 +7,18 @@ symbol * {
 // паттерн `a·x² + b·x + c == 0` (два x²-члена). Параметрические произведения
 // (напр. дискриминант `(a-1)·(a-1)`) при этом раскрываются — нужно для
 // C26 substitute-path.
-rule {
+rule (a + b)*c <=> a*c + b*c {
     attr replace,level(2),goal(transform(x)),id(brackets_disclosure);
-
-    (a + b)*c <=> a*c + b*c;
 }
 
-rule {
+rule -(-a) <=> a {
     attr level(0),goal(transform(x)),replace;
-
-    -(-a) <=> a;
 }
 
-rule {
+rule -a == -b <=> a == b {
     attr level(1),goal(transform(x)),replace;
-
-    -a == -b <=> a == b;
 }
 
-rule {
+rule -a != -b <=> a != b {
     attr level(1),goal(transform(x)),replace;
-
-    -a != -b <=> a != b;
 }

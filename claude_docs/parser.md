@@ -50,9 +50,9 @@ Each returns `Result<_, ParserError>`, and `ParserError` carries the source
 ### Top-level shapes
 
 ```
-task   { goal <term>; [id "…";] [text "…";] [answer <t>, <t>;] <term>; … }
+task <goal> { [id "…";] [text "…";] [answer <t>, <t>;] <term>; … }
 symbol <name> { [<attrs>;] [py "<python source>";] }
-rule   { [<attrs>;] <term> (=> | <=>) <term>; [<requirement>, …;] }
+rule   <term> (=> | <=>) <term> { [<attrs>;] [<requirement>, …;] }
 ```
 
 Rules are top-level blocks in a `.sym` file, not nested inside `symbol`.
@@ -95,6 +95,9 @@ position, which `load_rules` maps to the file and line.
   expression")`; `)`, `;`, `}`, `,` and keywords stay visible. A token left
   visible by mistake shows up in every message at that position.
   `error::expected` puts a closing delimiter first, then an expression.
+- **A solve block at the end of a rule head eats the rule body.** `rule p =>
+  find(x) { … } { … }` reads the first `{ … }` as the solve block's givens;
+  such a head goes in parentheses. The grammar does not forbid it.
 - **Embedded Python is a real code path.** A `symbol X { py "…" }` block is
   executed by pyo3 at parse time; the resulting `calculator` serializes the term
   to a JSON dict, hands it to Python wrapped in the `Term` class from

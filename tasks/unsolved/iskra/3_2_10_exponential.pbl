@@ -1,23 +1,20 @@
 // 3.2.10. Показательные уравнения.
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:,:21";
     answer x == 6;
 
     0.125*4^(2*x - 3) == (sqrt(2)/8)^(-x);
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:,:23";
     answer x == 10;
 
     32^((x + 5)/(x - 7)) == 0.25*128^((x + 17)/(x - 3));
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:,:30";
     answer x == -4 && y == -2 || x == 0 && y == 0 || x == 3 && y == 1/3 || x == 8 && y == -8;
 
@@ -25,8 +22,7 @@ task {
     (0.37^(x - y))^(x^2 + x*y + 2*x - 16) == 1;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:большеилиравно:01";
     answer x == 7 && y == 121;
 
@@ -34,8 +30,7 @@ task {
     (x + y)*3^x == 279936;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:выводусловия:11";
     answer x == 2 && -2 < a || x == -a + 1;
 
@@ -44,24 +39,21 @@ task {
     a is known;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:деление:02";
     answer x == 2;
 
     3^((x + 2)/(3*x - 4)) - 7 == 2*3^((5*x - 10)/(3*x - 4));
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:дробь:067";
     answer x == 1 + 1/2;
 
     4^x - (3^(x - (1/2))) == 3^(x + 1/2) - (2^(2*x - 1));
 }
 
-task {
-    goal find(x, y, z);
+task find(x, y, z) {
     id "iskra:дробь:070";
     answer x == 1 && y == 2 && z == 1 || x == (-(979*sqrt(57)) + 7409)/162 && y == 1 + 1/3 && z == (-(11*sqrt(57)) + 89)/18;
 
@@ -70,8 +62,7 @@ task {
     y == x^(1/4) + z^(1/4);
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:записьзадачи:01";
     answer x == 2 && y == 2;
 
@@ -79,32 +70,28 @@ task {
     2^(x - 1) <= y;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:значениетерма:01";
     answer x == 1;
 
     -(6*(-(1/2^(x - 1)) + 2^x)) - (8*2^(-(3*x))) + 2^(3*x) == 1;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:меньшеилиравно:001";
     answer x == 0;
 
     2^(x/2 + 1) + 2^x == 3;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:минус:067";
     answer x == 3;
 
     10^x - (5^(x - 1)*2^(x - 2)) == 950;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:минус:069";
     answer x == -(1/2) && y == -(1/2) || x == 1/2 && y == 1/2;
 
@@ -112,8 +99,7 @@ task {
     2^(2*x + 1) + (1/2)^(2*y - 1) == 5;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:минус:070";
     answer x == 12 && y == 4;
 
@@ -121,8 +107,7 @@ task {
     sqrt(x) - sqrt(2*y) == sqrt(12) - sqrt(8);
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:облнорм:08";
     answer x == 1 && -1 < a || x == -a + 1;
 
@@ -131,32 +116,28 @@ task {
     a is known;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:опредзначение:01";
     answer x == 0;
 
     18^x + 8^x == 2*27^x;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:плюс:065";
     answer x == 9;
 
     (2*(2^(sqrt(x) + 3))^(1/(2*sqrt(x))))^(2/(sqrt(x) - 1)) == 4;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:плюс:067";
     answer x == 2;
 
     4^(x - 1) + 4^x + 4^(x + 1) == 84;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:плюс:070";
     answer x == 2 && y == 3 || x == 1/2^(15/23) && y == -(23/5);
 
@@ -164,8 +145,7 @@ task {
     x^(2*y) + 5 == y*x^y + 5*y^2;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:плюс:071";
     answer x == 1 && y == -1;
 
@@ -173,8 +153,7 @@ task {
     2*x*2^(2*x + y) + 3*y*8^(x + y) == 1;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:подобны:01";
     answer y == 3 && x == 2;
 
@@ -182,8 +161,7 @@ task {
     81^x/3^y == 243;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:подслучаи:01";
     answer (x == -((a + sqrt(-4 + a^2))/2) && y == (-a + sqrt(-4 + a^2))/2 || x == (-a + sqrt(-4 + a^2))/2 && y == -((a + sqrt(-4 + a^2))/2)) && a <= -2 || x == 1 && y == 1 || x == (-1 + sqrt(a*8 + 1))/2 && y == ((-1 + sqrt(a*8 + 1))/2)^2 && 0 < a;
 
@@ -193,32 +171,28 @@ task {
     a is known;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:префиксныйфильтр:04";
     answer x == 2;
 
     (x - 1)^x - x == -1;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:равно:067";
     answer x == -(4/3);
 
     (1/4)^(3*x) - ((1/8)^(x - 1)) == 128;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:равно:068";
     answer x == 0;
 
     27*2^(-(3*x)) + 9*2^x - (2^(3*x)) - (27*2^(-x)) == 8;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:равно:069";
     answer y == 1/14 && x == 3/14;
 
@@ -226,8 +200,7 @@ task {
     5*5^(x - y) == sqrt(25^(2*y + 1));
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:равно:070";
     answer (x == 1 && y == 1 || y == x && 0 < x) && x in Reals;
 
@@ -235,8 +208,7 @@ task {
     x^x == y^y;
 }
 
-task {
-    goal find(x, y, z);
+task find(x, y, z) {
     id "iskra:равно:071";
     answer x == 1 && y == 1 && z == 1 || x == sqrt(2) && y == 4 && z == 2;
 
@@ -245,8 +217,7 @@ task {
     z^z == y;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:равно:072";
     answer x == 1/2^(1/3) && y == -3 || x == sqrt(2) && y == 2;
 
@@ -254,16 +225,14 @@ task {
     (2*x)^(y^2) == 64;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:степень:065";
     answer x == 1;
 
     (3/7)^(3*x - 7) == (7/3)^(7*x - 3);
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:степень:069";
     answer x == 1 + 1/2 && y == 1/2 || x == -2 && y == 4;
 
@@ -271,8 +240,7 @@ task {
     (3^x)^(1/y) == 3*(9^(1 - y))^(1/y);
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:степень:070";
     answer x == 1 && y == 1 || x == 25*sqrt(5/3)/9 && y == 5*sqrt(5/3)/3;
 
@@ -280,8 +248,7 @@ task {
     x^3 == y^5;
 }
 
-task {
-    goal find(x, y, z);
+task find(x, y, z) {
     id "iskra:степень:071";
     answer y == 1 && z == 2 && x == 2;
 
@@ -290,8 +257,7 @@ task {
     11^((x - 1)*y) + 5^(z/2) == 16;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:схемавариантов:01";
     answer x == 2 && y == 1 || x == 4 && y == sqrt(3);
 
@@ -299,16 +265,14 @@ task {
     y == sqrt(x - 1);
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:типы:01";
     answer x == 4;
 
     (x - 3)^(3*x^2 - (10*x) + 3) == 1;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:точкиплоскости:02";
     answer x == 0 && y == 0;
 
@@ -316,32 +280,28 @@ task {
     4*2^(3*x) + y^2 == 4;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:треугольник:01";
     answer x == 1;
 
     (-(2^(x + 2)) + 4^x + 3)/(2^(x/2) - 1) + 2^(x/2) + 1 == 0;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:удаление:01";
     answer x == 1;
 
     1.5*4^(x + 0.5) == 2*9^(x - 0.5) + 6^x;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:умножение:067";
     answer x == 66;
 
     sqrt(3^(x - 54)) - (7*sqrt(3^(x - 58))) == 162;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:умножение:069";
     answer y == 5 && x == 7;
 
@@ -349,8 +309,7 @@ task {
     (x + y)*2^(y - x) == 3;
 }
 
-task {
-    goal find(x, y);
+task find(x, y) {
     id "iskra:умножение:070";
     answer x == 1 && y == 1 || x == 1/3^(1/3) && y == 3^(2/3);
 
@@ -358,8 +317,7 @@ task {
     x^2*y == 1;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:учетответа:01";
     answer x == 1/2;
 

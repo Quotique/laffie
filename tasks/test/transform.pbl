@@ -1,45 +1,33 @@
-task {
-	goal prove((6039797760*sqrt(192)-83751862272)/(-67108864) != 0);
-
+task prove((6039797760*sqrt(192)-83751862272)/(-67108864) != 0) {
 	x == 2;
 }
 
-task {
-    goal transform((x+1)/(x-1)+(x+5)/(x-5) == (x+3)/(x-3)+(x+4)/(x-4));
-
+task transform((x+1)/(x-1)+(x+5)/(x-5) == (x+3)/(x-3)+(x+4)/(x-4)) {
     y == 100;
 }
 
-task {
-    goal find(x);
+task find(x) {
     answer x == (-5)/3 || x == 1, x == 1 || -5/3;
 
     3*x*x + x + x - 5 == 0;
 }
 
-task {
-	goal prove(4*sqrt(5) + 9 != 0);
-
+task prove(4*sqrt(5) + 9 != 0) {
 	x == 2;
 }
 
-task {
-    goal find(x);
-
+task find(x) {
     x in prime_factors(100);
 }
 
-task {
-    goal transform((5 - sqrt(29))*(-2) > 0);
+task transform((5 - sqrt(29))*(-2) > 0) {
     answer 2*sqrt(29) - 10 > 0;
 }
 
-task {
-    goal transform(sqrt(3)*sqrt(3) + 3^(1/2));
+task transform(sqrt(3)*sqrt(3) + 3^(1/2)) {
     answer 3 + sqrt(3);
 }
 
-task {
-    goal transform(sqrt(-2)*sqrt(-2));
+task transform(sqrt(-2)*sqrt(-2)) {
     answer sqrt(-2)^2;
 }

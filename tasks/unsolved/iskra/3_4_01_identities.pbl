@@ -1,15 +1,13 @@
 // 3.4.1. Доказательство тождеств.
 
-task {
-    goal prove(sqrt(sqrt(a) + b) == sqrt((-sqrt(b^2 - a) + b)/2) + sqrt((sqrt(b^2 - a) + b)/2));
+task prove(sqrt(sqrt(a) + b) == sqrt((-sqrt(b^2 - a) + b)/2) + sqrt((sqrt(b^2 - a) + b)/2)) {
     id "iskra:дробь:076";
 
     a in Reals;
     b in Reals;
 }
 
-task {
-    goal prove(a^2/(b + c) + b^2/(c + a) + c^2/(a + b) == 0);
+task prove(a^2/(b + c) + b^2/(c + a) + c^2/(a + b) == 0) {
     id "iskra:область:15";
 
     c in Reals;

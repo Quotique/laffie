@@ -22,11 +22,10 @@
 Обобщённое правило в `symbols/power.sym`:
 
 ```
-rule {
+rule F == 0 =>
+    (x == u) || (Q == 0)
+{
     attr level(5), goal(find(x, ..));
-
-    F == 0 =>
-        (x == u) || (Q == 0);
 
     is_polynomial(F, x),
     free_term(F, x) == d,

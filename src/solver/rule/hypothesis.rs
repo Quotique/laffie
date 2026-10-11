@@ -353,7 +353,7 @@ mod tests {
         requirements: Vec<TermBuf>,
     ) -> Hypothesis {
         let rule = Arc::new(parse_rule(
-            r#"rule { attr level(1); a + x == 0 => x == -a; a!=0; }"#,
+            r#"rule a + x == 0 => x == -a { attr level(1); a!=0; }"#,
         ));
 
         Hypothesis {

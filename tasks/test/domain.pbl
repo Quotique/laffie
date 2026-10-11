@@ -1,24 +1,20 @@
 // ОДЗ — doc/ru/domain.md. Здесь ворота all-solved, инверсные лежат в
 // tasks/negative/domain.pbl.
 
-task {
-	goal prove(sqrt(a) + 1 > 0);
+task prove(sqrt(a) + 1 > 0) {
 	text "ОДЗ из sqrt(a): 0 <= a, отсюда sqrt(a) >= 0 и sqrt(a) + 1 > 0";
 }
 
-task {
-	goal prove(sqrt(a) >= 0);
+task prove(sqrt(a) >= 0) {
 	text "sqrt(a) >= 0 сводится к ОДЗ 0 <= a";
 }
 
-task {
-	goal prove(a >= 0);
+task prove(a >= 0) {
 	text "ОДЗ выводится из посылки, содержащей sqrt(a)";
 
 	sqrt(a) + 1 < 5;
 }
 
-task {
-	goal prove(a^(1/2) + 1 > 0);
+task prove(a^(1/2) + 1 > 0) {
 	text "ОДЗ из дробной степени с чётным знаменателем (парно к sqrt)";
 }

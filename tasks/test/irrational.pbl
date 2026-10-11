@@ -1,37 +1,28 @@
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(x) == 2";
     answer x == 4;
 
     sqrt(x) == 2;
 }
 
-task {
-    goal find(x);
+task find(x) {
     text "Найти x";
     answer x in empty_set;
 
     (-sqrt(29)+5)/(-2) <= 0 && x == (sqrt(29)-19)/(-2) || x in empty_set;
 }
 
-task {
-    goal prove( (-sqrt(29)+5)/(-2) > 0 );
-
+task prove( (-sqrt(29)+5)/(-2) > 0 ) {
 	x == 2;
 }
 
-task {
-    goal prove( !((-sqrt(29)+5)/(-2) <= 0) );
-
+task prove( !((-sqrt(29)+5)/(-2) <= 0) ) {
 	x == 2;
 }
 
-task {
-    goal prove(3^(1/2) - 2 <= 0);
-}
+task prove(3^(1/2) - 2 <= 0) {}
 
-task {
-    goal find(x);
+task find(x) {
     answer x == 4 || x == -4/9;
 
     sqrt(5-x) + sqrt(8+2*x) == 5;

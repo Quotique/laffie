@@ -787,7 +787,7 @@ mod solve_tests {
     /// Seeded into a `find`, a premise like `x in Reals` would close it.
     #[test]
     fn a_premise_does_not_answer_a_find() {
-        let mut task = parse_task("task { goal find(x); x^2 == 4; }");
+        let mut task = parse_task("task find(x) { x^2 == 4; }");
         task.premises_mut().insert(
             term_with_vars("x == 1"),
             SharedTerm::new(term_with_vars("sqrt(x)")),
@@ -804,7 +804,7 @@ mod solve_tests {
 
     #[test]
     fn check_answer_find_test() {
-        let task = parse_task("task { goal find(x); x == 1; }");
+        let task = parse_task("task find(x) { x == 1; }");
         let rules = Arc::new(RulesEngine::default());
         let solver = Solver::new(rules);
         let solution = solver.solve(
@@ -820,7 +820,7 @@ mod solve_tests {
 
     #[test]
     fn check_answer_prove_test() {
-        let task = parse_task("task { goal prove(x > 0); x == 2; }");
+        let task = parse_task("task prove(x > 0) { x == 2; }");
         let rules = Arc::new(RulesEngine::default());
         let solver = Solver::new(rules);
         let solution = solver.solve(
@@ -845,22 +845,22 @@ mod solve_tests {
 
     #[test]
     fn a_numeric_bound_reaches_the_prove_check() {
-        assert!(prove_solved("task { goal prove(x > 0); x > 2; }"));
-        assert!(!prove_solved("task { goal prove(x > 3); x > 2; }"));
+        assert!(prove_solved("task prove(x > 0) { x > 2; }"));
+        assert!(!prove_solved("task prove(x > 3) { x > 2; }"));
         // The reversed form still works after normalization.
-        assert!(prove_solved("task { goal prove(x > 0); 0 < x; }"));
+        assert!(prove_solved("task prove(x > 0) { 0 < x; }"));
     }
 
     #[test]
     fn prove_trivial_truth_without_condition() {
         // A goal that reduces to a trivial truth is solved even with no
         // non-goal term to focus (no fictitious witness condition needed).
-        assert!(prove_solved("task { goal prove(1 > 0); }"));
+        assert!(prove_solved("task prove(1 > 0) {}"));
     }
 
     #[test]
     fn check_answer_multi_var_find() {
-        let task = parse_task("task { goal find(x, y); x == 3; y == 4; }");
+        let task = parse_task("task find(x, y) { x == 3; y == 4; }");
         let rules = Arc::new(RulesEngine::default());
         let solver = Solver::new(rules);
         let solution = solver.solve(
@@ -881,18 +881,18 @@ mod solve_tests {
         let limits = || Limits::init(usize::MAX, TIME_LIMIT_DEFAULT).0;
 
         let _first = solver.solve(
-            parse_task("task { goal find(x); x == 1; }"),
+            parse_task("task find(x) { x == 1; }"),
             Default::default(),
             limits(),
         );
         let second = solver.solve(
-            parse_task("task { goal find(y); y == 2; }"),
+            parse_task("task find(y) { y == 2; }"),
             Default::default(),
             limits(),
         );
 
         let fresh = Solver::new(Arc::new(RulesEngine::default())).solve(
-            parse_task("task { goal find(y); y == 2; }"),
+            parse_task("task find(y) { y == 2; }"),
             Default::default(),
             limits(),
         );
@@ -910,7 +910,7 @@ mod solve_tests {
             .into_iter()
             .collect::<Result<_, _>>()
             .unwrap();
-        let task = parse_task("task { goal find(x); x + 1 == 3; }");
+        let task = parse_task("task find(x) { x + 1 == 3; }");
         let given = task.givens[0].to_string();
         let solution = Solver::new(Arc::new(rules)).solve(
             task,
@@ -928,10 +928,10 @@ mod solve_tests {
     #[test]
     fn a_replace_rule_retires_its_source_term() {
         assert!(given_retired(
-            "rule { attr replace,level(0); a + b == c => a == c - b; }"
+            "rule a + b == c => a == c - b { attr replace,level(0); }"
         ));
         assert!(!given_retired(
-            "rule { attr level(0); a + b == c => a == c - b; }"
+            "rule a + b == c => a == c - b { attr level(0); }"
         ));
     }
 
@@ -939,7 +939,7 @@ mod solve_tests {
     fn cancelled_token_aborts_solve() {
         use crate::engine::{SolutionStatus, SolveError};
 
-        let task = parse_task("task { goal find(x); x == 1; }");
+        let task = parse_task("task find(x) { x == 1; }");
         let solver = Solver::new(Arc::new(RulesEngine::default()));
         let (limits, cancel) = Limits::init(usize::MAX, TIME_LIMIT_DEFAULT);
         // Cancel before solving: the first cycle check must abort the run.
@@ -960,7 +960,7 @@ mod local_rules_tests {
     use crate::rule::{Level, RuleId, SharedRule, parse_rule};
 
     fn rule(id: u64, level: u64) -> SharedRule {
-        let mut rule = parse_rule("rule { attr level(1); a + b => a == b; }");
+        let mut rule = parse_rule("rule a + b => a == b { attr level(1); }");
         rule.id = RuleId::new(0, id);
         rule.level = level.into();
         Arc::new(rule)
@@ -1000,7 +1000,7 @@ mod resolve_solve_tests {
     #[test]
     fn two_solve_bindings_both_apply() {
         let solver = Solver::new(Arc::new(RulesEngine::default()));
-        let parent = Solution::new(parse_task("task { goal find(z); }"));
+        let parent = Solution::new(parse_task("task find(z) {}"));
         let mut state = Run {
             limits: Limits::init(usize::MAX, Duration::from_secs(60)).0,
             cycle:  0,
@@ -1015,7 +1015,7 @@ mod resolve_solve_tests {
         };
         let hyp = Hypothesis {
             rule:          Arc::new(parse_rule(
-                "rule { attr level(1); a + x == 0 => x == -a; a!=0; }",
+                "rule a + x == 0 => x == -a { attr level(1); a!=0; }",
             )),
             resolution:    TermBuf::symbol("&&")
                 .arg(TermBuf::param("p"))
@@ -1044,7 +1044,7 @@ mod resolve_solve_tests {
         use crate::engine::{SolveError, TermProps};
 
         let solver = Solver::new(Arc::new(RulesEngine::default()));
-        let mut solution = Solution::new(parse_task("task { goal find(z); }"));
+        let mut solution = Solution::new(parse_task("task find(z) {}"));
         // Focus term for the rule, plus a term equal to every grounding's resolution so each
         // hypothesis is a duplicate and the loop keeps going.
         let index = solution
@@ -1060,7 +1060,7 @@ mod resolve_solve_tests {
             .collect::<Vec<_>>()
             .join(", ");
         let rule_src: &'static str = Box::leak(
-            format!("rule {{ attr level(0); a + b => a == b; p in set({elems}); }}")
+            format!("rule a + b => a == b {{ attr level(0); p in set({elems}); }}")
                 .into_boxed_str(),
         );
         let rule: SharedRule = Arc::new(parse_rule(rule_src));

@@ -4,10 +4,8 @@ symbol == {
 
 // Канонизация к `== 0`; гард `!(a is atom && b is known)` не трогает уже
 // решённую форму `x == known`, чтобы её распознали как ответ.
-rule {
+rule a == b <=> a - b == 0 {
     attr replace,level(0),goal(find(x, ..)),id(move_left);
-
-    a == b <=> a - b == 0;
 
     !symbolic_eq(b, 0),
     !(a is atom && b is known);
@@ -19,10 +17,8 @@ rule {
 // не доказуемо, см. solver.rs:417). Используется для канонизации условий
 // case-split-ветвей: `-a + 2 == 0` → `-a == -2` → `a == 2` (с правилом
 // `-a == -b ⟺ a == b` в multiply.sym).
-rule {
+rule a + b == 0 <=> a == -b {
     attr replace,level(2),goal(transform(x)),block(move_left);
-
-    a + b == 0 <=> a == -b;
 
     a is known,
     b is known,
@@ -37,10 +33,8 @@ rule {
 // не плодить рекурсивные матчи в задачах с rational-roots (например,
 // кубическое x³−6x²+11x−6=0 экспоненциально размножается при общей
 // коммутативности `==`).
-rule {
+rule c == a <=> a == c {
     attr replace,level(2),goal(transform(x));
-
-    c == a <=> a == c;
 
     a is variable,
     c is known;
@@ -51,19 +45,15 @@ rule {
 // Для условия `c < 0` не пишем — в реальных параметрических ветвях
 // такие случаи отдельно дают `x ∈ ∅` через другие правила.
 // Дублируется для обеих ориентаций `==` (не commutative).
-rule {
+rule a^2 == c <=> a == sqrt(c) || a == -sqrt(c) {
     attr replace,level(3),goal(transform(x));
-
-    a^2 == c <=> a == sqrt(c) || a == -sqrt(c);
 
     c is known,
     c >= 0;
 }
 
-rule {
+rule c == a^2 <=> a == sqrt(c) || a == -sqrt(c) {
     attr replace,level(3),goal(transform(x));
-
-    c == a^2 <=> a == sqrt(c) || a == -sqrt(c);
 
     c is known,
     c >= 0;
@@ -71,10 +61,8 @@ rule {
 
 // `a² + b ≠ 0` → `a² ≠ −b` над параметром, дальше — правило ниже (C24: `a² − 4 ≠ 0`).
 // Только для квадрата: прочие `x + c ≠ 0` нужны правилам `sqrt.sym` как есть.
-rule {
+rule a^2 + b != 0 <=> a^2 != -b {
     attr replace,level(2),goal(transform(x));
-
-    a^2 + b != 0 <=> a^2 != -b;
 
     a is known,
     b is known,
@@ -84,19 +72,15 @@ rule {
 // Двойственное к квадратному корню для `!=`: `a² ≠ c ⟺ a ≠ √c ∧ a ≠ -√c`
 // при `c > 0`. Используется в branch третьего типа case-split-а
 // (`a² - 4 ≠ 0` → `a ≠ 2 ∧ a ≠ -2`).
-rule {
+rule a^2 != c <=> a != sqrt(c) && a != -sqrt(c) {
     attr replace,level(3),goal(transform(x));
-
-    a^2 != c <=> a != sqrt(c) && a != -sqrt(c);
 
     c is known,
     c > 0;
 }
 
-rule {
+rule x*a + b == 0 => x == - b/a {
     attr level(1),goal(find(x, ..)),one(a),zero(b),block(move_left);
-
-    x*a + b == 0 => x == - b/a;
 
     a != 0,
     b is known;
@@ -106,12 +90,11 @@ rule {
 // делегируем линейному правилу через B3 sub-solve — внутри sub-solve
 // квадратный паттерн (с `x^2`) не матчится на bare `b*x + c == 0`,
 // рекурсии нет.
-rule {
+rule a*x^2 + b*x + c == 0 =>
+    (a == 0 && lin) ||
+    (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x))
+{
     attr level(2),goal(find(x, ..));
-
-    a*x^2 + b*x + c == 0 =>
-        (a == 0 && lin) ||
-        (a != 0 && x in sympy_solve(a*x^2 + b*x + c, x));
 
     a is known,
     b is known,
@@ -125,23 +108,20 @@ rule {
 //   a == 0, b != 0  →  x ∈ ∅ (нет решений)
 //   a != 0          →  делегирование sympy_solve
 // Резолюция — сырой piecewise; распознаётся check_find_answer.
-rule {
+rule x*a + b == 0 =>
+    (a == 0 && b == 0 && x in Reals) ||
+    (a == 0 && b != 0 && x in empty_set) ||
+    (a != 0 && x in sympy_solve(x*a + b == 0, x))
+{
     attr level(2),goal(find(x, ..));
-
-    x*a + b == 0 =>
-        (a == 0 && b == 0 && x in Reals) ||
-        (a == 0 && b != 0 && x in empty_set) ||
-        (a != 0 && x in sympy_solve(x*a + b == 0, x));
 
     a is known,
     b is known;
 }
 
 // Опровергнутое следствие условий: решений нет.
-rule {
+rule a == c => x in empty_set {
     attr level(1),goal(find(x, ..));
-
-    a == c => x in empty_set;
 
     a is known,
     c is known,
@@ -149,19 +129,15 @@ rule {
 }
 
 // Сумма корней: (Σ√uᵢ)² ≤ n·Σuᵢ.
-rule {
+rule 0 < d - sqrt(p*a + q) - sqrt(p*b + q) - sqrt(p*c + q) <=> true {
     attr level(2),goal(prove(x));
-
-    0 < d - sqrt(p*a + q) - sqrt(p*b + q) - sqrt(p*c + q) <=> true;
 
     0 < d,
     0 < d^2 - 3*p*a - 3*p*b - 3*p*c - 9*q;
 }
 
-rule {
+rule 0 <= d - sqrt(p*a + q) - sqrt(p*b + q) <=> true {
     attr level(2),goal(prove(x));
-
-    0 <= d - sqrt(p*a + q) - sqrt(p*b + q) <=> true;
 
     0 <= d,
     0 <= d^2 - 2*p*a - 2*p*b - 4*q;
@@ -170,10 +146,8 @@ rule {
 // Переменная из линейного равенства-посылки. Посылка выбывает; равенство
 // `c == e` становится локальным правилом и подставляет e вместо c всюду.
 // level(0): локальное правило берёт уровень определения + 1 и иначе не застаёт цель.
-rule {
+rule c + p == s => c == s - p {
     attr level(0),goal(prove(x)),replace;
-
-    c + p == s => c == s - p;
 
     c is variable,
     symbolic_eq(substitute(c == 0, s - p), s - p);

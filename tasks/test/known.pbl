@@ -1,23 +1,15 @@
-task {
-    goal prove(set(5) is known);
-
+task prove(set(5) is known) {
     x == 1;
 }
 
-task {
-    goal prove(set(5, 1) is known);
-
+task prove(set(5, 1) is known) {
     x == 1;
 }
 
-task {
-    goal prove(set(5, 1, 2) is known);
-
+task prove(set(5, 1, 2) is known) {
     x == 1;
 }
 
-task {
-    goal prove( ((-sqrt(2944)+10)/(-18)) is known );
-
+task prove( ((-sqrt(2944)+10)/(-18)) is known ) {
     x == 1;
 }

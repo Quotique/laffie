@@ -2,98 +2,74 @@ symbol || {
     attr infix(600),display("|"),associative,commutative;
 }
 
-rule {
+rule a == c || b <=> a == c {
     attr level(2),goal(transform(x)),replace;
-
-    a == c || b <=> a == c;
 
     a == c;
 }
 
-rule {
+rule a != c || b <=> a != c {
     attr level(2),goal(transform(x)),replace;
-
-    a != c || b <=> a != c;
 
     a != c;
 }
 
-rule {
+rule a <= c || b <=> a <= c {
     attr level(2),goal(transform(x)),replace;
-
-    a <= c || b <=> a <= c;
 
     a <= c;
 }
 
-rule {
+rule a >= c || b <=> a >= c {
     attr level(2),goal(transform(x)),replace;
-
-    a >= c || b <=> a >= c;
 
     a >= c;
 }
 
-rule {
+rule a < c || b <=> a < c {
     attr level(2),goal(transform(x)),replace;
-
-    a < c || b <=> a < c;
 
     a < c;
 }
 
-rule {
+rule a > c || b <=> a > c {
     attr level(2),goal(transform(x)),replace;
-
-    a > c || b <=> a > c;
 
     a > c;
 }
 
-rule {
+rule a == c || b <=> b {
     attr level(2),goal(transform(x)),replace;
-
-    a == c || b <=> b;
 
     a != c;
 }
 
-rule {
+rule a != c || b <=> b {
     attr level(2),goal(transform(x)),replace;
-
-    a != c || b <=> b;
 
     a == c;
 }
 
-rule {
+rule a <= c || b <=> b {
     attr level(2),goal(transform(x)),replace;
-
-    a <= c || b <=> b;
 
     a > c;
 }
 
-rule {
+rule a >= c || b <=> b {
     attr level(2),goal(transform(x)),replace;
-
-    a >= c || b <=> b;
 
     a < c;
 }
 
-rule {
+rule a < c || b <=> b {
     attr level(2),goal(transform(x)),replace;
-
-    a < c || b <=> b;
 
     a >= c;
 }
 
-rule {
+rule a > c || b <=> b {
     attr level(2),goal(transform(x)),replace;
-
-    a > c || b <=> b;
 
     a <= c;
 }

@@ -8,29 +8,23 @@ symbol >= {
 // `=>` — только forward на не-goal термах. Правило лежит в файле корня паттерна.
 
 // Включая x^2 >= 0 (b == 0 удовлетворяет b <= 0).
-rule {
+rule a^2 >= b <=> true {
     attr level(1),goal(prove(x));
-
-    a^2 >= b <=> true;
 
     b <= 0;
 }
 
 // x^2 + c >= b при b - c <= 0. Специфично для `a^2 + c` (см. greater.sym).
-rule {
+rule a^2 + c >= b <=> true {
     attr level(1),goal(prove(x));
-
-    a^2 + c >= b <=> true;
 
     c is known,
     b - c <= 0;
 }
 
 // Трёхчлен со старшим a > 0 и неположительным дискриминантом неотрицателен.
-rule {
+rule a*x^2 + b*x + c >= d <=> true {
     attr level(1),goal(prove(t)),one(a),one(b);
-
-    a*x^2 + b*x + c >= d <=> true;
 
     a is known,
     b is known,
@@ -40,85 +34,65 @@ rule {
     b^2 - 4*a*(c - d) <= 0;
 }
 
-rule {
+rule a >= b => a >= c {
     attr level(1),goal(prove(a >= c));
-
-    a >= b => a >= c;
 
     b >= c,
     !symbolic_eq(b, c);
 }
 
-rule {
+rule a >= b => a > c {
     attr level(1),goal(prove(a > c));
-
-    a >= b => a > c;
 
     b > c;
 }
 
-rule {
+rule a >= b => a + c >= e {
     attr level(2),goal(prove(a + c >= e));
-
-    a >= b => a + c >= e;
 
     c >= e - b;
 }
 
-rule {
+rule a >= b => a + c > e {
     attr level(2),goal(prove(a + c > e));
-
-    a >= b => a + c > e;
 
     c > e - b;
 }
 
-rule {
+rule a >= 0 => a * c >= 0 {
     attr level(2),goal(prove(a * c >= 0));
-
-    a >= 0 => a * c >= 0;
 
     c >= 0;
 }
 
 // Знак степени: неотрицательное основание в любой нат. степени неотрицательно.
-rule {
+rule a >= 0 => a^c >= 0 {
     attr level(1),goal(prove(a^c >= 0));
-
-    a >= 0 => a^c >= 0;
 }
 
 // Модуль неотрицателен (безусловно).
-rule {
+rule abs(a) >= b <=> true {
     attr level(1),goal(prove(x));
-
-    abs(a) >= b <=> true;
 
     b <= 0;
 }
 
 // Чётная степень неотрицательна безусловно (x^4 >= 0).
-rule {
+rule a^c >= b <=> true {
     attr level(1),goal(prove(x));
-
-    a^c >= b <=> true;
 
     c is even,
     b <= 0;
 }
 
 // Модуль не меньше своего аргумента (безусловно): abs(x) >= x.
-rule {
+rule abs(a) >= a <=> true {
     attr level(1),goal(prove(x));
-
-    abs(a) >= a <=> true;
 }
 
 // Опровергнутое следствие условий: решений нет.
-rule {
+rule a >= c => x in empty_set {
     attr level(1),goal(find(x, ..));
-
-    a >= c => x in empty_set;
 
     a is known,
     c is known,
@@ -127,8 +101,6 @@ rule {
 
 // Каноническая форма цели prove: всё в правую часть (беклог §13). Шаблон
 // связан с целью через goal(...): иначе переписал бы и выведенные неравенства.
-rule {
+rule a >= b <=> 0 <= a - b {
     attr level(0),goal(prove(a >= b));
-
-    a >= b <=> 0 <= a - b;
 }

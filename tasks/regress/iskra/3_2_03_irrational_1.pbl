@@ -1,7 +1,6 @@
 // 3.2.3. Иррациональные уравнения - 1.
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:умножение:046";
     answer x in empty_set;
 

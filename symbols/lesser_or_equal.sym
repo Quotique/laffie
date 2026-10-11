@@ -7,45 +7,35 @@ symbol <= {
 // пускается к goal-терму prove — оттого обязано быть истинной эквивалентностью.
 // `=>` — только forward на не-goal термах. Правило лежит в файле корня паттерна.
 
-rule {
+rule a <= b => a <= c {
     attr level(1),goal(prove(a <= c));
-
-    a <= b => a <= c;
 
     b <= c,
     !symbolic_eq(b, c);
 }
 
-rule {
+rule a <= b => a < c {
     attr level(1),goal(prove(a < c));
-
-    a <= b => a < c;
 
     b < c;
 }
 
-rule {
+rule a <= b => a + c <= e {
     attr level(2),goal(prove(a + c <= e));
-
-    a <= b => a + c <= e;
 
     c <= e - b;
 }
 
 // Неположительное на неотрицательное.
-rule {
+rule a <= 0 => a * c <= 0 {
     attr level(2),goal(prove(a * c <= 0));
-
-    a <= 0 => a * c <= 0;
 
     c >= 0;
 }
 
 // Опровергнутое следствие условий: решений нет.
-rule {
+rule a <= c => x in empty_set {
     attr level(1),goal(find(x, ..));
-
-    a <= c => x in empty_set;
 
     a is known,
     c is known,
@@ -56,10 +46,8 @@ rule {
 // c^n/m <= a^n + b^n при чётном n и 2^n <= 2*m, т.к.
 // c^n <= (a+b)^n <= 2^(n-1)*(a^n + b^n) <= m*(a^n + b^n)
 // (a^2/2 <= b^2 + c^2 из a <= b + c, 0 <= a → требование 2^2 <= 2*2).
-rule {
+rule c <= a + b => c^n / m <= a^n + b^n {
     attr level(2),goal(prove(c^n / m <= a^n + b^n));
-
-    c <= a + b => c^n / m <= a^n + b^n;
 
     0 <= c,
     n is even,
@@ -69,10 +57,8 @@ rule {
 // Тройная QM-AM: из d <= a + b + e при 0 <= d следует c <= a^2 + b^2 + e^2
 // при 3*c <= d*d, т.к. d^2 <= (a+b+e)^2 <= 3*(a^2+b^2+e^2)
 // (3 <= a^2 + b^2 + c^2 из 3 <= a + b + c → требование 3*3 <= 9).
-rule {
+rule d <= a + b + e => c <= a^2 + b^2 + e^2 {
     attr level(2),goal(prove(c <= a^2 + b^2 + e^2));
-
-    d <= a + b + e => c <= a^2 + b^2 + e^2;
 
     0 <= d,
     3 * c <= d * d;
@@ -86,28 +72,22 @@ rule {
 // «естественной» записи `3*(a*b + ...) <= (a + b + c)^2` цель уже не
 // застаёт. После пересмотра transform-подзадач (беклог §6) вернуть
 // правило к канонической записи `3*(a*b + b*c + a*c) <= (a + b + c)^2`.
-rule {
+rule 3*a*b + 3*b*c + 3*a*c <= 2*a*b + 2*b*c + 2*a*c + a^2 + b^2 + c^2 <=> true {
     attr level(1),goal(prove(x));
-
-    3*a*b + 3*b*c + 3*a*c <= 2*a*b + 2*b*c + 2*a*c + a^2 + b^2 + c^2 <=> true;
 }
 
 // Каноническая форма цели prove: всё в правую часть (беклог §13). Шаблон
 // связан с целью через goal(...): иначе переписал бы и выведенные неравенства.
-rule {
+rule a <= b <=> 0 <= b - a {
     attr level(0),goal(prove(a <= b));
-
-    a <= b <=> 0 <= b - a;
 
     !symbolic_eq(a, 0);
 }
 
 // Поглощение |f·a^j| ≤ |f|/2·(a^k + a^l) при чётных k, l и k + l = 2j;
 // остаток — подзадачей.
-rule {
+rule 0 <= e*a^k + f*a^j + g*a^l + d <=> true {
     attr id(absorb_pow_le),level(1),goal(prove(x)),one(e),one(g),zero(l),zero(d);
-
-    0 <= e*a^k + f*a^j + g*a^l + d <=> true;
 
     k is even, l is even, k + l == 2*j,
     e is number, f is number, g is number,
@@ -116,10 +96,8 @@ rule {
 }
 
 // То же для произвольных A, B: |f·A·B| ≤ |f|/2·(A^2 + B^2).
-rule {
+rule 0 <= e*A^2 + f*A*B + g*B^2 + d <=> true {
     attr id(absorb_quad_le),level(1),goal(prove(x)),one(e),one(f),one(g),zero(d);
-
-    0 <= e*A^2 + f*A*B + g*B^2 + d <=> true;
 
     e is number, f is number, g is number,
     2*e >= abs(f), 2*g >= abs(f),
@@ -127,10 +105,8 @@ rule {
 }
 
 // Чётная степень с неотрицательным коэффициентом плюс неотрицательный остаток.
-rule {
+rule 0 <= e*a^c + d <=> true {
     attr level(1),goal(prove(x)),one(e),zero(d);
-
-    0 <= e*a^c + d <=> true;
 
     c is even,
     e is number,
@@ -139,10 +115,8 @@ rule {
 }
 
 // Член с корнем оценивается нижней границей подкоренного из посылки.
-rule {
+rule h <= u => 0 <= c + e*sqrt(u) {
     attr level(2),goal(prove(0 <= c + e*sqrt(u)));
-
-    h <= u => 0 <= c + e*sqrt(u);
 
     e is number,
     0 < e,
@@ -152,10 +126,8 @@ rule {
 }
 
 // Член с положительным коэффициентом оценивается нижней границей из посылки.
-rule {
+rule h <= y => 0 <= c + e*y {
     attr level(2),goal(prove(0 <= c + e*y));
-
-    h <= y => 0 <= c + e*y;
 
     e is number,
     0 < e,

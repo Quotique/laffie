@@ -1,5 +1,4 @@
-task {
-    goal find(x);
+task find(x) {
     text "Sanity-check: ответ вида x ∈ ℝ принимается answer-checker'ом";
     answer x in Reals;
 

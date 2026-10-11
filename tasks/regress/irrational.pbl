@@ -1,100 +1,84 @@
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(x + 3) == sqrt(5 - x);";
 
     sqrt(x + 3) == sqrt(5-x);
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(1-x) == x+1";
 
     sqrt(1 - x) == x + 1;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(x + 11) == x - 1";
 
     sqrt(x + 11) == x - 1;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(x^2 + x + 4) == 4";
 
     sqrt(x^2 + x + 4) == 4;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(2*x + 1) - sqrt(x) == 1"; 
 
     sqrt(2*x + 1) - sqrt(x) == 1;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(5 - x) - sqrt(5 + x) == 2"; 
 
     sqrt(5 - x) - sqrt(5 + x) == 2;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(x - 2) + sqrt(x + 6) == 4"; 
 
     sqrt(x - 2) + sqrt(x + 6) == 4;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(15 - x) + sqrt(3 - x) == 6"; 
 
     sqrt(15 - x) + sqrt(3 - x) == 6;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(5+2*x) = 5-x";
 
     sqrt(5+2*x) == 5-x;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(5*x-34) == x-7";
 
     sqrt(5*x-34) == x-7;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt((x+1)(2x+3)) == x+3";
 
     sqrt( (x+1)*(2x+3) ) == x+3;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(2*x + 5) - sqrt(x+6) == 1"; 
     answer x == 10;
 
     sqrt(2*x + 5) - sqrt(x+6) == 1;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(x^2-7*x+1) == sqrt(2*x^2-15*x+8)";
     answer x == 7;
 
     sqrt(x^2-7*x+1) == sqrt(2*x^2-15*x+8);
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(3*x + 1) - sqrt(2*x-1) == 7";
     answer x == 481;
 
     sqrt(3*x + 1) - sqrt(2*x-1) == 7;
 }
 
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(5-x) + sqrt(8+2*x) == 2";
     answer x in empty_set;
 
     sqrt(5-x) + sqrt(8+2*x) == 2;
 }
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение x + sqrt( (x^2 + 4*x)/(x-2) ) == 0";
     answer x == -1 || x == 0;
 

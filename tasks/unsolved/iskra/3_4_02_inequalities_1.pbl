@@ -1,43 +1,37 @@
 // 3.4.2. Доказательство неравенств - 1.
 
-task {
-    goal prove(a*sqrt(a) + 3*sqrt(a) - a + 5 > 0);
+task prove(a*sqrt(a) + 3*sqrt(a) - a + 5 > 0) {
     id "iskra:больше:61";
 
     a in Reals;
 }
 
-task {
-    goal prove(-(13*sqrt(a)) + a*sqrt(a) + 3*a + 15 > 0);
+task prove(-(13*sqrt(a)) + a*sqrt(a) + 3*a + 15 > 0) {
     id "iskra:больше:62";
 
     a in Reals;
 }
 
-task {
-    goal prove((a^2 + 3)/sqrt(a^2 + 2) > 2);
+task prove((a^2 + 3)/sqrt(a^2 + 2) > 2) {
     id "iskra:больше:63";
 
     a in Reals;
 }
 
-task {
-    goal prove(a^8 - (a^5) + a^2 - a + 1 > 0);
+task prove(a^8 - (a^5) + a^2 - a + 1 > 0) {
     id "iskra:больше:64";
 
     a in Reals;
 }
 
-task {
-    goal prove(2*a^3 + 2*a^2 + 1 > a);
+task prove(2*a^3 + 2*a^2 + 1 > a) {
     id "iskra:больше:65";
 
     a in Reals;
     0 < a;
 }
 
-task {
-    goal prove(3 <= a/b + b/c + c/a);
+task prove(3 <= a/b + b/c + c/a) {
     id "iskra:дробь:077";
 
     c in Reals;
@@ -48,66 +42,57 @@ task {
     0 < c;
 }
 
-task {
-    goal prove(0 <= a^2*sqrt(a) - (6*a*sqrt(a)) + sqrt(a) + a^3 + a^2 + a + 1);
+task prove(0 <= a^2*sqrt(a) - (6*a*sqrt(a)) + sqrt(a) + a^3 + a^2 + a + 1) {
     id "iskra:меньшеилиравно:046";
 
     a in Reals;
 }
 
-task {
-    goal prove(((a + 7)/(a^2 - (18*a) + 81) + (a + 5)/(a^2 - 81))*((a + 3)/(a - 9))^(-2) + (a + 7)/(a + 9) <= 1);
+task prove(((a + 7)/(a^2 - (18*a) + 81) + (a + 5)/(a^2 - 81))*((a + 3)/(a - 9))^(-2) + (a + 7)/(a + 9) <= 1) {
     id "iskra:меньшеилиравно:047";
 
     a in Reals;
 }
 
-task {
-    goal prove(1 <= -(((12*a^2 - (9*a))/(-(a^3) + 27) + 9/(a^2 + 3*a + 9) + a/(a - 3))^(-1)) + (2*a^2 - (3*a) + 18)/(-a + 3)^2);
+task prove(1 <= -(((12*a^2 - (9*a))/(-(a^3) + 27) + 9/(a^2 + 3*a + 9) + a/(a - 3))^(-1)) + (2*a^2 - (3*a) + 18)/(-a + 3)^2) {
     id "iskra:меньшеилиравно:048";
 
     a in Reals;
 }
 
-task {
-    goal prove(1 <= (2*a^2 + 1)/sqrt(4*a^2 + 1));
+task prove(1 <= (2*a^2 + 1)/sqrt(4*a^2 + 1)) {
     id "iskra:меньшеилиравно:049";
 
     a in Reals;
 }
 
-task {
-    goal prove(2*a*sqrt(b) + 2*b*sqrt(a) + 2*b*a <= 2*b^2 + 2*a^2 + b + a);
+task prove(2*a*sqrt(b) + 2*b*sqrt(a) + 2*b*a <= 2*b^2 + 2*a^2 + b + a) {
     id "iskra:меньшеилиравно:050";
 
     a in Reals;
     b in Reals;
 }
 
-task {
-    goal prove(1 <= 1/(a^2 + 1) + a^2);
+task prove(1 <= 1/(a^2 + 1) + a^2) {
     id "iskra:меньшеилиравно:052";
 
     a in Reals;
 }
 
-task {
-    goal prove(a^2/(a^4 + 1) <= 1/2);
+task prove(a^2/(a^4 + 1) <= 1/2) {
     id "iskra:меньшеилиравно:053";
 
     a in Reals;
 }
 
-task {
-    goal prove(a*b + a + b <= a^2 + b^2 + 1);
+task prove(a*b + a + b <= a^2 + b^2 + 1) {
     id "iskra:меньшеилиравно:056";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove(2*(a + b + c) - 3 <= a^2 + b^2 + c^2);
+task prove(2*(a + b + c) - 3 <= a^2 + b^2 + c^2) {
     id "iskra:меньшеилиравно:057";
 
     c in Reals;
@@ -115,46 +100,40 @@ task {
     a in Reals;
 }
 
-task {
-    goal prove(0 <= a^4 + a^3*b + a*b^3 + b^4);
+task prove(0 <= a^4 + a^3*b + a*b^3 + b^4) {
     id "iskra:меньшеилиравно:058";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove(0 <= a^4 - (2*a^3*b) + 2*a^2*b^2 - (2*a*b^3) + b^4);
+task prove(0 <= a^4 - (2*a^3*b) + 2*a^2*b^2 - (2*a*b^3) + b^4) {
     id "iskra:меньшеилиравно:059";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove(0 <= 4*a^4 - (4*a^3) + 5*a^2 - (2*a) + 1);
+task prove(0 <= 4*a^4 - (4*a^3) + 5*a^2 - (2*a) + 1) {
     id "iskra:меньшеилиравно:060";
 
     a in Reals;
 }
 
-task {
-    goal prove(a^2/(a^4 + 1) <= 1/2);
+task prove(a^2/(a^4 + 1) <= 1/2) {
     id "iskra:меньшеилиравно:061";
 
     a in Reals;
 }
 
-task {
-    goal prove(a^3*b + a*b^3 <= a^4 + b^4);
+task prove(a^3*b + a*b^3 <= a^4 + b^4) {
     id "iskra:меньшеилиравно:062";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove(9*sqrt(a*b*c) <= (sqrt(b) + sqrt(a) + sqrt(c))*(b + a + c));
+task prove(9*sqrt(a*b*c) <= (sqrt(b) + sqrt(a) + sqrt(c))*(b + a + c)) {
     id "iskra:меньшеилиравно:064";
 
     c in Reals;
@@ -162,8 +141,7 @@ task {
     b in Reals;
 }
 
-task {
-    goal prove(a*b*c*(a + b + c) <= a^4 + b^4 + c^4);
+task prove(a*b*c*(a + b + c) <= a^4 + b^4 + c^4) {
     id "iskra:меньшеилиравно:066";
 
     c in Reals;
@@ -171,24 +149,21 @@ task {
     a in Reals;
 }
 
-task {
-    goal prove((a + b)^4 <= 8*(a^4 + b^4));
+task prove((a + b)^4 <= 8*(a^4 + b^4)) {
     id "iskra:меньшеилиравно:067";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove((a^3 + b^3)^2 <= (a^2 + b^2)*(a^4 + b^4));
+task prove((a^3 + b^3)^2 <= (a^2 + b^2)*(a^4 + b^4)) {
     id "iskra:меньшеилиравно:068";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove((a + b + c + d)^2 <= 4*(a^2 + b^2 + c^2 + d^2));
+task prove((a + b + c + d)^2 <= 4*(a^2 + b^2 + c^2 + d^2)) {
     id "iskra:меньшеилиравно:069";
 
     d in Reals;
@@ -197,32 +172,28 @@ task {
     a in Reals;
 }
 
-task {
-    goal prove(a^2*(b^4 + 1) + b^2*(a^4 + 1) <= (a^4 + 1)*(b^4 + 1));
+task prove(a^2*(b^4 + 1) + b^2*(a^4 + 1) <= (a^4 + 1)*(b^4 + 1)) {
     id "iskra:меньшеилиравно:070";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove(2*a^2*b^2 <= a^6 + b^6 + 1);
+task prove(2*a^2*b^2 <= a^6 + b^6 + 1) {
     id "iskra:меньшеилиравно:071";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove(3*a^2*b^2 - 4 <= (a^6 + b^6)/2);
+task prove(3*a^2*b^2 - 4 <= (a^6 + b^6)/2) {
     id "iskra:меньшеилиравно:072";
 
     b in Reals;
     a in Reals;
 }
 
-task {
-    goal prove(2*sqrt(a*b) <= b/c + c*a);
+task prove(2*sqrt(a*b) <= b/c + c*a) {
     id "iskra:меньшеилиравно:073";
 
     c in Reals;
@@ -233,8 +204,7 @@ task {
     0 < c;
 }
 
-task {
-    goal prove(sqrt(a*b) <= (b*c^4 + a)/(2*c^2));
+task prove(sqrt(a*b) <= (b*c^4 + a)/(2*c^2)) {
     id "iskra:меньшеилиравно:074";
 
     c in Reals;
@@ -245,16 +215,14 @@ task {
     0 < c;
 }
 
-task {
-    goal prove(2*sqrt(a) + a^2 <= a^3 + 2);
+task prove(2*sqrt(a) + a^2 <= a^3 + 2) {
     id "iskra:меньшеилиравно:075";
 
     a in Reals;
     0 < a;
 }
 
-task {
-    goal prove(sqrt(a*b) + sqrt(b*c) + sqrt(a*c) <= a + b + c);
+task prove(sqrt(a*b) + sqrt(b*c) + sqrt(a*c) <= a + b + c) {
     id "iskra:меньшеилиравно:077";
 
     c in Reals;
@@ -265,8 +233,7 @@ task {
     0 < c;
 }
 
-task {
-    goal prove(9/(a + b + c) <= 2/(b + c) + 2/(c + a) + 2/(a + b));
+task prove(9/(a + b + c) <= 2/(b + c) + 2/(c + a) + 2/(a + b)) {
     id "iskra:меньшеилиравно:078";
 
     c in Reals;
@@ -277,8 +244,7 @@ task {
     0 < c;
 }
 
-task {
-    goal prove(sqrt(a^2 + b^2 + c^2) <= abs(a) + abs(b) + abs(c));
+task prove(sqrt(a^2 + b^2 + c^2) <= abs(a) + abs(b) + abs(c)) {
     id "iskra:модуль:32";
 
     c in Reals;
@@ -286,8 +252,7 @@ task {
     a in Reals;
 }
 
-task {
-    goal prove(3*abs(a*b*c) <= abs(a)^3 + abs(b)^3 + abs(c)^3);
+task prove(3*abs(a*b*c) <= abs(a)^3 + abs(b)^3 + abs(c)^3) {
     id "iskra:модуль:33";
 
     c in Reals;
@@ -295,8 +260,7 @@ task {
     a in Reals;
 }
 
-task {
-    goal prove(8*abs(a*b*c) <= (abs(a) + abs(b))*(abs(b) + abs(c))*(abs(a) + abs(c)));
+task prove(8*abs(a*b*c) <= (abs(a) + abs(b))*(abs(b) + abs(c))*(abs(a) + abs(c))) {
     id "iskra:модуль:34";
 
     c in Reals;
@@ -304,8 +268,7 @@ task {
     a in Reals;
 }
 
-task {
-    goal prove(sqrt(a*b) + sqrt(c*d) <= sqrt((a + c)*(b + d)));
+task prove(sqrt(a*b) + sqrt(c*d) <= sqrt((a + c)*(b + d))) {
     id "iskra:плюс:077";
 
     d in Reals;
@@ -318,8 +281,7 @@ task {
     0 < d;
 }
 
-task {
-    goal prove(6 <= (a + b)/c + (b + c)/a + (a + c)/b);
+task prove(6 <= (a + b)/c + (b + c)/a + (a + c)/b) {
     id "iskra:плюс:078";
 
     c in Reals;
@@ -330,8 +292,7 @@ task {
     0 < c;
 }
 
-task {
-    goal prove(((a + b)/2)^3 <= (a^3 + b^3)/2);
+task prove(((a + b)/2)^3 <= (a^3 + b^3)/2) {
     id "iskra:степень:077";
 
     b in Reals;
@@ -340,8 +301,7 @@ task {
     0 < b;
 }
 
-task {
-    goal prove(2*(a + b)*(b + c)*(a + c) <= -(a^3 + b^3 + c^3) + (a + b + c)^3);
+task prove(2*(a + b)*(b + c)*(a + c) <= -(a^3 + b^3 + c^3) + (a + b + c)^3) {
     id "iskra:умножение:076";
 
     c in Reals;

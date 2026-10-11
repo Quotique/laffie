@@ -92,10 +92,8 @@
 множителя:
 
 ```
-rule {
+rule (a+b)^n <=> (a+b)^(n - 1)*(a + b) {
    attr replace, level(4), goal(transform(x)), normalize(2);
-
-   (a+b)^n <=> (a+b)^(n - 1)*(a + b);
 
    a is known,
    b is known;

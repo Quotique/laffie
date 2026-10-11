@@ -1,106 +1,87 @@
-task {
-	goal prove(1 > 0);
-
+task prove(1 > 0) {
 	x == 2;
 }
 
-task {
-	goal prove(-9 < 0);
-
+task prove(-9 < 0) {
 	x == 2;
 }
 
-task {
-	goal prove((1>0) is (true));
-
+task prove((1>0) is (true)) {
 	x == 2;
 }
 
-task {
-	goal prove(x > 0);
-
+task prove(x > 0) {
 	x == 2;
 }
 
-task {
-	goal prove(x > 0);
-
+task prove(x > 0) {
 	x == 2 + 2;
 }
 
-task {
-    goal find(x);
+task find(x) {
     answer x == 1;
 
     x == 1;
 }
 
-task {
-    goal find(x);
+task find(x) {
     answer x == 1, x in set(1);
 
     x in set(1);
 }
 
-task {
-    goal find(x);
+task find(x) {
     answer x == 1 || x == (sqrt(2) + 5)/2, x in set(1, (sqrt(2) + 5)/2 ), x == (sqrt(2) + 5)/2 || x == 1;
 
     x in set(1, (sqrt(2) + 5)/2 );
 }
 
-task {
-    goal find(x);
+task find(x) {
     answer x == 1;
 
     -(-x) == 1;
 }
 
-task {
-    goal find(x);
+task find(x) {
     answer x == -3;
 
     x+3 == 0;
 }
 
 // Доказательство неравенств — этап 1 (см. doc/ru/inequalities.md).
-task { goal prove(x^2 >= 0); }
-task { goal prove(x^2 + 1 > 0); }
-task { goal prove(x^2 + 3 > 2); }
-task { goal prove(x^2 > 0);       x != 0; }
-task { goal prove(x > 0);         x > 2; }
-task { goal prove(x >= 0);        x > 2; }
-task { goal prove(x >= 2);        x >= 2; }
-task { goal prove(x > 0);         0 < x; }
-task { goal prove(x < 0);         x < -2; }
-task { goal prove(x <= 0);        x <= -1; }
-task { goal prove(x + y > 3);     x > 2; y > 1; }
-task { goal prove(x + y >= 3);    x >= 2; y >= 1; }
-task { goal prove(x + y > 0);     x > 0; y > 0; }
-task { goal prove(x * y > 0);     x > 0; y > 0; }
-task { goal prove(x * y > 0);     x < 0; y < 0; }
-task { goal prove(x * y >= 0);    x >= 0; y >= 0; }
-task { goal prove(x > z);         x > y; y > z; }
-task { goal prove(1/x > 0);       x > 0; }
+task prove(x^2 >= 0) {}
+task prove(x^2 + 1 > 0) {}
+task prove(x^2 + 3 > 2) {}
+task prove(x^2 > 0) {       x != 0; }
+task prove(x > 0) {         x > 2; }
+task prove(x >= 0) {        x > 2; }
+task prove(x >= 2) {        x >= 2; }
+task prove(x > 0) {         0 < x; }
+task prove(x < 0) {         x < -2; }
+task prove(x <= 0) {        x <= -1; }
+task prove(x + y > 3) {     x > 2; y > 1; }
+task prove(x + y >= 3) {    x >= 2; y >= 1; }
+task prove(x + y > 0) {     x > 0; y > 0; }
+task prove(x * y > 0) {     x > 0; y > 0; }
+task prove(x * y > 0) {     x < 0; y < 0; }
+task prove(x * y >= 0) {    x >= 0; y >= 0; }
+task prove(x > z) {         x > y; y > z; }
+task prove(1/x > 0) {       x > 0; }
 
 // Этап 2 — знаковые/оценочные леммы и оценки на отрезке (см. doc/ru/inequalities.md).
-task { goal prove(x^3 + 3 > 0);   x >= 0; x < 5; }
-task { goal prove(x^2 < 30);      x >= 0; x < 5; }
-task { goal prove(x^3 > 0);       x > 0; }
-task { goal prove(x^4 >= 0);      x >= 0; }
-task { goal prove(abs(x) >= 0); }
-task { goal prove(x + y + z > 6); x > 1; y > 2; z > 3; }
-task { goal prove(x^4 >= 0); }
-task { goal prove(x^2 + y^2 + 1 > 0); }
-task { goal prove(x * z > y * z);  x > y; z > 0; }
-task { goal prove(6 - x > 0);      x < 5; }
-task { goal prove(x * y > 6);      x > 2; y > 3; }
-task { goal prove(abs(x) >= x); }
+task prove(x^3 + 3 > 0) {   x >= 0; x < 5; }
+task prove(x^2 < 30) {      x >= 0; x < 5; }
+task prove(x^3 > 0) {       x > 0; }
+task prove(x^4 >= 0) {      x >= 0; }
+task prove(abs(x) >= 0) {}
+task prove(x + y + z > 6) { x > 1; y > 2; z > 3; }
+task prove(x^4 >= 0) {}
+task prove(x^2 + y^2 + 1 > 0) {}
+task prove(x * z > y * z) {  x > y; z > 0; }
+task prove(6 - x > 0) {      x < 5; }
+task prove(x * y > 6) {      x > 2; y > 3; }
+task prove(abs(x) >= x) {}
 
-task {
-    goal prove((x-1)^2 >= 0);
-}
+task prove((x-1)^2 >= 0) {}
 
-task {
-    goal prove(2*x^2 + x + 1 > 0);
-}
+task prove(2*x^2 + x + 1 > 0) {}

@@ -369,9 +369,8 @@ pub mod tests {
 
     fn base_rule() -> SharedRule {
         Arc::new(parse_rule(
-            r#"rule {
+            r#"rule a + x == 0 => x == -a {
                 attr level(1);
-                a + x == 0 => x == -a;
                 a!=0;
             }"#,
         ))
@@ -379,9 +378,8 @@ pub mod tests {
 
     fn rule_with_binds() -> SharedRule {
         Arc::new(parse_rule(
-            r#"rule {
+            r#"rule a/((b + c) as D) == 0 <=> a == 0 && D != 0 {
                 attr level(1);
-                a/((b + c) as D) == 0 <=> a == 0 && D != 0;
             }"#,
         ))
     }
@@ -414,9 +412,8 @@ pub mod tests {
     #[test]
     fn nested_ternary_sum_rule_applies_to_goal() {
         let rule: SharedRule = Arc::new(parse_rule(
-            r#"rule {
+            r#"rule d <= (a + b + c)^2 <=> true {
                 attr level(1),goal(prove(x));
-                d <= (a + b + c)^2 <=> true;
             }"#,
         ));
         let term =
@@ -434,7 +431,7 @@ pub mod tests {
     #[test]
     fn apply_leaves_the_resolution_raw() {
         let rule = Arc::new(parse_rule(
-            r#"rule { attr level(0),goal(find(x)); x*a + b == 0 => x == a + 1; b is known; }"#,
+            r#"rule x*a + b == 0 => x == a + 1 { attr level(0),goal(find(x)); b is known; }"#,
         ));
         // `2 + 1` would fold to `3`.
         let term = term_with_vars("x*2 + y == 0");
@@ -452,7 +449,7 @@ pub mod tests {
     #[test]
     fn a_false_requirement_refutes_the_raw_hypothesis() {
         let rule = Arc::new(parse_rule(
-            r#"rule { attr level(0),goal(find(x)); x*a + b == 0 => x == -b/a; a is known, b is known; }"#,
+            r#"rule x*a + b == 0 => x == -b/a { attr level(0),goal(find(x)); a is known, b is known; }"#,
         ));
         let term = term_with_vars("x*2 + y == 0");
         let mut filters = TermFilters::from(term.symbols());
@@ -471,9 +468,9 @@ pub mod tests {
 
     #[test]
     fn a_goal_param_in_the_pattern_makes_the_rule_goal_bound() {
-        let bound = parse_rule(r#"rule { attr level(0),goal(prove(a != b)); a < b => a != b; }"#);
-        let gated = parse_rule(r#"rule { attr level(0),goal(prove(x)); a < b => a != b; }"#);
-        let free = parse_rule(r#"rule { attr level(0); a < b => a != b; }"#);
+        let bound = parse_rule(r#"rule a < b => a != b { attr level(0),goal(prove(a != b)); }"#);
+        let gated = parse_rule(r#"rule a < b => a != b { attr level(0),goal(prove(x)); }"#);
+        let free = parse_rule(r#"rule a < b => a != b { attr level(0); }"#);
 
         assert!(bound.is_goal_bound());
         assert!(!gated.is_goal_bound());
@@ -508,9 +505,8 @@ pub mod tests {
     #[test]
     fn subtree_apply_test_2() {
         let rule = Arc::new(parse_rule(
-            r#"rule {
+            r#"rule a && b <=> b {
                 attr level(0),goal(transform(x)),replace;
-                a && b <=> b;
 
                 a is true;
             }"#,
@@ -547,7 +543,7 @@ pub mod tests {
     #[test]
     fn a_premise_rule_without_a_goal_applies_under_transform() {
         let rule = Arc::new(parse_rule(
-            r#"rule { attr premise; sqrt(a) => domain(0 <= a); }"#,
+            r#"rule sqrt(a) => domain(0 <= a) { attr premise; }"#,
         ));
         let goal = TermBuf::symbol("transform").arg(term_with_vars("sqrt(x) + 1"));
 
@@ -556,7 +552,7 @@ pub mod tests {
 
     #[test]
     fn an_ordinary_rule_without_a_goal_stays_out_of_transform() {
-        let rule = Arc::new(parse_rule(r#"rule { attr level(0); a * 1 => a + a; }"#));
+        let rule = Arc::new(parse_rule(r#"rule a * 1 => a + a { attr level(0); }"#));
         let goal = TermBuf::symbol("transform").arg(term_with_vars("sqrt(x) + 1"));
 
         assert_eq!(
@@ -568,7 +564,7 @@ pub mod tests {
     #[test]
     fn a_premise_rule_can_still_be_scoped_to_a_goal() {
         let rule = Arc::new(parse_rule(
-            r#"rule { attr premise,goal(prove(x)); sqrt(a) => domain(0 <= a); }"#,
+            r#"rule sqrt(a) => domain(0 <= a) { attr premise,goal(prove(x)); }"#,
         ));
 
         let prove = TermBuf::symbol("prove").arg(term_with_vars("sqrt(x) > 0"));
@@ -584,9 +580,8 @@ pub mod tests {
     #[test]
     fn goal_mapping_test() {
         let rule = Arc::new(parse_rule(
-            r#"rule {
+            r#"rule a + x == 0 => x == -a {
                 attr level(0),goal(find(x));
-                a + x == 0 => x == -a;
             }"#,
         ));
 
@@ -616,9 +611,8 @@ pub mod tests {
             .collect()
     }
 
-    const PREMISE_RULE: &str = r#"rule {
+    const PREMISE_RULE: &str = r#"rule sqrt(a) => 0 <= a {
         attr premise;
-        sqrt(a) => 0 <= a;
     }"#;
 
     #[test]
@@ -636,9 +630,8 @@ pub mod tests {
 
     #[test]
     fn an_ordinary_rule_still_substitutes_in_place() {
-        let same_rule_without_attr = r#"rule {
+        let same_rule_without_attr = r#"rule sqrt(a) => 0 <= a {
             attr level(0);
-            sqrt(a) => 0 <= a;
         }"#;
         assert_eq!(
             resolutions(same_rule_without_attr, "sqrt(x) + 1 < 5"),

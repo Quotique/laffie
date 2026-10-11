@@ -1,5 +1,4 @@
-task {
-    goal find(x);
+task find(x) {
     text "Решить уравнение sqrt(5-x) == sqrt(3) + 2 - x";
     answer x == 2;
 

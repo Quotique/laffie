@@ -63,13 +63,13 @@ mod tests {
             .unwrap()
     }
 
-    const SQRT: &str = r#"rule { attr premise; sqrt(a) => domain(0 <= a); }"#;
+    const SQRT: &str = r#"rule sqrt(a) => domain(0 <= a) { attr premise; }"#;
 
     #[test]
     fn a_condition_is_read_off_the_goal() {
         let premises = Premises::derive(
             &engine(&[SQRT]),
-            &parse_task("task { goal prove(sqrt(a) + 1 > 0); }"),
+            &parse_task("task prove(sqrt(a) + 1 > 0) {}"),
         );
 
         assert_eq!(premises.iter().count(), 1);
@@ -83,7 +83,7 @@ mod tests {
     fn a_condition_is_read_off_a_given() {
         let premises = Premises::derive(
             &engine(&[SQRT]),
-            &parse_task("task { goal prove(a >= 0); sqrt(a) + 1 < 5; }"),
+            &parse_task("task prove(a >= 0) { sqrt(a) + 1 < 5; }"),
         );
 
         assert_eq!(premises.iter().count(), 1);
@@ -98,7 +98,7 @@ mod tests {
     fn a_nested_root_yields_both_conditions() {
         let premises = Premises::derive(
             &engine(&[SQRT]),
-            &parse_task("task { goal prove(sqrt(sqrt(a) - 1) + 1 > 0); }"),
+            &parse_task("task prove(sqrt(sqrt(a) - 1) + 1 > 0) {}"),
         );
 
         let mut conditions: Vec<String> =
@@ -111,7 +111,7 @@ mod tests {
     fn a_find_task_yields_nothing() {
         let premises = Premises::derive(
             &engine(&[SQRT]),
-            &parse_task("task { goal find(x); sqrt(x) == x - 2; }"),
+            &parse_task("task find(x) { sqrt(x) == x - 2; }"),
         );
 
         assert!(premises.is_empty());
@@ -121,7 +121,7 @@ mod tests {
     fn a_task_without_a_source_term_yields_nothing() {
         let premises = Premises::derive(
             &engine(&[SQRT]),
-            &parse_task("task { goal prove(a >= 0); a > 1; }"),
+            &parse_task("task prove(a >= 0) { a > 1; }"),
         );
 
         assert!(premises.is_empty());
@@ -129,10 +129,10 @@ mod tests {
 
     #[test]
     fn an_undecidable_requirement_drops_the_candidate() {
-        let guarded = r#"rule { attr premise; sqrt(a) => domain(0 <= a); a is known; }"#;
+        let guarded = r#"rule sqrt(a) => domain(0 <= a) { attr premise; a is known; }"#;
         let premises = Premises::derive(
             &engine(&[guarded]),
-            &parse_task("task { goal prove(sqrt(a) + 1 > 0); }"),
+            &parse_task("task prove(sqrt(a) + 1 > 0) {}"),
         );
 
         assert!(premises.is_empty());
@@ -140,10 +140,10 @@ mod tests {
 
     #[test]
     fn a_satisfied_requirement_keeps_the_candidate() {
-        let guarded = r#"rule { attr premise; sqrt(a) => domain(0 <= a); a is known; }"#;
+        let guarded = r#"rule sqrt(a) => domain(0 <= a) { attr premise; a is known; }"#;
         let premises = Premises::derive(
             &engine(&[guarded]),
-            &parse_task("task { goal prove(sqrt(a) + 1 > 0); a is known; }"),
+            &parse_task("task prove(sqrt(a) + 1 > 0) { a is known; }"),
         );
 
         assert_eq!(premises.iter().count(), 1);

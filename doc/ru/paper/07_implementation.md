@@ -23,8 +23,7 @@
 Задача во входном формате системы (`tasks/sympy_comparison/parametric/c1.pbl`):
 
 ```
-task {
-    goal find(x);
+task find(x) {
     text "C1 — параметрическое линейное a·x = a";
     answer (a == 0 && x in Reals) || (a != 0 && x in set(1)),
            (a == 0 && x in Reals) || (a != 0 && x == 1);
@@ -42,10 +41,8 @@ task {
 переписывает уравнение в форму с нулём в правой части:
 
 ```
-rule {
+rule a + b == c <=> a + b - c == 0 {
     attr replace, level(5), goal(find(x, ..));
-
-    a + b == c <=> a + b - c == 0;
 
     !symbolic_eq(c, 0);
 }
@@ -58,15 +55,14 @@ rule {
 же файле — ключевой артефакт настоящей работы:
 
 ```
-rule {
+rule x*a + b == 0 =>
+    answer(
+        (a == 0 && b == 0 && x in Reals) ||
+        (a == 0 && b != 0 && x in empty_set) ||
+        (a != 0 && x in sympy_solve(x*a + b == 0, x))
+    )
+{
     attr level(2), goal(find(x, ..));
-
-    x*a + b == 0 =>
-        answer(
-            (a == 0 && b == 0 && x in Reals) ||
-            (a == 0 && b != 0 && x in empty_set) ||
-            (a != 0 && x in sympy_solve(x*a + b == 0, x))
-        );
 
     a is known,
     b is known;

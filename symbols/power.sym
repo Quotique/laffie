@@ -4,38 +4,32 @@ symbol ^ {
 
 // Пара к domain_sqrt: нормализация не сводит `a^(1/2)` к `sqrt(a)`. Условие
 // даёт только чётный знаменатель; `r is number` отсекает символьный показатель.
-rule {
+rule a^r => domain(0 <= a) {
     attr id(domain_power),premise;
-
-    a^r => domain(0 <= a);
 
     r is number, denom(r) is even;
 }
 
-rule {
+rule a * x^2 + b * x + c == 0 =>
+    (((b^2 - 4*a*c) as D) < 0 && x in empty_set) ||
+    (D >= 0 && x in set( (-b+sqrt(D))/(2*a), (-b-sqrt(D))/(2*a) ))
+{
     attr level(4),goal(find(x, ..)),one(a),one(b),zero(b),zero(c),block(move_left);
-
-    a * x^2 + b * x + c == 0 => 
-        (((b^2 - 4*a*c) as D) < 0 && x in empty_set) || 
-        (D >= 0 && x in set( (-b+sqrt(D))/(2*a), (-b-sqrt(D))/(2*a) ));
 
     a != 0,
     c is known;
 }
 
-rule {
+rule a * x^3 + b * x^2 + c * x == 0 => (x == 0) || (a * x^2 + b * x + c == 0) {
     attr level(4),goal(find(x, ..)),one(a),one(b),zero(c);
-
-    a * x^3 + b * x^2 + c * x == 0 => (x == 0) || (a * x^2 + b * x + c == 0);
 
     a != 0;
 }
 
-rule {
+rule F == 0 =>
+    (x == u) || (Q == 0)
+{
     attr level(5),goal(find(x, ..));
-
-    F == 0 =>
-        (x == u) || (Q == 0);
 
     is_polynomial(F, x),
     free_term(F, x) == d,
@@ -45,10 +39,8 @@ rule {
     poly_div(F, x - u) == Q;
 }
 
-rule {
+rule a * x^4 + b * x^3 + c * x^2 == 0 => (x == 0) || (a * x^2 + b * x + c == 0) {
     attr level(4),goal(find(x, ..)),one(a),one(b),zero(c);
-
-    a * x^4 + b * x^3 + c * x^2 == 0 => (x == 0) || (a * x^2 + b * x + c == 0);
 
     a != 0;
 }
@@ -56,10 +48,8 @@ rule {
 // Path A — биквадрат через подстановку y = x². Внутренний find(y) решает
 // квадрат (делегирует sympy/квадратной формуле), substitute возвращает корни
 // в форме `x² ∈ {...}`; дальше set-unfold + правило `a·x² == b` дают x-корни.
-rule {
+rule a*x^4 + b*x^2 + c == 0 => substitute(y == x^2, quad) {
     attr level(2),goal(find(x, ..)),one(a),one(b);
-
-    a*x^4 + b*x^2 + c == 0 => substitute(y == x^2, quad);
 
     a is known,
     b is known,
@@ -67,48 +57,36 @@ rule {
     quad == find(y) { a*y^2 + b*y + c == 0; a is known; b is known; c is known };
 }
 
-rule {
+rule (a/b)^n <=> (a^n)/(b^n) {
     attr replace,level(1),goal(transform(x));
-
-    (a/b)^n <=> (a^n)/(b^n);
 }
 
 // Биномиальная развёртка: применима только при n ≥ 2.
 // Без guard правило срабатывало на отрицательных и символических n,
 // порождая неограниченное переписывание (например, (a+2)^-1 →
 // (a+2)^-2·(a+2) → ... ad infinitum).
-rule {
+rule (a+b)^n <=> (a+b)^(n - 1)*(a + b) {
     attr replace,level(4),goal(transform(x)),normalize(2),id(binomial_unfold);
-
-    (a+b)^n <=> (a+b)^(n - 1)*(a + b);
 
     n > 1;
 }
 
-rule {
+rule (sqrt(a))^2 <=> a {
     attr replace,level(1),goal(transform(x));
-
-    (sqrt(a))^2 <=> a;
 
     a >= 0;
 }
 
-rule {
+rule (-a)^2 <=> a^2 {
     attr replace,level(1),goal(transform(x));
-
-    (-a)^2 <=> a^2;
 }
 
 // Фолд perfect-square trinomial. block(binomial_unfold) — чтобы (a+b)^n не
 // развернул результат обратно. one(b) — unit-вариант (b=1) для a^2 ± 2·a + 1.
-rule {
+rule a^2 - 2*a*b + b^2 => (a - b)^2 {
     attr replace,level(2),goal(transform(x)),block(binomial_unfold),one(b);
-
-    a^2 - 2*a*b + b^2 => (a - b)^2;
 }
 
-rule {
+rule a^2 + 2*a*b + b^2 => (a + b)^2 {
     attr replace,level(2),goal(transform(x)),block(binomial_unfold),one(b);
-
-    a^2 + 2*a*b + b^2 => (a + b)^2;
 }

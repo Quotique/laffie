@@ -64,7 +64,7 @@ def pbl_files(paths):
     return files
 
 
-TASK = re.compile(r"^task \{.*?^\}\n", re.M | re.S)
+TASK = re.compile(r"^task\b(?:[^\n]*\}\n|.*?^\}\n)", re.M | re.S)
 TASK_ID = re.compile(r'^\s*id "([^"]+)";', re.M)
 
 

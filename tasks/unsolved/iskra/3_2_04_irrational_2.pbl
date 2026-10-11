@@ -1,31 +1,27 @@
 // 3.2.4. Иррациональные уравнения - 2.
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:блокфрагментов:01";
     answer x == 2*sqrt(4*sqrt(2/3) + 3)/5;
 
     (x - 1)^(1/4) + x^(1/4) == (x + 1)^(1/4);
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:вхождениепеременной:2";
     answer x == ((27*sqrt(77) + 191)^(1/3) + (-(27*sqrt(77)) + 191)^(1/3))/(3*2^(1/3)) + 7/3;
 
     (x - 2)^(3/2) + x == 5;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:заменаоперанда:1";
     answer x == 78;
 
     (2/19)*(sqrt(x^2 + 39*x + 374) - sqrt(x^2 + 20*x + 51)) == sqrt((x + 22)/(x + 17));
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:контрольтитра:01";
     answer (x == (-sqrt(a*4 + 1) + 1)/2 && a <= 0 || x == (1 + sqrt(a*4 + 1))/2) && -(1/4) <= a || x == -((1 + sqrt(a*4 - 3))/2) && 1 <= a;
 
@@ -34,8 +30,7 @@ task {
     a is known;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:определениепараметра:02";
     answer a == 0 && x == 0 || x == 2*sqrt(a - 1) && 2 <= a;
 
@@ -44,16 +39,14 @@ task {
     a is known;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:перпендикулярно:05";
     answer x == 5;
 
     sqrt((x + 4)*(2*x + 3)) - (3*sqrt(x + 8)) == -sqrt((x + 8)*(2*x + 3)) + 3*sqrt(x + 4) + 4;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:перпендикулярно:06";
     answer (a <= -(2/sqrt(3)) || 2/sqrt(3) <= a) && x == -((a + 1 + sqrt((-1 + a^2)*3))/2) || a == 0 && x == 0 || x == (-a + 1 + sqrt(3*a^2 + 1))/2;
 
@@ -62,16 +55,14 @@ task {
     a is known;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:равно:036";
     answer x == 0;
 
     (-sqrt(x) + 1)^(1/3) + (sqrt(x) + 1)^(1/3) == 2;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:справочник:1";
     answer (a <= 0 || 8 <= a) && x == (a/2)^2;
 
@@ -80,24 +71,21 @@ task {
     a is known;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:схемаоперандов:1";
     answer x == -2;
 
     (x + 1)^(1/3) + (x + 2)^(1/3) + (x + 3)^(1/3) == 0;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:усмнатуральное:01";
     answer x == ((2 + sqrt(2*sqrt(194) - 12))/6)^2;
 
     sqrt(-(x^2) + 1) == (-sqrt(x) + 2/3)^2;
 }
 
-task {
-    goal find(x);
+task find(x) {
     id "iskra:учетответа:06";
     answer x == 2 + 2/3;
 

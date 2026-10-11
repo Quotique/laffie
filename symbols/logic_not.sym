@@ -3,44 +3,30 @@ symbol ! {
 }
 
 
-rule {
+rule !(a == b) <=> a != b {
     attr level(0),replace;
-
-    !(a == b) <=> a != b;
 }
 
-rule {
+rule !(a != b) <=> a == b {
     attr level(0),replace;
-
-    !(a != b) <=> a == b;
 }
 
-rule {
+rule !(a < b) <=> a >= b {
     attr level(0),replace;
-
-    !(a < b) <=> a >= b;
 }
 
-rule {
+rule !(a <= b) <=> a > b {
     attr level(0),replace;
-
-    !(a <= b) <=> a > b;
 }
 
-rule {
+rule !(a >= b) <=> a < b {
     attr level(0),replace;
-
-    !(a >= b) <=> a < b;
 }
 
-rule {
+rule !(a > b) <=> a <= b {
     attr level(0),replace;
-
-    !(a > b) <=> a <= b;
 }
 
-rule {
+rule !false <=> true {
     attr level(0),replace;
-
-    !false <=> true;
 }

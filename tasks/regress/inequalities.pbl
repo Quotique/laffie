@@ -1,2 +1,2 @@
-task { goal prove((x-1)^2 + 3 > 2); }
-task { goal prove(x^2 - 2*x + 1 >= 0); }
+task prove((x-1)^2 + 3 > 2) {}
+task prove(x^2 - 2*x + 1 >= 0) {}

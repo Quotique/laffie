@@ -212,7 +212,7 @@ def convert_task(t):
 
 
 def render_task(c):
-    lines = ["task {\n", f"    goal {c['goal']};\n", f"    id \"{c['id']}\";\n"]
+    lines = [f"task {c['goal']} {{\n", f"    id \"{c['id']}\";\n"]
     if c["answer"]:
         lines.append(f"    answer {', '.join(c['answer'])};\n")
     lines.append("\n")

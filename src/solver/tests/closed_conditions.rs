@@ -25,6 +25,6 @@ fn answer(name: &str, src: &str) -> Option<String> {
 
 #[test]
 fn a_false_condition_does_not_prove_itself() {
-    let answer = answer("false", "task { goal find(x); sqrt(11.5) >= 4 && x == 2; }");
+    let answer = answer("false", "task find(x) { sqrt(11.5) >= 4 && x == 2; }");
     assert_ne!(answer.as_deref(), Some("x=2"), "√11.5 ≥ 4 is false");
 }

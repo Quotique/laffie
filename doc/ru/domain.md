@@ -193,10 +193,8 @@ transform-упрощения, а **не** replace-правило. Атрибут
 В `symbols/sqrt.sym`:
 
 ```
-rule {
+rule sqrt(a) => domain(0 <= a) {
     attr id(domain_sqrt),premise;
-
-    sqrt(a) => domain(0 <= a);
 }
 ```
 
@@ -226,10 +224,8 @@ find-задач его отделяет §5.5.
 В `symbols/power.sym`:
 
 ```
-rule {
+rule a^r => domain(0 <= a) {
     attr id(domain_power),premise;
-
-    a^r => domain(0 <= a);
 
     r is number, denom(r) is even;
 }
@@ -289,18 +285,15 @@ py-символ — тяжелее и медленнее ради арифмет
 `x == 2` из откаченной версии не нужен — проверено прогоном):
 
 ```
-task {
-	goal prove(sqrt(a) + 1 > 0);
+task prove(sqrt(a) + 1 > 0) {
 	text "ОДЗ из sqrt(a): 0 <= a, отсюда sqrt(a) >= 0 и sqrt(a) + 1 > 0";
 }
 
-task {
-	goal prove(sqrt(a) >= 0);
+task prove(sqrt(a) >= 0) {
 	text "sqrt(a) >= 0 сводится к ОДЗ 0 <= a";
 }
 
-task {
-	goal prove(a >= 0);
+task prove(a >= 0) {
 	text "ОДЗ выводится из посылки, содержащей sqrt(a)";
 
 	sqrt(a) + 1 < 5;
@@ -320,10 +313,8 @@ task {
 Одно правило, без правок Rust:
 
 ```
-rule {
+rule a / b => domain(b != 0) {
     attr premise;
-
-    a / b => domain(b != 0);
 }
 ```
 
@@ -514,7 +505,7 @@ file-rotate паникует на конкурентной ротации (`back
 контрадикция не эксплуатируется — но это свойство набора лемм, а не
 гарантия.
 
-**Посылки опциональны.** `task { goal prove(...); }` без единой посылки
+**Посылки опциональны.** `task prove(...) {}` без единой посылки
 парсится и решается — прецедент `tasks/unsolved/inequalities.pbl:4`.
 Филлер `x == 2` в корпусе не нужен.
 

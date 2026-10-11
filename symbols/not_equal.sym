@@ -3,10 +3,8 @@ symbol != {
 }
 
 // Опровергнутое следствие условий: решений нет.
-rule {
+rule a != c => x in empty_set {
     attr level(1),goal(find(x, ..));
-
-    a != c => x in empty_set;
 
     a is known,
     c is known,
@@ -15,17 +13,13 @@ rule {
 
 // Факторизация разности: a^6 + b^6 - a^5*b - a*b^5 = (a - b)*(a^5 - b^5) > 0
 // при a != b (оба сомножителя одного знака: x^5 строго монотонна).
-rule {
+rule a != b => a^6 + b^6 > a^5*b + a*b^5 {
     attr level(2),goal(prove(a^6 + b^6 > a^5*b + a*b^5));
-
-    a != b => a^6 + b^6 > a^5*b + a*b^5;
 }
 
 // Произведение не ноль, если не ноль каждый сомножитель.
-rule {
+rule a*b != 0 <=> true {
     attr level(2),goal(prove(a*b != 0));
-
-    a*b != 0 <=> true;
 
     a != 0,
     b != 0;
@@ -33,14 +27,10 @@ rule {
 
 // Строгое неравенство среди термов даёт неравенство величин. Поиск по форме,
 // а не подзадача: подзадача на каждую цель `!=` замедляла поиск в разы.
-rule {
+rule a < b => a != b {
     attr level(0),goal(prove(a != b));
-
-    a < b => a != b;
 }
 
-rule {
+rule b < a => a != b {
     attr level(0),goal(prove(a != b));
-
-    b < a => a != b;
 }

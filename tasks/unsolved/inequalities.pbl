@@ -2,11 +2,11 @@
 
 // Ограничение (а): цепочка goal-переписываний не строится (divide.sym к двум
 // переменным не цепляется).
-task { goal prove(x / y > 0);            x > 0; y > 0; }
+task prove(x / y > 0) {            x > 0; y > 0; }
 
 // Форма E1 cmp E2 (сведение разности вне охвата) и/или sqrt.
-task { goal prove(a^2 + b^2 >= 2*a*b); }
-task { goal prove((a + b)/2 >= sqrt(a*b));       a >= 0; b >= 0; }
+task prove(a^2 + b^2 >= 2*a*b) {}
+task prove((a + b)/2 >= sqrt(a*b)) {       a >= 0; b >= 0; }
 
 // Проблема зависимостей — правила не находят минимум (x = 1).
-task { goal prove(x + 1/x >= 2);                 x > 0; }
+task prove(x + 1/x >= 2) {                 x > 0; }
