@@ -63,14 +63,10 @@ impl From<PegError> for ParserError {
     fn from(value: PegError) -> Self {
         Self {
             loc: Location {
-                col: if value.location.column > 0 {
-                    value.location.column - 1
-                } else {
-                    0
-                },
                 row: value.location.line,
+                col: value.location.column.saturating_sub(1),
             },
-            msg: format!("expected: {}", value.expected),
+            msg: expected(value.expected.tokens()),
         }
     }
 }
@@ -104,5 +100,90 @@ impl ParserError {
             self.msg,
             lines[first_line..last_line].join("\n")
         )
+    }
+}
+
+/// A missing closing delimiter tells most, then a missing expression.
+fn expected(tokens: impl Iterator<Item = &'static str>) -> String {
+    let mut tokens: Vec<_> = tokens.collect();
+    // peg quotes a literal Rust-style; `expected!` text is a phrase or a keyword.
+    let shown = |t: &str| match t {
+        "EOF" => "end of input".to_owned(),
+        t if t.starts_with('"') => {
+            let literal = t[1..t.len() - 1]
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\");
+            format!("`{literal}`")
+        }
+        t if t.contains(' ') => t.to_owned(),
+        t => format!("`{t}`"),
+    };
+    if let Some(first) = [r#"")""#, r#""}""#, "an expression"]
+        .into_iter()
+        .find(|t| tokens.contains(t))
+    {
+        return format!("expected {}", shown(first));
+    }
+    tokens.sort_unstable_by_key(|&t| (t == "EOF", t));
+    let shown: Vec<_> = tokens.into_iter().map(shown).collect();
+    format!("expected {}", shown.join(" or "))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ParserError;
+    use crate::{Names, syntax::grammar::parse, term};
+
+    #[test]
+    fn a_missing_delimiter_is_named_at_the_end_of_input() {
+        let err = term("(x + 1", Names::Params).unwrap_err();
+        assert_eq!(err.msg, "expected `)`");
+        assert_eq!((err.loc.row, err.loc.col), (1, 6));
+    }
+
+    #[test]
+    fn a_missing_operand_is_an_expression() {
+        for text in ["x + ", "x^", "2^^3", "a == ", ""] {
+            assert_eq!(message(text), "expected an expression", "{text}");
+        }
+    }
+
+    #[test]
+    fn a_word_after_a_term_fails_at_the_word() {
+        let err = term("x inside", Names::Params).unwrap_err();
+        assert_eq!((err.loc.row, err.loc.col), (1, 2));
+    }
+
+    #[test]
+    fn no_message_lists_character_classes() {
+        for text in [
+            "(x + 1",
+            "x + ",
+            "x^",
+            "x inside",
+            "f(x",
+            "set(..) as",
+            "\"abc",
+            "x +* y",
+            "find(x) { x == 1",
+        ] {
+            let msg = message(text);
+            assert!(!msg.contains("['") && !msg.contains("[_]"), "{text}: {msg}");
+        }
+        for text in [
+            "rule { a b; }",
+            "rule { a => ; }",
+            "task { find(x); x == 1; }",
+        ] {
+            let msg = ParserError::from(parse::file(text).unwrap_err()).msg;
+            assert!(
+                !msg.contains("['") && !msg.contains("unreported"),
+                "{text}: {msg}"
+            );
+        }
+    }
+
+    fn message(text: &str) -> String {
+        term(text, Names::Params).unwrap_err().msg
     }
 }

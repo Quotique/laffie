@@ -90,6 +90,11 @@ position, which `load_rules` maps to the file and line.
 
 ## Gotchas worth knowing before you edit
 
+- **A grammar token is `quiet!` unless its absence is the error.** Operators,
+  literals and names are quiet, and `primary` ends in `expected!("an
+  expression")`; `)`, `;`, `}`, `,` and keywords stay visible. A token left
+  visible by mistake shows up in every message at that position.
+  `error::expected` puts a closing delimiter first, then an expression.
 - **Embedded Python is a real code path.** A `symbol X { py "…" }` block is
   executed by pyo3 at parse time; the resulting `calculator` serializes the term
   to a JSON dict, hands it to Python wrapped in the `Term` class from

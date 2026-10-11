@@ -100,7 +100,7 @@ impl<'s> TermScope<'s> {
                 if self.params.insert(param.clone(), value.clone()).is_some() {
                     return Err(self
                         .src
-                        .error(e.span, format!("Multiple definition of param {param}")));
+                        .error(e.span, format!("param `{param}` is bound twice")));
                 }
                 Ok(value)
             }
@@ -142,9 +142,10 @@ impl<'s> TermScope<'s> {
                 term.term_mut().push_last_arg(arg);
             }
         } else if !args.is_empty() {
-            return Err(self
-                .src
-                .error(span, format!("Node {name} can't contains children!")));
+            return Err(self.src.error(
+                span,
+                format!("`{name}` is not a symbol and takes no arguments"),
+            ));
         }
         Ok(term)
     }

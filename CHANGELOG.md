@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expressions: `x^2y` is `x^2·y`, `2x^2` is `2·(x^2)`, `x^-1`, `2^3^2`, `2(x+1)`
   and `a * -b` parse, `--x` is `x`; `x y` and `x inside` are errors.
 - An unknown rule attribute is a parse error at its place.
+- A parse error says what was expected in words: ``expected `)` ``, `expected an expression`.
 - API: `parser::{term, rule, task, symbol}` replace `parser::lang` and the `*Parser` types;
   `DirectoryParser` is `DirectoryLoader`.
 - A rule is indexed by the rarest function symbol of its pattern, not by the

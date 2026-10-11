@@ -19,7 +19,7 @@ peg::parser! {
         rule word_end() = !['0'..='9' | 'a'..='z' | 'A'..='Z' | '_']
 
         rule keyword(id: &'static str) =
-            #{|input, pos| input.parse_string_literal(pos, id)} word_end()
+            quiet!{ #{|input, pos| input.parse_string_literal(pos, id)} word_end() } / expected!(id)
 
         rule reserved_word() = ("in" / "is" / "as") word_end()
 
@@ -73,7 +73,7 @@ peg::parser! {
 
         rule symbol_item() -> Symbol =
             start:position!() keyword("symbol") _
-            name:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '*' | '/' | '^' | '=' | '<' | '>' | '!' | '|' | '&' | '_']+)
+            name:(quiet!{ $(['a'..='z' | 'A'..='Z' | '0'..='9' | '+' | '-' | '*' | '/' | '^' | '=' | '<' | '>' | '!' | '|' | '&' | '_']+) } / expected!("a symbol name"))
             body:(_ "{" attrs:(_ a:attrs() { a })? _ ";"?
                   py:(_ ps:position!() keyword("py") _ code:string() _ ";" pe:position!() {
                       PySource { code, span: Span { start: ps, end: pe } }
@@ -93,22 +93,23 @@ peg::parser! {
 
         /// `a`, or one `a => b` / `a <=> b`: a deduction does not chain.
         pub rule term() -> Expr =
-            l:logic() d:(_ p:position!() o:deduction_op() _ r:logic() { (p, o, r) })? {
+            l:logic() d:(_ p:position!() o:quiet!{deduction_op()} _ r:logic() { (p, o, r) })? {
                 match d {
                     Some((p, o, r)) => Expr::bin(BinOp::Deduction(o), l, r, op_span(p, BinOp::Deduction(o))),
                     None => l,
                 }
             }
 
-        rule deduction_op() -> DeductionOp = "=>" { DeductionOp::Implies } / "<=>" { DeductionOp::Equiv }
+        rule deduction_op() -> DeductionOp =
+            quiet!{ "=>" { DeductionOp::Implies } / "<=>" { DeductionOp::Equiv } } / expected!("`=>` or `<=>`")
 
         rule logic() -> Expr = precedence!{
-            x:(@) _ p:position!() "||" _ y:@ { Expr::bin(BinOp::Or, x, y, op_span(p, BinOp::Or)) }
+            x:(@) _ p:position!() quiet!{"||"} _ y:@ { Expr::bin(BinOp::Or, x, y, op_span(p, BinOp::Or)) }
             --
-            x:(@) _ p:position!() "&&" _ y:@ { Expr::bin(BinOp::And, x, y, op_span(p, BinOp::And)) }
+            x:(@) _ p:position!() quiet!{"&&"} _ y:@ { Expr::bin(BinOp::And, x, y, op_span(p, BinOp::And)) }
             --
             // Below `&&`, above the comparisons: `!a == b` is `!(a == b)`.
-            p:position!() "!" _ y:@ { Expr::new(ExprKind::Not(Box::new(y)), p, p + 1) }
+            p:position!() quiet!{"!"} _ y:@ { Expr::new(ExprKind::Not(Box::new(y)), p, p + 1) }
             --
             c:compare() { c }
         }
@@ -122,13 +123,14 @@ peg::parser! {
                 }
             }
 
-        rule cmp_op() -> CmpOp =
+        rule cmp_op() -> CmpOp = quiet!{
             keyword("is") { CmpOp::Is } / keyword("in") { CmpOp::In }
             / "==" { CmpOp::Eq } / "!=" { CmpOp::Ne } / "<=" { CmpOp::Le } / ">=" { CmpOp::Ge }
             / "<" { CmpOp::Lt } / ">" { CmpOp::Gt }
+        }
 
         rule bind() -> Expr =
-            e:arith() n:(_ keyword("as") _ s:position!() i:name() { (s, i) })? {
+            e:arith() n:(_ quiet!{keyword("as")} _ s:position!() i:(name() / expected!("a name")) { (s, i) })? {
                 match n {
                     Some((s, name)) => {
                         let span = Span { start: s, end: s + name.len() };
@@ -139,8 +141,8 @@ peg::parser! {
             }
 
         rule arith() -> Expr = precedence!{
-            x:(@) _ p:position!() "+" _ y:@ { Expr::bin(BinOp::Add, x, y, op_span(p, BinOp::Add)) }
-            x:(@) _ p:position!() "-" _ y:@ { Expr::bin(BinOp::Sub, x, y, op_span(p, BinOp::Sub)) }
+            x:(@) _ p:position!() quiet!{"+"} _ y:@ { Expr::bin(BinOp::Add, x, y, op_span(p, BinOp::Add)) }
+            x:(@) _ p:position!() quiet!{"-"} _ y:@ { Expr::bin(BinOp::Sub, x, y, op_span(p, BinOp::Sub)) }
             --
             s:signed_product() { s }
         }
@@ -148,8 +150,8 @@ peg::parser! {
         // Outside the table: a prefix there fires at every operand, and a
         // leading sign takes the whole product, `-a/b` is `-(a/b)`.
         rule signed_product() -> Expr =
-            p:position!() "-" _ s:signed_product() { Expr::new(ExprKind::Neg(Box::new(s)), p, p + 1) }
-            / p:position!() "+" _ x:product() { Expr::new(ExprKind::Pos(Box::new(x)), p, p + 1) }
+            p:position!() quiet!{"-"} _ s:signed_product() { Expr::new(ExprKind::Neg(Box::new(s)), p, p + 1) }
+            / p:position!() quiet!{"+"} _ x:product() { Expr::new(ExprKind::Pos(Box::new(x)), p, p + 1) }
             / product()
 
         rule product() -> Expr =
@@ -157,11 +159,11 @@ peg::parser! {
                 r.into_iter().fold(f, |l, (p, o, x)| Expr::bin(o, l, x, op_span(p, o)))
             }
 
-        rule mul_op() -> BinOp = "*" { BinOp::Mul } / "/" { BinOp::Div }
+        rule mul_op() -> BinOp = quiet!{ "*" { BinOp::Mul } / "/" { BinOp::Div } }
 
         /// `a * -b`
         rule factor() -> Expr =
-            p:position!() "-" _ f:factor() { Expr::new(ExprKind::Neg(Box::new(f)), p, p + 1) }
+            p:position!() quiet!{"-"} _ f:factor() { Expr::new(ExprKind::Neg(Box::new(f)), p, p + 1) }
             / juxt()
 
         /// Tighter than `*`: `a/2x` is `a/(2x)`.
@@ -192,7 +194,7 @@ peg::parser! {
 
         /// Tighter than juxtaposition: `2x^2` is `2*(x^2)`.
         rule power() -> Expr =
-            b:primary() e:(_ p:position!() "^" _ e:exponent() { (p, e) })? {
+            b:primary() e:(_ p:position!() quiet!{"^"} _ e:exponent() { (p, e) })? {
                 match e {
                     Some((p, e)) => Expr::bin(BinOp::Pow, b, e, op_span(p, BinOp::Pow)),
                     None => b,
@@ -201,46 +203,49 @@ peg::parser! {
 
         /// Right-associative and signed: `2^3^2`, `x^-1`.
         rule exponent() -> Expr =
-            p:position!() "-" _ e:exponent() { Expr::new(ExprKind::Neg(Box::new(e)), p, p + 1) }
+            p:position!() quiet!{"-"} _ e:exponent() { Expr::new(ExprKind::Neg(Box::new(e)), p, p + 1) }
             / power()
 
         rule primary() -> Expr =
-            s:position!() "(" _ e:logic() _ ")" end:position!() {
+            s:position!() quiet!{"("} _ e:logic() _ ")" end:position!() {
                 Expr::new(ExprKind::Group(Box::new(e)), s, end)
             }
             / solve_block()
             / call()
-            / s:position!() ".." end:position!() { Expr::new(ExprKind::ArgList, s, end) }
+            / s:position!() quiet!{".."} end:position!() { Expr::new(ExprKind::ArgList, s, end) }
             / num()
             / s:position!() n:name() end:position!() { Expr::new(ExprKind::Name(n), s, end) }
             / s:position!() t:string() end:position!() { Expr::new(ExprKind::Str(t), s, end) }
+            / expected!("an expression")
 
         rule num() -> Expr =
-            s:position!() n:$(['0'..='9']+ ("." ['0'..='9']+)?) end:position!() {
+            s:position!() n:quiet!{$(['0'..='9']+ ("." ['0'..='9']+)?)} end:position!() {
                 let value = from_decimal_str(n).expect("the grammar admits only decimal digits");
                 Expr::new(ExprKind::Num(value), s, end)
             }
 
         rule name() -> solver::CompactString =
-            !reserved_word() n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']+) { n.into() }
+            quiet!{ !reserved_word() n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']+) { n.into() } }
 
         rule call() -> Expr =
-            s:position!() n:$(['a'..='z' | 'A'..='Z'] ['a'..='z' | 'A'..='Z' | '0'..='9' | '_']*)
-            "(" _ args:commasep(<logic()>) _ ")" end:position!() {
+            s:position!() n:quiet!{n:$(['a'..='z' | 'A'..='Z'] ['a'..='z' | 'A'..='Z' | '0'..='9' | '_']*) "(" { n }}
+            _ args:commasep(<logic()>) _ ")" end:position!() {
                 Expr::new(ExprKind::Call { name: n.into(), args }, s, end)
             }
 
         rule solve_block() -> Expr =
-            s:position!() keyword("find") _ "(" _ vars:commasep(<logic()>) _ ")"
-            _ "{" _ givens:semicolonsep(<term()>) _ "}" end:position!() {
+            s:position!() quiet!{keyword("find") _ "("} _ vars:commasep(<logic()>) _ ")"
+            _ quiet!{"{"} _ givens:semicolonsep(<term()>) _ "}" end:position!() {
                 Expr::new(ExprKind::Solve { vars, givens }, s, end)
             }
 
-        rule string() -> String = "\"" s:quoted_char()* "\"" { s.into_iter().collect() }
+        rule string() -> String =
+            quiet!{"\""} s:quoted_char()* "\"" { s.into_iter().collect() } / expected!("a string")
 
-        rule quoted_char() -> char =
+        rule quoted_char() -> char = quiet!{
             "\\\"" { '\"' } / "\\\\" { '\\' }
             / !("\"" / "\\") c:$([_]) { c.chars().next().expect("one char") }
+        }
     }
 }
 
