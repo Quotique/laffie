@@ -78,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer part with the store index it was bound to.
 
 ### Fixed
+- `x is variable` is false on a non-variable, so a rule guarded by it spawns no subtask.
 - A subtask retries goal-bound rules the parent's goal exhausted on its terms.
 - A long sum matches a pattern with a rest param within the match budget;
   two or more rest params split sums of up to 7 terms only.

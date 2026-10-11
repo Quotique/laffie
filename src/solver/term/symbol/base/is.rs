@@ -41,9 +41,12 @@ pub fn is(root: TermRef, ctx: TruthCtx) -> Truth {
                 Truth::False
             }
         }
-        Atom::Symbol(s) if s == "variable" && matches!(lhs.data(), Atom::Variable(_)) => {
-            Truth::True
-        }
+        // Syntactic like `number`: only an unbound param is undecidable.
+        Atom::Symbol(s) if s == "variable" => match lhs.data() {
+            Atom::Variable(_) => Truth::True,
+            Atom::Param(_) => Truth::Unknown,
+            _ => Truth::False,
+        },
         // Unlike `even`, a symbolic operand is False — literalness is decidable.
         Atom::Symbol(s) if s == "number" => {
             if lhs.data().number().is_some() {
@@ -147,15 +150,15 @@ mod tests {
     }
 
     #[test]
-    fn is_variable_unknown_for_number() {
+    fn is_variable_false_for_number() {
         let t = term_with_vars("5 is variable");
-        assert_eq!(is(t.term(), TruthCtx::default()), Truth::Unknown);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
     }
 
     #[test]
-    fn is_variable_unknown_for_compound() {
+    fn is_variable_false_for_compound() {
         let t = term_with_vars("x^2 is variable");
-        assert_eq!(is(t.term(), TruthCtx::default()), Truth::Unknown);
+        assert_eq!(is(t.term(), TruthCtx::default()), Truth::False);
     }
 
     #[test]
