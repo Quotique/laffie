@@ -85,3 +85,15 @@ task {
     0 < b;
     0 < c;
 }
+
+task {
+    goal prove(0 <= a*b*(a + b - (2*c)) + b*c*(b + c - (2*a)) + a*c*(a + c - (2*b)));
+    id "iskra:минус:076";
+
+    c in Reals;
+    a in Reals;
+    b in Reals;
+    0 < b;
+    0 < a;
+    0 < c;
+}

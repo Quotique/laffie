@@ -18,15 +18,3 @@ task {
     a/(b + c) + b/(c + a) + c/(a + b) == 1;
 }
 
-task {
-    goal prove(a*b*c != 0);
-    id "iskra:равно:001";
-
-    a < 0;
-    b < 0;
-    0 < c;
-    a in Reals;
-    b in Reals;
-    c in Reals;
-}
-

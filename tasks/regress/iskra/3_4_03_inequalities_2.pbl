@@ -135,3 +135,44 @@ task {
     a <= b + c;
     0 <= a;
 }
+
+task {
+    goal prove(0 < 4*sqrt(a + b) - (8*b) + 28);
+    id "iskra:меньше:65";
+
+    b in Reals;
+    a in Reals;
+    9 <= a + b;
+    b < 5;
+}
+
+task {
+    goal prove(sqrt(4*a + 1) + sqrt(4*b + 1) + sqrt(4*c + 1) < 5);
+    id "iskra:меньше:68";
+
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a + b + c == 1;
+}
+
+task {
+    goal prove(sqrt(2*a + 1) + sqrt(2*b + 1) + sqrt(2*c + 1) < 15);
+    id "iskra:меньше:69";
+
+    c in Reals;
+    b in Reals;
+    a in Reals;
+    a + b + c == 1;
+}
+
+task {
+    goal prove(sqrt(4*a + 1) + sqrt(4*b + 1) <= 4);
+    id "iskra:плюс:080";
+
+    b in Reals;
+    a in Reals;
+    0 < a;
+    0 < b;
+    a + b == 1;
+}

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Inequality absorption lemmas: `|f·A·B| ≤ |f|/2·(A² + B²)`, the rest a subgoal.
+- Lemmas: a sum of roots, a linear constraint from a premise, a term bounded by a premise, a nonzero product.
 - Iskra task book import: `scripts/iskra_import.py`, `scripts/run_report.py`, pilot
   corpus by the task book's sections in `tasks/*/iskra/`.
 - Definedness conditions (ОДЗ) of a `prove` task: `attr premise` rules read
@@ -28,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A parse error says what was expected in words: ``expected `)` ``, `expected an expression`.
 - API: `parser::{term, rule, task, symbol}` replace `parser::lang` and the `*Parser` types;
   `DirectoryParser` is `DirectoryLoader`.
+- AM-GM triple lemmas match the canonical `0 <= S` goal, not its literal form.
 - A rule is indexed by the rarest function symbol of its pattern, not by the
   symbol declared above it; a pattern with no function symbol is a load error.
   API: `Rule::symbol`, `with_func_symbol` and the `AnySymbol` symbol are gone.

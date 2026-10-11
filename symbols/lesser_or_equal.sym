@@ -137,3 +137,28 @@ rule {
     0 <= e,
     0 <= d;
 }
+
+// Член с корнем оценивается нижней границей подкоренного из посылки.
+rule {
+    attr level(2),goal(prove(0 <= c + e*sqrt(u)));
+
+    h <= u => 0 <= c + e*sqrt(u);
+
+    e is number,
+    0 < e,
+    h is number,
+    0 <= h,
+    0 <= c + e*sqrt(h);
+}
+
+// Член с положительным коэффициентом оценивается нижней границей из посылки.
+rule {
+    attr level(2),goal(prove(0 <= c + e*y));
+
+    h <= y => 0 <= c + e*y;
+
+    e is number,
+    0 < e,
+    h is number,
+    0 <= c + e*h;
+}

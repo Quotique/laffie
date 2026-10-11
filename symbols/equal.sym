@@ -147,3 +147,39 @@ rule {
     c is known,
     a != c;
 }
+
+// Сумма корней: (Σ√uᵢ)² ≤ n·Σuᵢ.
+rule {
+    attr level(2),goal(prove(x));
+
+    0 < d - sqrt(p*a + q) - sqrt(p*b + q) - sqrt(p*c + q) <=> true;
+
+    0 < d,
+    0 < d^2 - 3*p*a - 3*p*b - 3*p*c - 9*q;
+}
+
+rule {
+    attr level(2),goal(prove(x));
+
+    0 <= d - sqrt(p*a + q) - sqrt(p*b + q) <=> true;
+
+    0 <= d,
+    0 <= d^2 - 2*p*a - 2*p*b - 4*q;
+}
+
+// Линейная связь из посылки: сумма в цели заменяется своим значением.
+rule {
+    attr level(2),goal(prove(0 < d + k*a + k*b + k*c));
+
+    a + b + c == s => 0 < d + k*a + k*b + k*c;
+
+    0 < d + k*s;
+}
+
+rule {
+    attr level(2),goal(prove(0 <= d + k*a + k*b));
+
+    a + b == s => 0 <= d + k*a + k*b;
+
+    0 <= d + k*s;
+}
