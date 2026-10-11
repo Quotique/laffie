@@ -11,9 +11,9 @@ use solver::{
 };
 
 use crate::{
-    LoadError, LoadFailure, Location, ParserError, RuleParser, SymbolParser, TaskParser, Tree,
-    grammar::{TOKEN_DECLARE, TOKEN_RULE, TOKEN_TASK},
-    lang,
+    LoadError, LoadFailure, ParserError,
+    source::Source,
+    syntax::{Item, Span, grammar::parse},
 };
 
 /// Parsed value plus every non-fatal error collected during a directory load.
@@ -22,12 +22,12 @@ pub struct LoadReport<T> {
     pub errors: Vec<LoadError>,
 }
 
-pub struct DirectoryParser {
+pub struct DirectoryLoader {
     symbols_path: PathBuf,
     tasks_path:   PathBuf,
 }
 
-impl DirectoryParser {
+impl DirectoryLoader {
     pub fn new<P: AsRef<Path>>(symbols_path: P, tasks_path: P) -> Self {
         Self {
             symbols_path: PathBuf::from(symbols_path.as_ref()),
@@ -43,11 +43,9 @@ impl DirectoryParser {
         // Pass 1: register every symbol so rules can resolve any of them; the
         // symbol's Python runs here, once.
         for file in &files {
-            for block in &file.blocks {
-                if block.data().symbol != TOKEN_DECLARE {
-                    continue;
-                }
-                match SymbolParser::from(block).parse() {
+            for item in &file.items {
+                let Item::Symbol(symbol) = item else { continue };
+                match symbol.build(&file.source) {
                     Ok(program) => {
                         program.register();
                     }
@@ -57,17 +55,12 @@ impl DirectoryParser {
         }
 
         // Pass 2: parse rules.
-        let mut parsed: Vec<(Rule, (&ParsedFile, &Location))> = Vec::new();
+        let mut parsed: Vec<(Rule, (&ParsedFile, Span))> = Vec::new();
         for file in &files {
-            for block in &file.blocks {
-                if block.data().symbol != TOKEN_RULE {
-                    continue;
-                }
-                match RuleParser::from(block).parse() {
-                    Ok(rules) => {
-                        let origin = (file, &block.data().location);
-                        parsed.extend(rules.into_iter().map(|r| (r, origin)));
-                    }
+            for item in &file.items {
+                let Item::Rule(rule) = item else { continue };
+                match rule.build(&file.source) {
+                    Ok(rules) => parsed.extend(rules.into_iter().map(|r| (r, (file, rule.span)))),
                     Err(e) => errors.push(file.error(&e)),
                 }
             }
@@ -78,11 +71,8 @@ impl DirectoryParser {
             Ok(engine) => Some(engine),
             Err(rejected) => {
                 errors.extend(rejected.iter().map(|(at, r)| {
-                    let (file, loc) = origin[*at];
-                    file.error(&ParserError {
-                        loc: loc.clone(),
-                        msg: r.to_string(),
-                    })
+                    let (file, span) = origin[*at];
+                    file.error(&file.source.error(span, r))
                 }));
                 None
             }
@@ -99,11 +89,9 @@ impl DirectoryParser {
 
         let mut result = Vec::new();
         for file in &files {
-            for block in &file.blocks {
-                if block.data().symbol != TOKEN_TASK {
-                    continue;
-                }
-                match TaskParser::from(block).parse() {
+            for item in &file.items {
+                let Item::Task(task) = item else { continue };
+                match task.build(&file.source) {
                     Ok(mut t) => {
                         trace!(
                             "New task: [{:x}] {} [{}]",
@@ -158,10 +146,14 @@ impl DirectoryParser {
                         continue;
                     }
                 };
-                match lang::any(&src) {
-                    Ok(blocks) => files.push(ParsedFile { path, src, blocks }),
+                match parse::file(&src) {
+                    Ok(items) => files.push(ParsedFile {
+                        path,
+                        source: Source::new(src),
+                        items,
+                    }),
                     Err(e) => errors.push(LoadError {
-                        message: e.error_string(&src, Some(&path)),
+                        message: ParserError::from(e).error_string(&src, Some(&path)),
                     }),
                 }
             }
@@ -170,17 +162,17 @@ impl DirectoryParser {
     }
 }
 
-/// A source file read once, split into its top-level blocks.
+/// A source file read once, split into its top-level items.
 struct ParsedFile {
     path:   PathBuf,
-    src:    String,
-    blocks: Vec<Tree>,
+    source: Source,
+    items:  Vec<Item>,
 }
 
 impl ParsedFile {
     fn error(&self, e: &ParserError) -> LoadError {
         LoadError {
-            message: e.error_string(&self.src, Some(&self.path)),
+            message: e.error_string(self.source.text(), Some(&self.path)),
         }
     }
 }
@@ -203,7 +195,7 @@ mod tests {
     }
 
     fn corpus_errors(dir: &Path) -> Vec<String> {
-        let Err(LoadFailure::Corpus(errors)) = DirectoryParser::new(dir, dir).load_rules() else {
+        let Err(LoadFailure::Corpus(errors)) = DirectoryLoader::new(dir, dir).load_rules() else {
             panic!("a rejected rule must not yield a base");
         };
         errors.into_iter().map(|e| e.message).collect()
@@ -302,7 +294,7 @@ mod tests {
             ],
         );
 
-        let engine = DirectoryParser::new(&dir, &dir)
+        let engine = DirectoryLoader::new(&dir, &dir)
             .load_rules()
             .expect("symbols resolve across files");
         assert_eq!(engine.iter().count(), 1);
@@ -335,7 +327,7 @@ mod tests {
         )
         .unwrap();
 
-        let engine = DirectoryParser::new(&dir, &dir)
+        let engine = DirectoryLoader::new(&dir, &dir)
             .load_rules()
             .expect("a forward reference resolves without deferral");
         assert_eq!(engine.iter().count(), 2);

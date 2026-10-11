@@ -1,7 +1,6 @@
 use std::{collections::HashSet, str::FromStr};
 
 use solver::{
-    CompactString,
     rule::{Rule, RuleAttr, RuleAttrValue, RuleBuilder},
     term::{Atom, Term, TermBuf, TermMut, TermRef, var},
 };
@@ -13,183 +12,10 @@ use crate::{
     syntax::{self, BinOp, Expr},
 };
 
-use super::{Node, Tree, term::TermParser};
-
-pub struct RuleParser<'a> {
-    syntax_tree: &'a Tree,
-}
-
-impl<'a> From<&'a Tree> for RuleParser<'a> {
-    fn from(syntax_tree: &'a Tree) -> Self {
-        Self { syntax_tree }
-    }
-}
-
-impl<'a> RuleParser<'a> {
-    pub fn parse(self) -> Result<Vec<Rule>, ParserError> {
-        if self.syntax_tree.root().data().symbol != "Rule" {
-            return Err(ParserError {
-                loc: self.syntax_tree.root().data().location.clone(),
-                msg: "expected 'rule'".to_owned(),
-            });
-        }
-        let mut parser = TermParser::default();
-
-        let mut pattern_term: Option<TermBuf> = None;
-        let mut pattern_loc = None;
-        let mut requirements: Vec<TermBuf> = vec![];
-        let mut attributes: Vec<(RuleAttr, RuleAttrValue)> = vec![];
-
-        for child in self.syntax_tree.iter() {
-            match child.data().symbol.as_str() {
-                "=>" | "<=>" => {
-                    if pattern_term.replace(parser.try_parse(child)?).is_some() {
-                        return Err(ParserError {
-                            loc: child.data().location.clone(),
-                            msg: "only one rule template is allowed".to_owned(),
-                        });
-                    }
-                    pattern_loc = Some(child.data().location.clone());
-                }
-                "Predicates" => {
-                    for req in child.iter() {
-                        requirements.push(parser.try_parse(req)?);
-                    }
-                }
-                "Attributes" => {
-                    for attr in child.iter() {
-                        attributes.push(RuleParser::parse_attribute(attr)?);
-                    }
-                }
-                _ => {
-                    error!("{:?}", child.data().symbol);
-                    return Err(ParserError {
-                        loc: child.data().location.clone(),
-                        msg: "unexpected word".to_owned(),
-                    });
-                }
-            }
-        }
-
-        if let Some(pat) = pattern_term.as_mut() {
-            promote_body_find_targets(pat, &mut requirements);
-        }
-
-        let mut builder = RuleBuilder::default();
-        if let Some(pat) = pattern_term {
-            let loc = pattern_loc.unwrap_or_else(|| self.syntax_tree.data().location.clone());
-            builder = builder.with_term(pat).map_err(|e| ParserError {
-                loc,
-                msg: e.to_string(),
-            })?;
-        }
-        for req in requirements {
-            builder = builder.with_require(req);
-        }
-        for (attr, value) in attributes {
-            builder = builder.with_attribute(attr, value);
-        }
-
-        builder.build().map_err(|e| ParserError {
-            loc: self.syntax_tree.data().location.clone(),
-            msg: e.to_string(),
-        })
-    }
-
-    fn parse_attribute(attr: &Node) -> Result<(RuleAttr, RuleAttrValue), ParserError> {
-        match attr.data().symbol.as_str() {
-            "subtree" | "equivalence" | "replace" => Ok((
-                RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
-                RuleAttrValue::None,
-            )),
-            "level" => {
-                if attr.degree() != 1 {
-                    return Err(ParserError {
-                        loc: attr.data().location.clone(),
-                        msg: "must have one argument".to_owned(),
-                    });
-                }
-                let data = attr.front().unwrap().data();
-
-                Ok((
-                    RuleAttr::Level,
-                    RuleAttrValue::UInt(data.symbol.parse::<u64>().map_err(|_| ParserError {
-                        loc: data.location.clone(),
-                        msg: "must be u64".to_owned(),
-                    })?),
-                ))
-            }
-            "goal" | "zero" | "one" => {
-                if attr.degree() != 1 {
-                    return Err(ParserError {
-                        loc: attr.data().location.clone(),
-                        msg: "must have one argument".to_owned(),
-                    });
-                }
-
-                let goal = TermParser::default().try_parse(attr.front().unwrap())?;
-                Ok((
-                    RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
-                    RuleAttrValue::Goal(goal),
-                ))
-            }
-            "id" => {
-                if attr.degree() != 1 {
-                    return Err(ParserError {
-                        loc: attr.data().location.clone(),
-                        msg: "must have one argument".to_owned(),
-                    });
-                }
-                let data = attr.front().unwrap().data();
-
-                Ok((
-                    RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
-                    RuleAttrValue::Str(CompactString::from(data.symbol.as_str())),
-                ))
-            }
-            "block" => {
-                if attr.degree() != 1 {
-                    return Err(ParserError {
-                        loc: attr.data().location.clone(),
-                        msg: "must have one argument".to_owned(),
-                    });
-                }
-                let data = attr.front().unwrap().data();
-
-                Ok((
-                    RuleAttr::from_str(attr.data().symbol.as_str()).unwrap(),
-                    RuleAttrValue::Str(CompactString::from(data.symbol.as_str())),
-                ))
-            }
-            "normalize" => {
-                if attr.degree() != 1 {
-                    return Err(ParserError {
-                        loc: attr.data().location.clone(),
-                        msg: "must have one argument".to_owned(),
-                    });
-                }
-                let data = attr.front().unwrap().data();
-
-                Ok((
-                    RuleAttr::Normalize,
-                    RuleAttrValue::UInt(data.symbol.parse::<u64>().map_err(|_| ParserError {
-                        loc: data.location.clone(),
-                        msg: "must be u64".to_owned(),
-                    })?),
-                ))
-            }
-            _ => Err(ParserError {
-                loc: attr.data().location.clone(),
-                msg: "unknown attribute".to_owned(),
-            }),
-        }
-    }
-}
-
 impl syntax::Rule {
     pub(crate) fn build(&self, src: &Source) -> Result<Vec<Rule>, ParserError> {
         let action = Expr::bin(
-            BinOp::Ded(self.op),
+            BinOp::Deduction(self.op),
             self.pattern.clone(),
             self.resolution.clone(),
             self.op_span,
@@ -306,20 +132,15 @@ mod tests {
         term::{TermBuf, param},
     };
 
-    use crate::lang;
-
-    use super::*;
-
     #[test]
-    fn rule_parse_test() {
+    fn a_rule_reads_attributes_action_and_requirements() {
         let test = r#"rule {
                         attr replace,level(1);
                         a + x == 0 => x == -a;
                         a!=0;
                       }"#;
 
-        let states = lang::lang_rule(test).unwrap();
-        let result = RuleParser::from(&states).parse();
+        let result = crate::rule(test);
         assert!(result.is_ok());
 
         let mut rules = result.unwrap();
@@ -359,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn rule_parse_2_test() {
+    fn an_equivalence_marks_the_rule_and_keeps_its_goal() {
         let test = r#"rule {
                     attr level(0),goal(prove(a/b is known));
                     a/b is known <=> true;
@@ -367,8 +188,7 @@ mod tests {
                     b is known
                 }"#;
 
-        let states = lang::lang_rule(test).unwrap();
-        let result = RuleParser::from(&states).parse();
+        let result = crate::rule(test);
         assert!(result.is_ok());
 
         let mut rules = result.unwrap();
@@ -407,15 +227,14 @@ mod tests {
     }
 
     #[test]
-    fn arg_reduction_test() {
+    fn zero_and_one_expand_a_rule_into_three() {
         let test = r#"rule {
                         attr replace,level(1),one(a),zero(b);
                         a * x + b == 0 => x == -b / a;
                         a!=0;
                       }"#;
 
-        let states = lang::lang_rule(test).unwrap();
-        let result = RuleParser::from(&states).parse();
+        let result = crate::rule(test);
         assert!(result.is_ok());
 
         let rules = result.unwrap();
@@ -423,15 +242,14 @@ mod tests {
     }
 
     #[test]
-    fn attr_parse_test() {
+    fn id_block_and_normalize_keep_their_values() {
         let test = r#"rule {
             attr replace,level(1),id(move_left),block(hello),block(world),normalize(4);
             a == b => a - b == 0;
             b != 0;
         }"#;
 
-        let states = lang::lang_rule(test).map_err(|e| println!("{e}")).unwrap();
-        let result = RuleParser::from(&states).parse();
+        let result = crate::rule(test);
         assert!(result.is_ok());
 
         let mut rules = result.unwrap();

@@ -2,7 +2,7 @@
 
 use std::{fs, sync::Arc, time::Duration};
 
-use parser::DirectoryParser;
+use parser::DirectoryLoader;
 use solver::engine::{Limits, Solver, TracerHub};
 
 /// The answer to the single task in `src`, solved against the real corpus.
@@ -13,7 +13,7 @@ fn answer(name: &str, src: &str) -> Option<String> {
     fs::create_dir_all(&dir).unwrap();
     fs::write(dir.join("t.pbl"), src).unwrap();
 
-    let parser = DirectoryParser::new(root.join("symbols"), dir.clone());
+    let parser = DirectoryLoader::new(root.join("symbols"), dir.clone());
     let rules = parser.load_rules().expect("the symbols corpus loads clean");
     let task = parser.load_tasks().unwrap().value.pop().expect("one task");
     let (limits, _cancel) = Limits::init(10_000, Duration::from_secs(60));

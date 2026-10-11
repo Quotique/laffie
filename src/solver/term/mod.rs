@@ -20,23 +20,12 @@ pub use symbol::{
 
 #[cfg(test)]
 pub fn term_with_params(text: &'static str) -> TermBuf {
-    let states = parser::lang::terms(text).unwrap();
-    let term = parser::TermParser::default().try_parse(&states[0]).unwrap();
-
-    rebridge(&term)
+    rebridge(&parser::term(text, parser::Names::Params).unwrap())
 }
 
 #[cfg(test)]
 pub fn term_with_vars(text: &'static str) -> TermBuf {
-    let states = parser::lang::terms(text)
-        .map_err(|e| println!("parsing error {text}: {e}"))
-        .unwrap();
-    let term = parser::TermParser::default()
-        .with_variables()
-        .try_parse(&states[0])
-        .unwrap();
-
-    rebridge(&term)
+    rebridge(&parser::term(text, parser::Names::Variables).unwrap())
 }
 
 /// Bridge a value produced by the `parser` dev-dependency into this crate's own

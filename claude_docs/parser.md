@@ -8,57 +8,39 @@ PEG grammar (the `peg` crate) for `.sym` (symbols + rules) and `.pbl` (tasks).
 
 ```
 src/parser/
-├── lib.rs          # Location, NodeData, Tree/Node aliases over trees::Tree<NodeData>
-├── error.rs        # ParserError { loc, msg } + error_string(); PegError
-├── grammar.rs      # the PEG itself: tokens → Tree<Token> with byte offsets
-├── lang.rs         # the five entry points; wraps the grammar and annotates Locations
-├── term.rs         # TermParser  — AST → TermBuf
-├── rule.rs         # RuleParser  — AST → Vec<Rule> via RuleBuilder; syntax::Rule::build → Vec<Rule>
-├── symbol.rs       # SymbolParser — AST → SymbolProgram, including embedded Python; syntax::Symbol::build → SymbolProgram
-├── task.rs         # TaskParser  — AST → Task via TaskBuilder; syntax::Task::build → Task
+├── lib.rs          # Location; the entry points term / rule / task / symbol
+├── error.rs        # ParserError { loc, msg } + error_string(); LoadError, LoadFailure
+├── syntax/         # mod.rs: Span, Expr, Item (syntax::Task/Rule/Symbol); grammar.rs: the PEG `parse`
+├── source.rs       # Source — spans back to Locations, slices, span errors
+├── scope.rs        # TermScope — `Expr` → TermBuf, resolving names; Names
+├── rule.rs         # syntax::Rule::build → Vec<Rule> via RuleBuilder; find-target promotion
+├── task.rs         # syntax::Task::build → Task via TaskBuilder
+├── symbol.rs       # syntax::Symbol::build → SymbolProgram; PySource::calculator runs embedded Python
 ├── py_term.rs      # the `Term` class injected into an embedded Python program
-├── dir_loader.rs   # DirectoryParser — loads a tree of .sym/.pbl, collecting errors
-├── syntax/         # the rewrite's grammar `parse` (precedence!), `Expr` and `Item` (syntax::Task/Rule/Symbol); not yet used by the loader
-├── scope.rs        # TermScope — `Expr` → TermBuf, resolving names; `parser::term` goes through it
-├── source.rs       # Source — spans back to Locations
-├── legacy/         # test-only: verbatim copy of the pre-rewrite pipeline (grammar … task)
-└── corpus_diff.rs  # test-only: the corpus must build identically through legacy and current
+└── dir_loader.rs   # DirectoryLoader — loads a tree of .sym/.pbl, collecting errors
 ```
 
-## Entry points — `lang.rs`
+## Entry points — `lib.rs`
 
 | Function | Parses |
 |----------|--------|
-| `symbol(text)` | one `symbol` declaration |
-| `terms(text)` | semicolon-separated terms |
-| `lang_rule(text)` | one `rule` block |
+| `term(text, names)` | one term; `Names::Params` for rule-like text, `Names::Variables` for task-like |
+| `rule(text)` | one `rule` block → `Vec<Rule>` (`zero`/`one` attributes expand it) |
 | `task(text)` | one `task` block |
-| `any(text)` | mixed content: tasks, rules, symbols |
+| `symbol(text)` | one `symbol` declaration, unregistered; its `py` block runs |
 
 Each returns `Result<_, ParserError>`, and `ParserError` carries the source
-`Location` (row, col, len) so a message can point at the offending text.
+`Location` (row, col) so a message can point at the offending text.
 
 ## Key Types
 
-### lib.rs
 | Type | What it is |
 |------|------------|
-| `Location` | `{ col, row, len }` — where a node came from. |
-| `NodeData` | `{ symbol, location }` — an AST node after annotation. |
-| `Tree` / `Node` | `trees::Tree<NodeData>` / `trees::Node<NodeData>`. |
-
-### the four parsers
-| Type | What it is |
-|------|------------|
-| `TermParser` | `with_variables()` for tasks (bare identifiers become variables), `with_params()` for rules; `try_parse(&Node) -> TermBuf`. |
-| `RuleParser` | Reads attributes, the `=>` / `<=>` body, then requirements. Helpers promote `find` targets and collect params out of the body. |
-| `SymbolParser` | Name + attributes → `SymbolProgram`. A `py "…"` block runs at parse time and its `calculator` becomes the symbol's. |
-| `TaskParser` | Goal, id, text, expected answers, conditions → `Task` through `TaskBuilder`. |
-
-### dir_loader.rs
-| Type | What it is |
-|------|------------|
-| `DirectoryParser` | `new(symbols_path, tasks_path)`, then `load_rules()` / `load_tasks()`. |
+| `syntax::Expr` | `{ kind, span }` — an expression before names are resolved; an operation's span is its operator's. |
+| `syntax::Item` | a top-level `Task` / `Rule` / `Symbol`; attributes stay `Expr` until `build` checks them. |
+| `Source` | the parsed text, owned: `loc(span)`, `slice(span)`, `error(span, msg)`, `uint(span)`, `ident(expr)`. |
+| `TermScope` | resolves names against the symbol registry. One scope spans a whole rule (pattern and requirements share `as` params and `..` ids) or one task term; task ids depend on it. |
+| `DirectoryLoader` | `new(symbols_path, tasks_path)`, then `load_rules()` / `load_tasks()`. |
 | `LoadReport<T>` | `{ value, errors }` from `load_tasks()`: a bad task file lands in `errors`, the good tasks in `value`. |
 | `LoadFailure` | `load_rules()`'s error: `Io`, or `Corpus(errors)` — any problem in the `.sym` corpus yields no rule base, and every problem is listed. |
 | `LoadError` | `{ message }`, starting with `file:row:col` and carrying the snippet. |
@@ -75,35 +57,35 @@ rule   { [<attrs>;] <term> (=> | <=>) <term>; [<requirement>, …;] }
 
 Rules are top-level blocks in a `.sym` file, not nested inside `symbol`.
 
-### Operator precedence, lowest first
+### Operator precedence, lowest first (`syntax/grammar.rs`)
 
 | Rule | Operators | Associativity |
 |------|-----------|---------------|
-| `deduction` | `=>`, `<=>` | — |
-| `or` | `\|\|` | left (`#cache_left_rec`) |
-| `and` | `&&` | left |
-| `predicate` | `is`, `in`, `==`, `!=`, `<=`, `>=`, `<`, `>` | left |
+| `term` | `=>`, `<=>` | does not chain |
+| `logic` | `\|\|`, then `&&`, then prefix `!` | left |
+| `compare` | `is`, `in`, `==`, `!=`, `<=`, `>=`, `<`, `>` | does not chain |
 | `bind` | `as` | — |
-| `sum` | `+`, `-` | left |
-| `unary` | prefix `-`, `+`, `!` | — |
+| `arith` | `+`, `-` | left |
+| `signed_product` | a leading `-`/`+` takes the whole product: `-a/b` is `-(a/b)` | — |
 | `product` | `*`, `/` | left |
-| `power` | `^` | right |
-| `atom` | literals, identifiers, `(…)`, calls | — |
+| `factor` | prefix `-`: `a * -b` | — |
+| `juxt` | `2x`, `2(x+1)`, `(a)(b)`: a number or a parenthesis on the left | left |
+| `power` | `^`, signed exponent | right |
+| `primary` | `(…)`, `find(…) {…}`, calls, `..`, numbers, names, strings | — |
 
 ## Pipeline
 
 ```
 .sym / .pbl text
-  → grammar.rs   Tree<Token>     (byte offsets)
-  → lang.rs      Tree<NodeData>  (row/col/len Locations)
-  → TermParser / RuleParser / SymbolParser / TaskParser
+  → syntax::grammar::parse::file   Vec<Item>   (byte spans)
+  → {Task,Rule,Symbol}::build(&Source)   TermScope resolves names
   → solver types: TermBuf, Rule, SymbolProgram, Task
 ```
 
 `load_rules()` makes two passes over the `.sym` files: symbols first, so that
 every `SymbolProgram` is in the global registry before any rule mentioning it
-is parsed. Then every rule, paired with its block's location, is collected
-into a `RulesEngine` in one go; a rejection comes back with the rule's input
+is built. Then every rule, paired with its item's span, is collected into a
+`RulesEngine` in one go; a rejection comes back with the rule's input
 position, which `load_rules` maps to the file and line.
 
 ## Gotchas worth knowing before you edit

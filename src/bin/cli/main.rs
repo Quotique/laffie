@@ -16,7 +16,7 @@ use colored::*;
 use itertools::Itertools;
 
 use database::{Db, Run, Task as DbTask, id_from_hex, id_to_hex};
-use parser::DirectoryParser;
+use parser::DirectoryLoader;
 use solver::{
     engine::{Limits, SolutionStatus, Solver, TracerHub},
     task::{Answer, Task as SolverTask},
@@ -136,7 +136,7 @@ fn main() -> ExitCode {
         println!("Tasks dir is not specified");
         return ExitCode::FAILURE;
     };
-    let parser = DirectoryParser::new(symbols_dir, tasks_dir);
+    let parser = DirectoryLoader::new(symbols_dir, tasks_dir);
 
     let rules_engine = match parser.load_rules() {
         Ok(engine) => engine,

@@ -109,13 +109,15 @@ term  ← rule  ← task
 
 ## Структура `parser`
 
-`src/parser/` содержит PEG-грамматику и постобработку:
+`src/parser/` содержит PEG-грамматику и сборку типов `solver`:
 
 | Файл | Что |
 |------|-----|
-| `grammar.rs` | PEG-грамматика (`peg`-крейт). |
-| `lang.rs` | Точки входа: `task`, `rule`, `symbol`, `terms`. |
-| `term.rs`, `task.rs`, `rule.rs`, `symbol.rs` | Постобработка деревьев в типы из `solver`. |
+| `syntax/` | PEG-грамматика (`peg`-крейт) и синтаксис до разрешения имён: `Expr`, `Item`. |
+| `lib.rs` | Точки входа: `term`, `rule`, `task`, `symbol`. |
+| `scope.rs` | `TermScope`: `Expr` → терм, имена — символы, параметры или переменные. |
+| `task.rs`, `rule.rs`, `symbol.rs` | Сборка `Task`, `Rule`, `SymbolProgram` из синтаксиса. |
+| `source.rs` | Исходный текст: позиции и ошибки по спанам. |
 | `dir_loader.rs` | Обход каталогов с `.sym`/`.pbl` файлами. |
 | `error.rs` | Тип ошибок парсера и форматирование сообщений. |
 

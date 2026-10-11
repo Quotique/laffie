@@ -65,7 +65,7 @@ pub(crate) enum BinOp {
     And,
     Or,
     Cmp(CmpOp),
-    Ded(DedOp),
+    Deduction(DeductionOp),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -81,7 +81,7 @@ pub(crate) enum CmpOp {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum DedOp {
+pub(crate) enum DeductionOp {
     Implies,
     Equiv,
 }
@@ -97,12 +97,12 @@ pub(crate) enum Item {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Task {
-    pub span:     Span,
-    pub goal:     Expr,
-    pub name:     Option<String>,
-    pub text:     String,
-    pub expected: Vec<Expr>,
-    pub givens:   Vec<Expr>,
+    pub span:    Span,
+    pub goal:    Expr,
+    pub name:    Option<String>,
+    pub text:    String,
+    pub answers: Vec<Expr>,
+    pub givens:  Vec<Expr>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -110,7 +110,7 @@ pub(crate) struct Rule {
     pub span:         Span,
     pub attrs:        Vec<Expr>,
     pub pattern:      Expr,
-    pub op:           DedOp,
+    pub op:           DeductionOp,
     pub op_span:      Span,
     pub resolution:   Expr,
     pub requirements: Vec<Expr>,
@@ -191,8 +191,8 @@ impl BinOp {
             BinOp::And => "&&",
             BinOp::Or => "||",
             BinOp::Cmp(op) => op.symbol(),
-            BinOp::Ded(DedOp::Implies) => "=>",
-            BinOp::Ded(DedOp::Equiv) => "<=>",
+            BinOp::Deduction(DeductionOp::Implies) => "=>",
+            BinOp::Deduction(DeductionOp::Equiv) => "<=>",
         }
     }
 }

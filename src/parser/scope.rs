@@ -23,14 +23,14 @@ pub enum Names {
 /// INVARIANT: one scope spans one task term or a whole rule (action and
 /// requirements share `as` params and `..` ids); task ids depend on it.
 pub(crate) struct TermScope<'s> {
-    src:             &'s Source<'s>,
+    src:             &'s Source,
     names:           Names,
     params:          HashMap<Param, TermBuf>,
     last_arglist_id: u64,
 }
 
 impl<'s> TermScope<'s> {
-    pub fn new(src: &'s Source<'s>, names: Names) -> Self {
+    pub fn new(src: &'s Source, names: Names) -> Self {
         Self {
             src,
             names,
@@ -41,56 +41,61 @@ impl<'s> TermScope<'s> {
 
     /// One term of the scope, with every `as` param bound so far substituted.
     pub fn term(&mut self, e: &Expr) -> Result<TermBuf, ParserError> {
-        let mut term = self.node(e)?;
+        let mut term = self.unbound(e)?;
         term.substitute_iter(self.params.clone());
         Ok(term.normalize(NormLevel::Off))
     }
 
-    fn node(&mut self, e: &Expr) -> Result<TermBuf, ParserError> {
+    fn unbound(&mut self, e: &Expr) -> Result<TermBuf, ParserError> {
         match &e.kind {
             ExprKind::Num(n) => Ok(TermBuf::from(Atom::Number(n.clone()))),
             ExprKind::Name(s) => Ok(TermBuf::from(self.atom(s))),
             ExprKind::Str(s) => Ok(TermBuf::from(self.atom(s))),
-            ExprKind::ArgList => Ok(TermBuf::from(self.atom(".."))),
+            ExprKind::ArgList => {
+                self.last_arglist_id += 1;
+                Ok(TermBuf::from(Atom::ArgList(ArgList::from(
+                    self.last_arglist_id,
+                ))))
+            }
             ExprKind::Call { name, args } => {
                 let args = args
                     .iter()
-                    .map(|a| self.node(a))
+                    .map(|a| self.unbound(a))
                     .collect::<Result<_, _>>()?;
                 self.apply(name, args, e.span)
             }
             ExprKind::Solve { vars, givens } => {
                 let vars = vars
                     .iter()
-                    .map(|v| self.node(v))
+                    .map(|v| self.unbound(v))
                     .collect::<Result<_, _>>()?;
                 let find = self.apply("find", vars, e.span)?;
                 let mut args = vec![find];
                 for g in givens {
-                    args.push(self.node(g)?);
+                    args.push(self.unbound(g)?);
                 }
                 self.apply("solve", args, e.span)
             }
-            ExprKind::Group(inner) => self.node(inner),
+            ExprKind::Group(inner) => self.unbound(inner),
             ExprKind::Neg(inner) => self.negated(inner),
             ExprKind::Pos(inner) => {
-                let inner = self.node(inner)?;
+                let inner = self.unbound(inner)?;
                 self.apply("+", vec![inner], e.span)
             }
             ExprKind::Not(inner) => {
-                let inner = self.node(inner)?;
+                let inner = self.unbound(inner)?;
                 self.apply("!", vec![inner], e.span)
             }
             ExprKind::Bin { op, lhs, rhs } => {
-                let lhs = self.node(lhs)?;
+                let lhs = self.unbound(lhs)?;
                 let rhs = match op {
                     BinOp::Sub => self.negated(rhs)?,
-                    _ => self.node(rhs)?,
+                    _ => self.unbound(rhs)?,
                 };
                 self.apply(op.symbol(), vec![lhs, rhs], e.span)
             }
             ExprKind::Bind { expr, name } => {
-                let value = self.node(expr)?;
+                let value = self.unbound(expr)?;
                 let param = Param::from_str(name).expect("a name is a valid param");
                 if self.params.insert(param.clone(), value.clone()).is_some() {
                     return Err(self
@@ -105,7 +110,7 @@ impl<'s> TermScope<'s> {
     /// `-e`: a number leading a product takes the sign (`a - 25*x^2` has `-25`), else `-1*e`.
     fn negated(&mut self, e: &Expr) -> Result<TermBuf, ParserError> {
         match &e.kind {
-            ExprKind::Neg(inner) => self.node(inner),
+            ExprKind::Neg(inner) => self.unbound(inner),
             ExprKind::Num(n) => Ok(TermBuf::from(Atom::Number(-n.clone()))),
             ExprKind::Bin {
                 op: op @ (BinOp::Mul | BinOp::Div | BinOp::Juxt),
@@ -113,12 +118,12 @@ impl<'s> TermScope<'s> {
                 rhs,
             } if leads_with_number(lhs) => {
                 let lhs = self.negated(lhs)?;
-                let rhs = self.node(rhs)?;
+                let rhs = self.unbound(rhs)?;
                 self.apply(op.symbol(), vec![lhs, rhs], e.span)
             }
             _ => {
                 let minus_one = TermBuf::from(Atom::Number(-Rational::from_integer(1.into())));
-                let term = self.node(e)?;
+                let term = self.unbound(e)?;
                 self.apply("*", vec![minus_one, term], e.span)
             }
         }
@@ -144,11 +149,8 @@ impl<'s> TermScope<'s> {
         Ok(term)
     }
 
-    fn atom(&mut self, name: &str) -> Atom {
-        if name == ".." {
-            self.last_arglist_id += 1;
-            Atom::ArgList(ArgList::from(self.last_arglist_id))
-        } else if let Some(value) = from_decimal_str(name) {
+    fn atom(&self, name: &str) -> Atom {
+        if let Some(value) = from_decimal_str(name) {
             Atom::Number(value)
         } else if let Some(symbol) = try_sym(name) {
             Atom::Symbol(symbol)
@@ -179,59 +181,126 @@ fn leads_with_number(e: &Expr) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use solver::term::{SymbolProgram, TermBuf, try_sym};
+    use solver::term::{SymbolProgram, TermBuf, param, try_sym, var};
 
-    use crate::{Names, legacy, term};
+    use crate::{Names, term};
 
-    /// Corpus forms that must give the reference's terms.
-    const CORPUS_FORMS: &[&str] = &[
-        "a - b",
-        "a - 25*x^2",
-        "2*x-5",
-        "- 5",
-        "-2*x/y",
-        "-(2)*x",
-        "-2^2",
-        "-a/b",
-        "-a+b",
-        "x - 2^2*y",
-        "-2/3",
-        "2x",
-        "2 x",
-        "2sqrt(x)",
-        "-2x",
-        "-2x^2",
-        "x^2",
-        "x^(1/2)",
-        "f()",
-        "f(x, ..)",
-        "set(a, b) as S",
-        "set(5, x as S) is known <=> set(S) is known",
-        "find(x) { x + 1 == 0 }",
-        "!f(x)",
-        "!(a is atom && b is known)",
-        "+x",
-        "a => b",
-        "a <=> b",
-        "x in Reals",
-        "a is known",
-        "a == c && b <=> b",
-        "(a > 0 && sqrt(b) <= -c/a) || (a < 0 && sqrt(b) >= -c/a)",
-        "a*x^2 + b*x + c > d <=> true",
-        "x^4 - 25*x^2 != 0",
-        "\"x\"",
+    /// Corpus forms and their terms, as `Debug` prints them.
+    const CORPUS_FORMS: &[(&str, &str)] = &[
+        ("a - b", "+( a *( (-1) b ) )"),
+        ("a - 25*x^2", "+( a *( (-25) ^( x 2 ) ) )"),
+        ("2*x-5+t == 0", "==( +( *( 2 x ) (-5) t ) 0 )"),
+        ("- 5", "(-5)"),
+        ("-2*x/y", "/( *( (-2) x ) y )"),
+        ("-(2)*x", "*( (-1) 2 x )"),
+        ("-2^2", "*( (-1) ^( 2 2 ) )"),
+        ("-a/b", "*( (-1) /( a b ) )"),
+        ("-a+b", "+( *( (-1) a ) b )"),
+        ("x - 2^2*y", "+( x *( (-1) ^( 2 2 ) y ) )"),
+        ("-2/3", "/( (-2) 3 )"),
+        ("x == -5/3", "==( x /( (-5) 3 ) )"),
+        ("2.1/3.5", "/( 2.1 3.5 )"),
+        ("2x", "*( 2 x )"),
+        ("2 x", "*( 2 x )"),
+        ("2sqrt(x)", "*( 2 sqrt( x ) )"),
+        ("2.1sqrt(x)", "*( 2.1 sqrt( x ) )"),
+        ("-2x", "*( (-2) x )"),
+        ("-2x^2", "*( (-2) ^( x 2 ) )"),
+        ("x^(1/2)", "^( x /( 1 2 ) )"),
+        (
+            "x^4 - 25*x^2 + 60*x - 36 != 0",
+            "!=( +( ^( x 4 ) *( (-25) ^( x 2 ) ) *( 60 x ) (-36) ) 0 )",
+        ),
+        ("f()", "f"),
+        ("f(x, ..)", "f( x .. )"),
+        (
+            "set(5, x as S) is known <=> set(S) is known",
+            " ⟺  (  is ( set( 5 x ) known )  is ( set( x ) known ) )",
+        ),
+        (
+            "find(x) { x + 1 == 0 }",
+            "solve( find( x ) ==( +( x 1 ) 0 ) )",
+        ),
+        (
+            "find(x, y) { x + y == 0; x - y == 2 }",
+            "solve( find( x y ) ==( +( x y ) 0 ) ==( +( x *( (-1) y ) ) 2 ) )",
+        ),
+        ("!f(x)", "!( f( x ) )"),
+        (
+            "!(a is atom && b is known)",
+            "!( &&(  is ( a atom )  is ( b known ) ) )",
+        ),
+        ("+x", "+( x )"),
+        ("a => b", " ⟹  ( a b )"),
+        ("3 in set(1, 3)", "∈ ( 3 set( 1 3 ) )"),
+        ("a == c && b <=> b", " ⟺  ( &&( ==( a c ) b ) b )"),
+        (
+            "(a > 0 && sqrt(b) <= -c/a) || (a < 0 && sqrt(b) >= -c/a)",
+            "||( &&( >( a 0 ) <=( sqrt( b ) *( (-1) /( c a ) ) ) ) &&( <( a 0 ) >=( sqrt( b ) *( (-1) /( c a ) ) ) ) )",
+        ),
+        (
+            "a*x^2 + b*x + c > d <=> true",
+            " ⟺  ( >( +( *( a ^( x 2 ) ) *( b x ) c ) d ) true )",
+        ),
+        ("\"x\"", "x"),
+        ("// before\n-a/b // near\n// after", "*( (-1) /( a b ) )"),
     ];
 
     #[test]
-    fn corpus_forms_give_the_reference_terms() {
-        register(&[
-            "f", "set", "find", "solve", "sqrt", "known", "atom", "Reals", "true",
-        ]);
-        for form in CORPUS_FORMS {
-            let want = reference(form);
-            assert!(want.is_some(), "the reference rejects {form}");
-            assert_eq!(parsed(form), want, "{form}");
+    fn corpus_forms_keep_their_terms() {
+        register(&["f", "set", "find", "solve", "sqrt", "known", "atom", "true"]);
+        for (form, want) in CORPUS_FORMS {
+            let got = parsed(form).map(|t| format!("{t:?}"));
+            assert_eq!(got.as_deref(), Some(*want), "{form}");
         }
+    }
+
+    #[test]
+    fn an_unregistered_name_is_a_param_or_a_variable() {
+        register(&["f"]);
+        let f = TermBuf::symbol("f");
+        assert_eq!(parsed("f(a)"), Some(f.clone().arg(param("a"))));
+        assert_eq!(term("f(a)", Names::Variables).ok(), Some(f.arg(var("a"))));
+    }
+
+    #[test]
+    fn names_become_symbols_or_params_and_bound_params_substitute() {
+        register(&["set", "known"]);
+        assert_eq!(
+            parsed("a*x + b == 0"),
+            Some(
+                TermBuf::symbol("==")
+                    .arg(
+                        TermBuf::symbol("+")
+                            .arg(TermBuf::symbol("*").arg(param("a")).arg(param("x")))
+                            .arg(param("b"))
+                    )
+                    .arg(TermBuf::zero())
+            )
+        );
+        let set_is_known =
+            |arg: TermBuf| TermBuf::symbol("is").arg(arg).arg(TermBuf::symbol("known"));
+        assert_eq!(
+            parsed("set(5, x as S) is known <=> set(S) is known"),
+            Some(
+                TermBuf::symbol("<=>")
+                    .arg(set_is_known(
+                        TermBuf::symbol("set")
+                            .arg(TermBuf::number(5))
+                            .arg(param("x"))
+                    ))
+                    .arg(set_is_known(TermBuf::symbol("set").arg(param("x"))))
+            )
+        );
+    }
+
+    #[test]
+    fn a_negative_literal_leads_a_product() {
+        register(&["sqrt"]);
+        same("-2*x", "(-2)*x");
+        same("-2*x*y", "((-2)*x)*y");
+        same("-3/x*y", "((-3)/x)*y");
+        same("-2*(5 - sqrt(29)) > 0", "(-2)*(5 - sqrt(29)) > 0");
     }
 
     #[test]
@@ -296,11 +365,6 @@ mod tests {
 
     fn parsed(text: &str) -> Option<TermBuf> {
         term(text, Names::Params).ok()
-    }
-
-    fn reference(text: &str) -> Option<TermBuf> {
-        let trees = legacy::lang::terms(text).ok()?;
-        legacy::TermParser::default().try_parse(&trees[0]).ok()
     }
 
     #[track_caller]

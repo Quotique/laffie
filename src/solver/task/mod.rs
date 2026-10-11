@@ -95,8 +95,7 @@ pub fn content_id(givens: &[SharedTerm], goal: &Goal) -> u64 {
 
 #[cfg(test)]
 pub fn parse_task(text: &'static str) -> Task {
-    let states = parser::lang::task(text).unwrap();
-    let task = parser::TaskParser::from(&states).parse().unwrap();
+    let task = parser::task(text).unwrap();
 
     // SAFETY: the dev-dependency cycle (solver tests → parser → solver) links a
     // second instance of this crate, so `parser`'s `Task` is a nominally

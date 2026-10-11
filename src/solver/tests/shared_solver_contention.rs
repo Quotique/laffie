@@ -8,7 +8,7 @@
 
 use std::{sync::Arc, thread, time::Duration};
 
-use parser::DirectoryParser;
+use parser::DirectoryLoader;
 use solver::{
     engine::{Limits, SolutionStatus, Solver, TracerHub},
     task::Task,
@@ -29,7 +29,7 @@ fn repo_root() -> std::path::PathBuf {
 
 fn corpus() -> (Arc<Solver>, Vec<Task>) {
     let root = repo_root();
-    let parser = DirectoryParser::new(root.join("symbols"), root.join("tasks/regress"));
+    let parser = DirectoryLoader::new(root.join("symbols"), root.join("tasks/regress"));
 
     let rules = parser.load_rules().expect("the symbols corpus loads clean");
     let tasks = parser.load_tasks().expect("tasks dir readable");

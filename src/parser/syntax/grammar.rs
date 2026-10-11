@@ -1,7 +1,7 @@
 use solver::from_decimal_str;
 
 use super::{
-    BinOp, CmpOp, DedOp, Expr, ExprKind, Item, JuxtLeft, PySource, Rule, Span, Symbol, Task,
+    BinOp, CmpOp, DeductionOp, Expr, ExprKind, Item, JuxtLeft, PySource, Rule, Span, Symbol, Task,
 };
 
 peg::parser! {
@@ -41,7 +41,7 @@ peg::parser! {
             _ keyword("goal") _ goal:call() _ ";"
             name:(_ keyword("id") _ i:string() _ ";" { i })?
             text:(_ keyword("text") _ t:string() _ ";" { t })?
-            expected:(_ keyword("answer") _ a:commasep(<term()>) _ ";" { a })?
+            answers:(_ keyword("answer") _ a:commasep(<term()>) _ ";" { a })?
             givens:semicolonsep(<term()>)
             _ "}" end:position!() {
                 Task {
@@ -49,7 +49,7 @@ peg::parser! {
                     goal,
                     name,
                     text: text.unwrap_or_default(),
-                    expected: expected.unwrap_or_default(),
+                    answers: answers.unwrap_or_default(),
                     givens,
                 }
             }
@@ -57,7 +57,7 @@ peg::parser! {
         rule rule_item() -> Rule =
             start:position!() keyword("rule") _ "{"
             attrs:(_ a:attrs() _ ";" { a })?
-            _ pattern:logic() _ p:position!() op:ded_op() _ resolution:logic() _ ";"
+            _ pattern:logic() _ p:position!() op:deduction_op() _ resolution:logic() _ ";"
             requirements:commasep(<term()>) _ ";"?
             _ "}" end:position!() {
                 Rule {
@@ -65,7 +65,7 @@ peg::parser! {
                     attrs: attrs.unwrap_or_default(),
                     pattern,
                     op,
-                    op_span: op_span(p, BinOp::Ded(op)),
+                    op_span: op_span(p, BinOp::Deduction(op)),
                     resolution,
                     requirements,
                 }
@@ -93,14 +93,14 @@ peg::parser! {
 
         /// `a`, or one `a => b` / `a <=> b`: a deduction does not chain.
         pub rule term() -> Expr =
-            l:logic() d:(_ p:position!() o:ded_op() _ r:logic() { (p, o, r) })? {
+            l:logic() d:(_ p:position!() o:deduction_op() _ r:logic() { (p, o, r) })? {
                 match d {
-                    Some((p, o, r)) => Expr::bin(BinOp::Ded(o), l, r, op_span(p, BinOp::Ded(o))),
+                    Some((p, o, r)) => Expr::bin(BinOp::Deduction(o), l, r, op_span(p, BinOp::Deduction(o))),
                     None => l,
                 }
             }
 
-        rule ded_op() -> DedOp = "=>" { DedOp::Implies } / "<=>" { DedOp::Equiv }
+        rule deduction_op() -> DeductionOp = "=>" { DeductionOp::Implies } / "<=>" { DeductionOp::Equiv }
 
         rule logic() -> Expr = precedence!{
             x:(@) _ p:position!() "||" _ y:@ { Expr::bin(BinOp::Or, x, y, op_span(p, BinOp::Or)) }

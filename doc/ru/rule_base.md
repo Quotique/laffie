@@ -137,7 +137,7 @@ function suggest_rules(R, filters, goal):
 | Построение правила | `src/solver/rule/builder.rs` (`RuleBuilder`) |
 | Фильтр кандидата | `src/solver/rule/rule.rs::Rule::try_filter` |
 | Кэш символов терма | `TermFilters::symbols`, `contains_symbol` (`src/solver/rule/term_filters.rs`) |
-| Загрузка и привязка ошибок к файлам | `src/parser/dir_loader.rs` (`DirectoryParser::load_rules`) |
+| Загрузка и привязка ошибок к файлам | `src/parser/dir_loader.rs` (`DirectoryLoader::load_rules`) |
 
 ## Связанные документы
 

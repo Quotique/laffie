@@ -1000,17 +1000,12 @@ dependencies = [
 name = "parser"
 version = "0.7.0"
 dependencies = [
- "eyre",
  "itertools 0.14.0",
  "log",
  "peg",
  "pyo3",
- "serde",
  "serde_json",
- "smartstring",
  "solver",
- "trees",
- "utils",
 ]
 
 [[package]]

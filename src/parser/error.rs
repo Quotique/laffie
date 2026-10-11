@@ -57,11 +57,7 @@ impl fmt::Display for ParserError {
     }
 }
 
-impl Error for ParserError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-}
+impl Error for ParserError {}
 
 impl From<PegError> for ParserError {
     fn from(value: PegError) -> Self {
@@ -73,7 +69,6 @@ impl From<PegError> for ParserError {
                     0
                 },
                 row: value.location.line,
-                len: 0, // `offset` is an absolute position, not a length
             },
             msg: format!("expected: {}", value.expected),
         }

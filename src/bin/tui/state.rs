@@ -5,7 +5,7 @@ use trees::{Node, Tree, tr};
 use tui_scrollview::ScrollViewState;
 use tui_tree_widget::TreeState;
 
-use parser::DirectoryParser;
+use parser::DirectoryLoader;
 use solver::{
     CompactString,
     engine::{SharedSolution, Solution, SolutionStatus},
@@ -151,7 +151,7 @@ impl TasksNode {
 
 impl State {
     pub fn try_new(settings: Settings) -> io::Result<Self> {
-        let parser = DirectoryParser::new(settings.symbols.clone(), settings.tasks.clone());
+        let parser = DirectoryLoader::new(settings.symbols.clone(), settings.tasks.clone());
 
         let rules = Arc::new(parser.load_rules().map_err(io::Error::other)?);
         let tasks = parser.load_tasks()?.value;
@@ -192,7 +192,7 @@ impl State {
         // Assigned only on success: a broken `.sym` leaves the previous base
         // in place, so the tab keeps working while the error is on screen.
         self.rules_engine = Arc::new(
-            DirectoryParser::new(&self.settings.symbols, &self.settings.tasks)
+            DirectoryLoader::new(&self.settings.symbols, &self.settings.tasks)
                 .load_rules()
                 .map_err(io::Error::other)?,
         );
@@ -200,7 +200,7 @@ impl State {
     }
 
     pub fn reload_tasks(&mut self) -> io::Result<()> {
-        let parser = DirectoryParser::new(&self.settings.symbols, &self.settings.tasks);
+        let parser = DirectoryLoader::new(&self.settings.symbols, &self.settings.tasks);
         let new_tasks = parser.load_tasks()?.value;
 
         let mut existing: HashSet<u64> = HashSet::new();
