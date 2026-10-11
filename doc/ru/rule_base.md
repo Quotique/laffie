@@ -88,7 +88,7 @@ candidates = ⋃ s∈Symbols(t) level_rules[s]
 
 - `is_term_suitable`:
   - совпадение уровней (защита от ошибок индексации);
-  - правило не находится в `applied_rules` терма (уже пробовали);
+  - правило не находится в `exhausted_rules` терма (больше ничего не даёт);
   - правило не находится в `blocked_rules` терма (заблокировано
     по атрибуту `block` другого правила, ранее применённого к этому
     же дереву вывода);
@@ -121,7 +121,7 @@ function suggest_rules(R, filters, goal):
     result ← []
     for r in candidates:
         if r.level ≠ filters.level: continue
-        if r.id in filters.applied_rules: continue
+        if r.id in filters.exhausted_rules: continue
         if r.id in filters.blocked_rules: continue
         if not (Symbols(r.pattern) ⊆ filters.symbols): continue
         if not goal_mapping(r, goal): continue

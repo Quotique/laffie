@@ -10,7 +10,7 @@ pub use hypothesis::{GroundedHypothesis, Hypothesis, HypothesisIterator};
 pub use rule::{ApplyRule, Level, Rule, RuleDeclineReason, RuleId, SharedRule};
 pub use rule_attribute::{RuleAttr, RuleAttrValue};
 pub use rules_engine::{RuleRejection, RulesEngine};
-pub use term_filters::TermFilters;
+pub use term_filters::{ExhaustionScope, TermFilters};
 
 #[cfg(test)]
 pub fn parse_rule(text: &'static str) -> Rule {

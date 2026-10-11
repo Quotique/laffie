@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answer part with the store index it was bound to.
 
 ### Fixed
+- A subtask retries goal-bound rules the parent's goal exhausted on its terms.
 - A long sum matches a pattern with a rest param within the match budget;
   two or more rest params split sums of up to 7 terms only.
 - `sympy_solve` no longer hangs the solver on a radical equation: it solves

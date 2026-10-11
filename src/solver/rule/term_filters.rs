@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::{RuleId, rule::Level};
 use crate::term::Symbol;
@@ -16,13 +16,21 @@ bitflags! {
     }
 }
 
+/// The goals under which an exhausted rule stays exhausted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExhaustionScope {
+    AnyGoal,
+    ThisGoal,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct TermFilters {
-    symbols:           Vec<Symbol>,
-    pub applied_rules: HashSet<RuleId>,
-    pub blocked_rules: HashSet<RuleId>,
-    pub level:         Level,
-    flags:             TermFlags,
+    symbols:             Vec<Symbol>,
+    /// Rules that yield nothing more on this term.
+    pub exhausted_rules: HashMap<RuleId, ExhaustionScope>,
+    pub blocked_rules:   HashSet<RuleId>,
+    pub level:           Level,
+    flags:               TermFlags,
 }
 
 impl<I: IntoIterator<Item = Symbol>> From<I> for TermFilters {

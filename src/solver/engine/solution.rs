@@ -13,7 +13,7 @@ use itertools::Itertools;
 use super::{TermInference, TermProps};
 use crate::{
     CompactString, NormLevel,
-    rule::{Level, RuleId},
+    rule::{ExhaustionScope, Level, RuleId},
     task::{Answer, AnswerPart, Goal, GoalKind, Task, TaskBuilder},
     term::{SharedTerm, TermRef, TruthCtx, answer, domain},
 };
@@ -117,6 +117,11 @@ impl Solution {
             .map(|x| {
                 let mut props = x.clone();
                 props.filters.level = 0.into();
+                // CONTEXT: the subtask's goal is not the parent's.
+                props
+                    .filters
+                    .exhausted_rules
+                    .retain(|_, scope| *scope == ExhaustionScope::AnyGoal);
                 props.inference = TermInference::Condition;
                 props
             })

@@ -13,8 +13,8 @@ use crate::{
     NormLevel,
     engine::{Tracer, solution::SolutionStatus},
     rule::{
-        GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr, RuleId, RulesEngine,
-        SharedRule,
+        ExhaustionScope, GroundedHypothesis, Hypothesis, HypothesisIterator, Level, RuleAttr,
+        RuleId, RulesEngine, SharedRule,
     },
     task::{Goal, GoalKind, Premises, Task},
     term::{
@@ -279,7 +279,15 @@ impl Solver {
                     added = true;
                 }
                 None => {
-                    solution[index].filters.applied_rules.insert(rule.id);
+                    let scope = if rule.is_goal_bound() {
+                        ExhaustionScope::ThisGoal
+                    } else {
+                        ExhaustionScope::AnyGoal
+                    };
+                    solution[index]
+                        .filters
+                        .exhausted_rules
+                        .insert(rule.id, scope);
                 }
             }
         }

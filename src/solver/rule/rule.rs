@@ -1,4 +1,9 @@
-use std::{collections::HashSet, fmt, hash, sync::Arc};
+use std::{
+    collections::{BTreeSet, HashSet},
+    fmt, hash,
+    iter::once,
+    sync::Arc,
+};
 
 use derive_more::{Display, From, Into};
 use eyre::Result;
@@ -8,7 +13,7 @@ use multimap::MultiMap;
 use super::{Hypothesis, RuleAttr, RuleAttrValue, TermFilters};
 use crate::{
     NormLevel,
-    term::{ParamSubstitution, Substitute, Symbol, Term, TermBuf, TermPath, TermRef},
+    term::{Param, ParamSubstitution, Substitute, Symbol, Term, TermBuf, TermPath, TermRef},
 };
 
 /// Unique identifier for a rule.
@@ -32,8 +37,8 @@ pub enum RuleDeclineReason {
     LevelMismatch,
     /// The task goal does not match the rule’s goal pattern.
     GoalMismatch,
-    /// The rule has already been applied to the term.
-    AlreadyApplied,
+    /// The rule yields nothing more on the term.
+    Exhausted,
     /// The rule is explicitly blocked for the term.
     Blocked,
     #[display("symbol {_0} not in term")]
@@ -145,6 +150,25 @@ impl Rule {
         self.contains_attribute(&RuleAttr::Premise)
     }
 
+    /// A param of `goal(...)` occurs in the pattern, the resolution or a requirement.
+    pub fn is_goal_bound(&self) -> bool {
+        let Some(RuleAttrValue::Goal(goal)) = self.attribute(&RuleAttr::Goal).next() else {
+            return false;
+        };
+        let goal_params: BTreeSet<Param> = goal
+            .term()
+            .bfs()
+            .filter_map(|v| v.data.param())
+            .cloned()
+            .collect();
+        once(self.term.term())
+            .chain(self.requirements.iter().map(|r| r.term()))
+            .any(|t| {
+                t.bfs()
+                    .any(|v| v.data.param().is_some_and(|p| goal_params.contains(p)))
+            })
+    }
+
     /// Checks whether the rule can be applied under the given term filters and
     /// goal.
     ///
@@ -177,8 +201,8 @@ impl Rule {
     pub fn is_term_suitable(&self, filters: &TermFilters) -> Result<(), RuleDeclineReason> {
         if self.level != filters.level {
             return Err(RuleDeclineReason::LevelMismatch);
-        } else if filters.applied_rules.contains(&self.id) {
-            return Err(RuleDeclineReason::AlreadyApplied);
+        } else if filters.exhausted_rules.contains_key(&self.id) {
+            return Err(RuleDeclineReason::Exhausted);
         } else if filters.blocked_rules.contains(&self.id) {
             return Err(RuleDeclineReason::Blocked);
         }
@@ -260,8 +284,8 @@ impl ApplyRule for SharedRule {
             mapping.push(Default::default());
         }
 
-        if term_filters.applied_rules.contains(&self.id) {
-            return Err(RuleDeclineReason::AlreadyApplied);
+        if term_filters.exhausted_rules.contains_key(&self.id) {
+            return Err(RuleDeclineReason::Exhausted);
         }
         if term_filters.blocked_rules.contains(&self.id) {
             return Err(RuleDeclineReason::Blocked);
@@ -443,6 +467,17 @@ pub mod tests {
 
         assert!(refuted(&[]));
         assert!(!refuted(&["y"]));
+    }
+
+    #[test]
+    fn a_goal_param_in_the_pattern_makes_the_rule_goal_bound() {
+        let bound = parse_rule(r#"rule { attr level(0),goal(prove(a != b)); a < b => a != b; }"#);
+        let gated = parse_rule(r#"rule { attr level(0),goal(prove(x)); a < b => a != b; }"#);
+        let free = parse_rule(r#"rule { attr level(0); a < b => a != b; }"#);
+
+        assert!(bound.is_goal_bound());
+        assert!(!gated.is_goal_bound());
+        assert!(!free.is_goal_bound());
     }
 
     #[test]
