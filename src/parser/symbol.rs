@@ -16,7 +16,7 @@ use super::{Node, ParserError, Tree};
 use crate::{
     py_term::get_term_class,
     source::Source,
-    syntax::{self, Expr, ExprKind},
+    syntax::{self, Expr},
 };
 
 pub struct SymbolParser<'a> {
@@ -131,14 +131,10 @@ fn attr(e: &Expr, src: &Source) -> Result<(SymbolAttr, SymbolAttrValue), ParserE
             SymbolAttr::Infix,
             SymbolAttrValue::UInt(src.uint(arg.span)?),
         )),
-        ("display", Some(arg)) => {
-            let shown = match &arg.kind {
-                ExprKind::Str(s) => s.as_str().into(),
-                ExprKind::Name(s) => s.clone(),
-                _ => src.slice(arg.span).into(),
-            };
-            Ok((SymbolAttr::Display, SymbolAttrValue::UStr(shown)))
-        }
+        ("display", Some(arg)) => Ok((
+            SymbolAttr::Display,
+            SymbolAttrValue::UStr(src.ident(arg).into()),
+        )),
         ("infix" | "display", None) => Err(src.error(e.span, "must have an argument")),
         ("associative", _) => Ok((SymbolAttr::Associative, SymbolAttrValue::None)),
         ("commutative", _) => Ok((SymbolAttr::Commutative, SymbolAttrValue::None)),

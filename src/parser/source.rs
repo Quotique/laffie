@@ -1,4 +1,7 @@
-use crate::{Location, ParserError, syntax::Span};
+use crate::{
+    Location, ParserError,
+    syntax::{Expr, ExprKind, Span},
+};
 
 /// Parsed text, for turning spans back into locations.
 pub(crate) struct Source<'a> {
@@ -23,6 +26,15 @@ impl<'a> Source<'a> {
         self.slice(span)
             .parse()
             .map_err(|_| self.error(span, "must be u64"))
+    }
+
+    /// A name or a string as itself, anything else as written.
+    pub fn ident<'e>(&'e self, e: &'e Expr) -> &'e str {
+        match &e.kind {
+            ExprKind::Name(s) => s,
+            ExprKind::Str(s) => s,
+            _ => self.slice(e.span),
+        }
     }
 
     pub fn error(&self, span: Span, msg: impl ToString) -> ParserError {

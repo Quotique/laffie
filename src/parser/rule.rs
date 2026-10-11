@@ -10,7 +10,7 @@ use crate::{
     Names, ParserError,
     scope::TermScope,
     source::Source,
-    syntax::{self, BinOp, Expr, ExprKind},
+    syntax::{self, BinOp, Expr},
 };
 
 use super::{Node, Tree, term::TermParser};
@@ -230,16 +230,7 @@ fn attr(e: &Expr, src: &Source) -> Result<(RuleAttr, RuleAttrValue), ParserError
         RuleAttr::Goal | RuleAttr::Zero | RuleAttr::One => {
             RuleAttrValue::Goal(TermScope::new(src, Names::Params).term(arg?)?)
         }
-        RuleAttr::Id | RuleAttr::Block => {
-            let arg = arg?;
-            let ident = match &arg.kind {
-                ExprKind::Name(s) => s.as_str(),
-                ExprKind::Str(s) => s.as_str(),
-                ExprKind::Call { name, .. } => name.as_str(),
-                _ => src.slice(arg.span),
-            };
-            RuleAttrValue::Str(CompactString::from(ident))
-        }
+        RuleAttr::Id | RuleAttr::Block => RuleAttrValue::Str(src.ident(arg?).into()),
     };
     Ok((key, value))
 }
